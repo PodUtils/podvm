@@ -59,9 +59,10 @@ usage: podvm exec [options] <image> <command> [arg...]
                    docker's --volume (TODO/cli.md T-1416)
   -t, --tty        refused: REFUSED BY NAME where /dev/ptmx is unusable, rather
                    than silently degraded (TODO/enter.md T-0503)
-  --podvm-tier T  machine, incus and emulate are refused: the machine tier
-                   serves `run`, and a re-entry into a guest is
-                   TODO/machine.md T-1750; each
+  --podvm-tier T  `exec NAME` enters a running guest of `run -d
+                   --podvm-tier=machine` (TODO/machine.md T-1750);
+                   machine with no such guest, and emulate, are
+                   refused; each
                    other value is a flag error; with no flag the ladder
                    selects (TODO/machine.md T-1302, TODO/cli.md T-1712)
   --podvm-qemu-arg A

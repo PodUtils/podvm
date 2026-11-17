@@ -41,8 +41,10 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   the table cannot map, and `io_uring_setup`, answer `ENOSYS`. A program
   that issues the `syscall` instruction itself (a static program, Go,
   liburing) passes the interposer (T-1652).
-- A volume (`-v HOST:GUEST`), `--tmpfs` and `--read-only` are a path
-  rewrite of the userland loader family, not a mount (T-1653). A run with
+- On the namespace rung a volume (`-v HOST:GUEST`) is a bind mount:
+  `/proc/mounts` lists it, and `/proc/self/mountinfo` names the host path
+  (T-1920). On the userland rung a volume, `--tmpfs` and `--read-only` are
+  a path rewrite of the loader family, not a mount (T-1653). A run with
   one of them takes that family also where chroot works (T-1761). A write
   lands in HOST. A static program or a raw `syscall` instruction sees
   the image path, and `/proc/mounts` does not list the volume. Where the
@@ -187,10 +189,10 @@ image and gives the command's exit code (T-1656). The guest
 runs under KVM where `/dev/kvm` opens and under TCG elsewhere;
 `PODVM_MACHINE_ACCEL=kvm` asks for KVM and refuses by name without it.
 The guest kernel is the pinned `vmlinuz-virt` of Alpine 3.22.6, which
-podvm fetches into the store. The guest is x86_64 (linux/amd64): an
-image of another architecture, or `--platform linux/arm64`, is refused
-by name with exit 125 before the boot (T-1889); T-1890 plans such a
-guest. The image needs `/bin/sh`. With no
+podvm fetches into the store. The guest is x86_64 (linux/amd64), or
+arm64 as the paragraph below says; an image of each other architecture
+is refused by name with exit 125 before the boot (T-1889). The image
+needs `/bin/sh`. With no
 `--podvm-net none` and no `--podvm-sealed`, the guest has QEMU's
 user-mode network: it reaches the host's loopback at
 10.0.2.2. `-v HOST:GUEST[:ro]` is a 9p mount of the host directory (T-1723): a write
@@ -201,8 +203,10 @@ serial port. stdin reaches the guest where it is a pipe or a file (at
 most 64 MiB, read before the boot). With `-t` the command runs on a terminal
 of a virtio console with the size of the host terminal, stdin goes there
 live, and stdout and stderr share it, as under docker (T-1723); a change of
-the size during the run does not reach the guest. `create` and `exec`
-with the machine tier report the profile and exit 125.
+the size during the run does not reach the guest. `create` with the
+machine tier reports the profile and exits 125; `exec NAME` enters a
+running guest of `run -d` (T-1750), and `exec --podvm-tier=machine`
+with no such guest exits 125.
 A `--platform linux/arm64` guest needs `qemu-system-aarch64` on PATH and a
 kernel named by `PODVM_MACHINE_KERNEL_ARM64`, runs under TCG on an x86_64
 host, and has no `-t`, 9p volume or podvm in the guest (T-1890).
