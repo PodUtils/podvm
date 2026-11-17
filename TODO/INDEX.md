@@ -594,8 +594,8 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1929](enter.md) | P3 | S | none | enter | blocked | `PODVM_MODE=rundir` and `tmpfs` refuse each tree of root: the device nodes of the fixups |
 | [T-1930](enter.md) | P1 | M | none | enter | done | `run -d` on the namespace rung has no PID namespace: a job sees and signals the processes of the host |
 | [T-1931](cli.md) | P2 | S | none | cli | done | A run connects to the hosts of the package sources of the image, and no document names it |
-| [T-1932](machine.md) | P2 | S | none | machine | partial | A foreground `run windows:NAME` writes its overlay into the tmpfs of the runtime directory |
-| [T-1933](machine.md) | P1 | S | none | machine | partial | The first `run windows:NAME` of a fresh golden image can miss its agent on 2 CPUs |
+| [T-1932](machine.md) | P2 | S | none | machine | done | A foreground `run windows:NAME` writes its overlay into the tmpfs of the runtime directory |
+| [T-1933](machine.md) | P1 | S | none | machine | done | The first `run windows:NAME` of a fresh golden image can miss its agent on 2 CPUs |
 | [T-1934](enter.md) | P2 | S | none | enter | blocked | A unit on the namespace rung has no usable pty: no `/dev/ptmx`, and the host's `/dev/pts` |
 | [T-1935](enter.md) | P1 | M | none | enter | partial | `run -d` on the userland rung: a raw path call of a dynamic program reaches the host |
 | [T-1936](gate.md) | P1 | S | none | gate | done | A gate of the tools of a CI job: a raw syscall, a spawn, a pty, `uv` and `ruff` in a unit |
@@ -621,7 +621,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-552 entries: 13 open, 24 partial, 4 blocked, 511 done.
+552 entries: 13 open, 22 partial, 4 blocked, 513 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -631,10 +631,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 1 | 10 | 0 | 220 | 231 |
-| P2 | 9 | 10 | 3 | 174 | 196 |
+| P1 | 1 | 9 | 0 | 221 | 231 |
+| P2 | 9 | 9 | 3 | 175 | 196 |
 | P3 | 3 | 4 | 1 | 42 | 50 |
-| **All** | 13 | 24 | 4 | 511 | 552 |
+| **All** | 13 | 22 | 4 | 513 | 552 |
 
 ## Work order
 

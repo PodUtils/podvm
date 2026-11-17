@@ -68,7 +68,8 @@ Deployed: none yet.
   QEMU Guest Agent of a short-lived machine, as `podvm exec` does. On a
   host with 2 CPUs the run through the mailbox agent timed out at 600 s
   in 3 of 4 runs. The mailbox stays the fallback for an image with no
-  agent; `PODVM_WINDOWS_MAILBOX=1` selects it.
+  agent; `PODVM_WINDOWS_MAILBOX=1` selects it. Measured on `windows:2025` and
+  `windows:11`, with 2 and 4 CPUs (kvm runs 44104748355, 44126060517).
 
 ### Fixed: a Windows run keeps its overlay in the store, 2026-11-17
 

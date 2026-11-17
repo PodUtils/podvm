@@ -5203,7 +5203,7 @@ Experiment 463 passes in the job `nonroot` of `kvm.yml`; `cargo test -p podvm --
 **Milestone:** none
 **Priority:** P2
 **Effort:** S
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -5227,6 +5227,8 @@ Experiment 452 on `kvm.yml` (`only=install`) passes clause 5 (`run windows:NAME 
 
 ## Done
 
+**Done (2026-11-17, runs 44104748355 and 44126060517).** Clause 5 of experiment 452 passes on both legs for `windows:2025` and `windows:11`, with the overlay of the run in the store and no `podvm-windows-*-run` directory left after it (T-1933 ended the timeout on 2 CPUs).
+
 **Partial (2026-11-17, run 44088895746).** Experiment 452 (`windows:2025`) counts the work directories of a run left in the store after clause 5: 0 on both legs; the leg with 4 CPUs passes clause 5 with the overlay in the store (rc 0 in 18 s). Remaining: clause 5 on the leg with 2 CPUs, which T-1933 holds.
 
 **Partial (2026-11-17, run 44077136976).** `windows:11` on `b2d736a`: the leg with 8 GiB and 4 CPUs passes each clause, with the overlay of `run windows:11 ver` in the store (rc 0 in 53 s) and clause 7 on `windows:11` for the first time (`exec ver`, `exit 7`, `cp`, `stop` by `guest-shutdown`, in 34 s). The leg with 2 CPUs failed clause 5 at 600 s (the first boot of the fresh golden image, T-1933), and passed clause 7 on the next boot (51 s). Remaining: a run where clause 5 passes on both legs (after T-1933), and no `podvm-windows-*-run` directory left in the store.
@@ -5240,7 +5242,7 @@ Experiment 452 on `kvm.yml` (`only=install`) passes clause 5 (`run windows:NAME 
 **Milestone:** none
 **Priority:** P1
 **Effort:** S
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -5265,6 +5267,8 @@ A failed boot of the installed disk fails the `pull`, and the disk is kept as fo
 Experiment 452 on `kvm.yml` passes clause 5 on the leg with 2 CPUs for `windows:11` and `windows:2025`, and `pull` names the time of the first boot.
 
 ## Done
+
+**Done (2026-11-17, run 44126060517 on `fdd7f06`).** Experiment 452 passes for `windows:11` on both legs, after `windows:2025` passed on both in run 44104748355: on the leg with 2 CPUs the foreground `run windows:NAME ver` goes through the guest agent of a short-lived machine, no machine and no work directory of the run stay, and clause 7 passes. The mailbox stays the fallback (measured in each run, rc 0); COORD-175 (#468) asks for evidence of its old timeout.
 
 **Partial (2026-11-17, the run on the agent).** `windows/machine/once.rs`: a foreground `run windows:NAME` of a golden image goes through the guest agent of a machine, which passed on 2 CPUs in each run; the mailbox stays the fallback. `machine::create` makes a machine with no line on stdout, and `life::remove` removes it with no line on stdout. Experiment 452 clause 5 also counts the machines that stay, and measures the run through the mailbox (`PODVM_WINDOWS_MAILBOX=1`) with no judgement. `cargo test -p podvm windows` passes. Remaining: a run of experiment 452 on `kvm.yml` where clause 5 passes on both legs.
 
