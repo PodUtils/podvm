@@ -5719,3 +5719,148 @@ Each of the issues 492 to 508 has the label `confirmed` and an entry, or is clos
 ## Done
 
 **Done (2026-11-17).** Each of the 16 reports (492 to 508, without 501, which T-1938 holds) is reproduced as uid 1000 with the binary of `main`, or for 502 traced in the code (the helper `proxy` of podvm-ssh drops the status of the command); each carries the label `confirmed` and maps to T-1943 or T-1944.
+
+# T-1946: The contract of the CLI: one table-driven harness of each verb
+
+**Source:** the owner's ruling "Quality first" (2026-11-17); `docs/methodology/quality.md`, rule 3
+**Category:** gate
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+The parser, the help and the parity table of each verb are written by hand, and nothing compares them. The external QA of `0.2.0-beta.31` found 17 faults of that class (478, 479, 482 to 488, 492 to 494, 497, 500, 519, 520) and two panics (505, 506).
+
+## Premise
+
+The parity table is in the binary (`system info --format '{{json .Parity}}'`), as `tests/flag_equals.rs` reads it.
+
+## Approach
+
+One test file walks each verb of the table. (a) Each flag row of the verb is in its `--help`. (b) The verb gets a fixed set of hostile argv: an argument that is not UTF-8, an extra positional, `--`, an empty value, a number of 20 digits, and `--flag=false` and `--flag=0` of each boolean. Each case must end with no panic (no exit 101 or 134), with an exit code of the published table, and with one stderr line that names the verb. A case that a verb takes by design is in a short list of exceptions, with the reason.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test --release -p podvm --test cli_contract` passes, and the harness fails on the tree of `0.2.0-beta.31` (a planted copy of 505 or 492).
+
+# T-1947: Fail safe at the edges: a panic hook, checked numbers, and the writes of the store
+
+**Source:** the owner's ruling "Quality first" (2026-11-17); `docs/methodology/quality.md`, rule 2
+**Category:** gate
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+A panic ends podvm with exit 134 and no named cause (505, 506); a number flag clamps or overflows (493, 506); a writer of the store that keeps no lock loses its file to a sweep (472, 501), and the launcher drops a failed write of the end of a run.
+
+## Premise
+
+-
+
+## Approach
+
+A panic hook in `main` prints one line (podvm, the verb, the place, "a bug of podvm") and exits 125; no process of podvm is left. One checked parser of a number with a bound serves each number flag. Each write of the store holds a lock, and each sweep needs an age (done in T-1938). The launcher retries a failed write of the end of a run, then writes a side file that the reconcile reads. A COORD issue asks podcrates for the lock of the table's writer.
+
+## Decision
+
+The second path stays, also where the first path holds: a fallback that is never used costs less than a fault that a user finds.
+
+## Prove
+
+`podvm run --kill-after 99999999999999999999` and a planted `panic!` in a verb exit 125 with one named line; `cargo test --release -p podvm --bin podvm` passes.
+
+# T-1948: Each banner and each inspect field says what the entered mechanism did
+
+**Source:** the owner's ruling "Quality first" (2026-11-17); `docs/methodology/quality.md`, rule 4; reports 491, 499, 507, 508, 510
+**Category:** gate
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+Banners are written before the entry, from what podvm asked for: the syscall tier says that the identity is faked and runs the payload as the caller (508); the warning of an image `USER` says uid 0 on a rung where the payload runs as the caller (507); `.Exec.Mode` says "fresh chroot" where `exec` joins the namespaces of the container (510).
+
+## Premise
+
+-
+
+## Approach
+
+The entered mechanism returns what it did (the uid of the payload, the preload, the namespaces it joined), and the banner and the fields are written from that value. Where the value is not known, the text says so.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000: the repro of 507, 508 and 510 gives a banner or a field that matches `id` and `/proc/self/status` in the payload.
+
+# T-1949: The gate of a beta: workloads, the harness, an outside pass, and the known gaps
+
+**Source:** the owner's ruling "Quality first" (2026-11-17); `docs/methodology/quality.md`, rules 1 and 5
+**Category:** gate
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** open
+
+## Problem
+
+podvm called `0.2.0-beta.31` ready from its own checks, and an outside tester found 37 faults in one hour.
+
+## Premise
+
+-
+
+## Approach
+
+Before `release.yml` of a beta: `workloads.yml` (T-1936) and the harness of T-1946 pass; an agent with only the binary and `podvm man` (no source) works for one hour and files its findings, and no P0 or P1 stays open; the release notes list what the checks prove and the known gaps. `docs/maintenance.md` names the steps, and AGENTS.md section 8 names the page.
+
+## Decision
+
+-
+
+## Prove
+
+The next beta has a run of `workloads.yml` on its commit, an outside pass whose findings are in the record, and a section "Known gaps" in its notes.
+
+# T-1950: The external QA of `0.2.0-beta.31`: verify the third batch of reports
+
+**Source:** the external QA of `0.2.0-beta.31` (2026-11-17), issues 510 to 544
+**Category:** gate
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+The tester filed 35 more reports (510 to 544): `exec` and `.Exec.Mode` (510), the machine tier (511, 537 to 543), exit codes outside the published table (519, 521, 513), output that is not valid JSON or mixes stdout (514, 522), name and digest resolution (523, 524, 544), the sealed bundle and `import` (515 to 517, 538), and the manual (518, 520). They are not verified yet.
+
+## Premise
+
+-
+
+## Approach
+
+Reproduce each report as uid 1000 on `main` (the machine tier from the code and the refusal path; no guest in a cloud session), find the cause, and move each confirmed one to the entry of its class (T-1946 to T-1948, or a new one); label it `confirmed`, or close it with the reason.
+
+## Decision
+
+-
+
+## Prove
+
+Each of the issues 510 to 544 has the label `confirmed` and an entry, or is closed with its reason.

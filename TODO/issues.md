@@ -402,6 +402,42 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #506 | `notebook --kill-after` panics on a large value instead of refusing it | open | T-1943 |
 | #507 | The image-`USER` warning says podvm runs as uid 0, but on the userland rung it runs as the caller's uid | open | T-1943 |
 | #508 | `--podvm-tier=syscall -u UID` says the identity is faked, but the payload runs as the caller | open | T-1943 |
+| #509 | COORD-179: the answer to PodUtils/podrunner#277: exec --env-file is on main; a -v source with no link is in progress (to podrunner) | open | T-1945 |
+| #510 | `podvm exec` joins a container's namespaces or shares the host PID table, while its help and `.Exec.Mode` say fresh chroot, filesystem only | open | T-1950 |
+| #511 | Machine-tier records ignore `PODVM_STORE`: `ps` lists them from `$HOME`, while `inspect` and `wait` cannot find them | open | T-1950 |
+| #512 | `-w /tmp/<new dir>` always fails with ENOENT after podvm creates the directory | open | T-1950 |
+| #513 | A `--report` path that cannot be written runs the payload first, then returns 125 in place of its exit code | open | T-1950 |
+| #514 | `podvm inspect` with more than one container prints several JSON arrays, so its output is not valid JSON | open | T-1950 |
+| #515 | `podvm import` refuses a compressed file with a raw tar error, not the named refusal the help promises | open | T-1950 |
+| #516 | A normal `tar -C DIR -cf bundle.tar .` is refused by `--podvm-sealed` and blamed on `..` or a leading `/` | open | T-1950 |
+| #517 | A sealed bundle with an empty or missing `argv` exits 0 and runs nothing | open | T-1950 |
+| #518 | `podvm man --roff` and `--llms` print every usage line twice, as `Usage: podvm run usage: podvm run ...` | open | T-1950 |
+| #519 | Seven verbs exit 125 for a missing required argument, where the exit table says 1 | open | T-1950 |
+| #520 | `podvm --help` omits the working verbs `port` and `logout`, and the unknown-command refusal points at it | open | T-1950 |
+| #521 | `system abi` exits 2 for an unreadable file, a code the published exit table does not contain | open | T-1950 |
+| #522 | `podvm save -o FILE` prints the file name on stdout, which the help reserves for the tarball | open | T-1950 |
+| #523 | `podvm inspect NAME` returns the image when a container and an image share the name, while every other verb returns the container | open | T-1950 |
+| #524 | The digest `inspect` prints is not accepted by `inspect`, `rmi`, `tag` or `cp`, and two printed fields are not selectable by `--format` | open | T-1950 |
+| #525 | `import` accepts a rootfs tar whose hard link precedes its target, then every `extract` and `run` fails with a false "already extracted" message | open | T-1950 |
+| #526 | `system df` counts one extracted rootfs once per record, and its reclaimed figures do not match the disk | open | T-1950 |
+| #527 | A pull killed with SIGTERM leaves zero-byte `.partial` files and blobs no image names, and no verb reclaims them | open | T-1950 |
+| #528 | `pull --platform linux/amd64/v3` stores a platform the index does not offer, and the tag then refuses `extract` | open | T-1950 |
+| #529 | Refusals for `--tmpfs` name `-v` and print an internal store path the caller never passed | open | T-1950 |
+| #530 | The syscall tier's `uname -v` contains an internal task reference: `podvm syscall tier (TODO/enter.md T-1657)` | open | T-1950 |
+| #531 | `podvm version --verbose` reports `commit:` as a build error string instead of a commit | open | T-1950 |
+| #532 | Five command groups print help and exit 0 for a bare name, three exit 125, and the exit table names only the first behavior | open | T-1950 |
+| #533 | `run --help` says a `-w` or a first program inside a volume is refused, but both work | open | T-1950 |
+| #534 | A foreground run piped into `head` dies of SIGPIPE and leaves a permanent `Created` record and its tree | open | T-1950 |
+| #535 | A direct SIGINT to `podvm run` is ignored, although the help says SIGINT is forwarded | open | T-1950 |
+| #536 | A symlink at `containers/<id>/log` makes the launcher append the payload output to a file outside the store | open | T-1950 |
+| #537 | The machine tier replaces non-UTF-8 stdout bytes with U+FFFD and appends a newline | open | T-1950 |
+| #538 | A sealed bundle with `./` members and a directory entry never returns: the guest channel fails to unpack and podvm hangs | open | T-1950 |
+| #539 | `stop` on a machine guest powers the VM off with QMP quit, so the payload never gets SIGTERM and no exit code is recorded | open | T-1950 |
+| #540 | `logs` on a machine-tier container drops payload stderr, and `--tail` is ignored | open | T-1950 |
+| #541 | `podvm exec` on a machine-tier container enters the running guest, while the help and limits say a guest exec is refused | open | T-1950 |
+| #542 | The machine-tier `--device` refusal also says `-v` needs the chroot tier, but `-v` works on the machine tier | open | T-1950 |
+| #543 | `docs/limits.md` says an arm64 guest is refused before boot and also that it runs with `qemu-system-aarch64` | open | T-1950 |
+| #544 | Pulling `linux/arm64` and `linux/arm64/v8` creates two records for one manifest | open | T-1950 |
 
 ## Messages whose title does not start with COORD-NNN
 
