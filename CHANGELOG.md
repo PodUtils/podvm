@@ -40,6 +40,9 @@ Deployed: none yet.
   `windows` print their help and exit 0 (#532).
 - `cp` into an image is refused: it changed the shared extraction that
   each later container copies (#498, #563). A copy out of an image stays.
+- `--env-file` and `--report` keep the caller's own file permissions in
+  podvm's user namespace (#552), and `--report` refuses a path that the
+  writer cannot use before the payload runs (#513).
 
 ### Added: the syscall tier for a detached container, 2026-11-17
 

@@ -478,8 +478,10 @@ pub use values::usage;
 use values::*;
 pub(crate) use values::{env_arg, read_env_file};
 
+mod access;
 pub(crate) mod limits;
-mod opts; // TODO/machine.md T-1897
+mod opts; // TODO/machine.md T-1897 // PodUtils/podvm#513, #552
+use access::report_path;
 pub(crate) mod publish; // TODO/machine.md T-1869
 pub(crate) use opts::Opts;
 

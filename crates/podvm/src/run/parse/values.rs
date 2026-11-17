@@ -250,6 +250,10 @@ pub(crate) fn read_env_file(verb: &str, path: &str) -> std::result::Result<Vec<S
         eprintln!("podvm {verb}: --env-file {path:?} is not a file");
         return Err(EXIT_FLAG_ERROR);
     }
+    if !super::access::caller_may(&meta, 0o400) {
+        eprintln!("podvm {verb}: --env-file {path:?}: Permission denied (the mode lets its owner not read it)");
+        return Err(EXIT_FLAG_ERROR);
+    }
     if meta.len() > MAX_ENV_FILE {
         eprintln!(
             "podvm {verb}: --env-file {path:?} is {} bytes, over the 1048576-byte ceiling",
@@ -310,50 +314,6 @@ pub(super) fn create_detach(verb: &str, o: &Opts) -> std::result::Result<(), i32
         return Err(EXIT_FLAG_ERROR);
     }
     Ok(())
-}
-
-/// TODO/cli.md T-1825: `--report PATH`, a flag of `run`, whose directory
-/// takes a file. A report that cannot be written is refused before the
-/// payload runs: it printed a notice after the run and exited 0.
-pub(super) fn report_path(verb: &str, path: &str) -> std::result::Result<(), i32> {
-    report(verb)?;
-    let p = std::path::Path::new(path);
-    let dir = p
-        .parent()
-        .filter(|d| !d.as_os_str().is_empty())
-        .unwrap_or(std::path::Path::new("."));
-    // A path that exists (a file, `/dev/stdout`) is checked itself, with
-    // nothing truncated; a new path through a probe file in its directory.
-    let probe = dir.join(format!(".podvm-report-{}", std::process::id()));
-    let opened = if p.exists() {
-        std::fs::OpenOptions::new()
-            .append(true)
-            .open(p)
-            .map(|_| false)
-    } else {
-        std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&probe)
-            .map(|_| true)
-    };
-    match opened {
-        Ok(made) => {
-            if made {
-                let _ = std::fs::remove_file(&probe);
-            }
-            super::super::report::note_path(path);
-            Ok(())
-        }
-        Err(e) => {
-            eprintln!(
-                "podvm {verb}: --report {path:?}: the directory {} takes no file: {e} \
-                 (TODO/cli.md T-1825)",
-                dir.display()
-            );
-            Err(podvm_image::error::EXIT_RUNTIME_ERROR)
-        }
-    }
 }
 
 /// `--label KEY[=VALUE]` as `KEY=VALUE` (TODO/cli.md T-1695).
