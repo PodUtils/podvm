@@ -45,17 +45,45 @@ everything must be statically compiled." (the owner, 2026-11-05)
 * KVM is free (the owner, 2026-11-09): a session can start a KVM guest
   where `/dev/kvm` exists. Bound each guest with a timeout, and make sure
   that no emulator stays after the run.
-* **Quality first** (the owner, 2026-11-17): podvm does not call a release
-  ready from its own checks. Each edge (an input, a shared file, a peer, a
-  proxy, the host) has a check and a second path, also where the first
-  path works. Each failure gives one true line and a documented exit code;
-  no panic reaches the user. A test pins a class of fault, not one case.
-  `docs/methodology/quality.md` has the plan.
-* **Shared code first** (the owner, 2026-11-17): before you write a
-  capability, search podcrates (its design page and each crate's README) and
-  each sibling. Take a crate that has it; ask podcrates for an extension by
-  a COORD issue; never copy a sibling's code: ask podcrates to move it.
 * `docs/decisions.md` and `TODO/RULES.md`, section 11, have each ruling.
+
+## 2a. Shared code first (the owner's ruling, 2026-11-17)
+
+Before you write a capability (a dialer, a proxy client, a DNS path, a
+retry, a lock of a shared file, a probe of the host, a parser of the help,
+an installer step, a stand-in for a test), search for it:
+
+1. In podcrates: docs/design.md of podcrates (the table of crates) and each crate's
+   `README.md`. Where a crate has it, take the crate. Where it has most of
+   it, ask podcrates for the extension by a COORD issue `(to podcrates)`;
+   do not write a second copy beside it.
+2. In each sibling (podssh, podnet, podvm, podrunner). Where a sibling has
+   it, do not copy it: ask podcrates for it by a COORD issue. A module of a
+   sibling that a second project needs moves to podcrates, and both take
+   it from there.
+3. Where nobody has it and a second project can need it, ask podcrates
+   first. Write it in your own repository only when it is specific to it.
+
+Each copy that exists today is an entry of the record of podcrates that
+ends with one copy in podcrates.
+
+## 2b. Quality first (the owner's ruling, 2026-11-17)
+
+- Write code that fails safe at each edge: an input (not UTF-8, too large,
+  out of range), a file that another process shares (a lock and a unique
+  name: a pid is not unique across PID namespaces), a peer that answers
+  wrong or not at all, a proxy, a resolver, the host. Each edge has a
+  check and a second path, also where the first path works today.
+- Each failure gives one line that is true (what happened, not what was
+  asked), and a documented exit code. No panic reaches the user.
+- A test pins a class of fault: one table-driven test where a family of
+  cases has one rule (the help, the parser and the manual against one
+  table). Do not add a test for each case by reflex.
+- "Ready" comes from a run on a constrained host and an outside pass with
+  the binary and the documents only, not from your own checks.
+
+The text of 2a and 2b is podcrates' docs/session-protocol.md at
+`b950f27`, word for word. podvm's plan is `docs/methodology/quality.md`.
 
 ## 3. Git
 
