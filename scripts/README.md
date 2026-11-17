@@ -44,3 +44,7 @@ job by id. Keep the base and shared cache.
 [tooling](../docs/agent-tooling.md) owns source discovery and command paths.
 [twins history](../docs/history/twins-and-scripts.md) retains the imported
 check comparison.
+
+`dev/nouserns.c` runs a command with no user namespace (a seccomp filter
+refuses `unshare` and `clone(CLONE_NEWUSER)`), as on a host whose AppArmor
+restricts them. podvm then takes the userland rung (TODO/enter.md T-1935).

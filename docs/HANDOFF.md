@@ -1,6 +1,6 @@
 # Handoff
 
-The state on 2026-11-17, 11:30 (UTC), at the end of a session. `main` is at the commit that adds
+The state on 2026-11-17, 15:30 (UTC), during a session. `main` is at the commit that adds
 this file. `0.2.0-beta.31` is the last release (release run 44069288805
 on `a3370f59`). A fresh session with no memory reads this file first,
 then `AGENTS.md`, `TODO/PROGRESS.md` and `docs/decisions.md`. Remove this
@@ -91,6 +91,26 @@ file when each step below is done.
 * podcrates taken up to `v0.67.0`.
 * T-1931 (partial): podrunner#202, the `HEAD` of the source fixup;
   `--no-source-fixup` stops it; COORD-170 is open, COORD-171 is closed.
+
+## Done in this session (2026-11-17, the afternoon)
+
+* T-1933: a foreground `run windows:NAME` of a golden image goes through
+  the guest agent of a short-lived machine (`windows/machine/once.rs`).
+  The first `kvm.yml` run (44097296278) waited 900 s on both legs: the
+  probe's client held the one client of the QGA channel; fixed in
+  `89edd7f`, and run 44104748355 tests it. COORD-175 (#468) asks podcrates
+  for evidence of a mailbox timeout.
+* T-1934 (blocked): no pty in a unit on the namespace rung; COORD-176
+  (#469) asks podcrates for a devpts instance and `/dev/ptmx`.
+* T-1935 (partial, P1): `run -d --podvm-tier=syscall` for podrunner's
+  hosted runners (raw `renameat2` of `uv` and `ruff`), with `exec`,
+  `inspect` `Tier` and `:ro`; two crashes of the tier fixed
+  (`posix_spawn`, `close_range`). COORD-177 (#470) answers podrunner.
+* T-1936 (partial, P1): experiment 464 and `workloads.yml`, the tools of
+  a CI job in a unit; COORD-178 (#471) answers podnet's COORD-102.
+* To force the userland rung on the cloud host (no sysctl there), run
+  podvm under a seccomp filter that denies `unshare` and
+  `clone(CLONE_NEWUSER)`: `scripts/dev/nouserns.c`.
 
 ## Next steps, in order
 
