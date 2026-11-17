@@ -1,6 +1,6 @@
 # Handoff
 
-The state on 2026-11-17, 15:30 (UTC), during a session. `main` is at the commit that adds
+The state on 2026-11-17, 18:00 (UTC), during a session. `main` is at the commit that adds
 this file. `0.2.0-beta.31` is the last release (release run 44069288805
 on `a3370f59`). A fresh session with no memory reads this file first,
 then `AGENTS.md`, `TODO/PROGRESS.md` and `docs/decisions.md`. Remove this
@@ -111,6 +111,27 @@ file when each step below is done.
 * To force the userland rung on the cloud host (no sysctl there), run
   podvm under a seccomp filter that denies `unshare` and
   `clone(CLONE_NEWUSER)`: `scripts/dev/nouserns.c`.
+
+## Quality first (2026-11-17, the evening): read this before any work
+
+* An external tester confirmed 95 faults of `0.2.0-beta.31` (issues 472
+  to 566). The owner's ruling "Quality first" and the plan are
+  `docs/methodology/quality.md` and `AGENTS.md` 2a and 2b. **No beta until
+  T-1949 holds.**
+* Each report is verified, labelled `confirmed` (564 closed by design),
+  and mapped by class: T-1937 to T-1945 (the first two batches), T-1951
+  (output contract), T-1952 (images and the store), T-1953 (signals and
+  rungs), T-1954 (machine tier), T-1948 (true messages). The faults in
+  crates of podcrates are COORD-181 (#568) and COORD-182 (#569); podcrates
+  fixed #568 on its `main`.
+* Done in this pass: the CLI contract test (T-1946, `tests/cli_contract.rs`),
+  the panic hook (T-1947), the store races (T-1938), the syscall tier for
+  `run -d` (T-1935, for podrunner's hosted runners), `exec --env-file`
+  (T-1945), the Windows foreground run on the guest agent (T-1933 done),
+  and about 30 of the reports. `scripts/dev/checks.sh` is the one command
+  before each push.
+* COORD-180 (#567, to all) says what went wrong. COORD-183 (#570) answers
+  podcrates' COORD-131 (the copies of shared code, T-1955).
 
 ## Next steps, in order
 
