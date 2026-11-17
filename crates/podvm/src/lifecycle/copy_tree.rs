@@ -277,26 +277,28 @@ pub(super) fn copy_tree(
 ///
 /// ⚠ Tried after the image lookup fails, so a name that is both is an image, as
 /// docker resolves it.
-pub fn inspect_container(want: &str, template: Option<&str>) -> Option<i32> {
+/// PodUtils/podvm#514: the document of the container `want` (its line of
+/// `template`, or its JSON object), for the caller to print with the others
+/// in one array; `None` where no container has the name.
+pub fn inspect_container(want: &str, template: Option<&str>) -> Option<Result<String, i32>> {
     let s = podvm_image::open_store().ok()?;
     let c = podvm_supervise::get(&s, want).ok()?;
     let fields = container_fields(&s, &c);
-    match template {
-        Some(t) => match format::render(t, &fields) {
-            Ok(line) => {
-                println!("{line}");
-                Some(0)
-            }
-            Err(bad) => {
-                eprintln!("podvm inspect: {bad}");
-                Some(EXIT_CLI_ERROR)
-            }
-        },
+    Some(match template {
+        Some(t) => format::render(t, &fields).map_err(|bad| {
+            eprintln!("podvm inspect: {bad}");
+            EXIT_CLI_ERROR
+        }),
         None => {
-            println!("{}", container_json(&s, &c));
-            Some(0)
+            let doc = container_json(&s, &c);
+            // `container_json` gives an array of one object.
+            Ok(doc
+                .strip_prefix('[')
+                .and_then(|d| d.strip_suffix(']'))
+                .unwrap_or(&doc)
+                .to_string())
         }
-    }
+    })
 }
 
 /// One field of the end of the last run, or a dash where no run ended.

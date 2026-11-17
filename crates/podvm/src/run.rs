@@ -53,8 +53,9 @@ pub const RUN_OPTIONS: &str = "\
                    path rewrite through PODVM_MAPS on the userland loader
                    family, not a mount: a write lands in H, and :ro refuses
                    a write (TODO/cli.md T-1655). A 9p mount on the machine
-                   tier. A -w or a first program inside G is refused
-                   (TODO/enter.md T-1653)
+                   tier. A bind mount on the namespace rung, which
+                   /proc/mounts lists. A -w or a first program inside G
+                   resolves in H (TODO/enter.md T-1653)
   --unsafe-host-paths
                    podvm's own, userland rung only: opt into the
                    pass-through with no PODVM_MAPS anchoring, so absolute

@@ -78,9 +78,10 @@ pub(crate) fn parse(args: &[String]) -> Result<Option<Args>, i32> {
     let mut it = args.iter();
     let sub = match it.next() {
         Some(s) => s.clone(),
+        // PodUtils/podvm#532: the bare group prints its help and succeeds.
         None => {
-            eprintln!("podvm windows: no subcommand\n{USAGE}");
-            return Err(podvm_image::error::EXIT_FLAG_ERROR);
+            println!("{USAGE}");
+            return Ok(None);
         }
     };
     if sub == "-h" || sub == "--help" {
@@ -214,8 +215,9 @@ mod tests {
     }
 
     #[test]
-    fn no_subcommand_and_an_unknown_flag_are_flag_errors() {
-        assert!(p(&[]).is_err());
+    fn no_subcommand_prints_the_help_and_an_unknown_flag_is_a_flag_error() {
+        // PodUtils/podvm#532: the bare group succeeds, as the exit table says.
+        assert!(matches!(p(&[]), Ok(None)));
         assert!(p(&["run", "--nope"]).is_err());
         assert!(
             p(&["wat"]).is_ok(),

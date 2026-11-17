@@ -53,11 +53,8 @@ const GUEST_VERBS: [&str; 5] = ["up", "down", "check", "try", "matrix"];
 
 pub fn main(args: &[String]) -> i32 {
     match args.first().map(String::as_str) {
-        None => {
-            eprintln!("{USAGE}");
-            EXIT_FLAG_ERROR
-        }
-        Some("-h" | "--help") => {
+        // PodUtils/podvm#532: the bare group prints its help and succeeds.
+        None | Some("-h" | "--help") => {
             println!("{USAGE}");
             0
         }

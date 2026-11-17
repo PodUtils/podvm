@@ -35,6 +35,9 @@ Deployed: none yet.
   exits 125 for an unreadable file (#521).
 - `podvm run IMAGE CMD | head -1` ends as a pipeline does: the payload
   gets the broken pipe, and the run keeps its record and its `--rm` (#534).
+- `inspect A B` prints one JSON array, and a container comes before an
+  image of the same name (#514, #523). A bare `profile`, `lab` and
+  `windows` print their help and exit 0 (#532).
 
 ### Added: the syscall tier for a detached container, 2026-11-17
 

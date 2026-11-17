@@ -146,13 +146,15 @@ pub fn main(args: &[String]) -> i32 {
         }
         Some("list") if args.len() == 1 => list(),
         Some("show") => show(&args[1..]),
-        Some("-h" | "--help") => {
+        // PodUtils/podvm#532: the bare group prints its help and succeeds,
+        // as the table of exit codes says (`no-arguments`).
+        Some("-h" | "--help") | None => {
             println!("{USAGE}");
             0
         }
-        _ => {
-            eprintln!("{USAGE}");
-            EXIT_FLAG_ERROR
+        Some(other) => {
+            eprintln!("podvm profile: {other:?} is not a subcommand\n{USAGE}");
+            podvm_image::error::EXIT_CLI_ERROR
         }
     }
 }

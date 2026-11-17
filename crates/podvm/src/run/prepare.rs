@@ -47,13 +47,14 @@ pub(crate) fn prepare(
     let volumes_refused = // T-1722: `create` of the incus tier takes -v
         verb != "run" && !o.volumes.is_empty() && tier != crate::tier::Tier::Incus;
     if guest && (!o.devices.is_empty() || volumes_refused) {
-        // ⛔ Refused rather than silently dropped: the guest boots behind
-        // an emulator the host cannot hand descriptors or paths to, so a
-        // mapping the caller believes is set would serve nothing.
-        // TODO/enter.md T-0501 and T-1653.
+        // ⛔ Refused, not dropped: no host descriptor reaches the guest
+        // (T-0501, T-1653). #542: the line names only the flag given.
+        let dev = usize::from(!o.devices.is_empty());
+        let what = ["-v needs", "--device needs", "--device and -v need"]
+            [dev + dev * usize::from(volumes_refused)];
         eprintln!(
-            "podvm {verb}: --device and -v need the chroot tier: the machine \
-             tier boots a guest no host descriptor or host path reaches"
+            "podvm {verb}: {what} a rung of this host: the machine tier boots \
+             a guest that no host descriptor reaches"
         );
         return Err(EXIT_FLAG_ERROR);
     }

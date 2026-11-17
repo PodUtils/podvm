@@ -23,7 +23,9 @@ use crate::sys::{self, nr, sc, sc6};
 /// The release that `uname` gives on the tier.
 pub const RELEASE: &[u8] = crate::TIER_RELEASE.as_bytes();
 /// The version that `uname` gives on the tier.
-pub const VERSION: &[u8] = b"#1 SMP podvm syscall tier (TODO/enter.md T-1657)";
+/// PodUtils/podvm#530: `uname -v` of a payload, with no reference of the
+/// record of podvm in it.
+pub const VERSION: &[u8] = b"#1 SMP podvm syscall tier";
 /// The guest path of the sized directory.
 pub const TMP: &[u8] = b"/tmp";
 
