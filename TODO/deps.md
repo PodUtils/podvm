@@ -2314,3 +2314,32 @@ with `HTTP 429: TOOMANYREQUESTS: Data limit exceeded`. Remaining: one
 closed its issue 6 on the evidence of 5209adb.
 Remaining: a run of `podvm-workload` whose fetch step reports the pinned
 kernel sum.
+
+# T-1955: Remove the copies of shared code that podcrates names (COORD-131 of podcrates)
+
+**Source:** PodUtils/podcrates#221 (COORD-131 of podcrates), the owner's ruling "Shared code" (2026-11-17)
+**Category:** deps
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+podvm keeps four copies of code that podcrates centralises: a reader of squashfs and xz (`crates/podvm/src/machine/guest/squashfs.rs`, beside `pod-guest`), `crates/podvm-image/src/clock.rs` (beside `pod_core::clock`), the proxy variables and the loopback test of `crates/podvm/src/machine/proxy.rs` (beside `pod_proxy`), and `host_bundle_bytes` of `podvm-image` (beside `pod_tls::env_bundle`, podcrates@T-881).
+
+## Premise
+
+The survey of podcrates (2026-11-17) names each copy and its crate.
+
+## Approach
+
+At the next take of podcrates: take `pod-guest`'s squashfs reader, `pod_core::clock` and `pod_proxy`'s variables in place of the copies, and keep only the rewrite of the loopback to 10.0.2.2; `pod_tls::env_bundle` when its tag comes. Write the commits in the COORD issue of the take.
+
+## Decision
+
+-
+
+## Prove
+
+`grep -rn "fn civil_from_days\|fn rfc3339" crates/podvm-image/src` finds nothing, `crates/podvm/src/machine/guest/squashfs.rs` is gone, and the uid-1000 suite and `kvm.yml` experiment 390 pass.

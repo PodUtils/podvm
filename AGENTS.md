@@ -45,6 +45,16 @@ everything must be statically compiled." (the owner, 2026-11-05)
 * KVM is free (the owner, 2026-11-09): a session can start a KVM guest
   where `/dev/kvm` exists. Bound each guest with a timeout, and make sure
   that no emulator stays after the run.
+* **Quality first** (the owner, 2026-11-17): podvm does not call a release
+  ready from its own checks. Each edge (an input, a shared file, a peer, a
+  proxy, the host) has a check and a second path, also where the first
+  path works. Each failure gives one true line and a documented exit code;
+  no panic reaches the user. A test pins a class of fault, not one case.
+  `docs/methodology/quality.md` has the plan.
+* **Shared code first** (the owner, 2026-11-17): before you write a
+  capability, search podcrates (its design page and each crate's README) and
+  each sibling. Take a crate that has it; ask podcrates for an extension by
+  a COORD issue; never copy a sibling's code: ask podcrates to move it.
 * `docs/decisions.md` and `TODO/RULES.md`, section 11, have each ruling.
 
 ## 3. Git

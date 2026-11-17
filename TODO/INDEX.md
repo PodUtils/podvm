@@ -617,10 +617,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1952](image.md) | P2 | M | none | image | open | The external QA of `0.2.0-beta.31`, third batch: images, `import`, `cp` and the store |
 | [T-1953](enter.md) | P1 | M | none | enter | open | The external QA of `0.2.0-beta.31`, third batch: signals, rungs and runs |
 | [T-1954](machine.md) | P2 | M | none | machine | open | The external QA of `0.2.0-beta.31`, third batch: the machine tier |
+| [T-1955](deps.md) | P2 | M | none | deps | open | Remove the copies of shared code that podcrates names (COORD-131 of podcrates) |
 
 ## Counts
 
-551 entries: 13 open, 23 partial, 4 blocked, 511 done.
+552 entries: 14 open, 23 partial, 4 blocked, 511 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -631,9 +632,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 2 | 9 | 0 | 220 | 231 |
-| P2 | 8 | 10 | 3 | 174 | 195 |
+| P2 | 9 | 10 | 3 | 174 | 196 |
 | P3 | 3 | 4 | 1 | 42 | 50 |
-| **All** | 13 | 23 | 4 | 511 | 551 |
+| **All** | 14 | 23 | 4 | 511 | 552 |
 
 ## Work order
 
