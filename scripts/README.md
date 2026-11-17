@@ -48,3 +48,6 @@ check comparison.
 `dev/nouserns.c` runs a command with no user namespace (a seccomp filter
 refuses `unshare` and `clone(CLONE_NEWUSER)`), as on a host whose AppArmor
 restricts them. podvm then takes the userland rung (TODO/enter.md T-1935).
+
+`dev/checks.sh` runs the checks before each push (AGENTS.md, section 12)
+and exits non-zero when one fails; `sh scripts/dev/checks.sh && git commit`.

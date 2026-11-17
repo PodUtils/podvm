@@ -278,6 +278,10 @@ watches them.
 
 ## 12. Checks before each push
 
+`sh scripts/dev/checks.sh` runs each of them and exits non-zero when one
+fails; commit only behind it (`sh scripts/dev/checks.sh && git commit ...`).
+A chain of the commands by hand lost an exit code twice on 2026-11-17.
+
 ```sh
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings      # Linux, or CI
