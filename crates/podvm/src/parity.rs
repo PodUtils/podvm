@@ -331,6 +331,7 @@ pub const TABLE: &[Row] = &[
     Row { verb: "run", flag: Some("--init"), status: NoneStatus, note: "no PID namespace and no init to run. The launcher (or podvm, for a foreground run) is the child subreaper of the payload's tree and kills each descendant at the end (T-1708), so no flag is needed" },
     // ------------------------------------------------------ exec's own flags
     Row { verb: "exec", flag: Some("-e, --env"), status: Native, note: "repeatable; a later one wins over the environment that the container started with; -e NAME takes the caller's value" },
+    Row { verb: "exec", flag: Some("--env-file"), status: Native, note: "as in run: KEY=VALUE lines, repeatable, at the flag's position; a secret stays out of the argv of podvm (PodUtils/podrunner#277)" },
     Row { verb: "exec", flag: Some("-w, --workdir"), status: Native, note: "chdir inside the new root, after the chroot" },
     Row { verb: "exec", flag: Some("--platform"), status: Native, note: "which platform of a multi-platform image to enter" },
     Row { verb: "exec", flag: Some("-t, --tty"), status: Degraded, note: "REFUSED BY NAME where /dev/ptmx is unusable (T-0503)" },

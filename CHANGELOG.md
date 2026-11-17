@@ -22,6 +22,8 @@ Deployed: none yet.
   container and `version` an operand (#486). `image bogus` is a usage
   error (#487). `exec --platform` of a container refuses another
   platform (#489). `doctor` names what the machine profile needs (#491).
+- `exec --env-file PATH`, as in `run`: a secret stays out of the argv of
+  podvm (PodUtils/podrunner#277).
 
 ### Added: the syscall tier for a detached container, 2026-11-17
 

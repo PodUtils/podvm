@@ -5694,7 +5694,7 @@ A known gap is measured, not judged, so that the experiment guards each fix that
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -5715,3 +5715,7 @@ Reproduce each report as uid 1000 on `main`, find the cause, and give each confi
 ## Prove
 
 Each of the issues 492 to 508 has the label `confirmed` and an entry, or is closed with its reason.
+
+## Done
+
+**Done (2026-11-17).** Each of the 16 reports (492 to 508, without 501, which T-1938 holds) is reproduced as uid 1000 with the binary of `main`, or for 502 traced in the code (the helper `proxy` of podvm-ssh drops the status of the command); each carries the label `confirmed` and maps to T-1943 or T-1944.

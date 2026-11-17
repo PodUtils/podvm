@@ -474,9 +474,9 @@ fn parse_flags_with(
 }
 
 pub(super) mod values;
-pub(crate) use values::env_arg;
 pub use values::usage;
 use values::*;
+pub(crate) use values::{env_arg, read_env_file};
 
 pub(crate) mod limits;
 mod opts; // TODO/machine.md T-1897

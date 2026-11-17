@@ -29,6 +29,8 @@ pub const EXEC_USAGE: &str = "\
 usage: podvm exec [options] <image> <command> [arg...]
 
   -e, --env K=V    set an environment variable. Repeatable; a later one wins
+  --env-file PATH  read KEY=VALUE lines from PATH, as in run: a secret then
+                   stays out of the argv of podvm. Repeatable
   -w, --workdir D  working directory inside the container
   -u, --user U:G   as in run: fake the identity through the interposer memo
                    (TODO/interpose.md T-0711)
@@ -151,6 +153,8 @@ fn parse(args: &[String]) -> std::result::Result<Opts, i32> {
         if let Some(flag) = expecting.take() {
             match flag {
                 "-e" => o.env.extend(crate::run::env_arg("exec", a)?),
+                // PodUtils/podrunner#277: a secret in a file, not in argv.
+                "--env-file" => o.env.extend(crate::run::read_env_file("exec", a)?),
                 "-w" => o.workdir = Some(a.clone()),
                 "--add-host" => crate::complete::add_host(&mut o.ask, "exec", a)?,
                 "--user" => o.user = Some(a.clone()),
@@ -199,6 +203,7 @@ fn parse(args: &[String]) -> std::result::Result<Opts, i32> {
                 // stdin, so it is already interactive when the caller's is.
             }
             "-e" | "--env" => expecting = Some("-e"),
+            "--env-file" => expecting = Some("--env-file"),
             "-w" | "--workdir" => expecting = Some("-w"),
             "-u" | "--user" => expecting = Some("--user"),
             "--platform" => expecting = Some("--platform"),
@@ -229,6 +234,9 @@ fn parse(args: &[String]) -> std::result::Result<Opts, i32> {
             other if other.starts_with("--env=") => {
                 o.env.extend(crate::run::env_arg("exec", &other[6..])?)
             }
+            other if other.starts_with("--env-file=") => o
+                .env
+                .extend(crate::run::read_env_file("exec", &other[11..])?),
             other if other.starts_with("--user=") => o.user = Some(other[7..].to_string()),
             other if other.starts_with("--workdir=") => o.workdir = Some(other[10..].to_string()),
             other if other.starts_with("--platform=") => o.platform = Some(other[11..].to_string()),

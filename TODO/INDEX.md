@@ -604,11 +604,14 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1939](enter.md) | P2 | M | none | enter | open | The external QA of `0.2.0-beta.31`: `--device` and `run -d --rm` |
 | [T-1940](image.md) | P2 | S | none | image | open | The external QA of `0.2.0-beta.31`: `images --filter`, `load`, `verify` and `--add-host` |
 | [T-1941](machine.md) | P3 | S | none | machine | open | The built-in `machine` profile asks for 1 GiB, which a file-size ceiling under 1 GiB refuses |
-| [T-1942](gate.md) | P1 | M | none | gate | open | The external QA of `0.2.0-beta.31`: verify the second batch of reports |
+| [T-1942](gate.md) | P1 | M | none | gate | done | The external QA of `0.2.0-beta.31`: verify the second batch of reports |
+| [T-1943](cli.md) | P1 | M | none | cli | open | The external QA of `0.2.0-beta.31`, second batch: panics, flags and messages |
+| [T-1944](cli.md) | P2 | M | none | cli | open | The external QA of `0.2.0-beta.31`, second batch: `cp`, `import` and the helpers of credentials |
+| [T-1945](cli.md) | P1 | M | none | cli | partial | `exec --env-file`, and a `-v` source that is opened with no symbolic link (PodUtils/podrunner#277) |
 
 ## Counts
 
-539 entries: 9 open, 18 partial, 4 blocked, 508 done.
+542 entries: 10 open, 19 partial, 4 blocked, 509 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -618,10 +621,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 1 | 5 | 0 | 217 | 223 |
-| P2 | 5 | 9 | 3 | 174 | 191 |
+| P1 | 1 | 6 | 0 | 218 | 225 |
+| P2 | 6 | 9 | 3 | 174 | 192 |
 | P3 | 3 | 4 | 1 | 42 | 50 |
-| **All** | 9 | 18 | 4 | 508 | 539 |
+| **All** | 10 | 19 | 4 | 509 | 542 |
 
 ## Work order
 

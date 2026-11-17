@@ -6037,3 +6037,107 @@ One small change for each item, with a test of its refusal. 485 keeps exit 1 (T-
 ## Done
 
 **Partial (2026-11-17).** 484: `--name` and `--name=` take docker's rule (`opts::name_arg`, `[a-zA-Z0-9][a-zA-Z0-9_.-]*`, at most 64 bytes), with a test. 486: `logs` refuses a second container and `version` an operand, with exit 1. 487: `image bogus` says "is not a subverb of the group" with the usage (which names `extract` now) and exit 1. 489: `exec --platform` of a container refuses a platform that is not the one of its image (`command::container_platform`), exit 125. 491: `doctor` prints `machine profile: refused (the machine tier needs: LEGS)`; experiment 364 reads the new label. Measured as uid 1000 with the binary of this commit. Remaining: 478, 479, 482, 483, 485, 488, and `lab profiles extra`.
+
+# T-1943: The external QA of `0.2.0-beta.31`, second batch: panics, flags and messages
+
+**Source:** the external QA of `0.2.0-beta.31` (2026-11-17), issues 492, 493, 494, 497, 499, 500, 504, 505, 506, 507, 508, verified by T-1942
+**Category:** cli
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+- 505: each argument that is not UTF-8 panics podvm (`env::args`), exit 134.
+- 492: `--tls-verify=false` is split into `--tls-verify` and the word `false`, which becomes the image; TLS verification cannot be turned off.
+- 506: `notebook --kill-after` with a large value panics (an overflow of `Instant`), after the child run started.
+- 508: `--podvm-tier=syscall -u UID` says that the identity is faked, and the payload runs as the caller (the tier takes the interposer out).
+- 507: the warning of an image `USER` says "podvm runs as uid 0" on the userland rung, where the payload runs as the caller.
+- 493, 494: `notebook --cycles` clamps above 1000, and `--restart-kernel-after` takes a cell past the end, with no word.
+- 497: `run --help` omits working flags (`--profile`, `--hostname`, `--cpus`, `--pids-limit`, `--network`, and more); `exec --help` omits `-i`.
+- 499: the help of `--podvm-confine` omits the paths that it always grants and that TCP is free with no `connect=`.
+- 500: `login` with no `--password-stdin`, no user or an empty password prints only the usage.
+- 504: `compare --strict` takes an empty reason as an explanation.
+
+## Premise
+
+Each item is reproduced as uid 1000 on the cloud host with the binary of `main` (T-1942), except that 508 and 507 were measured on the userland rung under `scripts/dev/nouserns.c`.
+
+## Approach
+
+505: `main` reads `args_os` and refuses an argument that is not UTF-8 by name, exit 125. 492: `expand` passes `--tls-verify=VALUE` through, as `--strict=VALUE`. 506: a bound on `--kill-after` and checked sums. 508: the tier refuses `-u` by name. The others: a refusal or a sentence of the help each, and a test that each flag row of `run` and `exec` is in its help (497).
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test --release -p podvm --bin podvm` passes, with a test of each refusal, and the repro of each issue, as uid 1000, gives the refusal or the result of the fix.
+
+# T-1944: The external QA of `0.2.0-beta.31`, second batch: `cp`, `import` and the helpers of credentials
+
+**Source:** the external QA of `0.2.0-beta.31` (2026-11-17), issues 495, 496, 498, 502, 503, verified by T-1942
+**Category:** cli
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+- 495: on the userland rung, `ln -s /tmp/f` in a container stores the host path of the tree, and `cp` out copies it; in the container `readlink` gives `/tmp/`.
+- 498: `cp` into an image changes only the extracted cache, which `extract --force` and `save` lose.
+- 503: `import` records an image with a hard link to an absolute path (or through `..`), which `extract` then refuses.
+- 496: a helper of credentials gets `https://HOST/v2/`, not the server key of the configuration (pod-oci, podcrates).
+- 502: `remote ssh forward exec` exits 0 whatever the exit code of the command (`podvm-ssh` `Exec` drops the status).
+
+## Premise
+
+Verified by T-1942 (the reproduction of each, or the code for 502).
+
+## Approach
+
+495: `cp` out takes the prefix of the tree off an absolute target, and the reverse map of `readlink` is fixed. 498: `cp` into an image is refused by name. 503: `import` refuses a hard link target that is absolute or holds `..`. 496: a COORD issue to podcrates. 502: `Exec` waits for the child and gives its code.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test --release -p podvm --bin podvm` passes, with a test of each refusal, and the repro of each issue, as uid 1000, gives the refusal or the result of the fix.
+
+# T-1945: `exec --env-file`, and a `-v` source that is opened with no symbolic link (PodUtils/podrunner#277)
+
+**Source:** PodUtils/podrunner#277 (COORD-081 of podrunner, podrunner@T-403 and @T-405)
+**Category:** cli
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+podrunner gives the secrets of a job as `-e K=V`, which `/proc/PID/cmdline` of `podvm` shows to each user of the host. And a job can make a symbolic link in the source of a `-v` after podrunner checked it and before podvm opens it, so that the container gets a writable path of the host.
+
+## Premise
+
+`run`, `run -d` and `create` take `--env-file` since T-1828; `exec` did not.
+
+## Approach
+
+`exec --env-file PATH`. For the source of a volume: an option with which podvm opens the source with `openat2(RESOLVE_NO_SYMLINKS)` and binds the descriptor, not the path; the bind of the namespace rung is pod-enter's (a COORD issue to podcrates), and the userland rung maps paths, which cannot hold a descriptor.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000: `exec --env-file F NAME sh -c 'echo $SECRET'` prints the value, and no `/proc/*/cmdline` holds it while the exec runs.
+
+## Done
+
+**Partial (2026-11-17).** `exec --env-file PATH` (and `--env-file=`), with the reader of `run` and a parity row. With alpine 3.20 of mirror.gcr.io, as uid 1000: the payload of `exec --env-file` prints the value, and no `/proc/*/cmdline` of the host holds it while the exec runs. Remaining: the source of a volume with no symbolic link.

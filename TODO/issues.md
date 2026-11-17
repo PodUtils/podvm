@@ -385,23 +385,23 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #489 | `exec --platform` is accepted but has no effect on a container | open | T-1937 |
 | #490 | `verify` reports a mismatched blob, but `pull` says "Already exists" and does not repair it | open | T-1940 |
 | #491 | `doctor` ends with an unexplained `profile: refused` line | open | T-1937 |
-| #492 | `--tls-verify=B` never consumes its value, so TLS verification cannot be disabled | open | T-1942 |
-| #493 | `notebook --cycles N` silently clamps N above 1000 to 1000 | open | T-1942 |
-| #494 | `notebook --restart-kernel-after CELL` accepts a cell past the end and silently does nothing | open | T-1942 |
-| #495 | `cp` from a container rewrites absolute symlink targets to the store's rootfs path | open | T-1942 |
-| #496 | Credential helpers receive `https://HOST/v2/`, not the configured server key | open | T-1942 |
-| #497 | `run --help` omits working flags that the parser accepts and the parity table lists | open | T-1942 |
-| #498 | `cp` to an image mutates only the extracted cache; `extract --force` and `save` lose the change | open | T-1942 |
-| #499 | `--podvm-confine` help omits the implicit `/proc`, device, and TCP grants | open | T-1942 |
-| #500 | `login` with a missing or empty password prints the whole usage instead of naming the missing input | open | T-1942 |
+| #492 | `--tls-verify=B` never consumes its value, so TLS verification cannot be disabled | open | T-1943 |
+| #493 | `notebook --cycles N` silently clamps N above 1000 to 1000 | open | T-1943 |
+| #494 | `notebook --restart-kernel-after CELL` accepts a cell past the end and silently does nothing | open | T-1943 |
+| #495 | `cp` from a container rewrites absolute symlink targets to the store's rootfs path | open | T-1944 |
+| #496 | Credential helpers receive `https://HOST/v2/`, not the configured server key | open | T-1944 |
+| #497 | `run --help` omits working flags that the parser accepts and the parity table lists | open | T-1943 |
+| #498 | `cp` to an image mutates only the extracted cache; `extract --force` and `save` lose the change | open | T-1944 |
+| #499 | `--podvm-confine` help omits the implicit `/proc`, device, and TCP grants | open | T-1943 |
+| #500 | `login` with a missing or empty password prints the whole usage instead of naming the missing input | open | T-1943 |
 | #501 | Concurrent `podvm run` fails with `containers.json: No such file or directory` | open | T-1938 |
-| #502 | `remote ssh forward exec` discards the target's exit code | open | T-1942 |
-| #503 | `import` records an image from a tar with an absolute hardlink that `extract` refuses | open | T-1942 |
-| #504 | `compare --strict` treats an empty reason as an explanation | open | T-1942 |
-| #505 | Any non-UTF-8 command-line argument panics podvm with SIGABRT | open | T-1942 |
-| #506 | `notebook --kill-after` panics on a large value instead of refusing it | open | T-1942 |
-| #507 | The image-`USER` warning says podvm runs as uid 0, but on the userland rung it runs as the caller's uid | open | T-1942 |
-| #508 | `--podvm-tier=syscall -u UID` says the identity is faked, but the payload runs as the caller | open | T-1942 |
+| #502 | `remote ssh forward exec` discards the target's exit code | open | T-1944 |
+| #503 | `import` records an image from a tar with an absolute hardlink that `extract` refuses | open | T-1944 |
+| #504 | `compare --strict` treats an empty reason as an explanation | open | T-1943 |
+| #505 | Any non-UTF-8 command-line argument panics podvm with SIGABRT | open | T-1943 |
+| #506 | `notebook --kill-after` panics on a large value instead of refusing it | open | T-1943 |
+| #507 | The image-`USER` warning says podvm runs as uid 0, but on the userland rung it runs as the caller's uid | open | T-1943 |
+| #508 | `--podvm-tier=syscall -u UID` says the identity is faked, but the payload runs as the caller | open | T-1943 |
 
 ## Messages whose title does not start with COORD-NNN
 
