@@ -5683,9 +5683,9 @@ A known gap is measured, not judged, so that the experiment guards each fix that
 
 ## Done
 
-**Partial (2026-11-17).** `experiments/464-workloads.sh` and `.github/workflows/workloads.yml`. Measured as uid 1000 on the cloud host, with the binary of `main` and `public.ecr.aws/docker/library/python:3.13-slim` (with the proxy of the host and its CA in the unit): on the namespace rung each judged clause passes, and the pty is measured (`out of pty devices`, T-1934); under a seccomp filter that denies `unshare` and `clone(CLONE_NEWUSER)` (the userland rung), the loader family gives EACCES for the raw calls, `uv` and `ruff` (measured, T-1935), and passes `subprocess` and the pty; the syscall tier passes each clause on both hosts. The first run of the experiment found that the tier refused a `:ro` volume, which podrunner gives its tool cache (fixed in T-1935). Remaining: the first run of `workloads.yml`.
-
 **Done (2026-11-17, run 44105817462 on `675920c`).** `workloads.yml` passes on both legs of a hosted `ubuntu-24.04` runner (`restricted`, the userland rung, and `userns`, the namespace rung).
+
+**Partial (2026-11-17).** `experiments/464-workloads.sh` and `.github/workflows/workloads.yml`. Measured as uid 1000 on the cloud host, with the binary of `main` and `public.ecr.aws/docker/library/python:3.13-slim` (with the proxy of the host and its CA in the unit): on the namespace rung each judged clause passes, and the pty is measured (`out of pty devices`, T-1934); under a seccomp filter that denies `unshare` and `clone(CLONE_NEWUSER)` (the userland rung), the loader family gives EACCES for the raw calls, `uv` and `ruff` (measured, T-1935), and passes `subprocess` and the pty; the syscall tier passes each clause on both hosts. The first run of the experiment found that the tier refused a `:ro` volume, which podrunner gives its tool cache (fixed in T-1935). Remaining: the first run of `workloads.yml`.
 
 # T-1942: The external QA of `0.2.0-beta.31`: verify the second batch of reports
 
