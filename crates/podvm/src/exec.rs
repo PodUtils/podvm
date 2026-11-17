@@ -28,6 +28,8 @@ use podvm_image::platform::Platform;
 pub const EXEC_USAGE: &str = "\
 usage: podvm exec [options] <image> <command> [arg...]
 
+  -i, --interactive
+                   accepted and a no-op: stdin is always passed
   -e, --env K=V    set an environment variable. Repeatable; a later one wins
   --env-file PATH  read KEY=VALUE lines from PATH, as in run: a secret then
                    stays out of the argv of podvm. Repeatable

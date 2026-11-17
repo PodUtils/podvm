@@ -133,6 +133,23 @@ pub const RUN_OPTIONS: &str = "\
   --ulimit N=S[:H] a resource limit of the payload (nofile, nproc, fsize,
                    cpu, as, core, ...), -1 for none; repeatable
                    (TODO/cli.md T-1655)
+  --hostname NAME  the host name of the payload (uname, gethostname,
+                   /etc/hostname); a UTS namespace where the rung has one
+                   (TODO/enter.md T-1908)
+  --profile NAME   a TOML recipe of run flags (`podvm profile list`). A
+                   profile that names an image takes each positional as the
+                   command (TODO/cli.md T-1654)
+  --cpus N, --pids-limit N
+                   limits of a native run where the host delegates a cgroup2
+                   subtree, and of the incus tier; else refused by name
+                   (TODO/machine.md T-1747, T-1897)
+  --network broker, --allow HOST, --ports P
+                   an egress broker that allows HOST on the ports P (443 by
+                   default); it needs --podvm-tier=syscall or machine
+                   (TODO/net.md T-1665)
+  --attach S, --expose P, --log-driver json-file
+                   accepted and change nothing (docker parity); --strict
+                   refuses them (TODO/supervise.md T-0605)
   --security-opt no-new-privileges
                    PR_SET_NO_NEW_PRIVS in the payload; each other option is
                    refused by name (TODO/cli.md T-1655)

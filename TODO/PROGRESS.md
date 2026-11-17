@@ -7,7 +7,7 @@ start.
 
 ## State
 
-547 entries: 13 open, 21 partial, 4 blocked, 509 done.
+547 entries: 12 open, 21 partial, 4 blocked, 510 done.
 
 The state on 2026-11-16 (`docs/HANDOFF.md` has the detail):
 
@@ -61,9 +61,9 @@ status with `podvm-count` in the same commit as the work.
 
 0. Quality first (the owner's ruling, 2026-11-17; `docs/methodology/quality.md`):
    no beta until T-1949 holds. Verify and work the reports of the external
-   QA (T-1937 to T-1945, T-1950), each by its class, with T-1946 (the
-   harness of the CLI), T-1947 (fail safe at the edges) and T-1948
-   (messages from the entered mechanism).
+   QA (T-1937 to T-1945, T-1950), each by its class, with T-1947 (fail
+   safe at the edges) and T-1948 (messages from the entered mechanism).
+   The harness of the CLI (`tests/cli_contract.rs`) guards the surface.
 1. A new ask of a peer session comes first (the watcher of `AGENTS.md`,
    section 9). The QA pass of
    experiment 443 is worked, and each of its entries is done. The copy

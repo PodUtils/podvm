@@ -117,7 +117,7 @@ usage: podvm images [options] [image]
 ";
 
 pub const RMI_USAGE: &str = "\
-usage: podvm rmi <image> [image...]
+usage: podvm rmi [-f|--force] <image> [image...]
        podvm image rm <image> [image...]
 
   Remove images and every blob no remaining image reaches. Refuses an image
@@ -144,7 +144,7 @@ usage: podvm image prune [-a|--all] [-f|--force]
 ";
 
 pub const INSPECT_USAGE: &str = "\
-usage: podvm inspect [--format T] <image> [image...]
+usage: podvm inspect [--format T] [--podvm-tier incus] <image> [image...]
 
   Fields: .Id .Digest .RepoTags .RepoDigests .Architecture .Os .Created
           .Platform .Size .Store .Layers .RootfsPath .Extracted

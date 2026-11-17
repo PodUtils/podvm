@@ -5727,7 +5727,7 @@ Each of the issues 492 to 508 has the label `confirmed` and an entry, or is clos
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -5748,6 +5748,10 @@ One test file walks each verb of the table. (a) Each flag row of the verb is in 
 ## Prove
 
 `cargo test --release -p podvm --test cli_contract` passes, and the harness fails on the tree of `0.2.0-beta.31` (a planted copy of 505 or 492).
+
+## Done
+
+**Done (2026-11-17).** `crates/podvm/tests/cli_contract.rs` walks each verb of the parity table (81 rows of verbs, 204 rows of flags; the refused docker verbs and the names `docker` and `podman` of argv[0] stay out): `VERB --help` exits 0 and names each flag row; an unknown flag and an argument that is not UTF-8 give a code of the table, a line on stderr, and no "internal error" line of the panic hook. Its first run found 22 rows that no help named (10 of `run`, `--podvm-tier` of six verbs, two of `lab`, `rmi -f`, `exec -i`); each help names them now (report 497). With 505 planted again (`env::args` in `main`), the test fails with 48 breaks, each "a panic of podvm". `cargo test --release -p podvm --test cli_contract` passes in under 1 s.
 
 # T-1947: Fail safe at the edges: a panic hook, checked numbers, and the writes of the store
 

@@ -32,7 +32,7 @@ const STOP_GRACE_MS: u64 = 10_000;
 const WAIT_BOUND_MS: u64 = 3_600_000;
 
 pub const PS_USAGE: &str = "\
-usage: podvm ps [-a|--all] [-q|--quiet] [--format T] [--no-trunc]
+usage: podvm ps [-a|--all] [-q|--quiet] [--format T] [--no-trunc] [--podvm-tier incus]
        [--filter key=value]
 
   Fields: .ID .Names .Image .Command .CreatedAt .Status .State .Ports .Pid
@@ -171,7 +171,7 @@ pub fn start(args: &[String]) -> i32 {
             return crate::parity::refuse_member(
                 "start",
                 &member,
-                "usage: podvm start <container> [container...]",
+                "usage: podvm start [--podvm-tier incus] <container> [container...]",
             )
         }
     };
@@ -179,7 +179,7 @@ pub fn start(args: &[String]) -> i32 {
     if let Some(c) = crate::parity::admit_all(
         "start",
         args,
-        "usage: podvm start <container> [container...]",
+        "usage: podvm start [--podvm-tier incus] <container> [container...]",
     ) {
         return c;
     }
@@ -191,14 +191,14 @@ pub fn start(args: &[String]) -> i32 {
     let mut any = false;
     for want in args {
         if want == "-h" || want == "--help" {
-            println!("usage: podvm start <container> [container...]");
+            println!("usage: podvm start [--podvm-tier incus] <container> [container...]");
             return 0;
         }
         if want.starts_with('-') {
             if let Err(c) = crate::parity::admit(
                 "start",
                 want,
-                "usage: podvm start <container> [container...]",
+                "usage: podvm start [--podvm-tier incus] <container> [container...]",
             ) {
                 return c;
             }
@@ -210,7 +210,7 @@ pub fn start(args: &[String]) -> i32 {
         }
     }
     if !any {
-        eprintln!("usage: podvm start <container> [container...]");
+        eprintln!("usage: podvm start [--podvm-tier incus] <container> [container...]");
         return EXIT_CLI_ERROR;
     }
     code

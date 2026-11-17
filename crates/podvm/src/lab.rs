@@ -19,7 +19,7 @@ use podvm_image::error::EXIT_FLAG_ERROR;
 
 const USAGE: &str = "\
 usage: podvm lab profiles
-       podvm lab run PROFILE[,PROFILE...] -- CMD [ARG...]
+       podvm lab run [--allow-connect PORT]... [--way-out] PROFILE[,PROFILE...] -- CMD [ARG...]
        podvm lab check PROFILE[,PROFILE...]
        podvm lab scenarios
        podvm lab plan SCENARIO
@@ -27,7 +27,9 @@ usage: podvm lab profiles
 
 A hostile host class on this host, with no root (TODO/net.md T-1916):
 `profiles` lists them, `run` runs CMD in them, and `check` proves that
-each part holds here.
+each part holds here. `run --allow-connect PORT` keeps a TCP connect to
+PORT where the profile refuses each one; `--way-out` lets the stand-in
+proxy of the lab reach the real network (TODO/net.md T-1916, T-1924).
 
 A network lab inside one guest: a guest, a router and a world namespace,
 with NAT, a policy and impairment (TODO/net.md T-1662). `scenarios` lists
