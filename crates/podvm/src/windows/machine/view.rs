@@ -92,8 +92,8 @@ pub(crate) fn port(args: &[String]) -> i32 {
         return 0;
     }
     let Some(name) = args.first().filter(|a| !a.starts_with('-')) else {
-        eprintln!("usage: podvm port NAME [PORT[/PROTO]]");
-        return EXIT_FLAG_ERROR;
+        eprintln!("podvm port: a NAME is required\nusage: podvm port NAME [PORT[/PROTO]]");
+        return podvm_image::error::EXIT_CLI_ERROR; // PodUtils/podvm#519
     };
     let Some(r) = find(name) else {
         eprintln!(

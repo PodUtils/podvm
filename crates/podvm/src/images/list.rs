@@ -438,15 +438,15 @@ pub(super) fn read_password(
         return Err(EXIT_CLI_ERROR);
     }
     let mut password = String::new();
-    if stdin.read_to_string(&mut password).is_err() {
-        eprint!("{LOGIN_USAGE}");
+    if let Err(e) = stdin.read_to_string(&mut password) {
+        eprintln!("podvm login: the password on stdin does not read: {e}");
         return Err(EXIT_CLI_ERROR);
     }
     while password.ends_with('\n') || password.ends_with('\r') {
         password.pop();
     }
     if password.is_empty() {
-        eprint!("{LOGIN_USAGE}");
+        eprintln!("podvm login: the password on stdin is empty"); // #500
         return Err(EXIT_CLI_ERROR);
     }
     Ok(password)

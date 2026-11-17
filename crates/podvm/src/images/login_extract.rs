@@ -62,7 +62,22 @@ pub(super) fn parse_login_args(verb: &str, args: &[String]) -> Result<LoginArgs,
     // ⛔ An empty username is a flag-shape refusal, not a stored login: the
     // read path skips entries with no user, so storing one would write a
     // login that never reads back.
-    if expecting.is_some() || username.as_deref().unwrap_or("").is_empty() || !password_stdin {
+    // PodUtils/podvm#500, #519: each refusal names what is missing.
+    if let Some(flag) = expecting {
+        eprintln!("podvm {verb}: {flag} needs a value");
+        return Err(EXIT_FLAG_ERROR);
+    }
+    // A missing required flag stays a flag refusal (125), as the table
+    // words it ("the flag parser refused"); the line names the flag.
+    if username.as_deref().unwrap_or("").is_empty() {
+        eprintln!("podvm {verb}: -u USER is required");
+        return Err(EXIT_FLAG_ERROR);
+    }
+    if !password_stdin {
+        eprintln!(
+            "podvm {verb}: --password-stdin is required: podvm reads the password from \
+             stdin, and never prompts for one"
+        );
         return Err(EXIT_FLAG_ERROR);
     }
     Ok(LoginArgs {

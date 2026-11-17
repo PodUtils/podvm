@@ -113,9 +113,10 @@ pub fn probe_inside(args: &[String]) -> i32 {
             }
         }
     }
+    // PodUtils/podvm#519: a missing argument is a usage error (1), named.
     let Some(image) = image else {
-        eprintln!("{USAGE_INSIDE}");
-        return EXIT_FLAG_ERROR;
+        eprintln!("podvm probe-inside: an IMAGE is required\n{USAGE_INSIDE}");
+        return podvm_image::error::EXIT_CLI_ERROR;
     };
     let me = match std::env::current_exe() {
         Ok(p) => p,
@@ -199,8 +200,8 @@ pub fn compare(args: &[String]) -> i32 {
         }
     }
     let (Some(report), Some(reference)) = (report, reference) else {
-        eprintln!("{USAGE_COMPARE}");
-        return EXIT_FLAG_ERROR;
+        eprintln!("podvm compare: a REPORT and --reference FILE are required\n{USAGE_COMPARE}");
+        return podvm_image::error::EXIT_CLI_ERROR;
     };
     let read = |p: &str| {
         std::fs::read_to_string(p).map_err(|e| {

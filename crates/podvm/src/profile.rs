@@ -219,13 +219,14 @@ fn show(args: &[String]) -> i32 {
             other if name.is_none() => name = Some(other.to_string()),
             other => {
                 eprintln!("podvm profile show: one NAME only, and {other:?} is a second");
-                return EXIT_FLAG_ERROR;
+                return podvm_image::error::EXIT_CLI_ERROR;
             }
         }
     }
     let Some(name) = name else {
-        eprintln!("{USAGE}");
-        return EXIT_FLAG_ERROR;
+        // PodUtils/podvm#519: a missing argument is a usage error (1), named.
+        eprintln!("podvm profile show: a NAME is required (`podvm profile list`)\n{USAGE}");
+        return podvm_image::error::EXIT_CLI_ERROR;
     };
     match document(&name, &sets) {
         Ok(doc) => {
