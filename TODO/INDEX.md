@@ -606,7 +606,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1941](machine.md) | P3 | S | none | machine | open | The built-in `machine` profile asks for 1 GiB, which a file-size ceiling under 1 GiB refuses |
 | [T-1942](gate.md) | P1 | M | none | gate | done | The external QA of `0.2.0-beta.31`: verify the second batch of reports |
 | [T-1943](cli.md) | P1 | M | none | cli | partial | The external QA of `0.2.0-beta.31`, second batch: panics, flags and messages |
-| [T-1944](cli.md) | P2 | M | none | cli | open | The external QA of `0.2.0-beta.31`, second batch: `cp`, `import` and the helpers of credentials |
+| [T-1944](cli.md) | P2 | M | none | cli | partial | The external QA of `0.2.0-beta.31`, second batch: `cp`, `import` and the helpers of credentials |
 | [T-1945](cli.md) | P1 | M | none | cli | partial | `exec --env-file`, and a `-v` source that is opened with no symbolic link (PodUtils/podrunner#277) |
 | [T-1946](gate.md) | P1 | M | none | gate | done | The contract of the CLI: one table-driven harness of each verb |
 | [T-1947](gate.md) | P1 | M | none | gate | partial | Fail safe at the edges: a panic hook, checked numbers, and the writes of the store |
@@ -621,7 +621,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-552 entries: 12 open, 23 partial, 4 blocked, 513 done.
+552 entries: 11 open, 24 partial, 4 blocked, 513 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -632,9 +632,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 1 | 9 | 0 | 221 | 231 |
-| P2 | 8 | 10 | 3 | 175 | 196 |
+| P2 | 7 | 11 | 3 | 175 | 196 |
 | P3 | 3 | 4 | 1 | 42 | 50 |
-| **All** | 12 | 23 | 4 | 513 | 552 |
+| **All** | 11 | 24 | 4 | 513 | 552 |
 
 ## Work order
 

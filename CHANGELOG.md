@@ -43,6 +43,11 @@ Deployed: none yet.
 - `--env-file` and `--report` keep the caller's own file permissions in
   podvm's user namespace (#552), and `--report` refuses a path that the
   writer cannot use before the payload runs (#513).
+- `--` ends the options of each verb (#488). `import` names each
+  compressed form and refuses a hard link that `extract` would refuse
+  (#503, #515, #525). `rmi` of one of several names of an image is an
+  untag, also while a container uses the image (#548). `man --roff` and
+  `--llms` write each usage line once (#518).
 
 ### Added: the syscall tier for a detached container, 2026-11-17
 

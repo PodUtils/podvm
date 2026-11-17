@@ -6087,7 +6087,7 @@ Each item is reproduced as uid 1000 on the cloud host with the binary of `main` 
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -6112,6 +6112,10 @@ Verified by T-1942 (the reproduction of each, or the code for 502).
 ## Prove
 
 `cargo test --release -p podvm --bin podvm` passes, with a test of each refusal, and the repro of each issue, as uid 1000, gives the refusal or the result of the fix.
+
+## Done
+
+**Partial (2026-11-17).** 498 (with T-1952): `cp` into an image is refused by name. 503 (with T-1952): `import` refuses a hard link whose target is absolute, holds `..`, or comes later. COORD-181 (#568) asks podcrates for 496 (the `ServerURL` of a helper of credentials). Remaining: 495 and 502.
 
 # T-1945: `exec --env-file`, and a `-v` source that is opened with no symbolic link (PodUtils/podrunner#277)
 

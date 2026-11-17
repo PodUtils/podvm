@@ -258,7 +258,19 @@ pub fn rmi(verb: &str, args: &[String]) -> i32 {
         if let Ok(records) = store.find(want) {
             let mut failed = false;
             let mut referrers: Vec<String> = Vec::new();
+            // PodUtils/podvm#548: a manifest that another record still names
+            // stays, so a removal of this name is an untag, as docker's.
+            let others = store.list().unwrap_or_default();
             for record in &records {
+                let named_elsewhere = others.iter().any(|o| {
+                    o.manifest_digest == record.manifest_digest
+                        && !records
+                            .iter()
+                            .any(|r| r.repository == o.repository && r.tag == o.tag)
+                });
+                if named_elsewhere {
+                    continue;
+                }
                 match podvm_supervise::referencing(&store, &record.manifest_digest) {
                     Ok(found) => referrers.extend(found.iter().map(|c| c.name.clone())),
                     Err(e) => {
