@@ -71,6 +71,31 @@ fn rest_of(note: &str) -> Option<String> {
 }
 
 /// The model: each verb that the table implements, with its flags, its
+/// The arguments of the first usage line of `help` (and of each line that
+/// goes on with `podvm` under it), with no `usage: podvm PATH`, and the
+/// rest of the help, where it has any.
+pub fn split_usage(help: &str, path: &[String]) -> (String, Option<String>) {
+    let head = format!("podvm {}", path.join(" "));
+    let mut usage = Vec::new();
+    let mut lines = help.lines().peekable();
+    while let Some(l) = lines.peek() {
+        let t = l.trim_start();
+        let t = t.strip_prefix("usage:").map_or(t, str::trim_start);
+        if !(usage.is_empty() && l.trim_start().starts_with("usage:")) && !t.starts_with("podvm ") {
+            break;
+        }
+        let args = t.strip_prefix(head.as_str()).map_or(t, str::trim_start);
+        usage.push(args.to_string());
+        lines.next();
+    }
+    if usage.is_empty() {
+        return (help.trim_end().to_string(), None);
+    }
+    let rest: Vec<&str> = lines.collect();
+    let body = rest.join("\n").trim().to_string();
+    (usage.join(" | "), (!body.is_empty()).then_some(body))
+}
+
 /// status and the bytes of its `--help` as its usage.
 pub fn manual(help: &dyn Fn(&str) -> Option<String>) -> Manual {
     let mut commands = Vec::new();
@@ -85,11 +110,17 @@ pub fn manual(help: &dyn Fn(&str) -> Option<String>) -> Manual {
             .filter(|r| r.verb == row.verb && r.flag.is_some())
             .flat_map(flags_of)
             .collect();
+        // PodUtils/podvm#518: pod-manual writes "Usage: podvm PATH" before
+        // the usage, so the field takes the arguments only, and the rest of
+        // the help becomes a note.
+        let (usage, body) = split_usage(&help(row.verb).unwrap_or_default(), &path);
+        let mut notes: Vec<String> = rest_of(row.note).into_iter().collect();
+        notes.extend(body);
         commands.push(Command {
             path,
             about: super::summary(row.note).to_string(),
-            notes: rest_of(row.note).into_iter().collect(),
-            usage: help(row.verb).unwrap_or_default(),
+            notes,
+            usage,
             flags,
             parity: Some(parity_of(row)),
             ..Command::default()
@@ -161,12 +192,32 @@ mod tests {
 
     #[test]
     fn each_implemented_verb_is_a_command_of_the_model() {
-        let m = manual(&|v: &str| Some(format!("usage: podvm {v}\n")));
+        let m = manual(&|v: &str| Some(format!("usage: podvm {v} ARG\n\nbody\n")));
         assert_eq!(m.commands.len(), super::super::implemented().len());
+        // PodUtils/podvm#518: pod-manual writes "Usage: podvm PATH" itself.
         assert!(m
             .commands
             .iter()
-            .all(|c| c.usage.starts_with("usage: podvm ")));
+            .all(|c| !c.usage.starts_with("usage:") && c.usage.ends_with("ARG")));
+        assert!(m
+            .commands
+            .iter()
+            .all(|c| c.notes.iter().any(|n| n == "body")));
         assert!(m.names.contains(&"docker".to_string()));
+    }
+
+    #[test]
+    fn a_usage_keeps_its_arguments_and_gives_the_rest_as_a_note() {
+        let p = vec!["lab".to_string()];
+        let (u, b) = split_usage(
+            "usage: podvm lab profiles\n       podvm lab run P\n\nText.\n",
+            &p,
+        );
+        assert_eq!(u, "profiles | run P");
+        assert_eq!(b.as_deref(), Some("Text."));
+        assert_eq!(
+            split_usage("no usage line", &p),
+            ("no usage line".to_string(), None)
+        );
     }
 }
