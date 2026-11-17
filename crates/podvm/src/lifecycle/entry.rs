@@ -300,6 +300,10 @@ pub fn decide_entry_prefer(
 ) -> Result<Option<Userland>, i32> {
     let chroot_ok = chroot_ok_for(verb, findings);
     if chroot_ok && !prefer {
+        if unsafe_host_paths {
+            eprintln!("podvm {verb}: --unsafe-host-paths acts on the loader family only (#553)");
+            return Err(podvm_image::error::EXIT_FLAG_ERROR);
+        }
         return Ok(None);
     }
     let path_dirs = podvm_enter::Plan::path_from(env);

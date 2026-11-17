@@ -251,6 +251,20 @@ pub fn install(verb: &str, args: &[String]) -> i32 {
     let dir = dir.unwrap_or_else(|| me.parent().unwrap_or(Path::new(".")).to_path_buf());
 
     let daemon = docker_daemon();
+    // PodUtils/podvm#549: a refusal of `docker` comes before any link, so a
+    // refused run installs nothing (it made `podman`, then exited 125).
+    if wanted.iter().any(|n| n == "docker")
+        && !force
+        && let Daemon::Reachable(where_) = &daemon
+    {
+        eprintln!(
+            "podvm system install-names: a docker daemon is reachable ({where_}), so podvm \
+             will not take the `docker` name: this is a machine where podvm is the wrong \
+             tool, and nothing was installed. --force installs it anyway, and `system \
+             install-names podman` installs the other name alone (TODO/cli.md T-0803)"
+        );
+        return EXIT_RUNTIME_ERROR;
+    }
     let mut code = 0;
     for name in &wanted {
         let dest = dir.join(name);

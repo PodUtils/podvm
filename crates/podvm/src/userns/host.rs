@@ -126,6 +126,22 @@ pub fn bind_volumes(
                 }
             }
         }
+        // PodUtils/podvm#565: a bind needs the same kind on both sides; the
+        // kernel's "Not a directory" named neither path.
+        if let Ok(t) = std::fs::metadata(&target)
+            && t.is_dir() != meta.is_dir()
+        {
+            let kind = |d: bool| if d { "a directory" } else { "not a directory" };
+            return Err(format!(
+                "-v {}:{}: the host path is {} and {} of the image is {}; a volume \
+                 binds a directory over a directory, or a file over a file or a new path",
+                v.host,
+                v.guest,
+                kind(meta.is_dir()),
+                v.guest,
+                kind(t.is_dir())
+            ));
+        }
         let (Ok(src), Ok(dst)) = (
             std::ffi::CString::new(host.as_os_str().as_encoded_bytes()),
             std::ffi::CString::new(target.as_os_str().as_encoded_bytes()),
