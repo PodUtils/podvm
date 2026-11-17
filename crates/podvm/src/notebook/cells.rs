@@ -4,13 +4,21 @@
 use serde_json::Value;
 
 /// The notebook `nb` cut after each cell of `after` (1-based cell numbers,
-/// over all cells): one notebook for each kernel. A number past the last
-/// cell cuts nothing.
+/// over all cells): one notebook for each kernel. A number of the last
+/// cell or past it cuts nothing, and is refused (PodUtils/podvm#494).
 pub fn segments(nb: &Value, after: &[usize]) -> Result<Vec<Value>, String> {
     let cells = nb
         .get("cells")
         .and_then(Value::as_array)
         .ok_or("the notebook has no `cells` array")?;
+    if let Some(&n) = after.iter().find(|&&n| n >= cells.len()) {
+        return Err(format!(
+            "--restart-kernel-after {n}: the notebook has {} cells (code and markdown), \
+             so a restart goes after cell 1 to {}",
+            cells.len(),
+            cells.len().saturating_sub(1)
+        ));
+    }
     let mut cuts: Vec<usize> = after
         .iter()
         .copied()

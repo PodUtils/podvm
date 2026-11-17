@@ -5756,7 +5756,7 @@ One test file walks each verb of the table. (a) Each flag row of the verb is in 
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -5777,6 +5777,10 @@ The second path stays, also where the first path holds: a fallback that is never
 ## Prove
 
 `podvm run --kill-after 99999999999999999999` and a planted `panic!` in a verb exit 125 with one named line; `cargo test --release -p podvm --bin podvm` passes.
+
+## Done
+
+**Partial (2026-11-17).** The panic hook (`names/stdout.rs`): each panic that is not a print failure ends with one line (`podvm VERB: internal error: MESSAGE at FILE:LINE. This is a bug of podvm ...`) and exit 125, after the default report where `RUST_BACKTRACE` is set. Measured: the repro of 506 on the build before its fix gave exit 125 with that line (before: SIGABRT, exit 134). The numbers of `notebook` go through one bounded parser (T-1943). Remaining: the bounded parser for each other number flag, the lock of the table's writer (COORD-181, #568), and the side file of a lost end of a run.
 
 # T-1948: Each banner and each inspect field says what the entered mechanism did
 

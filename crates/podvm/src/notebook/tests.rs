@@ -82,8 +82,12 @@ fn a_restart_cuts_the_notebook_after_its_cell() {
     assert_eq!(s[0]["cells"], json!([{"n": 1}]));
     assert_eq!(s[1]["cells"], json!([{"n": 2}, {"n": 3}]));
     assert_eq!(s[1]["nbformat"], 4);
-    // A cut at or past the last cell, and a repeated cut, cut nothing more.
-    assert_eq!(segments(&nb, &[3, 9]).unwrap().len(), 1);
+    // A cut at or past the last cell is refused (#494); a repeated cut cuts
+    // nothing more.
+    assert!(
+        segments(&nb, &[3, 9]).is_err(),
+        "#494: a cell past the end is refused"
+    );
     assert_eq!(segments(&nb, &[2, 2, 1]).unwrap().len(), 3);
     assert!(segments(&json!({}), &[]).is_err());
 }

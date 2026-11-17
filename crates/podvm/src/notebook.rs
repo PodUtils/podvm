@@ -33,7 +33,9 @@ usage: podvm notebook NB --persist DIR [--cycles N] [--kill-after S]
 Runs the notebook NB (.ipynb, or a marimo .py) N times (1 by default),
 each time in a new container with a read-only root; only DIR survives a
 cycle, at /persist. Each output line prints as `[N] text`. Exit 1 when a
-cell raised, 143 when --kill-after S ended a cycle (TODO/cli.md T-1660).";
+cell raised, 143 when --kill-after S ended a cycle (TODO/cli.md T-1660).
+N is at most 1000, S at most 31536000 (a year). CELL counts each cell of
+the notebook (code and markdown), and is below the number of cells.";
 
 /// The image of a Jupyter notebook, and of a marimo file.
 pub const JUPYTER_IMAGE: &str = "quay.io/jupyter/base-notebook:latest";
@@ -42,6 +44,9 @@ pub const MARIMO_IMAGE: &str = "ghcr.io/marimo-team/marimo:latest";
 pub use podvm_probe::exit::EXIT_KILLED;
 /// The time from SIGTERM to SIGKILL.
 const GRACE: Duration = Duration::from_secs(3);
+/// The bounds of `--cycles` and `--kill-after` (one year), T-1947.
+const MAX_CYCLES: u64 = 1000;
+const MAX_KILL_AFTER: u64 = 365 * 24 * 3600;
 
 /// The arguments of `podvm notebook`.
 #[derive(Debug, Default, PartialEq)]
@@ -74,19 +79,31 @@ pub fn parse(args: &[String]) -> Result<Args, String> {
                 .or_else(|| it.next().cloned())
                 .ok_or(format!("{name} needs a value"))
         };
-        let number = |name: &str, v: String| -> Result<u64, String> {
+        // TODO/gate.md T-1947, PodUtils/podvm#493, #506: a number out of its
+        // bound is refused by name, never clamped or wrapped.
+        let number = |name: &str, v: String, max: u64| -> Result<u64, String> {
             v.parse::<u64>()
                 .ok()
-                .filter(|n| *n > 0)
-                .ok_or(format!("{name} takes a whole number above 0, not {v:?}"))
+                .filter(|n| (1..=max).contains(n))
+                .ok_or(format!(
+                    "{name} takes a whole number from 1 to {max}, not {v:?}"
+                ))
         };
         match flag {
             "--persist" => persist = Some(PathBuf::from(value("--persist")?)),
-            "--cycles" => a.cycles = number("--cycles", value("--cycles")?)?.min(1000) as u32,
-            "--kill-after" => a.kill_after = Some(number("--kill-after", value("--kill-after")?)?),
-            "--restart-kernel-after" => a
-                .restart_after
-                .push(number("--restart-kernel-after", value("--restart-kernel-after")?)? as usize),
+            "--cycles" => a.cycles = number("--cycles", value("--cycles")?, MAX_CYCLES)? as u32,
+            "--kill-after" => {
+                a.kill_after = Some(number(
+                    "--kill-after",
+                    value("--kill-after")?,
+                    MAX_KILL_AFTER,
+                )?)
+            }
+            "--restart-kernel-after" => a.restart_after.push(number(
+                "--restart-kernel-after",
+                value("--restart-kernel-after")?,
+                u32::MAX as u64,
+            )? as usize),
             "--image" => a.image = Some(value("--image")?),
             f if f.starts_with('-') => return Err(format!("unknown option {f:?}")),
             _ if nb.is_none() => nb = Some(PathBuf::from(arg)),
@@ -239,7 +256,10 @@ pub fn run_argv(
     v.push(s("--workdir=/workspace"));
     // The bound of the run backs the bound of the verb.
     if let Some(k) = kill_after {
-        v.push(format!("--timeout={}", k + 2 * GRACE.as_secs() + 5));
+        v.push(format!(
+            "--timeout={}",
+            k.saturating_add(2 * GRACE.as_secs() + 5)
+        ));
     }
     v.push(s("--entrypoint="));
     v.push(s(image));
@@ -300,7 +320,7 @@ fn cycle_run(argv: &[String], kill_after: Option<u64>) -> Result<(i32, String, S
         let _ = se.read_to_string(&mut s);
         s
     });
-    let deadline = kill_after.map(|k| Instant::now() + Duration::from_secs(k));
+    let deadline = kill_after.and_then(|k| Instant::now().checked_add(Duration::from_secs(k)));
     let status = loop {
         if let Some(st) = child.try_wait().map_err(|e| e.to_string())? {
             break Some(st);

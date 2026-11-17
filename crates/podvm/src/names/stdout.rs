@@ -59,7 +59,7 @@ pub fn print_failure<'a>(msg: &'a str, stream: &str) -> Option<&'a str> {
 
 /// Install the hook. A panic of a print macro on stdout says so and exits
 /// 125; on stderr it exits 125 with no line, because stderr takes none. Each
-/// other panic keeps the default hook.
+/// other panic gives one named line and exits 125 (T-1947).
 pub fn install() {
     let default = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -79,8 +79,31 @@ pub fn install() {
         if print_failure(&msg, "stderr").is_some() {
             std::process::exit(EXIT);
         }
-        default(info);
+        // TODO/gate.md T-1947: each other panic is a bug of podvm. It ends
+        // with one named line and exit 125, not SIGABRT (exit 134, the
+        // release profile aborts), so that a caller reads a documented code
+        // (PodUtils/podvm#505, #506). `RUST_BACKTRACE` keeps the default
+        // report first.
+        if std::env::var_os("RUST_BACKTRACE").is_some() {
+            default(info);
+        }
+        say(&bug_line(
+            &verb(),
+            &msg,
+            info.location().map(|l| (l.file(), l.line())),
+        ));
+        std::process::exit(EXIT);
     }));
+}
+
+/// The line of a panic that is a bug of podvm.
+pub fn bug_line(verb: &str, msg: &str, at: Option<(&str, u32)>) -> String {
+    let at = at.map_or(String::new(), |(f, l)| format!(" at {f}:{l}"));
+    format!(
+        "podvm {verb}: internal error: {msg}{at}. This is a bug of podvm, not of the \
+         payload, and podvm stopped here. Please report this line \
+         (https://github.com/PodUtils/podvm/issues) (TODO/gate.md T-1947)\n"
+    )
 }
 
 #[cfg(test)]
@@ -96,5 +119,12 @@ mod tests {
         );
         assert_eq!(print_failure(m, "stderr"), None);
         assert_eq!(print_failure("index out of bounds", "stdout"), None);
+    }
+
+    #[test]
+    fn a_bug_line_names_the_verb_the_message_and_the_place() {
+        let l = bug_line("run", "overflow", Some(("src/x.rs", 7)));
+        assert!(l.starts_with("podvm run: internal error: overflow at src/x.rs:7."));
+        assert!(l.ends_with('\n') && l.matches('\n').count() == 1);
     }
 }
