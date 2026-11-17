@@ -7,13 +7,14 @@ use super::*;
 /// name is a container or, failing that, an image.
 pub(super) const CP_USAGE: &str = "\
 usage: podvm cp [-r|--recursive] <container|image>:<path> <dest>
-       podvm cp [-r|--recursive] <src> <container|image>:<path>
+       podvm cp [-r|--recursive] <src> <container>:<path>
 
   -r, --recursive  copy a directory tree. A file copies with or without
                    it; a directory without it is refused naming the flag.
 
   The name before the colon is a container first (as before), then an
-  image, whose rootfs is extracted if needed. A directory copies its
+  image, whose rootfs is extracted if needed. An image is a source only:
+  a copy into it would change the shared extraction, and is refused. A directory copies its
   contents into DEST: created where missing, and it must be a directory
   where present. Symlinks are replicated as symlinks, never followed,
   and every rootfs-side path passes the same containment gate as a

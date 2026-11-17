@@ -304,6 +304,18 @@ fn copy_named(
             return image_err.exit_code();
         }
     };
+    // PodUtils/podvm#498, #563: a copy INTO an image wrote the extraction
+    // that each later container copies, and that `extract --force` and
+    // `save` lose. An image takes no write; a copy out of it stays.
+    if !out_of {
+        eprintln!(
+            "podvm cp: {image} is an image, and a copy into an image is refused: it would \
+             change the shared extraction, not the image. Copy into a container \
+             (`podvm create --name NAME {image}`, then `podvm cp {} NAME:{inside}`)",
+            outside.display()
+        );
+        return EXIT_CLI_ERROR;
+    }
     // ⚠ The image lock for the whole copy: the rootfs below must not be
     // deleted between the extraction check and the last byte, which is
     // T-0204's hold and T-1322's query answering together.

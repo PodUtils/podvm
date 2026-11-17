@@ -4561,7 +4561,7 @@ The repro of each issue, as uid 1000: the filter lists no `windows:dos`; a packe
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -4582,3 +4582,7 @@ One change for each item; the platform of a record comes from the manifest (and 
 ## Prove
 
 `cargo test --release -p podvm-image` passes, and the repro of each issue of this entry gives the fix, as uid 1000.
+
+## Done
+
+**Partial (2026-11-17).** 563 and 498: `cp` into an image is refused by name with exit 1, and names `create` and `cp` into the container; a copy out of an image stays (the usage and the parity row say so). 523 (with T-1951): `inspect` takes a container before an image. Remaining: 515, 525, 526, 527, 528, 529, 544, 548, 551, 555.

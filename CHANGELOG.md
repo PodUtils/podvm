@@ -38,6 +38,8 @@ Deployed: none yet.
 - `inspect A B` prints one JSON array, and a container comes before an
   image of the same name (#514, #523). A bare `profile`, `lab` and
   `windows` print their help and exit 0 (#532).
+- `cp` into an image is refused: it changed the shared extraction that
+  each later container copies (#498, #563). A copy out of an image stays.
 
 ### Added: the syscall tier for a detached container, 2026-11-17
 
