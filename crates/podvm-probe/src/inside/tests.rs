@@ -69,6 +69,17 @@ fn the_compare_passes_one_tier_and_fails_a_planted_escape() {
     // A cause in the expected-differences file explains it.
     let e = parse_expected("# why\nescape-surface\thost-store\tplanted for the test\n");
     assert_eq!(compare(&b, &a, &e).code(true), 0);
+    // PodUtils/podvm#504: an empty or a missing reason explains nothing.
+    for line in [
+        "escape-surface\thost-store\t \n",
+        "escape-surface\thost-store\n",
+    ] {
+        assert_eq!(
+            compare(&b, &a, &parse_expected(line)).code(true),
+            1,
+            "{line:?}"
+        );
+    }
     // A difference outside the invariant sections never fails.
     let mut c = a.clone();
     c[2].verdict = Verdict::Unknown;

@@ -26,7 +26,8 @@ pub fn parse_expected(text: &str) -> Vec<Expected> {
             Some(Expected {
                 section: f.next()?.to_string(),
                 target: f.next()?.to_string(),
-                reason: f.next().unwrap_or("").to_string(),
+                // PodUtils/podvm#504: an empty reason explains nothing.
+                reason: f.next().map(str::trim).unwrap_or("").to_string(),
             })
         })
         .collect()
@@ -50,7 +51,7 @@ impl Difference {
 
     /// True where a strict compare fails on it.
     pub fn unexplained_invariant(&self) -> bool {
-        self.invariant() && self.reason.is_none()
+        self.invariant() && self.reason.as_deref().is_none_or(str::is_empty)
     }
 }
 

@@ -210,7 +210,11 @@ pub const RUN_OPTIONS: &str = "\
                    PORT,... confines the payload with Landlock, the seccomp
                    deny filter of pod-confine and no_new_privs. Each path
                    that no rule names is denied; the system directories of
-                   the image are read and execute, /etc is not. On a rung
+                   the image are read and execute, /etc is not. Each run
+                   may also read /proc, /dev/zero, /dev/random,
+                   /dev/urandom and the files of the dynamic loader, and
+                   write /dev/null. With no connect=, TCP is not
+                   confined (PodUtils/podvm#499). On a rung
                    with a chroot and on each family of the userland rung
                    (the loader family, native-static, the syscall and the
                    emulate tier: host paths through the table, -v

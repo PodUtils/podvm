@@ -231,6 +231,15 @@ fn run(args: &[String], help: &dyn Fn(&str) -> Option<String>) -> i32 {
         );
         return podvm_image::error::EXIT_CLI_ERROR;
     }
+    // PodUtils/podvm#478: one form of the manual at a time, and `--llms` is
+    // the whole manual, with no page.
+    if llms && (json || roff || want.is_some()) {
+        eprintln!(
+            "podvm man: --llms is the whole manual, with no other form and no page; \
+             fix: give one of --json, --roff, --llms, and a page with --json or --roff"
+        );
+        return podvm_image::error::EXIT_CLI_ERROR;
+    }
     // TODO/cli.md T-1917: the whole manual as llms.txt, with no other page.
     if llms {
         print!("{}", pod_manual::llms::full(&model::manual(help), &[]));
