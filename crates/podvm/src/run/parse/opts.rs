@@ -199,6 +199,35 @@ pub(super) fn name_arg(verb: &str, a: &str) -> Result<String, i32> {
     Err(podvm_image::error::EXIT_FLAG_ERROR)
 }
 
+/// PodUtils/podvm#482: where the profile `name` names an image, each operand
+/// is the command; a first operand that reads as an image reference (a `:`
+/// or a `/`, and not an absolute path) is refused by name, not run as the
+/// command.
+pub(super) fn profile_operand(
+    verb: &str,
+    name: &str,
+    image: &str,
+    first: Option<&str>,
+) -> Result<(), i32> {
+    let Some(f) = first.filter(|f| !f.starts_with('/') && f.contains([':', '/'])) else {
+        return Ok(());
+    };
+    eprintln!(
+        "podvm {verb}: --profile {name} names the image {image}, so each operand is the \
+         command, and {f:?} reads as an image; give only the command, or another image \
+         with -s fs.image={f}"
+    );
+    Err(podvm_image::error::EXIT_FLAG_ERROR)
+}
+
+#[cfg(test)]
+#[test]
+fn an_operand_that_reads_as_an_image_is_refused_under_a_profile_of_an_image() {
+    let p = |f| profile_operand("run", "p", "busybox:musl", Some(f));
+    assert!(p("alpine:3.20").is_err() && p("ghcr.io/x/y").is_err());
+    assert!(p("python3").is_ok() && p("/bin/echo").is_ok());
+}
+
 #[cfg(test)]
 #[test]
 fn a_name_follows_the_rule_of_docker() {

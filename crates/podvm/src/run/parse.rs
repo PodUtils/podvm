@@ -26,6 +26,7 @@ pub(super) fn parse(verb: &str, args: &[String]) -> std::result::Result<Opts, i3
         // TODO/cli.md T-1659: the profile names the image, so each word of
         // the command line after the flags is the command.
         Some(image) => {
+            opts::profile_operand(verb, &name, image, o.image.as_deref())?; // #482
             let positional = usize::from(o.image.is_some()) + o.command.len();
             let cut = args.len().saturating_sub(positional);
             flags.extend(args[..cut].iter().filter(|a| *a != "--").cloned());
