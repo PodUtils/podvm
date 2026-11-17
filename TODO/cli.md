@@ -5993,3 +5993,47 @@ The fixup stays on by default: a host that drops tcp/80 stalls apt for minutes, 
 **Done (2026-11-17).** podcrates `v0.68.0` (PodUtils/podcrates#219, podcrates@T-846) answers COORD-170: `pod-rootfs` takes a URL only from a line that the package manager reads (no comment; in a `*.sources` file only `URIs`). Measured as uid 1000 on the cloud host with `ubuntu:24.04` and a listener as `HTTPS_PROXY`: with no flag the run sends `CONNECT archive.ubuntu.com:443` and `CONNECT security.ubuntu.com:443`, and none to `help.ubuntu.com`; with `--no-source-fixup` it sends none. podrunner passes the flag since its `2d481dd` (PodUtils/podrunner#202 closed).
 
 **Partial (2026-11-17).** Measured as uid 1000 on the cloud host (a listener on `127.0.0.1:18777` that answers 403, `ubuntu:24.04`): with no flag the run sends `CONNECT help.ubuntu.com:443`, `CONNECT archive.ubuntu.com:443` and `CONNECT security.ubuntu.com:443`; with `--no-source-fixup` it sends none, and `run -d`, `create` and `exec` take the flag. `help.ubuntu.com` is line 1 of `etc/apt/sources.list.d/ubuntu.sources`, a comment. The parity notes of `--no-source-fixup` (`run`, `exec`) now name the request, its hosts, its bounds and its cache. COORD-171 (#464) tells podrunner to pass the flag; COORD-170 (#463) asks podcrates to skip comments. Remaining: the tag of podcrates that skips them, and the Prove with no `help.ubuntu.com`.
+
+# T-1937: The external QA of `0.2.0-beta.31`: the argument checks of the CLI
+
+**Source:** the external QA of `0.2.0-beta.31` (2026-11-17), issues 478, 479, 482, 483, 484, 485, 486, 487, 488, 489, 491, verified by a reproduction on `main`
+**Category:** cli
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+Each verified report is a promise of the help or of docker that the parser does not keep:
+- 484: `--name` takes an empty name, a `/`, a space and 300 characters, and `ps` and `inspect` show them.
+- 486: `logs NAME extra` and `version extra` ignore the extra word (also `lab profiles extra`, a comment of 486).
+- 487: `image bogus` says "not implemented yet" with exit 125, where `container bogus` says "not a subverb" with exit 1.
+- 489: `exec --platform P NAME` of a container is accepted and ignored.
+- 491: `doctor` ends with a bare `profile: refused`, with no reason.
+- 478: `man --llms` with `--json` or `--roff` (and a page name) ignores the other flag.
+- 479: `doctor --strict=0` and `probe --strict=0` report an internal bug of podvm; `--strict=false` works.
+- 482: `run --profile NAME IMAGE CMD`, where the profile names an image, takes IMAGE as the command, and no help says so.
+- 483: `podvm man` lists `abi`, `df`, `prune` and `install-names` as top-level commands; they refuse and name `system`.
+- 485: `logout` help says a second logout is still logged out; it exits 1 (the decision of T-0209).
+- 488: `--` ends the options of `run`, and `exec`, `pull` and `images` refuse it.
+
+## Premise
+
+Each item is reproduced as uid 1000 on the cloud host with the binary of `main` at `cf61cdc`.
+
+## Approach
+
+One small change for each item, with a test of its refusal. 485 keeps exit 1 (T-0209) and says so in the help.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test --release -p podvm --bin podvm` passes, with a test of each refusal, and the repro of each issue, as uid 1000, gives the refusal or the result of the fix.
+
+## Done
+
+**Partial (2026-11-17).** 484: `--name` and `--name=` take docker's rule (`opts::name_arg`, `[a-zA-Z0-9][a-zA-Z0-9_.-]*`, at most 64 bytes), with a test. 486: `logs` refuses a second container and `version` an operand, with exit 1. 487: `image bogus` says "is not a subverb of the group" with the usage (which names `extract` now) and exit 1. 489: `exec --platform` of a container refuses a platform that is not the one of its image (`command::container_platform`), exit 125. 491: `doctor` prints `machine profile: refused (the machine tier needs: LEGS)`; experiment 364 reads the new label. Measured as uid 1000 with the binary of this commit. Remaining: 478, 479, 482, 483, 485, 488, and `lab profiles extra`.

@@ -46,6 +46,7 @@ fn the_sweep_takes_an_abandoned_partial_and_leaves_a_held_one() {
     // what a SIGKILL leaves behind.
     let (dead, handle) = s.stage("abandoned").unwrap();
     drop(handle);
+    backdate(&dead);
     // Live: still held, exactly as a writer mid-blob holds it.
     let (live, _held) = s.stage("live").unwrap();
 
@@ -71,6 +72,7 @@ fn opening_a_store_sweeps_what_a_killed_process_left() {
     let s = Store::open(&d).unwrap();
     let (dead, handle) = s.stage("abandoned").unwrap();
     drop(handle);
+    backdate(&dead);
     assert!(dead.is_file());
     let _again = Store::open(&d).unwrap();
     assert!(
@@ -79,6 +81,32 @@ fn opening_a_store_sweeps_what_a_killed_process_left() {
         who_holds(&dead)
     );
     let _ = std::fs::remove_dir_all(&d);
+}
+
+/// Set the time of the last write of `p` past [`crate::store::blobs::STAGING_AGE`].
+fn backdate(p: &std::path::Path) {
+    let old = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+    std::fs::File::options()
+        .write(true)
+        .open(p)
+        .and_then(|f| f.set_modified(old))
+        .unwrap();
+}
+
+/// PodUtils/podvm#472, #501: a young `.partial` that no lock holds is a
+/// write in progress (the table of containers is written so), and the
+/// sweep keeps it.
+#[test]
+fn the_sweep_keeps_a_young_unlocked_partial() {
+    let _serialised = STORE_TESTS.lock().unwrap_or_else(|e| e.into_inner());
+    let s = scratch("sweep-young");
+    let young = s.root().join("staging").join("containers.json.1.2.partial");
+    std::fs::write(&young, b"[]").unwrap();
+    let swept = s.sweep_staging();
+    assert!(young.exists() && !swept.contains(&young));
+    backdate(&young);
+    assert!(s.sweep_staging().contains(&young));
+    let _ = std::fs::remove_dir_all(s.root());
 }
 
 #[test]

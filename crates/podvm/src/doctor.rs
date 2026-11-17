@@ -179,7 +179,7 @@ impl Doctor {
                 self.unrunnable.join(", "),
             ));
         }
-        out.push_str(&format!("profile: {profile}\n"));
+        out.push_str(&format!("machine profile: {profile}\n"));
         out
     }
 }
@@ -229,10 +229,15 @@ pub fn doctor(verb: &str, args: &[String]) -> i32 {
     }
     let findings = podvm_probe::run();
     let assessed = machine::assess(&findings);
+    // PodUtils/podvm#491: a refusal names the legs that block every
+    // profile of the machine tier.
     let profile = match assessed.profile {
-        Some(machine::Profile::Full) => "full",
-        Some(machine::Profile::Tcg) => "tcg",
-        None => "refused",
+        Some(machine::Profile::Full) => "full".to_string(),
+        Some(machine::Profile::Tcg) => "tcg".to_string(),
+        None => format!(
+            "refused (the machine tier needs: {})",
+            assessed.tcg_blocked_by.join(", ")
+        ),
     };
     let mut report = Doctor::default();
     examine_legs(&assessed, &mut report);
@@ -251,7 +256,7 @@ pub fn doctor(verb: &str, args: &[String]) -> i32 {
         ),
     }
     scope::examine(store.as_ref().ok().map(|s| s.root()), &mut report); // T-1667
-    print!("{}", report.render(profile));
+    print!("{}", report.render(&profile));
     report.exit_code(strict)
 }
 

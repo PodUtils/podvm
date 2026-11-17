@@ -239,7 +239,7 @@ echo "" >>"$WORK/report"
 echo "== doctor-1. doctor holds with profile tcg and no fix" >>"$WORK/report"
 timeout 120 "$BIN" doctor >"$WORK/doctor.out" 2>"$WORK/doctor.err"
 rc=$?
-if [ "$rc" -eq 0 ] && grep -q "^profile: tcg" "$WORK/doctor.out"; then
+if [ "$rc" -eq 0 ] && grep -q "^machine profile: tcg" "$WORK/doctor.out"; then
 	pass "doctor exits 0 with profile tcg"
 else
 	miss "doctor rc=$rc"

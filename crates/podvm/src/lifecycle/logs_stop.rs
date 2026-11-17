@@ -87,10 +87,13 @@ pub(super) fn parse_logs(args: &[String]) -> std::result::Result<LogsArgs, i32> 
                 crate::parity::admit("logs", other, LOGS_USAGE)?;
                 return Err(crate::parity::no_arm("logs", other));
             }
-            // ⚠ The first positional wins and the rest are ignored, as before:
-            // `logs` names one container.
             other if want.is_none() => want = Some(other.to_string()),
-            _ => {}
+            // PodUtils/podvm#486: `logs` names one container, and a second
+            // word is refused, as `pull` refuses a second image.
+            other => {
+                eprintln!("podvm logs: logs takes one container, and {other:?} is a second one\n{LOGS_USAGE}");
+                return Err(podvm_image::error::EXIT_CLI_ERROR);
+            }
         }
     }
     if let Some(flag) = expecting {

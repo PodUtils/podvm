@@ -364,28 +364,30 @@ pub fn group(args: &[String]) -> i32 {
         Some("pull") => pull("image pull", rest),
         Some("extract") => extract("image extract", rest),
         Some("-h") | Some("--help") | None => {
-            println!("usage: podvm image ls | rm | prune | tag | inspect | pull");
+            println!("{IMAGE_USAGE}");
             0
         }
         Some(first) if first.starts_with('-') => {
             // ⛔ TODO/cli.md T-0801. The table decides: `image` takes
             // subverbs, never flags, so a flag has no row and is refused
             // rather than reaching the subverb match below.
-            if let Err(c) = crate::parity::admit(
-                "image",
-                first,
-                "usage: podvm image ls | rm | prune | tag | inspect | pull",
-            ) {
+            if let Err(c) = crate::parity::admit("image", first, IMAGE_USAGE) {
                 return c;
             }
             crate::parity::no_arm("image", first)
         }
+        // PodUtils/podvm#487: an unknown subverb is a usage error, as in
+        // `podvm container`, not a missing feature.
         Some(other) => {
-            eprintln!("podvm image: {other:?}: not implemented yet");
-            EXIT_RUNTIME_ERROR
+            eprintln!("podvm image: {other:?} is not a subverb of the group");
+            eprintln!("{IMAGE_USAGE}");
+            EXIT_CLI_ERROR
         }
     }
 }
+
+/// The usage of `podvm image`: each subverb that its match takes.
+const IMAGE_USAGE: &str = "usage: podvm image ls | rm | prune | tag | inspect | pull | extract";
 
 /// TODO/image.md T-1781: remove the extraction of each manifest digest of
 /// `before` that no record of the store names after a removal. The delete

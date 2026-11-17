@@ -598,11 +598,17 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1933](machine.md) | P1 | S | none | machine | partial | The first `run windows:NAME` of a fresh golden image can miss its agent on 2 CPUs |
 | [T-1934](enter.md) | P2 | S | none | enter | blocked | A unit on the namespace rung has no usable pty: no `/dev/ptmx`, and the host's `/dev/pts` |
 | [T-1935](enter.md) | P1 | M | none | enter | partial | `run -d` on the userland rung: a raw path call of a dynamic program reaches the host |
-| [T-1936](gate.md) | P1 | S | none | gate | partial | A gate of the tools of a CI job: a raw syscall, a spawn, a pty, `uv` and `ruff` in a unit |
+| [T-1936](gate.md) | P1 | S | none | gate | done | A gate of the tools of a CI job: a raw syscall, a spawn, a pty, `uv` and `ruff` in a unit |
+| [T-1937](cli.md) | P2 | M | none | cli | partial | The external QA of `0.2.0-beta.31`: the argument checks of the CLI |
+| [T-1938](supervise.md) | P1 | S | none | supervise | partial | The external QA of `0.2.0-beta.31`: two runs at once lose the table of containers or the exec probe |
+| [T-1939](enter.md) | P2 | M | none | enter | open | The external QA of `0.2.0-beta.31`: `--device` and `run -d --rm` |
+| [T-1940](image.md) | P2 | S | none | image | open | The external QA of `0.2.0-beta.31`: `images --filter`, `load`, `verify` and `--add-host` |
+| [T-1941](machine.md) | P3 | S | none | machine | open | The built-in `machine` profile asks for 1 GiB, which a file-size ceiling under 1 GiB refuses |
+| [T-1942](gate.md) | P1 | M | none | gate | open | The external QA of `0.2.0-beta.31`: verify the second batch of reports |
 
 ## Counts
 
-533 entries: 5 open, 17 partial, 4 blocked, 507 done.
+539 entries: 9 open, 18 partial, 4 blocked, 508 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -612,10 +618,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 0 | 5 | 0 | 216 | 221 |
-| P2 | 3 | 8 | 3 | 174 | 188 |
-| P3 | 2 | 4 | 1 | 42 | 49 |
-| **All** | 5 | 17 | 4 | 507 | 533 |
+| P1 | 1 | 5 | 0 | 217 | 223 |
+| P2 | 5 | 9 | 3 | 174 | 191 |
+| P3 | 3 | 4 | 1 | 42 | 50 |
+| **All** | 9 | 18 | 4 | 508 | 539 |
 
 ## Work order
 

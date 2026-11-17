@@ -241,9 +241,8 @@ fn main() -> std::process::ExitCode {
                     continue;
                 }
                 if a.starts_with('-') {
-                    // ⛔ TODO/cli.md T-0801. The table decides: a flag the
-                    // table has no row for is refused rather than silently
-                    // accepted with the version number.
+                    // ⛔ TODO/cli.md T-0801. The table decides: a flag with no
+                    // row is refused, not taken with the version number.
                     if let Err(c) =
                         crate::parity::admit("version", a, "usage: podvm version [--verbose]")
                     {
@@ -251,6 +250,7 @@ fn main() -> std::process::ExitCode {
                     }
                     return exit(crate::parity::no_arm("version", a));
                 }
+                return exit(crate::version::operand(a)); // #486
             }
             if verbose {
                 print!("{}", crate::version::info().render_verbose());

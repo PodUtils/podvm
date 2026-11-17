@@ -4521,3 +4521,35 @@ into a fresh store printed `Loaded image: runner:2.338.2`, and `run --rm
 runner:2.338.2 echo ran` found the record. `cargo test -p podvm --bin
 podvm load_prints` exits 0.
 
+
+# T-1940: The external QA of `0.2.0-beta.31`: `images --filter`, `load`, `verify` and `--add-host`
+
+**Source:** the external QA of `0.2.0-beta.31` (2026-11-17), issues 476, 477, 480, 490
+**Category:** image
+**Milestone:** none
+**Priority:** P2
+**Effort:** S
+**Status:** open
+
+## Problem
+
+- 476: `images --filter name=zzz` lists the record `windows:dos`; with `--format` the Windows rows go.
+- 477: `load` refuses an OCI layout that `tar` packed again: its directory entries `blobs/`, `blobs/sha256/` and `./`.
+- 480: `--add-host NAME:host-gateway` writes `host-gateway` into `/etc/hosts`, and `NAME:[::1]` keeps the brackets.
+- 490: `verify` finds a blob that does not match, and `pull` says "Already exists" and keeps it.
+
+## Premise
+
+Measured as uid 1000 on `main` (`list.rs`, `layout.rs`, `complete/add_host.rs`, `pull/run.rs`).
+
+## Approach
+
+476: the filter and `--format` take the Windows rows too. 477: a directory entry of the layout's own directories passes. 480: `host-gateway` is the address that the rung reaches the host on (`127.0.0.1` where the payload shares the network of the host), and an IPv6 address loses its brackets. 490: `verify` names the repair, and `pull` checks the digest of a blob that it would keep.
+
+## Decision
+
+-
+
+## Prove
+
+The repro of each issue, as uid 1000: the filter lists no `windows:dos`; a packed-again layout loads; `/etc/hosts` holds `127.0.0.1 bar` and `::1 six`; after `pull`, `verify` finds no mismatch.

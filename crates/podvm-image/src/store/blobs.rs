@@ -52,7 +52,16 @@ impl Store {
             let Ok(resolved) = contain::within(&self.root, &path) else {
                 continue;
             };
-            // ⭐ The whole test: a live writer holds this file, so a lock this
+            // PodUtils/podvm#472, #501: the table of containers is written
+            // to a `.partial` with no lock and renamed (pod-supervise), so a
+            // sweep of another process deleted it before its rename, and the
+            // launcher lost the end of a run (`Dead`, no exit code), or `run`
+            // failed with "containers.json: No such file or directory". A
+            // young file is a write in progress, locked or not.
+            if !abandoned_by_age(&resolved) {
+                continue;
+            }
+            // ⭐ The lock test: a live writer holds this file, so a lock this
             // process can take means nobody is writing it.
             match try_lock_at(&resolved, sys::LOCK_EX) {
                 Ok(Some(_held)) => {
@@ -254,4 +263,16 @@ impl Store {
             Err(e) => Err(e),
         }
     }
+}
+
+/// The age after which an unlocked staging file is abandoned.
+pub const STAGING_AGE: std::time::Duration = std::time::Duration::from_secs(600);
+
+/// True where the file at `p` was last written [`STAGING_AGE`] or more ago.
+fn abandoned_by_age(p: &Path) -> bool {
+    std::fs::metadata(p)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.elapsed().ok())
+        .is_some_and(|age| age >= STAGING_AGE)
 }

@@ -1970,3 +1970,38 @@ columns. The shared table of `ps`, `images` and the other verbs pads by
 it, and `command_of` cuts the COMMAND column by it. `cargo test -p podvm
 --bin podvm display_width` exits 0. On the cloud host `ps -a` puts the
 CREATED column of `echo 日日 日日日` at the column of an ASCII row.
+
+# T-1938: The external QA of `0.2.0-beta.31`: two runs at once lose the table of containers or the exec probe
+
+**Source:** the external QA of `0.2.0-beta.31` (2026-11-17), issues 472, 475, 501
+**Category:** supervise
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** partial
+
+## Problem
+
+- 472: `run -d` of a payload that ends at once is `Dead` with no exit code in 6 of 10 runs, on both rungs, and `wait` refuses.
+- 501: `run` at the same time as other runs fails with "containers.json: No such file or directory".
+- 475: each refused `run --strict=all` leaves a zero-byte `staging/memo-*.tmp`.
+
+## Premise
+
+Measured: the table of containers is written to `staging/containers.json.PID.NANOS.partial` with no lock and renamed (pod-supervise `table.rs`), and each `Store::open` sweeps each `.partial` that it can lock (`podvm-image` `store/blobs.rs`), so another podvm process deleted the file before its rename; the launcher drops a failed write of the end. With that fixed, 6 of 12 parallel `run --rm` failed with "the store exec probe could not run: .pod-hostprobe-exec.2.0: No such file or directory": pod-hostprobe names its probe file by the process id, and each foreground run is pid 2 in its own PID namespace (T-1909).
+
+## Approach
+
+The sweep takes an unlocked `.partial` only when it is 10 minutes old (`STAGING_AGE`); the exec probe runs in a directory that `mkdir` makes for one process. A COORD issue asks podcrates for the lock of the table's temp file (I5) and a probe name that does not repeat across PID namespaces. 475: a guard removes the memo when `prepare` fails.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000: 10 `run -d IMAGE /bin/true` give 10 `Exited (0)` and `wait` gives 0; 12 parallel `run --rm` exit 0, twice; 3 refused `run --strict=all` leave no `memo-*.tmp`.
+
+## Done
+
+**Partial (2026-11-17).** `store/blobs.rs`: the sweep keeps a young unlocked `.partial` (test `the_sweep_keeps_a_young_unlocked_partial`); `exec_probe.rs`: the probe runs in a directory of its own. Measured as uid 1000 with mirror.gcr.io/library/alpine:3.20: 10 `run -d ... /bin/true` give 10 `Exited (0)` (before: 6 of 10 `Dead`), and `wait` gives 0; 12 parallel `run --rm` exit 0 in each of two rounds (before: 6 of 12 failed). Remaining: 475, and the COORD issue to podcrates.

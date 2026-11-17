@@ -112,7 +112,7 @@ fn parse_flags_with(
                 "--entrypoint" => o.entrypoint = Some(a.clone()),
                 "--platform" => o.platform = Some(a.clone()),
                 "--pull" => o.pull = a.clone(),
-                "--name" => o.name = Some(a.clone()),
+                "--name" => o.name = Some(opts::name_arg(verb, a)?), // #484
                 "--user" => o.user = Some(a.clone()),
                 "--hostname" => o.hostname = Some(opts::hostname_arg(verb, a)?), // T-1908
                 "--add-host" => crate::complete::add_host(&mut o.ask, verb, a)?,
@@ -222,7 +222,9 @@ fn parse_flags_with(
             "--rm" => o.rm = true,
             "-d" | "--detach" => o.detach = true,
             "--name" => expecting = Some("--name"),
-            other if other.starts_with("--name=") => o.name = Some(other[7..].to_string()),
+            other if other.starts_with("--name=") => {
+                o.name = Some(opts::name_arg(verb, &other[7..])?)
+            }
             "-t" | "--tty" => o.tty = true,
             "-q" | "--quiet" => o.ask.quiet = true,
             "--verbose" => o.ask.verbose = true,

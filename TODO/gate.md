@@ -5659,7 +5659,7 @@ among them); after it, ten runs each exit 0 with 98 of 98.
 **Milestone:** none
 **Priority:** P1
 **Effort:** S
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -5684,3 +5684,34 @@ A known gap is measured, not judged, so that the experiment guards each fix that
 ## Done
 
 **Partial (2026-11-17).** `experiments/464-workloads.sh` and `.github/workflows/workloads.yml`. Measured as uid 1000 on the cloud host, with the binary of `main` and `public.ecr.aws/docker/library/python:3.13-slim` (with the proxy of the host and its CA in the unit): on the namespace rung each judged clause passes, and the pty is measured (`out of pty devices`, T-1934); under a seccomp filter that denies `unshare` and `clone(CLONE_NEWUSER)` (the userland rung), the loader family gives EACCES for the raw calls, `uv` and `ruff` (measured, T-1935), and passes `subprocess` and the pty; the syscall tier passes each clause on both hosts. The first run of the experiment found that the tier refused a `:ro` volume, which podrunner gives its tool cache (fixed in T-1935). Remaining: the first run of `workloads.yml`.
+
+**Done (2026-11-17, run 44105817462 on `675920c`).** `workloads.yml` passes on both legs of a hosted `ubuntu-24.04` runner (`restricted`, the userland rung, and `userns`, the namespace rung).
+
+# T-1942: The external QA of `0.2.0-beta.31`: verify the second batch of reports
+
+**Source:** the external QA of `0.2.0-beta.31` (2026-11-17), issues 492 to 508
+**Category:** gate
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+The tester filed 17 more reports (492 to 508), among them a panic on each argument that is not UTF-8 (505), `--tls-verify=false` that never disables TLS verification (492), and a panic of `notebook --kill-after` (506). They are not verified yet.
+
+## Premise
+
+-
+
+## Approach
+
+Reproduce each report as uid 1000 on `main`, find the cause, and give each confirmed one an entry; label it `confirmed`, or close it with the reason.
+
+## Decision
+
+-
+
+## Prove
+
+Each of the issues 492 to 508 has the label `confirmed` and an entry, or is closed with its reason.

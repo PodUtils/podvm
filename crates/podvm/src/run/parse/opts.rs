@@ -183,3 +183,29 @@ pub(super) fn hostname_arg(verb: &str, a: &str) -> Result<String, i32> {
     );
     Err(podvm_image::error::EXIT_FLAG_ERROR)
 }
+
+/// `--name NAME` (PodUtils/podvm#484): docker's rule of a container name,
+/// `[a-zA-Z0-9][a-zA-Z0-9_.-]*`, as for the name of a machine, at most 64
+/// bytes. An empty name, a `/` or a space made a record that `ps` showed
+/// and `inspect` resolved, and a long name a path of the store.
+pub(super) fn name_arg(verb: &str, a: &str) -> Result<String, i32> {
+    if podvm_windows::machines::valid_name(a) {
+        return Ok(a.to_string());
+    }
+    eprintln!(
+        "podvm {verb}: --name takes 1 to 64 letters, digits, '_', '.' and '-', with a \
+         letter or a digit first ([a-zA-Z0-9][a-zA-Z0-9_.-]*), not {a:?}"
+    );
+    Err(podvm_image::error::EXIT_FLAG_ERROR)
+}
+
+#[cfg(test)]
+#[test]
+fn a_name_follows_the_rule_of_docker() {
+    for ok in ["web", "a", "u-1", "x.y_z", &"n".repeat(64)] {
+        assert_eq!(name_arg("run", ok), Ok(ok.to_string()));
+    }
+    for bad in ["", "bad/name", "bad name", "-x", ".x", &"n".repeat(65)] {
+        assert!(name_arg("run", bad).is_err(), "{bad:?}");
+    }
+}

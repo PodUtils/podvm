@@ -81,6 +81,13 @@ impl BuildInfo {
     }
 }
 
+/// PodUtils/podvm#486: `version` takes no operand; give the refusal and
+/// its exit code.
+pub fn operand(a: &str) -> i32 {
+    eprintln!("podvm version: {a:?}: version takes no operand\nusage: podvm version [--verbose]");
+    podvm_image::error::EXIT_CLI_ERROR
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

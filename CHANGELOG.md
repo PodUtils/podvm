@@ -8,6 +8,21 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: the first reports of the external QA of `0.2.0-beta.31`, 2026-11-17
+
+Record: T-1937, T-1938.
+Deployed: none yet.
+
+- Two podvm commands at once no longer lose the table of containers: a
+  fast `run -d` no longer ends `Dead` with no exit code, and `run` no
+  longer fails with "containers.json: No such file or directory" (#472,
+  #501). Parallel foreground runs no longer share one file of the exec
+  probe.
+- `--name` takes docker's rule of a name (#484). `logs` refuses a second
+  container and `version` an operand (#486). `image bogus` is a usage
+  error (#487). `exec --platform` of a container refuses another
+  platform (#489). `doctor` names what the machine profile needs (#491).
+
 ### Added: the syscall tier for a detached container, 2026-11-17
 
 Record: T-1935.

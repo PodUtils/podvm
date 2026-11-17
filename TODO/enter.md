@@ -4460,3 +4460,33 @@ As uid 1000 on the cloud host under the seccomp filter of the Problem: `run -d` 
 **Partial (2026-11-17, the tier for `run -d`).** `run -d --podvm-tier=syscall` and `create` keep the tier: `run/prepare.rs` no longer refuses them, and the `/tmp` of the container is the `/tmp` of its own tree (the handler caps it by its guest path, and `rm` removes the tree); `lifecycle/userland.rs` gives the tier the detached drive of the native-static rung; `exec` in such a container enters the tier (`lifecycle::syscall::exec_entry`, from the variable of the tier in the record); `inspect` has the field `Tier`. Two faults of the tier were found on the way and fixed in `podvm-dispatch`: the vfork path of the handler copied 256 bytes above the `sp` of the child, past the end of the 36 KiB stack of glibc's `posix_spawn` and into the guard page of Rust's alternate stack, so each spawn of a Rust program died of SIGSEGV (`uv venv`; now `window_of` stops at a page that `process_vm_readv` cannot read); and a `close_range` closed the memfd of the count of `/tmp`, so a child of Python's `subprocess` exited 127 (now `range_gaps` goes around it). Measured as uid 1000 on the cloud host under the seccomp filter of the Problem (`inspect`: `userland syscall`), `public.ecr.aws/docker/library/python:3.13-slim`: the glibc program prints 0 for raw `renameat2`, `rename` and `link` in `/root`, `/tmp` and a volume, in the main payload and through `exec`; `uv venv` passes 5 of 5, `uv pip install six` and `uv cache clean` pass; `ruff check` writes its cache. On the loader family the same `ruff check` gives "Failed to rename temporary cache file ... Permission denied (os error 13)", as in PodUtils/podrunner#189. podrunner's argv (`-w`, `--hostname`, `--label`, `--no-source-fixup`, `--report`, `-e`, two volumes) runs, and `stop` then `start` keeps the tier. The 35 integration test binaries of podvm, podvm-supervise and podvm-dispatch pass as uid 1000. Remaining: a detached run of a dynamic program takes the tier with no flag where the userland rung is the best rung and Syscall User Dispatch arms (after the measure of T-1740).
 
 **Partial (2026-11-17, `:ro`).** Experiment 464 (T-1936) found that the tier refused a `:ro` volume ("--read-only and :ro need the read-only layer of the interposer"), and podrunner mounts its tool cache `:ro`. The tier runs the handler of the native-static rung, whose read-only layer holds a `:ro` volume (T-1901); `lifecycle/volume.rs` now gives it the tier too. Measured under the seccomp filter: in a foreground run and through `exec` of `run -d`, a read of `/ro/f` passes, a write and a `touch` give "Read-only file system", `/tmp` stays writable, and the host directory keeps its one file. Experiment 464 passes each clause on the tier, on both hosts.
+
+# T-1939: The external QA of `0.2.0-beta.31`: `--device` and `run -d --rm`
+
+**Source:** the external QA of `0.2.0-beta.31` (2026-11-17), issues 473, 474
+**Category:** enter
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+- 473: `run --device HOSTFILE:/dev/x`: `ls /dev/x` gives ENOENT on both rungs, a read gives ENOENT on the userland rung, and a write (`>`, `>>`) creates a file in the image, while the host file does not change.
+- 474: `run -d --rm` keeps the record and the tree of the container after its end, on both rungs.
+
+## Premise
+
+Measured as uid 1000 on `main`. 473: the gate of the interposer compares the pointer of the path (`create_calls.rs`), which the table of the userland rung has rewritten, and `device::answer` sends `O_CREAT`, `O_TRUNC` and an `O_APPEND` mismatch to the kernel. 474: the detached branch never reads `rm`; the launcher of pod-supervise has no removal at the end.
+
+## Approach
+
+473: the gate takes "the path matched no `-v` pair" in place of the pointer, a write of a regular device file goes to the host file, and `stat` answers from the descriptor. 474: the launcher removes the record and the tree after the end and the waiters (a COORD issue to podcrates), or `-d --rm` is refused by name until then.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 on both rungs: the repro of 473 reads `hostdev`, a write lands in the host file, and `ls -l /dev/hostdev` lists it; `run -d --rm IMAGE sleep 1` leaves no record and no tree after 3 s.

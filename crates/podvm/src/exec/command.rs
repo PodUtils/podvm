@@ -92,6 +92,11 @@ pub fn exec(args: &[String]) -> i32 {
         if let Some(c) = crate::userns::again_in_range("exec", running, args) {
             return c;
         }
+        if o.platform.is_some()
+            && let Err(c) = container_platform(&store, &image, &platform)
+        {
+            return c;
+        }
         return enter(&image, &rootfs, state, &o, &store);
     }
 
@@ -441,4 +446,30 @@ pub fn exec(args: &[String]) -> i32 {
     drop(memo);
     let _ = std::fs::remove_file(&memo_host_path);
     code
+}
+
+/// PodUtils/podvm#489: `exec --platform P NAME` of a container refuses a
+/// platform that is not the one of the container's image, as the image path
+/// refuses one that the store does not hold. Before, the flag was accepted
+/// and ignored.
+fn container_platform(
+    store: &podvm_image::Store,
+    target: &str,
+    want: &podvm_image::platform::Platform,
+) -> Result<(), i32> {
+    let Ok(c) = podvm_supervise::get(store, target) else {
+        return Ok(());
+    };
+    let Ok(r) = store.find_one(&c.image) else {
+        return Ok(());
+    };
+    if r.os == want.os && r.architecture == want.arch {
+        return Ok(());
+    }
+    eprintln!(
+        "podvm exec: the container {target} runs {} for {}/{}, and {want} was asked for; \
+         exec enters the container's own platform, so drop --platform or name an image",
+        c.image, r.os, r.architecture
+    );
+    Err(podvm_image::error::EXIT_RUNTIME_ERROR)
 }

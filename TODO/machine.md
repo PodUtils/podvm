@@ -5270,8 +5270,39 @@ Experiment 452 on `kvm.yml` passes clause 5 on the leg with 2 CPUs for `windows:
 
 **Partial (2026-11-17, run 44097296278 on `5e7ba3d`).** Both legs failed clause 5 the same way: `run windows:2025 ver` on the agent waited out the bound of 900 s of the experiment (rc 124), and its machine and its emulator stayed (clause 4). The cause is in `once.rs`: the client of the readiness probe (`qga::ready` gives a connected client) stayed open in the `match` while `exec` connected again, and QEMU serves one client of the channel at a time. The probe's client now ends before `exec`. In the same run, the run through the mailbox (measured) passed in 18 s on both legs, also on 2 CPUs, and clause 7 passed (14 s and 18 s). Remaining: the next run.
 
+**Partial (2026-11-17, run 44104748355 on `89edd7f`).** Experiment 452 (`windows:2025`) passes on both legs. On the leg with 2 CPUs, `run windows:2025 ver` on the guest agent gives rc 0 in 15 s, no work directory and no machine of the run stay, the run through the mailbox (measured) gives rc 0 in 16 s, and clause 7 passes in 14 s. Remaining: the same run for `windows:11`.
+
 **Partial (2026-11-17, run 44088895746, the fault is the mailbox run).** `windows:2025` on `9d6be71`: the extra boot of `pull` passes on both legs (16 s and 18 s), and the leg with 4 CPUs passes each clause. On the leg with 2 CPUs the next boot, the first `run windows:2025 ver`, failed again at 600 s ("the agent did not write WQREADY.TXT"), and the detached machine of clause 7 on the same image passed (`exec`, `cp`, `stop` in 16 s). So the fault is not the first boot of the image (the Premise was wrong): it is the foreground run through the mailbox, on 2 CPUs, in 3 of 4 runs since the guest tools of T-1868 (44050312708 attempt 1, 44077136976, 44088895746; 44082202946 passed). The detached machine reaches the guest through the QEMU Guest Agent, not the mailbox. The agent of the mailbox probes for its volume 600 times with a nap (about 20 min), and it writes no line before it finds the volume, so a run that times out cannot tell "the agent did not start" from "the volume did not come". The extra boot stays: it costs some 20 s and proves that the installed disk boots. Next: read what the guest did (a screen of the foreground run at its bound, or a line of the agent before the probe), and judge whether a foreground run of an image with the guest tools goes through the QEMU Guest Agent, as a detached machine does. COORD-175 (#468) asks podcrates for that evidence: a line of the agent before its first probe, or a screen of `pod_guest::run` at the bound.
 
 **Partial (2026-11-17, run 44082202946).** `windows:11` on `2c18d67`: experiment 452 passes on both legs. `pull` prints "first boot of the installed disk in 31s" (8 GiB, 4 CPUs) and "in 29s" (4 GiB, 2 CPUs); the first `run windows:11 ver` of the golden image is rc 0 in 22 s and 19 s, and clause 7 passes in 17 s and 14 s. So the extra boot ends the fault, but the Premise is not confirmed: that boot is short, not a long setup of the drivers. Something of the first boot after the install held the agent once in two runs on 2 CPUs, and the extra boot takes it in the install. One pass after two failures of three is not a rate: more runs of the leg with 2 CPUs. Remaining: those runs (`windows:2025` next).
 
 **Partial (2026-11-17).** `windows/settle.rs` boots the installed disk once after the power-off of the install (after the reports of the first logon are read) and runs `ver` through the agent with a bound of 20 min; `pull` prints "first boot of the installed disk in TIME". `cargo test -p podvm windows` passes. Remaining: the runs of experiment 452.
+
+# T-1941: The built-in `machine` profile asks for 1 GiB, which a file-size ceiling under 1 GiB refuses
+
+**Source:** the external QA of `0.2.0-beta.31` (2026-11-17), issue 481
+**Category:** machine
+**Milestone:** none
+**Priority:** P3
+**Effort:** S
+**Status:** open
+
+## Problem
+
+With `RLIMIT_FSIZE` under 1 GiB (the tester's host had 1,000,000,000 bytes), `run --profile machine` and `--profile bun-runtime` refuse at once: "guest memory 1073741824 bytes over the RLIMIT_FSIZE ceiling". The Linux default is no limit.
+
+## Premise
+
+T-1305 refuses a guest memory over the soft `RLIMIT_FSIZE`, because a memory image is a file. A plain boot (`-m`) has anonymous memory, and nothing saves a guest yet.
+
+## Approach
+
+Either the two profiles take the soft ceiling where it is under their memory, or the check applies only where a memory image is written to a file. The second changes T-1305: a question for the owner.
+
+## Decision
+
+-
+
+## Prove
+
+With `prlimit --fsize=1000000000`, `run --profile machine IMAGE true` passes the check, or refuses with a reason that names the profile and a remedy.

@@ -22,7 +22,7 @@ fn health_agrees_with_the_problem_list() {
     let text = d.render("tcg");
     assert!(text.contains("fail accel: denied\n"));
     assert!(text.contains("fix: install QEMU\n"));
-    assert!(text.contains("profile: tcg\n"));
+    assert!(text.contains("\nmachine profile: tcg\n"));
     assert_eq!(d.fixes.len(), 1);
     d.unrunnable("prlimit(RLIMIT_FSIZE)");
     assert_eq!(d.exit_code(false), 2);
