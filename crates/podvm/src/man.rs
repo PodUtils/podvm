@@ -135,11 +135,17 @@ fn render(only: Option<&str>, help: &dyn Fn(&str) -> Option<String>) -> Option<S
     let mut out = String::new();
     header(&mut out);
     out.push_str("COMMANDS\n");
-    let width = verbs.iter().map(|r| r.verb.len()).max().unwrap_or(0);
+    // PodUtils/podvm#483: a name that only redirects lists as the verb that
+    // serves it (`system df`, `image prune`), as the reference below does.
+    let width = verbs
+        .iter()
+        .map(|r| help_argv(r.verb).join(" ").len())
+        .max()
+        .unwrap_or(0);
     for row in &verbs {
         out.push_str(&format!(
             "  {:<width$} {} [{}]\n",
-            row.verb,
+            help_argv(row.verb).join(" "),
             summary(row.note),
             row.status.word(),
             width = width

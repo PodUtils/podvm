@@ -4490,3 +4490,34 @@ Measured as uid 1000 on `main`. 473: the gate of the interposer compares the poi
 ## Prove
 
 As uid 1000 on both rungs: the repro of 473 reads `hostdev`, a write lands in the host file, and `ls -l /dev/hostdev` lists it; `run -d --rm IMAGE sleep 1` leaves no record and no tree after 3 s.
+
+# T-1953: The external QA of `0.2.0-beta.31`, third batch: signals, rungs and runs
+
+**Source:** the external QA of `0.2.0-beta.31` (2026-11-17), issues 512, 534, 535, 536, 547, 549, 550, 552, 553, 554, 557, 558, 560, 561, 562, 565, 566, verified by T-1950
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+- Signals: SIGPIPE ends a foreground run before its record and its `--rm` (534); SIGINT is ignored in a run of the user namespace (535); SIGHUP leaves the payload and the reaper (562); SIGTERM to a Windows or DOS guest leaves QEMU (566).
+- Rungs: `-w /tmp/NEW` fails on the namespace rung (512); an image with no `/tmp` falls back to chroot and the record says namespace (547); `--unsafe-host-paths` does nothing on the namespace rung (553); `create --podvm-tier=emulate` gives a false chroot refusal (554); `--strict=all` refuses each run for the mtab of `/proc` (557); the probe cache never matches (558); `/tmp/execprobe` of the census (561); `-v` of a file over a directory of the image (565).
+- Files: the run is root of its user namespace before it reads `--env-file` and writes `--report`, so it reads a file that the caller cannot (552); the log of a container follows a symbolic link (536); `logs -f` ends at a `restart` (550); `install-names` makes `podman` and then refuses `docker` (549); the source fixup follows redirects (560).
+
+## Premise
+
+T-1950 verified each signal and rung item as uid 1000, on the namespace rung and under `scripts/dev/nouserns.c`.
+
+## Approach
+
+podvm's items in podvm; pod-enter, pod-supervise, pod-rootfs, pod-hostprobe and pod-guest items as a COORD issue to podcrates (COORD-182). 552 first: a read of the caller's files before podvm enters its user namespace.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test --release -p podvm --bin podvm` passes, and for each issue of this entry its repro, on the rung of the report, gives the fix.

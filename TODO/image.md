@@ -4553,3 +4553,32 @@ Measured as uid 1000 on `main` (`list.rs`, `layout.rs`, `complete/add_host.rs`, 
 ## Prove
 
 The repro of each issue, as uid 1000: the filter lists no `windows:dos`; a packed-again layout loads; `/etc/hosts` holds `127.0.0.1 bar` and `::1 six`; after `pull`, `verify` finds no mismatch.
+
+# T-1952: The external QA of `0.2.0-beta.31`, third batch: images, `import`, `cp` and the store
+
+**Source:** the external QA of `0.2.0-beta.31` (2026-11-17), issues 515, 523, 525, 526, 527, 528, 529, 544, 548, 551, 555, 563, verified by T-1950
+**Category:** image
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+`import` of a small compressed file gives a raw tar error, and xz and bzip2 are not named (515); a hard link to a later member imports and fails at `extract` (525); `inspect NAME` takes the image before the container (523); `system df` counts a shared rootfs twice and `prune` counts no rootfs (526); blobs of no record are never counted or freed (527); `--platform linux/amd64/v3` or `arm64/v8` records the spelling asked, not the manifest's, so one manifest gets two records (528, 544); `rmi TAG` refuses an untag while a container uses the image (548); `cp` into an image writes the shared extraction (563, 498), and a trailing `/` of a missing destination is lost (555); `--tmpfs` is a bind of a store directory, named `-v` in its errors and listed as ext4 (529, 551).
+
+## Premise
+
+T-1950 verified each item of this entry as uid 1000 on the cloud host.
+
+## Approach
+
+One change for each item; the platform of a record comes from the manifest (and pod-oci's loose match of a variant is a COORD issue to podcrates).
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test --release -p podvm-image` passes, and the repro of each issue of this entry gives the fix, as uid 1000.

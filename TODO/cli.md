@@ -6145,3 +6145,38 @@ As uid 1000: `exec --env-file F NAME sh -c 'echo $SECRET'` prints the value, and
 ## Done
 
 **Partial (2026-11-17).** `exec --env-file PATH` (and `--env-file=`), with the reader of `run` and a parity row. With alpine 3.20 of mirror.gcr.io, as uid 1000: the payload of `exec --env-file` prints the value, and no `/proc/*/cmdline` of the host holds it while the exec runs. Remaining: the source of a volume with no symbolic link.
+
+# T-1951: The external QA of `0.2.0-beta.31`, third batch: the output contract
+
+**Source:** the external QA of `0.2.0-beta.31` (2026-11-17), issues 513, 514, 517, 518, 519, 520, 521, 522, 524, 530, 531, 532, 533, 541, 542, 543, 545, 546, 556, 559, verified by T-1950
+**Category:** cli
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+- Exit codes: seven verbs answer a missing argument with 125, not 1 (519); `system abi` exits 2, a code of no table (521); bare `profile`, `lab` and `windows` exit 125, where the table says 0 (532); `--report` that cannot be written runs the payload, then exits 125 (513).
+- Output: `inspect A B` prints two JSON arrays (514); `save -o FILE` prints the file name on stdout (522); `man --roff` and `--llms` print each usage line twice (518); `inspect` names fields that `--format` does not take (524); `uname -v` of the syscall tier holds a task reference (530); `version --verbose` shows a build error as the commit (531).
+- Texts that are not true: `podvm --help` omits `port` and `logout` (520); `run --help` says that a `-w` in a volume is refused (533); the machine tier's `exec` and `--device` texts (541, 542); `docs/limits.md` on arm64 guests (543); the probe, the banner, README, architecture, SECURITY and the limits page on the namespaces of the namespace rung (546), and on `-v` as a bind mount there (556); a sealed bundle with no `argv` (517, by design and in no document); `login` says "Login Succeeded" with no contact to the registry (559); `run -t` with no `-i` relays stdin (545).
+
+## Premise
+
+Each item was reproduced as uid 1000 on the cloud host with the binary of `main`, or traced in the code where it needs a guest (T-1950).
+
+## Approach
+
+One change for each item; `tests/cli_contract.rs` (T-1946) checks the help of each verb and the top help.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test --release -p podvm --bin podvm` and `cargo test --release -p podvm --test cli_contract` pass, and the repro of each issue, as uid 1000, gives the refusal or the result of the fix.
+
+## Done
+
+**Partial (2026-11-17).** 520: `podvm --help` names `port` and `logout` (the text moved to `usage_text.rs`), and the contract test checks that it names each one-word verb, with the names that redirect to `system` as named exceptions. 522: `save -o` writes no line on stdout, and its line on stderr names the file. 521: an unreadable file of `system abi` exits 125, a code of the table. 483 (T-1937): `podvm man` lists the redirects as `system df`, `image prune` and the others. Remaining: the other items.

@@ -127,7 +127,8 @@ fn abi_reports_unreadable_refused_and_arity() {
                 .map(|s| s.to_string())
                 .collect::<Vec<_>>()
         ),
-        2
+        125,
+        "#521: an unreadable file is a code of the published table"
     );
     let me = std::env::current_exe()
         .unwrap()

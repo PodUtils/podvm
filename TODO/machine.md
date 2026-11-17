@@ -5306,3 +5306,32 @@ Either the two profiles take the soft ceiling where it is under their memory, or
 ## Prove
 
 With `prlimit --fsize=1000000000`, `run --profile machine IMAGE true` passes the check, or refuses with a reason that names the profile and a remedy.
+
+# T-1954: The external QA of `0.2.0-beta.31`, third batch: the machine tier
+
+**Source:** the external QA of `0.2.0-beta.31` (2026-11-17), issues 511, 516, 537, 538, 539, 540, verified by T-1950 from the code
+**Category:** machine
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+Machine records ignore `PODVM_STORE`, and `inspect` and `wait` do not find them (511); a sealed bundle from `tar -C DIR -cf X .` is refused (516), and one with a directory member waits 120 s with a wrong cause (538); stdout of a guest is text (537); `stop` of a guest gives the payload no SIGTERM and no exit code (539); `logs` of a guest drops stderr and `--tail` (540).
+
+## Premise
+
+T-1950 traced each item in the code; a cloud session starts no guest.
+
+## Approach
+
+One change for each item; each is measured on `kvm.yml` (a cloud session starts no guest).
+
+## Decision
+
+-
+
+## Prove
+
+`kvm.yml` runs the repro of each issue, and each gives the result of the fix.

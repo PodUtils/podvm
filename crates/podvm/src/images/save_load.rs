@@ -220,8 +220,9 @@ pub fn save(verb: &str, args: &[String]) -> i32 {
         };
         match podvm_image::layout::save_for(&store, &o.want, platform.as_ref(), &mut file) {
             Ok(done) => {
+                // PodUtils/podvm#522: stdout is the tarball's where no -o is
+                // given, and empty with -o, as docker's; the line names it.
                 eprintln!("{}", saved_line(&o.want, &done));
-                println!("{path}");
                 0
             }
             Err(e) => {

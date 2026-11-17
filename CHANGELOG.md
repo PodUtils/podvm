@@ -24,6 +24,15 @@ Deployed: none yet.
   platform (#489). `doctor` names what the machine profile needs (#491).
 - `exec --env-file PATH`, as in `run`: a secret stays out of the argv of
   podvm (PodUtils/podrunner#277).
+- An argument that is not UTF-8 is refused by name with exit 125, and any
+  other panic ends with one named line and exit 125, not SIGABRT (#505,
+  #506). `--tls-verify=false` works (#492). `notebook` bounds its numbers
+  (#493, #494, #506). `exec --platform`, `--name`, `logs`, `version`,
+  `image`, `doctor` and `man` keep their help (#484 to #491, #497, #520).
+- The syscall tier refuses `-u` (it fakes no identity, #508), and the
+  `USER` warning names the real uid (#507). A refused run leaves no memo
+  file (#475). `save -o` writes nothing on stdout (#522). `system abi`
+  exits 125 for an unreadable file (#521).
 
 ### Added: the syscall tier for a detached container, 2026-11-17
 

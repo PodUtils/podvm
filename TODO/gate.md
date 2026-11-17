@@ -5855,7 +5855,7 @@ The next beta has a run of `workloads.yml` on its commit, an outside pass whose 
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -5876,3 +5876,7 @@ Reproduce each report as uid 1000 on `main` (the machine tier from the code and 
 ## Prove
 
 Each of the issues 510 to 566 has the label `confirmed` and an entry, or is closed with its reason.
+
+## Done
+
+**Done (2026-11-17).** Each of the 57 reports 510 to 566 is reproduced as uid 1000 with the binary of `main`, or traced in the code where it needs a guest: 40 confirmed, 11 in part, 517 and 564 by design (517 is in no document), 545 is a relay of stdin with no `-i`, and 560 depends on the network (its risk is in the code). Each maps to T-1948 or T-1951 to T-1954; 564 is closed with its reason.

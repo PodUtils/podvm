@@ -37,6 +37,10 @@ fn podvm<S: AsRef<std::ffi::OsStr>>(args: &[S], store: &std::path::Path) -> std:
 /// argv[0] (`docker`, `podman`, T-0803). `podvm docker` is no verb.
 const NOT_VERBS: [&str; 2] = ["docker", "podman"];
 
+/// Top-level names that only redirect to `podvm system VERB` (T-1832,
+/// PodUtils/podvm#483): `podvm --help` names them under `system`.
+const REDIRECTS: [&str; 5] = ["abi", "df", "info", "install-names", "prune"];
+
 /// The verbs that podvm serves, each with the flags of its rows.
 fn table(store: &std::path::Path) -> Vec<(String, Vec<String>)> {
     let out = podvm(&["system", "info", "--format", "{{json .Parity}}"], store);
@@ -87,6 +91,17 @@ fn each_verb_keeps_its_contract() {
     let verbs = table(&dir);
     assert!(verbs.len() > 30, "only {} verbs", verbs.len());
     let mut bad: Vec<String> = Vec::new();
+    // PodUtils/podvm#520: the top help names each one-word verb.
+    let top = podvm(&["--help"], &dir);
+    let top = String::from_utf8_lossy(&top.stdout).to_string();
+    for (verb, _) in &verbs {
+        if !verb.contains(' ')
+            && !REDIRECTS.contains(&verb.as_str())
+            && !top.contains(&format!("  {verb} "))
+        {
+            bad.push(format!("podvm --help: no line of the verb {verb}"));
+        }
+    }
     for (verb, rows) in &verbs {
         let argv: Vec<&str> = verb.split(' ').collect();
         let mut help_argv = argv.clone();

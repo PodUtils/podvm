@@ -220,10 +220,12 @@ pub fn abi(verb: &str, args: &[String]) -> i32 {
     let (object, libc) = match (read(paths[0]), read(paths[1])) {
         (Ok(o), Ok(l)) => (o, l),
         (Err(e), _) | (_, Err(e)) => {
-            eprintln!("podvm system abi: {e}");
-            // ⛔ 2, and it means "could not be measured". A file podvm cannot
-            // read is not a file podvm has refused.
-            return 2;
+            eprintln!("podvm system abi: {e}; nothing was measured");
+            // ⛔ Not 1: a file podvm cannot read is not a file podvm has
+            // refused. 125 ("podvm could not run the command") is the code of
+            // the published table for that; the old 2 was in no table
+            // (PodUtils/podvm#521).
+            return podvm_image::error::EXIT_RUNTIME_ERROR;
         }
     };
     match podvm_enter::abi::admits(&object, &libc) {
