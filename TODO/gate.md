@@ -5651,3 +5651,36 @@ in the job "workspace and interposer tests", with `--test-threads=1`, so
 the Problem's "CI does not run them" was wrong. On the cloud host the suite failed 7 of 98 tests before the
 change (`exec::tests::the_route_enters_each_arm_through_the_rootfs`
 among them); after it, ten runs each exit 0 with 98 of 98.
+
+# T-1936: A gate of the tools of a CI job: a raw syscall, a spawn, a pty, `uv` and `ruff` in a unit
+
+**Source:** COORD-102 of podnet (PodUtils/podnet#649: "a green gate is not readiness"); the faults of T-1934 and T-1935
+**Category:** gate
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** partial
+
+## Problem
+
+The gate, the integration tests and the experiments of a release start payloads; none runs the tools of a CI job in a unit. On 2026-11-17 such tools found four faults that each check had passed: no pty on the namespace rung (T-1934), EACCES of a raw `renameat2` on the loader family, and two crashes of the syscall tier (a SIGSEGV in each `posix_spawn` of a Rust program, exit 127 of a child of Python's `subprocess`) (T-1935). podrunner's users found the first two.
+
+## Premise
+
+A hosted `ubuntu-24.04` runner gives its own user the userland rung only (AppArmor restricts user namespaces), as podrunner's hosted runners do; with `kernel.apparmor_restrict_unprivileged_userns=0` it gives the namespace rung.
+
+## Approach
+
+Experiment 464 runs, in a unit of `run -d` with no flag and on the syscall tier: a glibc program with raw `renameat2`, `rename` and `link`; `subprocess.run`; `uv venv` and `uv pip install`; `ruff check` with its cache; `pty.spawn`; and `rm -f` with no process left. It judges what must pass on each mechanism and measures the known gaps (T-1934, T-1935). `workloads.yml` runs it on both legs, by hand before a release and each week.
+
+## Decision
+
+A known gap is measured, not judged, so that the experiment guards each fix that holds and stays green; the gap's entry names the clause that it turns into a judged one.
+
+## Prove
+
+`workloads.yml` passes on both legs, and its transcripts give the rung and the tier of each mode.
+
+## Done
+
+**Partial (2026-11-17).** `experiments/464-workloads.sh` and `.github/workflows/workloads.yml`. Measured as uid 1000 on the cloud host, with the binary of `main` and `public.ecr.aws/docker/library/python:3.13-slim` (with the proxy of the host and its CA in the unit): on the namespace rung each judged clause passes, and the pty is measured (`out of pty devices`, T-1934); under a seccomp filter that denies `unshare` and `clone(CLONE_NEWUSER)` (the userland rung), the loader family gives EACCES for the raw calls, `uv` and `ruff` (measured, T-1935), and passes `subprocess` and the pty; the syscall tier passes each clause on both hosts. The first run of the experiment found that the tier refused a `:ro` volume, which podrunner gives its tool cache (fixed in T-1935). Remaining: the first run of `workloads.yml`.

@@ -359,9 +359,11 @@ pub fn container_read_only(
 }
 
 /// TODO/enter.md T-1901: the native-static rung, whose handler of Syscall
-/// User Dispatch holds a `:ro` volume (the emulate and syscall tiers do not).
+/// User Dispatch holds a `:ro` volume; the syscall tier runs the same
+/// handler (T-1935: podrunner mounts its tool cache `:ro`). The emulate
+/// tier does not.
 fn native_static(userland: Option<&Userland>) -> bool {
-    userland.is_some_and(|u| u.dispatch_exe.is_some() && u.emulator.is_none() && !u.syscall)
+    userland.is_some_and(|u| u.dispatch_exe.is_some() && u.emulator.is_none())
 }
 
 /// The one spelling of a guest path: no trailing `/`, except for `/`

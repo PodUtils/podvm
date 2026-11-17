@@ -19,6 +19,7 @@ Deployed: none yet.
   this tier gives a raw `rename`, `renameat2` or `link` of a dynamic
   program (`uv`, `ruff`) the paths of the image: on the loader family
   these reach the host and fail with EACCES (PodUtils/podrunner#189).
+- The syscall tier takes a `:ro` volume: a write in it fails with EROFS.
 - The tier no longer kills a child of `posix_spawn` (each process spawn of
   a Rust program, such as `uv venv`): the handler read past the end of
   the stack of the child. Python's `subprocess` no longer loses the count
