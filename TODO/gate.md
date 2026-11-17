@@ -5838,7 +5838,7 @@ The next beta has a run of `workloads.yml` on its commit, an outside pass whose 
 
 # T-1950: The external QA of `0.2.0-beta.31`: verify the third batch of reports
 
-**Source:** the external QA of `0.2.0-beta.31` (2026-11-17), issues 510 to 544
+**Source:** the external QA of `0.2.0-beta.31` (2026-11-17), issues 510 to 566
 **Category:** gate
 **Milestone:** none
 **Priority:** P1
@@ -5863,4 +5863,4 @@ Reproduce each report as uid 1000 on `main` (the machine tier from the code and 
 
 ## Prove
 
-Each of the issues 510 to 544 has the label `confirmed` and an entry, or is closed with its reason.
+Each of the issues 510 to 566 has the label `confirmed` and an entry, or is closed with its reason.

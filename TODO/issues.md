@@ -438,6 +438,30 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #542 | The machine-tier `--device` refusal also says `-v` needs the chroot tier, but `-v` works on the machine tier | open | T-1950 |
 | #543 | `docs/limits.md` says an arm64 guest is refused before boot and also that it runs with `qemu-system-aarch64` | open | T-1950 |
 | #544 | Pulling `linux/arm64` and `linux/arm64/v8` creates two records for one manifest | open | T-1950 |
+| #545 | `podvm run -t` writes a NUL byte to stdout before the payload output | open | T-1950 |
+| #546 | The probe, README, architecture, SECURITY, the limits page and the banner disagree with the run about user, PID and UTS namespaces and `/proc` | open | T-1950 |
+| #547 | An image with no `/tmp` downgrades the namespace rung to chroot, and the report still says `namespace` | open | T-1950 |
+| #548 | `podvm rmi TAG` refuses to remove the tag whenever any container references the image | open | T-1950 |
+| #549 | `system install-names` creates the `podman` link and then exits 125 because it refused the `docker` name | open | T-1950 |
+| #550 | `podvm logs -f` stops following after `restart` and exits 0 while the new run is still writing | open | T-1950 |
+| #551 | `--tmpfs P` is listed in the payload's `/proc/mounts` as the host's ext4 root, and `/tmp` appears twice | open | T-1950 |
+| #552 | `--env-file` reads a file the caller cannot read, because the run is root of a user namespace | open | T-1950 |
+| #553 | `--unsafe-host-paths` is accepted and does nothing on the namespace rung | open | T-1950 |
+| #554 | `create --podvm-tier=emulate` refuses with a chroot-denied message that is false on this host and never names the tier | open | T-1950 |
+| #555 | `cp` drops a trailing slash on a missing destination and creates a file where a directory was implied | open | T-1950 |
+| #556 | `-v` is a real bind mount, `/proc/mounts` lists it, and `mountinfo` exposes the host path, while the help says it is not a mount | open | T-1950 |
+| #557 | `--strict=all` refuses every run on this host because the mtab fixup says `/proc` is not mounted, and it is | open | T-1950 |
+| #558 | The probe cache key is namespace-local, so `--cached` alternates "served" and "the confinement changed", and every pull re-probes | open | T-1950 |
+| #559 | `podvm login` prints `Login Succeeded` for a registry that is not listening | open | T-1950 |
+| #560 | The source fixup leaves `http://security.ubuntu.com` although it answers HTTPS, and names the redirect target in the error | open | T-1950 |
+| #561 | `podvm probe` leaves `/tmp/execprobe`, and every later probe skips the exec row because the file exists | open | T-1950 |
+| #562 | SIGHUP to a foreground run leaves the payload and `podvm --podvm-ns-reaper` running, and `--rm` does not remove the Dead record | open | T-1950 |
+| #563 | `cp` resolves a container/image name collision to the image and writes into the shared base image | open | T-1950 |
+| #564 | Under a low `RLIMIT_NOFILE`, a run prints that its record is not live, exits 0, and leaves no record | open | T-1950 |
+| #565 | `-v` with a file, FIFO or device host path fails with `bind: Not a directory` and names the guest path | open | T-1950 |
+| #566 | SIGTERM to a foreground Windows/DOS guest kills podvm and leaves QEMU running, and Ctrl-C to the group does not stop it | open | T-1950 |
+| #567 | COORD-180: podvm called beta.31 ready and an outside tester confirmed 37 faults in one hour; what podvm changes (to all) | open | T-1946, T-1947, T-1948, T-1949 |
+| #568 | COORD-181: five faults of the external QA of podvm that are in crates of podcrates: the table's temp file, the exec probe's name, a helper's ServerURL, run -d --rm, a -v source with no link (to podcrates) | open | T-1938, T-1939, T-1944, T-1945 |
 
 ## Messages whose title does not start with COORD-NNN
 
