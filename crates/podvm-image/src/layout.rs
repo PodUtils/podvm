@@ -338,40 +338,67 @@ fn commit_staged(
 /// record replaces it with `<none>` and no tag.
 const UNNAMED: &str = "podvm.invalid/unnamed:none";
 
-/// TODO/image.md T-1839: a member that `extract` refuses (`..` in its path,
-/// or an absolute path) is refused at `import`, before the store takes it.
+/// TODO/image.md T-1839: a member that `extract` refuses is refused at `import`.
 fn escaping_member(tar: &Path) -> Result<Option<String>> {
     let f = std::fs::File::open(tar).map_err(|e| Error::io(tar.display().to_string(), e))?;
     let mut a = ::tar::Archive::new(f);
     let entries = a
         .entries()
         .map_err(|e| Error::Oci(format!("{} does not read: {e}", tar.display())))?;
+    let bad = |p: &str| p.starts_with('/') || p.split('/').any(|c| c == "..");
+    // PodUtils/podvm#525: a hard link names a member that came before it.
+    let mut seen = std::collections::HashSet::new();
     for e in entries {
         let e = e.map_err(|e| Error::Oci(format!("{} does not read: {e}", tar.display())))?;
         let raw = String::from_utf8_lossy(&e.path_bytes()).to_string();
-        if raw.starts_with('/') || raw.split('/').any(|c| c == "..") {
+        if bad(&raw) {
             return Ok(Some(raw));
         }
+        // PodUtils/podvm#503: the target of a hard link takes the same rule.
+        if e.header().entry_type() == ::tar::EntryType::Link
+            && let Some(t) = e.link_name_bytes()
+        {
+            let t = String::from_utf8_lossy(&t).to_string();
+            let norm = |p: &str| p.trim_start_matches("./").trim_end_matches('/').to_string();
+            if bad(&t) || !seen.contains(&norm(&t)) {
+                return Ok(Some(format!(
+                    "{raw} (a hard link to {t}, which is absolute, holds .., or comes later)"
+                )));
+            }
+        }
+        seen.insert(
+            raw.trim_start_matches("./")
+                .trim_end_matches('/')
+                .to_string(),
+        );
     }
     Ok(None)
 }
 
 pub fn import(store: &Store, tar: &Path, reference: Option<&str>) -> Result<Record> {
+    // PodUtils/podvm#515: the magic of a compressed file is read from what
+    // is there, also under 512 bytes, and xz and bzip2 are named too.
     let mut head = [0u8; 512];
-    {
-        let mut f =
-            std::fs::File::open(tar).map_err(|e| Error::io(tar.display().to_string(), e))?;
-        f.read_exact(&mut head)
-            .map_err(|e| Error::Oci(format!("{} does not read: {e}", tar.display())))?;
-    }
-    if head.starts_with(&[0x1f, 0x8b]) || head.starts_with(&[0x28, 0xb5, 0x2f, 0xfd]) {
+    let n = {
+        let f = std::fs::File::open(tar).map_err(|e| Error::io(tar.display().to_string(), e))?;
+        f.take(512)
+            .read(&mut head)
+            .map_err(|e| Error::Oci(format!("{} does not read: {e}", tar.display())))?
+    };
+    const MAGIC: [(&[u8], &str); 4] = [
+        (&[0x1f, 0x8b], "gzip"),
+        (&[0x28, 0xb5, 0x2f, 0xfd], "zstd"),
+        (&[0xfd, b'7', b'z', b'X', b'Z', 0x00], "xz"),
+        (b"BZh", "bzip2"),
+    ];
+    if let Some((_, kind)) = MAGIC.iter().find(|(m, _)| head[..n].starts_with(m)) {
         return Err(Error::Oci(format!(
-            "{} is compressed; import takes a plain tar so the record's media type \
+            "{} is compressed ({kind}); import takes a plain tar so the record's media type \
              stays true. Decompress it first",
             tar.display()
         )));
     }
-    if &head[257..262] != b"ustar" {
+    if n < 512 || &head[257..262] != b"ustar" {
         return Err(Error::Oci(format!(
             "{} is not a tar archive (no ustar magic); nothing runnable can be built from it",
             tar.display()
@@ -379,8 +406,9 @@ pub fn import(store: &Store, tar: &Path, reference: Option<&str>) -> Result<Reco
     }
     if let Some(member) = escaping_member(tar)? {
         return Err(Error::Oci(format!(
-            "{} has the member {member:?}, which leaves the root of the tree: \
-             extract would refuse it, so import refuses it now (TODO/image.md T-1839)",
+            "{} has the member {member:?}, which extract would refuse (it leaves the root \
+             of the tree, or links to a member that is not there yet), so import refuses \
+             it now (TODO/image.md T-1839)",
             tar.display()
         )));
     }
