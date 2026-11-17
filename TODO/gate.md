@@ -5654,7 +5654,7 @@ among them); after it, ten runs each exit 0 with 98 of 98.
 
 # T-1936: A gate of the tools of a CI job: a raw syscall, a spawn, a pty, `uv` and `ruff` in a unit
 
-**Source:** COORD-102 of podnet (PodUtils/podnet#649: "a green gate is not readiness"); the faults of T-1934 and T-1935
+**Source:** COORD-102 of podnet (PodUtils/podnet#649: "a green gate is not readiness"), answered by COORD-178 (PodUtils/podvm#471); the faults of T-1934 and T-1935
 **Category:** gate
 **Milestone:** none
 **Priority:** P1
