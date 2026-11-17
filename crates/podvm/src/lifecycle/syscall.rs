@@ -32,6 +32,19 @@ pub fn decide(
         eprintln!("podvm {verb}: --podvm-tier=syscall: {why} (TODO/enter.md T-1657)");
         Err(podvm_image::error::EXIT_RUNTIME_ERROR)
     };
+    // TODO/gate.md T-1948, PodUtils/podvm#508: the tier takes the interposer
+    // out (T-1731), and the handler answers no `getuid`, so a `-u` that the
+    // interposer fakes would be a claim with nothing behind it.
+    if env.iter().any(|e| {
+        e.split_once('=')
+            .is_some_and(|(k, v)| k == crate::interpose::IDENTITY_VAR && !v.is_empty())
+    }) {
+        return refuse(
+            "-u is refused: the payload runs as the caller on this tier, and the tier \
+             fakes no identity; run without -u, or with no --podvm-tier"
+                .to_string(),
+        );
+    }
     if let Err(why) = podvm_dispatch::available() {
         return refuse(format!(
             "the tier runs on the native-static rung, and {why}"

@@ -224,6 +224,7 @@ pub(crate) fn prepare(
         eprintln!("podvm {verb}: the ownership memo could not be created: {e}");
         return Err(podvm_image::error::EXIT_RUNTIME_ERROR);
     } // T-1928: the descriptor and the identity of the memo.
+    let memo_guard = crate::interpose::MemoGuard::new(&memo_host_path); // #475
     let broker = crate::broker::for_run(verb, o.broker, syscall, &o.allow, &o.ports)?; // T-1665
     crate::lifecycle::syscall::tier_env(&mut env, syscall, tmp_cap, broker.as_ref());
     if let Some(b) = broker.as_ref().filter(|_| syscall) {
@@ -382,9 +383,10 @@ pub(crate) fn prepare(
         // ⚠ Read and REPORTED, not applied (T-1927 applies it on the namespace rung). podvm cannot setuid to an id
         // this machine does not map, which is the wall the project is about.
         banner.push_str(&format!(
-            "podvm: the image asks to run as user {:?}; podvm runs as uid 0 \
+            "podvm: the image asks to run as user {:?}; podvm runs as uid {} \
              and does not change to it\n",
-            cfg.config.user
+            cfg.config.user,
+            crate::interpose::own_uid() // T-1948, #507
         ));
     }
     // ⭐ T-0804 rule 1, applied HERE and nowhere else, so `run`, `run -d`,
@@ -458,6 +460,7 @@ pub(crate) fn prepare(
     // ENTERS takes its own, and for `-d` that is the launcher rather than this.
     drop(held);
     tree.keep();
+    memo_guard.keep();
     Ok(crate::lifecycle::Prepared {
         record,
         image,

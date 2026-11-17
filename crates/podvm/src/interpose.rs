@@ -466,7 +466,9 @@ pub fn apply<G: GuestRoot + ?Sized>(
 }
 
 mod admit;
+mod run_files; // T-1948, PodUtils/podvm#475
 use admit::admit_slot;
+pub use run_files::{own_uid, MemoGuard};
 #[cfg(test)]
 mod place_tests;
 mod shebang;
