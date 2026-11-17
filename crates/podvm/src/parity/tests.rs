@@ -458,23 +458,3 @@ fn a_memory_row_names_rlimit_fsize_only_where_the_verb_reads_it() {
         );
     }
 }
-
-/// PodUtils/podvm#492, #479: `--tls-verify=false` reaches the parser
-/// whole, and `--strict=VALUE` only where the parser reads a value.
-#[test]
-fn tls_verify_and_a_strict_value_keep_their_form() {
-    let v = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-    assert_eq!(
-        expand("pull", &v(&["--tls-verify=false", "img"])),
-        Ok(v(&["--tls-verify=false", "img"]))
-    );
-    assert_eq!(
-        expand("run", &v(&["--strict=all", "img"])),
-        Ok(v(&["--strict=all", "img"]))
-    );
-    assert_eq!(
-        expand("doctor", &v(&["--strict=0"])),
-        Err("--strict=0".to_string())
-    );
-    assert_eq!(expand("doctor", &v(&["--strict=false"])), Ok(v(&[])));
-}

@@ -148,6 +148,15 @@ pub fn expand(verb: &str, args: &[String]) -> Result<Vec<String>, String> {
             }
             continue;
         }
+        // PodUtils/podvm#488: `--` ends the options, as POSIX and docker read
+        // it. `run` and `create` read it in their parsers (T-1659); for each
+        // other verb it is dropped here, and each word after it is an operand.
+        // A `--` after the image of a bounded verb is the payload's: the walk
+        // ends at the image, above.
+        if a == "--" && !matches!(under, "run" | "create") {
+            out.extend(args[i..].iter().cloned());
+            break;
+        }
         if a.starts_with('-') && a.len() > 1 {
             value_next = a.starts_with("--")
                 && !a.contains('=')

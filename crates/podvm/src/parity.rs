@@ -479,4 +479,6 @@ pub use lookup::*;
 #[cfg(test)]
 mod api_tests;
 #[cfg(test)]
-mod tests; // TODO/cli.md T-1745
+mod filter_tests;
+#[cfg(test)]
+mod tests; // TODO/cli.md T-1745 // PodUtils/podvm#479, #488, #492
