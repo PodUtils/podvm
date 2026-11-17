@@ -78,10 +78,18 @@ pub(super) fn tee_fd_to(fd: i64, log_path: &std::path::Path) -> Result<Tee, Stri
     let handle = std::thread::spawn(move || {
         let mut old = 0u64;
         let _ = podvm_probe::sys::sigblock_shutdown(&mut old);
+        // PodUtils/podvm#534: a reader that closed stdout (`| head -1`) sent
+        // SIGPIPE to this thread, and its default action ended podvm before
+        // the record and `--rm`. Blocked here only (an ignored signal would
+        // pass to the payload through `execve`), the write gives EPIPE.
+        let _ = podvm_probe::sys::sigblock(1 << (SIGPIPE - 1), &mut old);
         pump(reader, out, log)
     });
     Ok(Tee { fd, saved, handle })
 }
+
+/// The number of SIGPIPE on Linux.
+const SIGPIPE: u64 = 13;
 
 /// The pump behind [`tee_stdout_to`]: every byte to the saved stdout and
 /// to the log, until EOF or a read error. Best-effort by design: the
@@ -98,8 +106,18 @@ fn pump(
         match reader.read(&mut buf) {
             Ok(0) => break,
             Ok(n) => {
-                let _ = std::io::Write::write_all(&mut *out, &buf[..n]);
+                let sent = std::io::Write::write_all(&mut *out, &buf[..n]);
                 let _ = std::io::Write::write_all(&mut log, &buf[..n]);
+                // PodUtils/podvm#534: the reader of stdout left. The pump
+                // stops and closes its end of the pipe, so the payload gets
+                // the broken pipe too, as in a pipeline with no podvm, and
+                // the run ends with its record and its `--rm`.
+                if sent
+                    .as_ref()
+                    .is_err_and(|e| e.kind() == std::io::ErrorKind::BrokenPipe)
+                {
+                    break;
+                }
             }
             Err(_) => break,
         }

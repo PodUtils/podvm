@@ -33,6 +33,8 @@ Deployed: none yet.
   `USER` warning names the real uid (#507). A refused run leaves no memo
   file (#475). `save -o` writes nothing on stdout (#522). `system abi`
   exits 125 for an unreadable file (#521).
+- `podvm run IMAGE CMD | head -1` ends as a pipeline does: the payload
+  gets the broken pipe, and the run keeps its record and its `--rm` (#534).
 
 ### Added: the syscall tier for a detached container, 2026-11-17
 

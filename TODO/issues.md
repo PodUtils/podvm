@@ -463,6 +463,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #567 | COORD-180: podvm called beta.31 ready and an outside tester confirmed 37 faults in one hour; what podvm changes (to all) | open | T-1946, T-1947, T-1948, T-1949 |
 | #568 | COORD-181: five faults of the external QA of podvm that are in crates of podcrates: the table's temp file, the exec probe's name, a helper's ServerURL, run -d --rm, a -v source with no link (to podcrates) | open | T-1938, T-1939, T-1944, T-1945 |
 | #569 | COORD-182: ten more faults of the external QA of podvm in crates of podcrates: signals, the entered rung, logs, mtab, the probe key, census and guest (to podcrates) | open | T-1953 |
+| #570 | COORD-183: the answer to PodUtils/podcrates#221: the two rulings are in podvm's AGENTS.md; the four copies go at the next take (to podcrates) | open | T-1955 |
 
 ## Messages whose title does not start with COORD-NNN
 

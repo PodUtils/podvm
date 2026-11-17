@@ -4498,7 +4498,7 @@ As uid 1000 on both rungs: the repro of 473 reads `hostdev`, a write lands in th
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -4521,3 +4521,7 @@ podvm's items in podvm; pod-enter, pod-supervise, pod-rootfs, pod-hostprobe and 
 ## Prove
 
 `cargo test --release -p podvm --bin podvm` passes, and for each issue of this entry its repro, on the rung of the report, gives the fix.
+
+## Done
+
+**Partial (2026-11-17).** 534: the pump of stdout blocks SIGPIPE in its own thread (the payload keeps the default), and at a broken pipe it stops and closes its end, so the payload gets the broken pipe as in a pipeline with no podvm. As uid 1000: `run --rm --name sp alpine sh -c 'yes hello' | head -1` prints `hello`, podvm exits 141 in 0.3 s, and `ps -a` lists nothing; with no `--rm` the record is `Exited (141)` (before: podvm died, the record stayed `Created`). COORD-182 (#569) asks podcrates for the items of pod-enter, pod-supervise, pod-rootfs, pod-hostprobe and pod-guest. Remaining: podvm's other items.
