@@ -59,6 +59,9 @@ pub fn parse_filter(raw: &str) -> Result<Filter, String> {
     }
 }
 
+/// The verbs whose parser reads a value of `--strict` (`--strict=all`).
+const STRICT_VALUE: [&str; 3] = ["run", "create", "exec"];
+
 /// `-aq` becomes `-a -q`; a member that takes a value consumes the rest
 /// (`-t5` becomes `-t 5`, `-eFOO=bar` becomes `-e FOO=bar`,
 /// `-f{{.Id}}` becomes `-f {{.Id}}`); an unknown member refuses naming
@@ -121,12 +124,20 @@ pub fn expand(verb: &str, args: &[String]) -> Result<Vec<String>, String> {
         if let Some((name, val)) = a.strip_prefix("--").and_then(|_| a.split_once('='))
             && flag(under, name).is_some()
         {
-            if BOOLEAN_LONGS.contains(&name) {
+            // PodUtils/podvm#492: the parsers of `pull`, `run` and `create`
+            // read `--tls-verify=VALUE` themselves; split, `false` became
+            // the image and TLS verification stayed on.
+            if name == "--tls-verify" {
+                out.push(a.clone());
+                prev_dash = true;
+            } else if BOOLEAN_LONGS.contains(&name) {
                 match val {
                     "true" => out.push(name.to_string()),
                     "false" => {}
-                    // `run --strict=all` (T-1415): the parser takes it.
-                    _ if name == "--strict" => out.push(a.clone()),
+                    // `run --strict=all` (T-1415): the parsers of `run`,
+                    // `create` and `exec` take it; each other verb refuses a
+                    // value by name (PodUtils/podvm#479).
+                    _ if name == "--strict" && STRICT_VALUE.contains(&verb) => out.push(a.clone()),
                     _ => return Err(a.clone()),
                 }
                 prev_dash = true;

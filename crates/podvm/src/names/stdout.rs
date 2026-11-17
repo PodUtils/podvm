@@ -17,9 +17,9 @@ pub const EXIT: i32 = podvm_image::error::EXIT_RUNTIME_ERROR;
 
 /// The verb of this process, for the message.
 fn verb() -> String {
-    std::env::args()
+    std::env::args_os()
         .nth(1)
-        .unwrap_or_else(|| "podvm".to_string())
+        .map_or_else(|| "podvm".to_string(), |a| a.to_string_lossy().into_owned())
 }
 
 /// Write `line` to stderr, best effort: stderr can be full too.

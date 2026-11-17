@@ -6045,7 +6045,7 @@ One small change for each item, with a test of its refusal. 485 keeps exit 1 (T-
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -6075,6 +6075,10 @@ Each item is reproduced as uid 1000 on the cloud host with the binary of `main` 
 ## Prove
 
 `cargo test --release -p podvm --bin podvm` passes, with a test of each refusal, and the repro of each issue, as uid 1000, gives the refusal or the result of the fix.
+
+## Done
+
+**Partial (2026-11-17).** 505: `names::argv` reads `args_os` and refuses an argument that is not UTF-8 by name with exit 125 (before: a panic, exit 134); the names of the process are read lossily. 492: `expand` passes `--tls-verify=VALUE` whole to the parser. 479: `--strict=VALUE` passes through only for `run`, `create` and `exec`; `doctor --strict=0` gets the refusal of the table. A unit test pins 492 and 479. Measured as uid 1000. Remaining: 493, 494, 497, 499, 500, 504, 506, 507, 508.
 
 # T-1944: The external QA of `0.2.0-beta.31`, second batch: `cp`, `import` and the helpers of credentials
 

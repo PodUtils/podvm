@@ -28,12 +28,33 @@ use std::time::Duration;
 
 use podvm_image::error::{EXIT_CLI_ERROR, EXIT_FLAG_ERROR, EXIT_RUNTIME_ERROR};
 
+/// The arguments of podvm. PodUtils/podvm#505: `env::args` panicked on an
+/// argument that is not UTF-8 (exit 134); such an argument is refused by
+/// name with exit 125. The native-static rung entered before this, so the
+/// arguments of a payload there stay bytes.
+pub fn argv() -> Vec<String> {
+    let mut out = Vec::new();
+    for (i, a) in std::env::args_os().enumerate() {
+        match a.into_string() {
+            Ok(s) => out.push(s),
+            Err(bad) => {
+                eprintln!(
+                    "podvm: argument {i} ({}) is not UTF-8; podvm takes UTF-8 arguments only",
+                    bad.to_string_lossy()
+                );
+                std::process::exit(EXIT_RUNTIME_ERROR);
+            }
+        }
+    }
+    out
+}
+
 /// The names podvm answers to besides its own.
 pub const ALIASES: &[&str] = &["docker", "podman"];
 
 /// The name podvm was invoked under, with no directory.
 pub fn invoked_as() -> String {
-    std::env::args()
+    std::env::args_os()
         .next()
         .as_deref()
         .map(Path::new)
