@@ -127,7 +127,7 @@ pub fn script(
             format!("{} ", sh_quote(size))
         };
         s.push_str(&format!(
-            "/podvm/podvm guest-tty {size}-- \"$@\"\nrc=$?\necho; echo PODVM-EXIT-{nonce} $rc\n"
+            "/podvm/podvm guest-tty {size}-- \"$@\"\nrc=$?\n{OOM}\necho; echo PODVM-EXIT-{nonce} $rc $o\n"
         ));
         s.push_str("sync\nreboot -f 2>/dev/null\necho b > /proc/sysrq-trigger\n");
         return s;
@@ -145,7 +145,7 @@ pub fn script(
         "{ERR_PORT}\nif [ -c \"$E\" ]; then cat /podvm-err >\"$E\" & else cat /podvm-err >&2 & fi\ne=$!\n"
     ));
     s.push_str("\"$@\" >/podvm-out 2>/podvm-err\nrc=$?\nwait $o $e\n");
-    s.push_str(&format!("echo; echo PODVM-EXIT-{nonce} $rc\n"));
+    s.push_str(&format!("{OOM}\necho; echo PODVM-EXIT-{nonce} $rc $o\n"));
     s.push_str("sync\nreboot -f 2>/dev/null\necho b > /proc/sysrq-trigger\n");
     s
 }
@@ -167,6 +167,8 @@ pub enum Line<'a> {
 pub struct Console {
     nonce: String,
     ready: bool,
+    /// The OOM kills of the guest that the exit marker gave (T-1969).
+    pub oom_kills: Option<u64>,
 }
 
 impl Console {
@@ -174,6 +176,7 @@ impl Console {
         Console {
             nonce: nonce.to_string(),
             ready: false,
+            oom_kills: None,
         }
     }
 
@@ -189,7 +192,9 @@ impl Console {
         }
         let mark = format!("PODVM-EXIT-{} ", self.nonce);
         if let Some(at) = raw.find(&mark) {
-            let code = raw[at + mark.len()..].trim().parse::<i32>().unwrap_or(125);
+            let mut f = raw[at + mark.len()..].split_whitespace();
+            let code = f.next().and_then(|c| c.parse::<i32>().ok()).unwrap_or(125);
+            self.oom_kills = f.next().and_then(|n| n.parse::<u64>().ok());
             return Line::Exit(code, &raw[..at]);
         }
         Line::Out(raw)
@@ -205,6 +210,13 @@ pub fn nonce() -> Result<String, String> {
         .map_err(|e| format!("/dev/urandom: {e}"))?;
     Ok(b.iter().map(|x| format!("{x:02x}")).collect())
 }
+
+/// TODO/machine.md T-1969 (PodUtils/podrunner#296 ask 6): the count
+/// `oom_kill` of the guest's `/proc/vmstat` into `$o`, with shell builtins
+/// only (an image can have no `sed`); empty where the kernel has no such
+/// line. The exit marker carries it after the code.
+const OOM: &str =
+    "o=; while read -r k v; do [ \"$k\" = oom_kill ] && o=$v; done </proc/vmstat 2>/dev/null";
 
 /// The second port of the guest, the one of stderr, into `$E`: `ttyS1` on
 /// x86_64; on arm64 the virtio port named `podvm.err` (TODO/machine.md

@@ -126,6 +126,9 @@ pub(super) fn drive(
                         let _ = writeln!(o, "{before}");
                     }
                     code = Some(c);
+                    if let Some(n) = console.oom_kills {
+                        crate::run::cgroup::set_guest_oom_kills(n);
+                    }
                     break;
                 }
             },

@@ -152,7 +152,7 @@
     "oom_kills": {
       "type": "integer",
       "minimum": 0,
-      "description": "Optional: the oom_kill count of memory.events of the cgroup leaf of the run, where the run has one (--memory in a delegated cgroup2 subtree). Absent where the run has no leaf."
+      "description": "Optional: the oom_kill count of memory.events of the cgroup leaf of the run, where the run has one (--memory in a delegated cgroup2 subtree); on the machine tier, the oom_kill count of /proc/vmstat of the guest kernel. Absent where the run has neither."
     },
     "timed_out": {
       "type": "boolean",

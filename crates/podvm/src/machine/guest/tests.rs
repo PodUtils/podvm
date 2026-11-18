@@ -87,6 +87,31 @@ fn the_exit_marker_needs_the_nonce_of_the_run() {
     assert_eq!(c.line("tailPODVM-EXIT-n1 7\r"), Line::Exit(7, "tail"));
 }
 
+/// T-1969: the exit marker carries the OOM kills of the guest after the
+/// code; a kernel with no count gives an empty field, and a bad field is
+/// no count, not a bad code.
+#[test]
+fn the_exit_marker_carries_the_oom_kills_of_the_guest() {
+    for (line, code, oom) in [
+        ("PODVM-EXIT-n1 0 0", 0, Some(0)),
+        ("PODVM-EXIT-n1 137 2\r", 137, Some(2)),
+        ("PODVM-EXIT-n1 3 ", 3, None),
+        ("PODVM-EXIT-n1 3", 3, None),
+        ("PODVM-EXIT-n1 3 x", 3, None),
+        ("PODVM-EXIT-n1 x 1", 125, Some(1)),
+    ] {
+        let mut c = Console::new("n1");
+        assert_eq!(c.line("PODVM-READY-n1"), Line::Ready);
+        assert_eq!(c.line(line), Line::Exit(code, ""), "{line}");
+        assert_eq!(c.oom_kills, oom, "{line}");
+    }
+    let s = init::script("n", &["true".into()], &[], "/", false, &[], None, None);
+    assert!(
+        s.contains("oom_kill") && s.contains("PODVM-EXIT-n $rc $o"),
+        "{s}"
+    );
+}
+
 #[test]
 fn the_init_script_quotes_each_word() {
     let s = init::script(

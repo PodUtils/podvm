@@ -8,6 +8,13 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- The run report of a machine guest has `oom_kills`: the guest init gives
+  the count `oom_kill` of its kernel with the exit marker (T-1969,
+  PodUtils/podrunner#296 ask 6). Measured under TCG with `--podvm-mem
+  256M`: a payload that fills the memory ends with 137 and `oom_kills` 1,
+  for `run --rm` and for `run -d`; a payload that exits 3 has
+  `oom_kills` 0.
+
 ## 0.2.0-beta.33 (2026-11-18)
 
 ### Known gaps: what the checks of 0.2.0-beta.33 prove, and what stays open, 2026-11-18

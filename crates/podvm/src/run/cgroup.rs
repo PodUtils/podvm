@@ -260,8 +260,23 @@ pub(crate) fn leave() {
 /// TODO/supervise.md T-1969: the OOM kills of the leaf of this run, for
 /// the run report; `None` where the run has no leaf.
 pub fn oom_kills() -> Option<u64> {
-    let leaf = LEAF.lock().ok()?.as_ref()?.0.clone();
-    podvm_supervise::report::oom_kills_of(&leaf)
+    let leaf = LEAF
+        .lock()
+        .ok()
+        .and_then(|l| l.as_ref().map(|l| l.0.clone()));
+    match leaf {
+        Some(leaf) => podvm_supervise::report::oom_kills_of(&leaf),
+        None => GUEST_OOM.get().copied(),
+    }
+}
+
+/// The OOM kills that a machine guest gave with its exit marker
+/// (TODO/machine.md T-1969): the count of the guest's kernel.
+static GUEST_OOM: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+
+/// Keep the OOM kills of the guest of this run for its report.
+pub fn set_guest_oom_kills(n: u64) {
+    let _ = GUEST_OOM.set(n);
 }
 
 /// At podvm's exit: name an OOM kill, move back, and remove the leaf.
