@@ -72,7 +72,8 @@ mod host;
 mod join;
 pub mod owners;
 mod range;
-mod sweep;
+mod sigrelay;
+mod sweep; // PodUtils/podvm#535
 pub use host::{bind_devices, bind_volumes, host_pid};
 pub use join::{joined_pidfd, rejoin};
 pub use range::{again_in_range, cp_in_range};
@@ -177,22 +178,6 @@ fn wait_for(pid: i32) -> i32 {
         } else {
             128 + (st & 0x7f)
         };
-    }
-}
-
-/// Install `forward` for the shutdown signals, and ignore the two that the
-/// terminal sends to the whole process group (pid 2 and the payload get
-/// them from the terminal).
-fn relay_signals() {
-    // SAFETY: forward is async-signal-safe; the handlers stay for the life
-    // of the process.
-    unsafe {
-        for s in [SIGHUP, SIGTERM, SIGUSR1, SIGUSR2] {
-            signal(s, forward as *const () as usize);
-        }
-        for s in [SIGINT, SIGQUIT] {
-            signal(s, SIG_IGN);
-        }
     }
 }
 
@@ -378,7 +363,7 @@ pub fn enter_if(argv: &[String]) {
         // SAFETY: the write end of this process.
         unsafe { close(code_w) };
         CHILD.store(pid1, Ordering::Relaxed);
-        relay_signals();
+        sigrelay::relay_signals();
         let mut b = [0u8; 1];
         loop {
             // SAFETY: b has room for one byte.
@@ -424,7 +409,7 @@ pub fn enter_if(argv: &[String]) {
         return;
     }
     CHILD.store(pid2, Ordering::Relaxed);
-    relay_signals();
+    sigrelay::relay_signals();
     let mut code = 125;
     let mut told = false;
     loop {

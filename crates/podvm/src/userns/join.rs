@@ -85,7 +85,7 @@ pub(super) fn join_if() {
     }
     if child > 0 {
         CHILD.store(child, Ordering::Relaxed);
-        relay_signals();
+        super::sigrelay::relay_signals();
         std::process::exit(wait_for(child));
     }
 }
