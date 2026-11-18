@@ -54,7 +54,10 @@ pub(crate) fn incus_limit(verb: &str, flag: &str, v: &str) -> Result<(&'static s
                     "takes size=N (docker's form); podvm knows no other option",
                 ));
             };
+            // `10g`, `10G`, `10GB` and `10GiB` (docker's and incus's
+            // spellings) name the same size.
             let t = size.trim_end_matches(['b', 'B']);
+            let t = t.strip_suffix(['i', 'I']).unwrap_or(t);
             let (num, mult) = match t.chars().last().map(|c| c.to_ascii_lowercase()) {
                 Some('k') => (&t[..t.len() - 1], 1u64 << 10),
                 Some('m') => (&t[..t.len() - 1], 1 << 20),
@@ -98,6 +101,28 @@ pub(crate) fn refuse_off_incus(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// T-1964: each spelling of a size names the same bytes; a size below
+    /// 64m, an unknown unit and an option other than size= are refusals.
+    #[test]
+    fn storage_opt_takes_each_spelling_of_a_size() {
+        for (v, want) in [
+            ("size=1G", Some(1u64 << 30)),
+            ("size=1g", Some(1 << 30)),
+            ("size=1GB", Some(1 << 30)),
+            ("size=1GiB", Some(1 << 30)),
+            ("size=512MiB", Some(512 << 20)),
+            ("size=2T", Some(2 << 40)),
+            ("size=1073741824", Some(1 << 30)),
+            ("size=1m", None),
+            ("size=1X", None),
+            ("size=", None),
+            ("dm.basesize=1G", None),
+        ] {
+            let got = incus_limit("run", "--storage-opt", v).ok();
+            assert_eq!(got, want.map(|b| (ROOT_SIZE, format!("{b}B"))), "{v}");
+        }
+    }
 
     #[test]
     fn incus_limits_map_the_docker_values() {
