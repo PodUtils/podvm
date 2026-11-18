@@ -25,6 +25,7 @@ pub mod elf;
 mod enter;
 #[cfg(target_arch = "x86_64")]
 mod exec;
+#[cfg(target_arch = "x86_64")]
 mod follow; // TODO/enter.md T-1975
 #[cfg(target_arch = "x86_64")]
 mod handler;
@@ -40,6 +41,7 @@ mod procself;
 mod ro; // TODO/enter.md T-1901
 #[cfg(target_arch = "x86_64")]
 mod signals;
+#[cfg(target_arch = "x86_64")]
 mod sock; // TODO/enter.md T-1973
 #[cfg(target_arch = "x86_64")]
 mod state;
@@ -49,7 +51,8 @@ mod sys;
 pub mod tier;
 #[cfg(target_arch = "x86_64")]
 mod uts;
-mod vols; // TODO/enter.md T-1724, T-1972 // TODO/enter.md T-1908
+#[cfg(target_arch = "x86_64")]
+mod vols; // TODO/enter.md T-1724, T-1972
 
 #[cfg(all(test, target_arch = "x86_64"))]
 mod tests;
