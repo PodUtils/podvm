@@ -364,7 +364,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #468 | COORD-175: pod-guest: evidence of a mailbox run that times out before WQREADY (podvm T-1933) (to podcrates) | closed (podcrates@T-861 in podcrates `v0.70.0`, PodUtils/podcrates#222, taken in `6b5a6cb`) | T-1933 |
 | #469 | COORD-176: pod-enter: a new devpts instance and /dev/ptmx on the namespace rung, so that openpty works in a unit (podvm T-1934, PodUtils/podrunner#216) (to podcrates) | closed (podcrates@T-864 and @T-868 in podcrates `v0.70.0`, PodUtils/podcrates#222, taken in `6b5a6cb`; T-1934 done) | T-1934 |
 | #470 | COORD-177: the answers to PodUtils/podrunner#216 (no pty: namespace rung) and #189 (raw renameat2 on the userland rung) (to podrunner) | open | T-1934, T-1935 |
-| #471 | COORD-178: the answer to PodUtils/podnet#649: what the gates of podvm prove, and the gap that real tools found (to podnet) | open | T-1936 |
+| #471 | COORD-178: the answer to PodUtils/podnet#649: what the gates of podvm prove, and the gap that real tools found (to podnet) | closed (podnet read the answer, PodUtils/podnet#649 state of 2026-11-18 10:40 (UTC)) | T-1936 |
 | #472 | `run -d` of a payload that exits immediately is recorded `Dead` with no exit code, and `wait` refuses | open | T-1938 |
 | #473 | `--device` opens the host file but the payload never sees it; reads get `ENOENT` and writes land in the image | open | T-1939 |
 | #474 | `run -d --rm` leaves the container record and its rootfs behind | open | T-1939 |

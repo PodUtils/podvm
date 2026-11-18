@@ -360,7 +360,7 @@
 468 issue closed
 469 issue closed
 470 issue open
-471 issue open
+471 issue closed
 472 issue open
 473 issue open
 474 issue open
