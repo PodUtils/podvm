@@ -36,6 +36,7 @@ pub const EBUSY: i64 = 16;
 
 /// The numbers of x86_64 that the handler names.
 pub mod nr {
+    pub const FSTAT: i64 = 5;
     pub const OPEN: i64 = 2;
     pub const CLOSE: i64 = 3;
     pub const STAT: i64 = 4;

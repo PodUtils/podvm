@@ -8,6 +8,23 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: the faults of the second outside pass, 2026-11-18
+
+Record: T-1974, T-1975.
+Deployed: none yet.
+
+- On the syscall tier, `exec` opens each volume under the base of the run:
+  a link that replaced a source after the start is refused (exit 125), not
+  followed out of `--podvm-volume-base`.
+- Ctrl-C of `run -it` and of `run -t` reaches the payload, and the run
+  exits with the code of the payload.
+- `exec` with no `-w` starts in a `-w` of the unit that is in a volume.
+- On the syscall tier, `-v HOST:/tmp` of a foreground run replaces the
+  tier's own `/tmp`, and a link in a volume that names an absolute path or
+  leaves the volume resolves as in the container: `python -m venv` works
+  in a work directory of a volume.
+- The ceiling of the size of the binary is 9 000 000 bytes (call C24).
+
 ### Fixed: a Unix socket of a volume on the syscall tier, 2026-11-18
 
 Record: T-1973.

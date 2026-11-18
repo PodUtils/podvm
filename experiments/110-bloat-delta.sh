@@ -23,7 +23,7 @@
 #       failed, 2 could not run.
 set -uo pipefail
 
-CEILING_BYTES=8500000
+CEILING_BYTES=9000000
 
 HERE="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 REPO="$(CDPATH= cd -- "$HERE/.." && pwd)"

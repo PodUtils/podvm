@@ -4661,3 +4661,36 @@ As uid 1000 under `scripts/dev/nouserns.c`, with a host process that listens on 
 ## Done
 
 **Done (2026-11-18).** `podvm-dispatch/src/sock.rs`, called first in `calls::path_call`. Measured as uid 1000 under `scripts/dev/nouserns.c` (`inspect`: `userland syscall`) with `docker.io/library/python:3.13-slim`: the payload of a foreground run and an `exec` of a `run -d` unit connect to the host's socket in the volume and read its answer; the payload binds `/tmp/own.sock`, connects to it and reads `own-ok`; the host has no `/tmp/own.sock`. `a_socket_path_of_the_guest_becomes_a_short_proc_path` pins the address and the refusal of a name that does not fit.
+
+# T-1975: On the syscall tier, a link inside a volume that names an absolute path or leaves the volume does not resolve
+
+**Source:** OR-06 of the second outside pass of 2026-11-18 (T-1974)
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** done
+
+## Problem
+
+The handler resolves a path at the root or at its volume with `RESOLVE_IN_ROOT`, so a link in a volume (or in the `/tmp` of a foreground run, a directory of the store) that names `/usr/bin/python3`, or `../x` out of the volume, resolves against the volume. `python -m venv` in such a directory makes `v/bin/python` that does not run: the venv of a CI job in its work directory (a volume of a unit) breaks.
+
+## Premise
+
+A prefix of a path that holds no link folds `.` and `..` by its text.
+
+## Approach
+
+Where a resolution at a base fails with ENOENT, ENOTDIR or ELOOP and the run has a volume, the handler walks the guest path one name at a time with the rules of the guest (`follow::walk`): each name opens with `O_NOFOLLOW` at its base; a link starts again at `/` (absolute) or at its directory (relative); `.` and `..` fold by their text; at most 40 links. Then it tries the new path. A path that resolves at once costs nothing more.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 under `scripts/dev/nouserns.c`, `--podvm-tier=syscall`: `cd /tmp; ln -s /etc/hostname h; cat h` reads the file; `python3 -m venv v --without-pip; v/bin/python` runs in `/tmp` and in a volume; a link `../w/v/bin/python` in the volume `/w` runs; a missing name still gives ENOENT.
+
+## Done
+
+**Done (2026-11-18).** `podvm-dispatch/src/follow.rs`, called from `path::open_in`. Measured as in the Prove with `docker.io/library/python:3.13-slim`: `link-ok`, `venv-tmp-ok`, `venv-vol-ok /w/v`, `rel-ok`, and `ls /w/nope` gives "No such file or directory". The walk opens only at the root and at the volumes (`path::base_of`), never at the host.

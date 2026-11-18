@@ -140,6 +140,7 @@ pub(super) fn take_hold(
     err: &mut dyn std::io::Write,
 ) {
     crate::run::cgroup::leave(); // TODO/cli.md T-1747: the leaf is the payload's
+    crate::run::pty::set_payload(pid); // OR-02: the target of the interrupt key
     match podvm_supervise::foreground(store, id, pid) {
         Ok(h) => {
             *hold = Some(h);

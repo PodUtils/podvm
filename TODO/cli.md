@@ -6252,3 +6252,36 @@ As uid 1000: `printf 'KEY=line1\nline2\0' > F; podvm run --rm --env-file0 F IMAG
 ## Done
 
 **Done (2026-11-18).** `run::parse::values::read_env_file0`, wired in `run` and `exec`, with parity rows and the help. Measured as uid 1000 on the cloud host with `docker.io/library/python:3.13-slim`: a value `line1\nline2-SEKRET` and a value `two words` reach the payload of a foreground run as written; `run -d --env-file0=F` and `exec --env-file0 F` give the same value; an entry with no `=` exits 125 with one line. While a unit ran, no `/proc/*/cmdline` of the host held the value. The machine tier under TCG (`docker.io/library/alpine:3.20`): the guest prints both lines, and no process of the host, QEMU included, holds the value in its argv (the values go into the init script of the initrd; the keeper of `run -d` takes the path of the file, not the values). The incus tier: by reading of the code, the values of `run -d` go into `/.podvm/cmd` of the instance (a file of root, mode 0600) and those of a foreground run and of `exec` into the request of the incus API; podvm starts no `incus` program.
+
+# T-1974: The outside pass of 2026-11-18, the second: a P0 and four P1 faults of the new surface
+
+**Source:** the outside pass of the gate of `0.2.0-beta.33` (T-1949, `docs/maintenance.md`), 2026-11-18: an agent with the binary of `9f714c7`, `podvm man` and a filter that denies user namespaces, as uid 1000 on the cloud host
+**Category:** cli
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+The pass found 1 P0, 4 P1, 7 P2 and 5 P3 faults (OR-01 to OR-17). P0 (OR-01): on the syscall tier, `exec` followed a symbolic link that replaced a volume source after the start, and read and wrote out of `--podvm-volume-base`. P1: Ctrl-C of `run -it` ended podvm and not the payload (OR-02); Ctrl-C of `run -t` did nothing (OR-03); `exec` with no `-w` refused where the `-w` of the unit is in a volume (OR-04); a foreground syscall-tier `-v H:/tmp` was refused as a second volume at `/tmp` (OR-05). P2: an absolute link in a volume of the syscall tier did not resolve, so `python -m venv` there broke (OR-06, T-1975); `getsockname` names `/proc/self/fd/N/...` (OR-07); a source out of the base is accepted with no word (OR-08); exit 127 for a refused volume, a file as a volume source, a directory as the command and an environment over the kernel's limit on the syscall tier (OR-09 to OR-12). P3: OR-13 to OR-17.
+
+## Premise
+
+Each finding was reproduced twice by the pass.
+
+## Approach
+
+The P0 and the P1 faults, and OR-06 (a venv in a work directory of a unit), before the beta; the others with the quality entries of their class.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000: the repro of OR-01 to OR-06 of the pass gives the result of the fix (`scratchpad` scripts `or05.sh`, `or06.sh` and the commands of the Done record).
+
+## Done
+
+**Partial (2026-11-18).** OR-01: the handler of `exec` on the syscall tier takes `PODVM_VOLUME_BASE` of the record (`lifecycle::syscall::exec_entry`), so a link that replaced a source is a refusal; a refused volume of the handler exits 125, not 127 (also OR-09). Measured: after `mv B/u B/u.old; ln -s OUT B/u`, `exec` exits 125 with "its host path holds a symbolic link under its base", reads nothing out of B and writes nothing there. OR-02: the relay of `-it` sends SIGINT to the payload (`run::pty::set_payload`); OR-03: with no `-i` the terminal stays cooked, and the relay threads block the signals that the waiter forwards. Measured with a payload whose handler logs SIGINT and exits 5: `-it` and `-t` each give the log line and exit 5. OR-04: `exec` passes the binds of the record to the plan of the joined entry and to its own check (`exec::in_bind`): `exec` of a unit of `-w /vol/sub -v V:/vol` prints `/vol/sub`, and a write lands in V. OR-05: a volume or `--tmpfs` at `/tmp` replaces the `/tmp` of the syscall tier (`run::binds::tmp_is_given`): `-v H:/tmp` writes into H. OR-06: T-1975. Remaining: OR-07, OR-08, OR-10 to OR-17.

@@ -89,7 +89,24 @@ pub fn base_of(guest: &[u8]) -> (i64, usize) {
 pub fn open_in(buf: &[u8], n: usize, flags: i64, mode: i64, resolve: u64) -> i64 {
     let (fd, at) = base_of(&buf[..n]);
     let rest = if at >= n { &b".\0"[..] } else { &buf[at..=n] };
-    sys::openat2(fd, rest, flags, mode, resolve | RESOLVE_IN_ROOT)
+    let r = sys::openat2(fd, rest, flags, mode, resolve | RESOLVE_IN_ROOT);
+    // OR-06 (TODO/enter.md T-1975): a link that crosses a base of a volume.
+    if !matches!(r, -2 | -20 | -40) || state::vols().is_empty() {
+        return r;
+    }
+    let Some(mut g) = crate::pool::Buf::get() else {
+        return r;
+    };
+    let w = g.buf();
+    w[..=n].copy_from_slice(&buf[..=n]);
+    match crate::follow::walk(w, n, flags & sys::O_NOFOLLOW == 0) {
+        Some(m) if w[..m] != buf[..n] => {
+            let (fd, at) = base_of(&w[..m]);
+            let rest = if at >= m { &b".\0"[..] } else { &w[at..=m] };
+            sys::openat2(fd, rest, flags, mode, resolve | RESOLVE_IN_ROOT)
+        }
+        _ => r,
+    }
 }
 
 /// The guest path of a host path into `out`: under a volume's host side

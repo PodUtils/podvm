@@ -22,7 +22,27 @@ use std::time::Duration;
 unsafe extern "C" {
     fn ioctl(fd: c_int, req: c_ulong, ...) -> c_int;
     fn kill(pid: c_int, sig: c_int) -> c_int;
-    fn getpid() -> c_int;
+    fn syscall(n: i64, ...) -> i64;
+}
+
+/// Block in this thread each signal that the waiter of a foreground run
+/// forwards (SIGHUP, SIGINT, SIGQUIT, SIGTERM): a process-directed signal
+/// then goes to the waiter, not to a relay thread whose default action
+/// ends podvm (OR-03 of the outside pass of 2026-11-18).
+fn block_forwarded() {
+    const SIG_BLOCK: i64 = 0;
+    const RT_SIGPROCMASK: i64 = 14;
+    let mask: u64 = [1u64, 2, 3, 15].iter().fold(0, |m, s| m | 1 << (s - 1));
+    // SAFETY: rt_sigprocmask reads one 8-byte mask of this thread.
+    unsafe {
+        syscall(
+            RT_SIGPROCMASK,
+            SIG_BLOCK,
+            &mask as *const u64,
+            0usize,
+            8usize,
+        )
+    };
 }
 
 use crate::machine::guest::tty::Raw;
@@ -90,9 +110,13 @@ impl Pty {
     pub fn relay(self, stdin: bool) -> std::io::Result<Relay> {
         let mut from = self.master.try_clone()?;
         let mut to = self.master;
-        let raw = Raw::new();
+        // OR-03 of the outside pass of 2026-11-18: with no `-i` podvm relays
+        // no input, and the terminal stays cooked, so its interrupt key is a
+        // SIGINT of podvm, which the waiter forwards to the payload.
+        let raw = stdin.then(Raw::new);
         let (done, wait) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
+            block_forwarded();
             let mut buf = [0u8; 8192];
             let mut out = std::io::stdout().lock();
             // EIO is the end: no slave is open any more.
@@ -105,6 +129,7 @@ impl Pty {
             let _ = done.send(());
         });
         std::thread::spawn(move || {
+            block_forwarded();
             if !stdin {
                 // The master stays open for the payload's writes; no input.
                 let _keep = to;
@@ -142,12 +167,22 @@ impl Pty {
     }
 }
 
+/// The payload of the run, for the interrupt key (0: none yet).
+static PAYLOAD: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+
+/// The pid of the payload, as the entry gave it.
+pub fn set_payload(pid: i64) {
+    PAYLOAD.store(pid, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// The outside pass of 2026-11-18, OQ-02 (TODO/cli.md T-1970): the slave
 /// is no controlling terminal (pod-enter makes no session), so the line
 /// discipline sends no SIGINT for the interrupt key. Where the pty has
-/// `ISIG`, podvm takes its `VINTR` byte out of the input and raises SIGINT
-/// on itself; the handler of a foreground run forwards it to the payload
-/// and names it. A payload that turns `ISIG` off (an editor) gets the byte.
+/// `ISIG`, podvm takes its `VINTR` byte out of the input and sends SIGINT
+/// to the payload, as a terminal sends it to its foreground process. A
+/// raise on podvm itself reached the relay thread, which does not block
+/// SIGINT, and ended podvm and its payload with it (OR-02 of the second
+/// pass). A payload that turns `ISIG` off (an editor) gets the byte.
 fn send(to: &mut std::fs::File, mut input: &[u8]) -> std::io::Result<()> {
     while !input.is_empty() {
         let at = intr_of(to.as_raw_fd()).and_then(|c| input.iter().position(|b| *b == c));
@@ -155,8 +190,11 @@ fn send(to: &mut std::fs::File, mut input: &[u8]) -> std::io::Result<()> {
             return to.write_all(input);
         };
         to.write_all(&input[..at])?;
-        // SAFETY: a signal to this process, whose handler forwards it.
-        unsafe { kill(getpid(), 2) };
+        let pid = PAYLOAD.load(std::sync::atomic::Ordering::Relaxed);
+        if pid > 0 {
+            // SAFETY: a signal to the payload of this run.
+            unsafe { kill(pid as c_int, 2) };
+        }
         input = &input[at + 1..];
     }
     Ok(())
@@ -184,7 +222,7 @@ const VEOF: u8 = 0x04;
 pub struct Relay {
     slave: OwnedFd,
     wait: std::sync::mpsc::Receiver<()>,
-    raw: Raw,
+    raw: Option<Raw>,
 }
 
 impl Relay {

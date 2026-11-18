@@ -193,14 +193,13 @@ pub(crate) fn prepare(
     // ⭐ TODO/enter.md T-1653: the table of the run. The payload, the
     // working directory and each guest path below resolve through it, so
     // a -w or a first program in a volume is the file of the volume.
-    // ⭐ TODO/enter.md T-1657: the syscall tier gives `/tmp` as a directory
-    // of the run, with a cap that its handler enforces.
+    // ⭐ T-1657: the syscall tier gives `/tmp` as a directory of the run.
     let syscall = tier == crate::tier::Tier::Syscall;
     // TODO/enter.md T-1935: a detached container keeps the /tmp of its own
     // tree, which `rm` removes with the tree; the handler caps it by its
     // guest path all the same.
     let detached = o.detach || verb == "create";
-    if syscall && !detached && !o.tmpfs.iter().any(|t| t == "/tmp") {
+    if syscall && !detached && !super::binds::tmp_is_given(&o) {
         o.tmpfs.push("/tmp".to_string());
     }
     let tmp_cap = o.tmp_size.unwrap_or(crate::lifecycle::syscall::TMP_CAP);

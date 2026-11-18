@@ -142,6 +142,17 @@ pub fn exec_entry(
 ) -> Result<Option<Userland>, i32> {
     if let Some(cap) = cap_of(record_env) {
         tier_env(env, true, cap, None);
+        // OR-01 of the outside pass of 2026-11-18 (TODO/enter.md T-1972):
+        // the handler of `exec` opens the volumes again; it opens them under
+        // the base of the run, so a link that replaced a source after the
+        // start is a refusal (ELOOP), not a way out of the base.
+        env.retain(|e| !e.starts_with("PODVM_VOLUME_BASE="));
+        if let Some(b) = record_env
+            .iter()
+            .find(|e| e.starts_with("PODVM_VOLUME_BASE="))
+        {
+            env.push(b.clone());
+        }
         return decide("exec", maps, argv, working_dir, env, cap).map(Some);
     }
     super::decide_entry(

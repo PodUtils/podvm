@@ -244,10 +244,10 @@ pub(super) fn enter(
             Err(code) => return code,
         }
     }
-    // ⭐ TODO/enter.md T-1412, as in `run`'s `prepare`: the workdir is
-    // checked before the fork and before any fixup mutates the rootfs. The
-    // image named is the container's own, read from its record above.
-    if let Err(e) = podvm_enter::check_workdir(&maps, &working_dir, &container.image) {
+    // ⭐ T-1412: the workdir is checked before the fork and any fixup.
+    if !super::in_bind(&container.env, &working_dir) // OR-04 (T-1970): a bind holds it
+        && let Err(e) = podvm_enter::check_workdir(&maps, &working_dir, &container.image)
+    {
         eprintln!("podvm exec: {e}");
         return e.exit_code();
     }
@@ -395,9 +395,9 @@ pub(super) fn enter(
         no_new_privs: false,
         die_with_parent: false,
         confine,
-        hostname: None,       // T-1908: `exec` joins the UTS namespace of the run
-        volumes: Vec::new(),  // T-1920: `exec` joins the mounts of the run
-        userns_ids: None,     // podcrates `v0.62.0`; T-1927 fills it for `run -d`
+        hostname: None, // T-1908: `exec` joins the UTS namespace of the run
+        volumes: podvm_supervise::launcher::binds_of(&container.env), // T-1920, OR-04
+        userns_ids: None, // podcrates `v0.62.0`; T-1927 fills it for `run -d`
         pid_namespace: false, // podcrates `v0.65.0`; T-1930 sets it for `run -d`
     };
     if let Err(c) = serve_devices(&mut plan, &mut err) {

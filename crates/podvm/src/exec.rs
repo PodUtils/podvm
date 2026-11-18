@@ -323,3 +323,14 @@ pub(crate) fn workdir_of(recorded: &str) -> String {
         "/".to_string()
     }
 }
+
+/// True where `dir` is the guest path of a bind of the record (`run -d`
+/// on the namespace rung, `PODVM_BINDS`) or under it: the unit's mount
+/// namespace holds it, and the tree of the image does not (OR-04 of the
+/// outside pass of 2026-11-18, TODO/cli.md T-1970).
+pub(crate) fn in_bind(env: &[String], dir: &str) -> bool {
+    podvm_supervise::launcher::binds_of(env).iter().any(|b| {
+        let g = b.guest.trim_end_matches('/');
+        dir == g || dir.strip_prefix(g).is_some_and(|r| r.starts_with('/'))
+    })
+}

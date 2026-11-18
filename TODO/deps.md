@@ -802,6 +802,8 @@ artefact's; its absolute sizes are not, and the file says so. Where
 `cargo-bloat` is not installed the script exits 2 and records that the
 breakdown was not taken, because a skip is not a pass.
 
+**Amended (2026-11-18), the ceiling raised again.** The ceiling moves from 8 500 000 to 9 000 000 bytes (call C24, `docs/decisions.md`): 8 489 016 bytes at `566f833` (run 44275525277), 8 525 880 bytes at `9f714c7` (run 44298963183), for the asks of podrunner and podcrates `v0.71.0`.
+
 **Amended (2026-11-16), the ceiling raised.** The ceiling moves from 8 000 000 to 8 500 000 bytes (call C23, `docs/decisions.md`). The gate of `88a04a60` (run 43830360668) measured 8 140 824 bytes on podcrates `v0.61.0`, against 7 542 776 bytes on `71099545` (`v0.59.0`, run 43821923369): +598 048 bytes, and 263 third-party crates against 222. The delta is the network labs of `pod-lab` (podcrates `v0.60.0`): `rcgen` for the certificates of the stand-in proxies, `pod-tls` with its features `pure` and `rsa` (`rsa`, `num-bigint-dig`, `p384`), and the TLS server side of rustls. podvm keeps them: `podvm lab` runs the profiles of `pod-lab`, and T-1924 takes the way out of a network class.
 
 # T-0911: The syscall table and the kernel structs come from a crate, per architecture

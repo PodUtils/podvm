@@ -154,3 +154,13 @@ pub(super) fn push_foreground(
         env.push(format!("{BASE_VAR}={base}"));
     }
 }
+
+/// True where the caller gives `/tmp` (`--tmpfs /tmp` or `-v H:/tmp`): the
+/// syscall tier then adds no `/tmp` of its own (OR-05 of the outside pass
+/// of 2026-11-18, TODO/cli.md T-1970).
+pub(super) fn tmp_is_given(o: &super::Opts) -> bool {
+    o.tmpfs
+        .iter()
+        .chain(o.volumes.iter().map(|v| &v.guest))
+        .any(|t| t == "/tmp")
+}

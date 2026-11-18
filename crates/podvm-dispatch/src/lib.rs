@@ -25,6 +25,7 @@ pub mod elf;
 mod enter;
 #[cfg(target_arch = "x86_64")]
 mod exec;
+mod follow; // TODO/enter.md T-1975
 #[cfg(target_arch = "x86_64")]
 mod handler;
 #[cfg(target_arch = "x86_64")]
@@ -220,7 +221,11 @@ pub fn main_if_entered(product: &str) {
         envp,
     );
     eprintln!("{product}: native-static rung: {why} (TODO/enter.md T-1652)");
-    std::process::exit(127);
+    // A volume that the entry refuses (a link under the base, OR-01 of the
+    // outside pass of 2026-11-18) is a refusal of podvm, 125; else the
+    // program could not be entered, 127.
+    let refused = why.starts_with("the volume") || why.starts_with("more than");
+    std::process::exit(if refused { 125 } else { 127 });
 }
 
 #[cfg(target_arch = "x86_64")]
