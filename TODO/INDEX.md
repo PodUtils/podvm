@@ -652,10 +652,12 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1987](enter.md) | P1 | S | none | enter | done | On AlmaLinux 9, `ls -l` dies with SIGSEGV in the interposer's `lgetxattr` |
 | [T-1988](enter.md) | P1 | S | none | enter | done | On the syscall tier, a volume whose guest path is not in the image cannot be stat-ed |
 | [T-1989](cli.md) | P2 | M | none | cli | open | The faults of the fourth outside pass (2026-11-18, the gate of beta.35) |
+| [T-1990](enter.md) | P1 | S | none | enter | partial | On the syscall tier, a dynamic program sometimes fails to start with "errno 11" |
+| [T-1991](enter.md) | P2 | M | none | enter | open | On the syscall tier, `cargo doc` of ripgrep prints "Compiling ripgrep" and then nothing for 45 min |
 
 ## Counts
 
-586 entries: 21 open, 30 partial, 3 blocked, 532 done.
+588 entries: 22 open, 31 partial, 3 blocked, 532 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -665,10 +667,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 0 | 13 | 0 | 238 | 251 |
-| P2 | 16 | 13 | 2 | 177 | 208 |
+| P1 | 0 | 14 | 0 | 238 | 252 |
+| P2 | 17 | 13 | 2 | 177 | 209 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
-| **All** | 21 | 30 | 3 | 532 | 586 |
+| **All** | 22 | 31 | 3 | 532 | 588 |
 
 ## Work order
 

@@ -5084,3 +5084,65 @@ As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm --podvm-tier=syscall
 
 **Done (2026-11-18).** `a_volume_whose_guest_path_is_not_in_the_root_stats_as_a_directory` (the probe verb `kind` calls `statx` as coreutils does) fails before the fix and passes after it. Measured as in the Prove with `mirror.gcr.io/library/ubuntu:24.04`: `ls -d /pkg`, `stat -c %F /pkg` (`directory`), `test -d /pkg`, `cp -r /pkg /tmp/p2` and `find /pkg` work; `mkdir /pkg` gives "File exists".
 
+
+# T-1990: On the syscall tier, a dynamic program sometimes fails to start with "errno 11"
+
+**Source:** PodUtils/podrunner#308 (COORD-098 of podrunner), items 1 and 2; also seen twice by the fourth outside pass (T-1989)
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** partial
+
+## Problem
+
+On GitHub's `ubuntu-24.04` runner, `--podvm-tier=syscall` gave "podvm: native-static rung: .../bin/node: /lib64/ld-linux-x86-64.so.2: errno 11 (TODO/enter.md T-1652)", exit 127: for Node in a volume each time, and for `/usr/bin/bash` once.
+
+## Premise
+
+errno 11 is EAGAIN. `openat2` with `RESOLVE_IN_ROOT` or `RESOLVE_BENEATH` answers EAGAIN where a rename or a mount anywhere on the system raced a `..` of the walk, and the caller may try again (openat2(2)). Ubuntu 24.04's loader path has one: `/usr/lib64/ld-linux-x86-64.so.2 -> ../lib/x86_64-linux-gnu/ld-linux-x86-64.so.2`.
+
+## Approach
+
+`sys::openat2` of the handler tries a call that asked for `RESOLVE_IN_ROOT` or `RESOLVE_BENEATH` again on EAGAIN, up to `EAGAIN_TRIES` (256) times. Each path that the handler resolves goes through it.
+
+## Decision
+
+-
+
+## Prove
+
+podrunner's `user-gate.yml`, lane `proxy-only`, executor podvm, with the tier: the express `lint` and `test` jobs run Node from `_work/_tool` and pass.
+
+## Done
+
+Partial (2026-11-18): the retry is on `main`. On the cloud host (kernel 6.18) neither the old nor the new binary failed in 300 execs of `/usr/bin/true` on the tier under a loop of renames and of tmpfs mounts, so the race is not measured here. Remaining: the measure on podrunner's CI.
+
+# T-1991: On the syscall tier, `cargo doc` of ripgrep prints "Compiling ripgrep" and then nothing for 45 min
+
+**Source:** PodUtils/podrunner#308 (COORD-098 of podrunner), item 3
+**Category:** enter
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+podrunner's job `docs` (`cargo doc` of ripgrep at `178cc027`) on the syscall tier printed `Compiling ripgrep v15.2.0` and then nothing until it was stopped at 45 min. It passes on the podvm kind with no tier and with `--runner-dir`.
+
+## Premise
+
+-
+
+## Approach
+
+Reproduce it as uid 1000 under `scripts/dev/nouserns.c` with a Rust image on the tier; find the process that waits and its call.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 under `scripts/dev/nouserns.c`: `cargo doc` of ripgrep at `178cc027` in `--podvm-tier=syscall` ends with exit 0 within the time it takes with no tier, plus a bound.

@@ -33,6 +33,7 @@ pub const ENOSYS: i64 = 38;
 pub const ENAMETOOLONG: i64 = 36;
 pub const ERANGE: i64 = 34;
 pub const EBUSY: i64 = 16;
+pub const EAGAIN: i64 = 11;
 
 /// The numbers of x86_64 that the handler names.
 pub mod nr {
@@ -149,25 +150,43 @@ pub struct OpenHow {
 }
 
 /// `openat2(dirfd, path, how)`; `path` ends with a NUL.
+///
+/// ⛔ With `RESOLVE_IN_ROOT` or `RESOLVE_BENEATH` the kernel answers EAGAIN
+/// where a rename or a mount anywhere on the system raced a `..` of the
+/// walk, and the caller may try again (openat2(2)). A busy host renames
+/// often: the loader of a dynamic program, whose links have `..`, gave up
+/// with "errno 11" (PodUtils/podrunner#308, TODO/enter.md T-1990). The call
+/// is tried again up to [`EAGAIN_TRIES`] times.
 pub fn openat2(dirfd: i64, path: &[u8], flags: i64, mode: i64, resolve: u64) -> i64 {
     let how = OpenHow {
         flags: flags as u64,
         mode: mode as u64,
         resolve,
     };
-    // SAFETY: the path and the struct live for the call.
-    unsafe {
-        sc6(
-            nr::OPENAT2,
-            dirfd,
-            path.as_ptr() as i64,
-            &how as *const OpenHow as i64,
-            core::mem::size_of::<OpenHow>() as i64,
-            0,
-            0,
-        )
+    let guarded = resolve & (RESOLVE_IN_ROOT | RESOLVE_BENEATH) != 0;
+    let mut r = -EAGAIN;
+    for _ in 0..EAGAIN_TRIES {
+        // SAFETY: the path and the struct live for the call.
+        r = unsafe {
+            sc6(
+                nr::OPENAT2,
+                dirfd,
+                path.as_ptr() as i64,
+                &how as *const OpenHow as i64,
+                core::mem::size_of::<OpenHow>() as i64,
+                0,
+                0,
+            )
+        };
+        if r != -EAGAIN || !guarded {
+            break;
+        }
     }
+    r
 }
+
+/// The tries of an `openat2` that a race of a rename gives EAGAIN.
+pub const EAGAIN_TRIES: usize = 256;
 
 pub fn close(fd: i64) {
     // SAFETY: closing a descriptor reads no memory.

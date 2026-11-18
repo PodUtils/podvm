@@ -8,6 +8,10 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- On the syscall tier, a path walk that a rename or a mount on the host
+  raced is tried again, as openat2(2) asks, in place of "errno 11" at the
+  start of a dynamic program (T-1990, PodUtils/podrunner#308).
+
 ## 0.2.0-beta.35 (2026-11-18)
 
 ### Known gaps: what the checks of 0.2.0-beta.35 prove, and what stays open, 2026-11-18
