@@ -8,28 +8,60 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+## 0.2.0-beta.35 (2026-11-18)
+
+### Known gaps: what the checks of 0.2.0-beta.35 prove, and what stays open, 2026-11-18
+
+Record: T-1949, T-1984, T-1985, T-1989.
+Deployed: version 0.2.0-beta.35.
+
+What the checks of this beta prove: the gate, the integration tests as uid
+1000, `workloads.yml`, `arm.yml`, the nightly trial and an outside pass with
+the binary and `podvm man` only (T-1989), whose P1 faults are fixed (T-1983,
+T-1986, T-1987, T-1988) or named in the manual (T-1984, T-1985, call C25).
+
+Each open fault that a user can meet:
+
+- `--podvm-confine` does not check a program that the dynamic loader runs
+  (`ld.so PROGRAM`), nor a change of mode, owner or times of a file in
+  reach (T-1984, T-1985): give a `-v` that must stay as it is `:ro`.
+- The P2 and P3 faults of the third and the fourth outside pass (T-1980,
+  T-1989): `..` after a link on the userland rung and at the root of a
+  volume on the syscall tier; wrong exit codes of `system abi`, `load`,
+  `import`, `profile show` and `cp`; a refused run of the syscall tier
+  leaves `tmpfs/PID/0` in the store.
+- The faults of `0.2.0-beta.34`'s known gaps stay open where this list does
+  not name them as fixed; T-1981 (Fedora 42) is fixed.
+
+### Fixed: the confine layer, Fedora 42 and AlmaLinux 9, 2026-11-18
+
+Record: T-1981, T-1982, T-1983, T-1986, T-1987, T-1988.
+Deployed: version 0.2.0-beta.35.
+
 - On the syscall tier, `--podvm-confine exec=` holds: the handler checks
   each exec against the exec table of the layer, as the interposer does,
   and a payload can neither drop nor widen the table (T-1983).
-
 - On the userland rung, the home of the run is writable to the payload, as
   to uid 0 of the image: `dnf` of Fedora 42 runs (T-1986).
-
 - On the syscall tier, a `-v` volume whose guest path the image does not
   have can be `stat`ed: `ls -d`, `stat`, `cp -r` and `find` of it work
   (T-1988).
-
 - On AlmaLinux 9, `ls -l` no longer dies with SIGSEGV on the namespace and
   the userland rung: the interposer makes the system call of each
   attribute call itself (T-1987).
-
 - On a host with no `chroot(2)` and no user namespace, a program whose
   `PT_INTERP` lies past its first 64 KiB runs: the shells of
   `quay.io/fedora/fedora:42` (T-1981; podcrates `v0.72.0`).
-
 - `run -d --podvm-tier=syscall --podvm-confine SPEC` starts its payload:
   the launcher gives podvm's own binary read and execute in the layer, as
   a foreground run does (T-1982, PodUtils/podrunner#304).
+
+### Changed: podcrates v0.72.0, 2026-11-18
+
+Record: T-1981.
+Deployed: version 0.2.0-beta.35.
+
+- podvm takes podcrates `v0.72.0` (PodUtils/podcrates#229).
 
 ## 0.2.0-beta.34 (2026-11-18)
 
