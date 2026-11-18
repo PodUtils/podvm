@@ -295,6 +295,51 @@ pub(crate) fn read_env_file(verb: &str, path: &str) -> std::result::Result<Vec<S
     Ok(out)
 }
 
+/// `--env-file0 PATH` (PodUtils/podrunner#300, TODO/cli.md T-1971): the
+/// entries `KEY=VALUE` with a NUL after each, as `env -0` writes them, so
+/// that a value can hold a newline. The checks of the file are those of
+/// [`read_env_file`]; a value is kept byte for byte, with no trim.
+pub(crate) fn read_env_file0(verb: &str, path: &str) -> std::result::Result<Vec<String>, i32> {
+    const MAX_ENV_FILE: u64 = 1_048_576;
+    let refuse = |why: String| {
+        eprintln!("podvm {verb}: --env-file0 {path:?}{why}");
+        EXIT_FLAG_ERROR
+    };
+    let meta = std::fs::metadata(path).map_err(|e| refuse(format!(": {e}")))?;
+    if !meta.is_file() {
+        return Err(refuse(" is not a file".into()));
+    }
+    if !super::access::caller_may(&meta, 0o400) {
+        return Err(refuse(
+            ": Permission denied (the mode lets its owner not read it)".into(),
+        ));
+    }
+    if meta.len() > MAX_ENV_FILE {
+        return Err(refuse(format!(
+            " is {} bytes, over the 1048576-byte ceiling",
+            meta.len()
+        )));
+    }
+    let bytes = std::fs::read(path).map_err(|e| refuse(format!(": {e}")))?;
+    let mut out = Vec::new();
+    for (n, raw) in bytes.split(|b| *b == 0).enumerate() {
+        if raw.is_empty() {
+            continue;
+        }
+        let Ok(entry) = std::str::from_utf8(raw) else {
+            return Err(refuse(format!(" entry {} is not UTF-8", n + 1)));
+        };
+        match entry.split_once('=') {
+            Some((k, _)) if !k.is_empty() && !k.contains(['\n', '\r']) => {
+                out.push(entry.to_string())
+            }
+            Some(_) => return Err(refuse(format!(" entry {} has no name", n + 1))),
+            None => return Err(refuse(format!(" entry {} has no `=`", n + 1))),
+        }
+    }
+    Ok(out)
+}
+
 /// `--report` is a flag of `run` only (TODO/cli.md T-1695).
 pub(super) fn report(verb: &str) -> std::result::Result<(), i32> {
     if verb == "run" {

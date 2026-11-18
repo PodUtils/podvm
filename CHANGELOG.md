@@ -8,6 +8,16 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Added: `--env-file0` for a value with a newline, 2026-11-18
+
+Record: T-1971.
+Deployed: none yet.
+
+- `run`, `run -d`, `create` and `exec` take `--env-file0 PATH`: entries
+  `KEY=VALUE` with a NUL after each, as `env -0` writes them, so that a
+  multi-line secret stays out of the argv of podvm
+  (PodUtils/podrunner#300).
+
 ## 0.2.0-beta.32 (2026-11-18)
 
 ### Known gaps: what the checks of 0.2.0-beta.32 prove, and what stays open, 2026-11-18

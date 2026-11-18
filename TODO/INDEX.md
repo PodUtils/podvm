@@ -633,10 +633,12 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1968](machine.md) | P2 | L | none | machine | open | No tier gives a sized writable disk to a unit |
 | [T-1969](supervise.md) | P1 | M | none | supervise | partial | The run report holds no OOM fact of a unit |
 | [T-1970](cli.md) | P1 | M | none | cli | partial | The outside pass of 2026-11-18: three P1 and seven P2 faults on the path of a unit |
+| [T-1971](cli.md) | P1 | S | none | cli | done | `--env-file` cannot hold a value with a newline |
+| [T-1972](enter.md) | P1 | L | none | enter | open | `--podvm-volume-base` holds on the namespace rung only, and job containers of podrunner run on the userland and supervise rungs |
 
 ## Counts
 
-567 entries: 19 open, 27 partial, 3 blocked, 518 done.
+569 entries: 20 open, 27 partial, 3 blocked, 519 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -646,10 +648,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 2 | 10 | 0 | 224 | 236 |
+| P1 | 3 | 10 | 0 | 225 | 238 |
 | P2 | 12 | 13 | 2 | 177 | 204 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
-| **All** | 19 | 27 | 3 | 518 | 567 |
+| **All** | 20 | 27 | 3 | 519 | 569 |
 
 ## Work order
 

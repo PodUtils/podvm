@@ -6219,3 +6219,36 @@ As uid 1000: `run --rm -v H:/tmp IMAGE sh -c 'echo hi > /tmp/tw'` leaves `H/tw`;
 ## Done
 
 **Partial (2026-11-18).** OQ-01: in the user namespace of a foreground run, each volume at or under `/tmp` goes to pod-enter's binds (`PODVM_BINDS` of the plan), which come after its tmpfs; podvm binds the others as before (`run::binds::split_tmp`). OQ-02: the relay of `-it` takes the `VINTR` byte of the pty out of the input where the pty has `ISIG`, and raises SIGINT on podvm, whose handler forwards it to the payload (`run::pty::send`); a controlling terminal needs a session in pod-enter (a COORD issue). OQ-03: a refused `run -d` drops its tree as `create` does (`run::drop_unrecorded`). OQ-05: `exec` takes the working directory of the record where `-w` names none. Measured as uid 1000 with `docker.io/library/python:3.13-slim`: `-v H:/tmp` lists and writes `H`, `-v H:/tmp/x:ro` reads and refuses a write, `-v H/one.txt:/tmp/one.txt` reads the file, `-v H:/data` still works; `-it` and a `^C` after 6 s end with 130; a refused `run -d --name dup` adds no directory under `trees/`; `exec` gives `/usr/lib` for a container of `-w /usr/lib`, `/etc` with `-w /etc`, and `/` for a container with no `-w`. Remaining: OQ-04, OQ-06 to OQ-17.
+
+# T-1971: `--env-file` cannot hold a value with a newline
+
+**Source:** PodUtils/podrunner#300 (COORD-090 of podrunner, asks 1 and 2, podrunner@T-405)
+**Category:** cli
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+`--env-file` reads `KEY=VALUE` lines, so a multi-line secret of a job (a key, a certificate) cannot go in it, and podrunner passes it as `-e`, which each user of the host reads in `/proc/PID/cmdline`. podrunner also asks whether `--env-file` holds on the machine and incus tiers.
+
+## Premise
+
+`env -0` writes `KEY=VALUE` entries with a NUL after each; a NUL cannot be part of a value of the environment.
+
+## Approach
+
+`--env-file0 PATH` of `run`, `run -d`, `create` and `exec` (also `--env-file0=PATH`): the checks of `--env-file` (a file, readable, at most 1 MiB), entries split at each NUL, each `KEY=VALUE` with a name and kept byte for byte; the order rule of `--env-file`.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000: `printf 'KEY=line1\nline2\0' > F; podvm run --rm --env-file0 F IMAGE python3 -c 'import os; print(repr(os.environ["KEY"]))'` prints `'line1\nline2'`, and no `/proc/*/cmdline` of the host holds the value while a unit and a machine guest run.
+
+## Done
+
+**Done (2026-11-18).** `run::parse::values::read_env_file0`, wired in `run` and `exec`, with parity rows and the help. Measured as uid 1000 on the cloud host with `docker.io/library/python:3.13-slim`: a value `line1\nline2-SEKRET` and a value `two words` reach the payload of a foreground run as written; `run -d --env-file0=F` and `exec --env-file0 F` give the same value; an entry with no `=` exits 125 with one line. While a unit ran, no `/proc/*/cmdline` of the host held the value. The machine tier under TCG (`docker.io/library/alpine:3.20`): the guest prints both lines, and no process of the host, QEMU included, holds the value in its argv (the values go into the init script of the initrd; the keeper of `run -d` takes the path of the file, not the values). The incus tier: by reading of the code, the values of `run -d` go into `/.podvm/cmd` of the instance (a file of root, mode 0600) and those of a foreground run and of `exec` into the request of the incus API; podvm starts no `incus` program.

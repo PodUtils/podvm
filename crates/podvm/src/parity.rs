@@ -296,6 +296,7 @@ pub const TABLE: &[Row] = &[
     // refused with its reason. `--env-file` is real behavior; `--label`,
     // `--attach` and `--expose` are Stub; the rest are None.
     Row { verb: "run", flag: Some("--env-file"), status: Native, note: "repeatable; entries load at the flag's position, so a later -e wins over the file and a later file over an earlier flag. Lines are KEY=VALUE, `#` comments and blank lines ignored, the value kept byte for byte with its quotes as docker keeps it (TODO/cli.md T-1828), a line without `=` refused naming its number" },
+    Row { verb: "run", flag: Some("--env-file0"), status: Native, note: "podvm's own: as --env-file, with entries KEY=VALUE each ended by a NUL (env -0), so a value can hold a newline; at the flag's position, repeatable; a value is kept byte for byte. run, run -d and create on each tier: the machine tier puts the values in the init of the guest, the incus tier in a file of root of the instance, never in an argv (PodUtils/podrunner#300, T-1971)" },
     Row { verb: "run", flag: Some("--label"), status: Native, note: "KEY=VALUE, repeatable: the container record keeps each label, `ps --filter label=KEY[=VALUE]` matches it, and `inspect` prints .Labels (TODO/cli.md T-1695)" },
     Row { verb: "run", flag: Some("--attach"), status: Stub, note: "accepted with its value (STDIN, STDOUT or STDERR) and does nothing: podvm always captures the payload's stdout and stderr together (TODO/supervise.md T-0605), and --strict refuses" },
     Row { verb: "run", flag: Some("--expose"), status: Stub, note: "accepted with its value (a port) and does nothing: docker's --expose only documents ports and podvm publishes none, so the run is unchanged, and --strict refuses" },
@@ -333,6 +334,7 @@ pub const TABLE: &[Row] = &[
     // ------------------------------------------------------ exec's own flags
     Row { verb: "exec", flag: Some("-e, --env"), status: Native, note: "repeatable; a later one wins over the environment that the container started with; -e NAME takes the caller's value" },
     Row { verb: "exec", flag: Some("--env-file"), status: Native, note: "as in run: KEY=VALUE lines, repeatable, at the flag's position; a secret stays out of the argv of podvm (PodUtils/podrunner#277)" },
+    Row { verb: "exec", flag: Some("--env-file0"), status: Native, note: "as in run: NUL-ended KEY=VALUE entries, so a value can hold a newline (PodUtils/podrunner#300, T-1971)" },
     Row { verb: "exec", flag: Some("-w, --workdir"), status: Native, note: "chdir inside the new root, after the chroot" },
     Row { verb: "exec", flag: Some("--platform"), status: Native, note: "which platform of a multi-platform image to enter" },
     Row { verb: "exec", flag: Some("-t, --tty"), status: Degraded, note: "REFUSED BY NAME where /dev/ptmx is unusable (T-0503)" },

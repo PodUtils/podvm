@@ -41,6 +41,9 @@ pub const RUN_OPTIONS: &str = "\
                    Repeatable; entries load at the flag's position, so a
                    later -e wins over the file; a value keeps its quotes
                    (TODO/cli.md T-0801, T-1828)
+  --env-file0 F    read KEY=VALUE entries from F, each ended by a NUL (as
+                   `env -0` writes them), so a value can hold a newline;
+                   the same order rule as --env-file (TODO/cli.md T-1971)
   -w, --workdir D  working directory inside the container
   --device H[:G[:P]]
                    map a host device or file into the container: opened

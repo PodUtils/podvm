@@ -4593,3 +4593,34 @@ T-1747 gives the cgroup2 leaf. The donors show how to end a whole job and how to
 ## Prove
 
 On a host with a delegated cgroup2 subtree, a shell that forks and reparents a sleeper ends with no sleeper left after `rm -f`; mmap growth in `/tmp` gives ENOSPC at the cap.
+
+# T-1972: `--podvm-volume-base` holds on the namespace rung only, and job containers of podrunner run on the userland and supervise rungs
+
+**Source:** PodUtils/podrunner#300 (COORD-090 of podrunner, ask 3, podrunner@T-403)
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** L
+**Status:** open
+
+## Problem
+
+podrunner starts job containers (the route of the container hooks) where podvm gives volumes to them, which includes the userland and supervise rungs (a host with no user namespace). There `--podvm-volume-base` is a refusal, so the race of PodUtils/podrunner#277 stays: a step of the job makes a path under the runner root a symbolic link after podrunner checked it and before podvm opens it.
+
+## Premise
+
+On the namespace rung the flag holds (T-1945): pod-enter binds the descriptor. The userland rung maps a guest path to a host path at each call of the interposer, and the supervise rung resolves each path of a notified call in the supervisor; neither holds one descriptor of a tree today. A host path `/proc/self/fd/N/REST` of an inherited `O_PATH` descriptor resolves under the opened directory and ignores a later link at its path, but a program that closes each descriptor (`close_range`, `close_fds` of Python) loses it.
+
+## Approach
+
+1. The namespace rung: tell podrunner that the route of containers with the flag holds there since `0.2.0-beta.32`, where the host gives user namespaces.
+2. The supervise rung: the supervisor opens each source under the base with `openat2(RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS)` at the start, keeps the descriptors, and resolves each notified path of a volume with `openat2` relative to its descriptor (`RESOLVE_BENEATH`), so that no link under the base is followed.
+3. The userland rung: the same check at the start, and each mapping of the interposer resolves the rest of a path under a descriptor that the interposer holds in a reserved range and restores after a `close_range`; measure the cost before the default.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 under the seccomp filter that denies user namespaces (`scripts/dev/nouserns.c`), on the supervise and the userland rung: with `--podvm-volume-base BASE -v BASE/w:/w`, a link that the host makes at `BASE/w/sub` to a directory out of BASE after the start gives the payload `ELOOP` or `EXDEV` for `/w/sub/f`, never the file out of BASE; a plain file under `BASE/w` reads and writes.

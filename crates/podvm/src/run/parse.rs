@@ -88,10 +88,8 @@ fn parse_flags_with(
             match flag {
                 "-e" => o.env.extend(env_arg(verb, a)?),
                 "--stub" => {}
-                "--env-file" => {
-                    let es = read_env_file(verb, a)?;
-                    o.env.extend(es);
-                }
+                "--env-file" => o.env.extend(read_env_file(verb, a)?),
+                "--env-file0" => o.env.extend(read_env_file0(verb, a)?), // T-1971
                 "--log-driver" => match a.as_str() {
                     // ⚠ Stub by the table, by value: `json-file` is the one
                     // driver this runtime's single sink already is, so it is
@@ -236,6 +234,7 @@ fn parse_flags_with(
             "-i" | "--interactive" => o.interactive = true,
             "-e" | "--env" => expecting = Some("-e"),
             "--env-file" => expecting = Some("--env-file"),
+            "--env-file0" => expecting = Some("--env-file0"),
             "--label" => expecting = Some("--label"),
             "-m" | "--memory" => expecting = Some("--memory"),
             "--cpus" => expecting = Some("--cpus"),
@@ -480,7 +479,7 @@ fn parse_flags_with(
 pub(super) mod values;
 pub use values::usage;
 use values::*;
-pub(crate) use values::{env_arg, read_env_file};
+pub(crate) use values::{env_arg, read_env_file, read_env_file0};
 
 mod access;
 pub(crate) mod limits;
