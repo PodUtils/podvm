@@ -232,7 +232,12 @@ pub const RUN_OPTIONS: &str = "\
                    may also read /proc, /dev/zero, /dev/random,
                    /dev/urandom and the files of the dynamic loader, and
                    write /dev/null. With no connect=, TCP is not
-                   confined (PodUtils/podvm#499). On a rung
+                   confined (PodUtils/podvm#499). Landlock checks
+                   the program that execve names, not one that the
+                   dynamic loader runs (ld.so PROGRAM), and it governs no
+                   change of mode, owner or times (chmod, chown, utimes):
+                   give a -v that must stay as it is :ro (TODO/enter.md
+                   T-1984, T-1985). On a rung
                    with a chroot and on each family of the userland rung
                    (the loader family, native-static, the syscall and the
                    emulate tier: host paths through the table, -v

@@ -4931,7 +4931,7 @@ As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm --podvm-tier=syscall
 **Source:** OT-02 of the fourth outside pass of 2026-11-18 (the gate of beta.35, T-1989)
 **Category:** enter
 **Milestone:** none
-**Priority:** P1
+**Priority:** P2
 **Effort:** M
 **Status:** open
 
@@ -4949,7 +4949,7 @@ Where podvm sees the exec (the interposer, the handler of the tier), an exec of 
 
 ## Decision
 
--
+Call C25 (`docs/decisions.md`, 2026-11-18): the help of `--podvm-confine` names the limit, and the entry goes from P1 to P2 for the enforcement where podvm sees the call.
 
 ## Prove
 
@@ -4960,7 +4960,7 @@ As uid 1000: `podvm run --rm --podvm-confine 'write=/tmp;exec=/usr/bin/sh,/usr/b
 **Source:** OT-03 of the fourth outside pass of 2026-11-18 (the gate of beta.35, T-1989)
 **Category:** enter
 **Milestone:** none
-**Priority:** P1
+**Priority:** P2
 **Effort:** M
 **Status:** open
 
@@ -4978,7 +4978,7 @@ Where podvm sees the call (the interposer, the handler of the tier), `chmod`, `c
 
 ## Decision
 
--
+Call C25 (`docs/decisions.md`, 2026-11-18): the help of `--podvm-confine` names the limit, and the entry goes from P1 to P2 for the enforcement where podvm sees the call.
 
 ## Prove
 
