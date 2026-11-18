@@ -20,7 +20,8 @@ reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
 
 ## Where things are
 
-* podcrates is taken at `v0.70.0` (`6b5a6cb`). The take is recorded in
+* podcrates is taken at `v0.71.0` (`c213375`; `v0.70.0` in `6b5a6cb`).
+  The takes are recorded in
   COORD-184 (#571): a podvm session can not write on PodUtils/podcrates
   issues (its GitHub access reaches podvm only).
 * The pkgforge mirrors answer for podvm and podcrates reads, with some
@@ -50,9 +51,11 @@ reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
   answered in COORD-185 (#572), released in beta.32.
 * PodUtils/podrunner#296 (COORD-187, #583): ask 3 (T-1966,
   `--podvm-engine` on the incus tier), ask 4 (T-1967, `--pids-limit` in a
-  machine guest) done; ask 6 (T-1969, `oom_kills`) partial; asks 1 and 2
-  (T-1964, T-1965) wait for COORD-186 (#582) to podcrates; ask 5 (T-1968)
-  open; ask 7 was done (T-1890).
+  machine guest) done; ask 6 (T-1969, `oom_kills`) partial: native run
+  reports proven in `kvm.yml` run 44285612361, `OomKills` in `inspect` of
+  an instance; ask 2 (T-1965) done; ask 1 (T-1964) partial: a pool with a
+  quota is not measured (route A mounts none); ask 5 (T-1968) open; ask 7
+  was done (T-1890).
 * PodUtils/podrunner#300 (COORD-189, #585): `--env-file0` (T-1971) done
   for the next beta; `--env-file` holds on the machine and incus tiers;
   ask 3, `--podvm-volume-base` off the namespace rung, is T-1972 (P1,
@@ -74,10 +77,9 @@ reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
 2. A new COORD issue `(to podvm)` of podrunner first. Watch #572, #583
    and #585 for podrunner's answers (it pins beta.32 and closes its
    asks). Then the T-1972 remainder (the loader family).
-3. Dispatch `kvm.yml` with `only=cgroup` on `main`: experiment 459 clause 5
-   proves `oom_kills` (T-1969).
-4. When podcrates answers COORD-186: T-1964 and T-1965, then T-1969 on
-   the incus tier; then T-1968.
+3. T-1969 remainder (the run report of the incus tier, a machine guest),
+   then T-1968; the T-1964 remainder waits for a measure on a host with a
+   quota pool (podrunner).
 5. When podcrates answers COORD-188: set the controlling terminal for `-t`
    and remove `run::pty::send`.
 6. T-1970 remainder (OQ-04, OQ-06 to OQ-17), T-1935 (the syscall tier by

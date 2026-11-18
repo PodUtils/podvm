@@ -471,7 +471,7 @@
 579 issue open
 580 issue open
 581 issue open
-582 issue open
+582 issue closed
 583 issue open
 584 issue open
 585 issue open
