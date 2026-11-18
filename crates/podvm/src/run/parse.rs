@@ -145,6 +145,7 @@ fn parse_flags_with(
                     }
                 },
                 "--podvm-cpus" => o.cpus = Some(cpus(verb, a)?),
+                "--podvm-volume-base" => volume_base::set(verb, a, &mut o)?,
                 "--publish" => o.publish.push(publish::parse(verb, a)?),
                 "--memory" | "--cpus" | "--pids-limit" => {
                     let (key, val) = limits::incus_limit(verb, flag, a)?;
@@ -265,6 +266,7 @@ fn parse_flags_with(
             "--podvm-net" => expecting = Some("--podvm-net"),
             "--podvm-channel" => expecting = Some("--podvm-channel"),
             "--podvm-cpus" => expecting = Some("--podvm-cpus"),
+            "--podvm-volume-base" => expecting = Some("--podvm-volume-base"),
             "--podvm-confine" => expecting = Some("--podvm-confine"),
             "--report" => expecting = Some("--report"),
             other if other.starts_with("--report=") => {
@@ -464,6 +466,7 @@ fn parse_flags_with(
         eprintln!("podvm {verb}: -v: {why}");
         return Err(EXIT_FLAG_ERROR);
     }
+    volume_base::check(verb, &o)?; // PodUtils/podrunner#277
     if !matches!(o.pull.as_str(), "never" | "missing" | "always") {
         eprintln!(
             "podvm {verb}: --pull takes never, missing or always, not {:?}",
@@ -482,6 +485,7 @@ pub(crate) use values::{env_arg, read_env_file};
 mod access;
 pub(crate) mod limits;
 mod opts; // TODO/machine.md T-1897 // PodUtils/podvm#513, #552
+mod volume_base;
 use access::report_path;
 pub(crate) mod publish; // TODO/machine.md T-1869
 pub(crate) use opts::Opts;

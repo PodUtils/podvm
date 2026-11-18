@@ -193,6 +193,8 @@ pub(super) fn volume(verb: &str, spec: &str, o: &mut Opts) -> std::result::Resul
     // volume and for each table built from it. `/data/` and `/data` were
     // two entries, and the `rw:` one widened a `:ro` volume.
     v.guest = crate::lifecycle::volume::guest_spelling(&v.guest);
+    o.volume_given
+        .push(spec.split(':').next().unwrap_or_default().to_string());
     if ro {
         o.ro_volumes.push(v.guest.clone());
     }

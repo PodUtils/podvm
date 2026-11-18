@@ -23,6 +23,7 @@ fn the_declared_container_fields_are_the_built_ones() {
         noticed: None,
         wall_ms: None,
         end: None,
+        rm: false,
         of: podvm_supervise::table::Detail {
             image: "img".into(),
             manifest_digest: "sha256:0".into(),
@@ -91,6 +92,7 @@ fn the_ps_fields_are_the_ones_the_template_check_allows() {
         noticed: None,
         wall_ms: None,
         end: None,
+        rm: false,
         of: podvm_supervise::table::Detail {
             image: "img".into(),
             manifest_digest: "sha256:0".into(),

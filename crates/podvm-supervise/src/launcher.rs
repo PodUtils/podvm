@@ -101,7 +101,7 @@ fn enter_in_launcher(
     // TODO/enter.md T-1920: the volumes that pod-enter binds on the
     // namespace rung ride in `PODVM_BINDS`; the payload does not see it.
     let binds = binds_of(&env);
-    env.retain(|e| !e.starts_with("PODVM_BINDS="));
+    env.retain(|e| !e.starts_with("PODVM_BINDS=") && !e.starts_with("PODVM_BINDS_BASE="));
     let mut plan = Plan {
         argv: container.argv.clone(),
         env: env.clone(),
@@ -212,12 +212,21 @@ fn enter_in_launcher(
 #[cfg(test)]
 mod tests;
 
+/// Is `host` the directory `base` or a path under it?
+fn under(host: &str, base: &str) -> bool {
+    let base = base.trim_end_matches('/');
+    host == base || host.strip_prefix(base).is_some_and(|r| r.starts_with('/'))
+}
+
 /// The volumes of `PODVM_BINDS` (`GUEST:HOST[:ro]`, comma separated), as
 /// pod-enter binds them (TODO/enter.md T-1920).
 fn binds_of(env: &[String]) -> Vec<podvm_enter::VolumeBind> {
     let Some(v) = env.iter().find_map(|e| e.strip_prefix("PODVM_BINDS=")) else {
         return Vec::new();
     };
+    // PodUtils/podrunner#277: a source under the base opens under it with
+    // no symbolic link, and pod-enter binds that descriptor.
+    let base = env.iter().find_map(|e| e.strip_prefix("PODVM_BINDS_BASE="));
     v.split(',')
         .filter_map(|p| {
             let (guest, rest) = p.split_once(':')?;
@@ -229,6 +238,7 @@ fn binds_of(env: &[String]) -> Vec<podvm_enter::VolumeBind> {
                 host: host.to_string(),
                 guest: guest.to_string(),
                 read_only,
+                host_base: base.filter(|b| under(host, b)).map(str::to_string),
             })
         })
         .collect()

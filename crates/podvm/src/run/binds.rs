@@ -10,6 +10,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 /// The variable of the record.
 pub const VAR: &str = "PODVM_BINDS";
+/// The base of `--podvm-volume-base` (PodUtils/podrunner#277).
+pub const BASE_VAR: &str = "PODVM_BINDS_BASE";
 
 static PLANNED: AtomicBool = AtomicBool::new(false);
 
@@ -59,9 +61,10 @@ pub(super) fn push_env(
     volumes: &[podvm_enter::userland::Volume],
     ro: &[String],
     on_namespace: bool,
+    base: Option<&str>,
     env: &mut Vec<String>,
 ) {
-    env.retain(|e| !e.starts_with("PODVM_BINDS="));
+    env.retain(|e| !e.starts_with("PODVM_BINDS=") && !e.starts_with("PODVM_BINDS_BASE="));
     if !planned() || !on_namespace || volumes.is_empty() {
         return;
     }
@@ -73,4 +76,21 @@ pub(super) fn push_env(
         })
         .collect();
     env.push(format!("{VAR}={}", pairs.join(",")));
+    if let Some(base) = base {
+        env.push(format!("{BASE_VAR}={base}"));
+    }
+}
+
+/// PodUtils/podrunner#277: only a bind holds a descriptor of a source; the
+/// userland rung maps each path at each call.
+pub(super) fn refuse_base_off_binds(verb: &str, base: bool, on_userland: bool) -> Result<(), i32> {
+    if base && on_userland {
+        eprintln!(
+            "podvm {verb}: --podvm-volume-base needs a bind of each volume (the namespace \
+             rung), and this run entered the userland rung, which maps each path at each \
+             call and holds no descriptor of a source"
+        );
+        return Err(podvm_image::error::EXIT_RUNTIME_ERROR);
+    }
+    Ok(())
 }

@@ -72,6 +72,9 @@ pub struct Options {
     /// T-1762. The file of the store that caches the verdicts of the HTTPS
     /// probe across runs; `None` probes each host.
     pub reach_cache: Option<std::path::PathBuf>,
+    /// PodUtils/podvm#557: the entry mounts a `/proc` in the root (the
+    /// namespace rung), so a link of `etc/mtab` into `/proc` stays.
+    pub entry_mounts_proc: bool,
 }
 
 impl Default for Options {
@@ -84,6 +87,7 @@ impl Default for Options {
             host_resolv_conf: "/etc/resolv.conf".to_string(),
             steps: true,
             reach_cache: None,
+            entry_mounts_proc: false,
         }
     }
 }
@@ -283,6 +287,7 @@ impl Report {
 /// The settings of `pod-rootfs` for one run of podvm.
 pub fn settings(rootfs: &str, opts: &Options) -> pod_rootfs::Settings {
     pod_rootfs::Settings {
+        entry_mounts_proc: opts.entry_mounts_proc,
         names: names(),
         host: podvm_probe::settings(),
         container_name: opts.container_name.clone(),

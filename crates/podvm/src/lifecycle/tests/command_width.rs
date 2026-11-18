@@ -17,6 +17,7 @@ fn with_argv(argv: &[&str]) -> Container {
         noticed: None,
         wall_ms: None,
         end: None,
+        rm: false,
         of: podvm_supervise::table::Detail {
             image: "img".into(),
             manifest_digest: "sha256:0".into(),

@@ -7,7 +7,7 @@ start.
 
 ## State
 
-552 entries: 10 open, 25 partial, 4 blocked, 513 done.
+552 entries: 10 open, 24 partial, 3 blocked, 515 done.
 
 The state on 2026-11-16 (`docs/HANDOFF.md` has the detail):
 
@@ -67,7 +67,7 @@ status with `podvm-count` in the same commit as the work.
    that a podrunner unit meets counts as an ask of podrunner.
 0. Quality first (the owner's ruling, 2026-11-17; `docs/methodology/quality.md`):
    no beta until T-1949 holds. Verify and work the reports of the external
-   QA (T-1937 to T-1945, T-1951 to T-1954), each by its class, with T-1947 (fail
+   QA (T-1937 to T-1944, T-1951 to T-1954), each by its class, with T-1947 (fail
    safe at the edges) and T-1948 (messages from the entered mechanism).
    The harness of the CLI (`tests/cli_contract.rs`) guards the surface.
 1. A new ask of a peer session comes first (the watcher of `AGENTS.md`,

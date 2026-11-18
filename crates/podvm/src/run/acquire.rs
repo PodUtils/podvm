@@ -185,12 +185,20 @@ pub(super) fn hostname_env(
     crate::userns::owners::apply(rootfs); // TODO/probe.md T-1911
     if userland.is_none() {
         // TODO/enter.md T-1920: the volumes as binds on the namespace rung.
-        if let Err(e) = crate::userns::bind_volumes(rootfs, &o.volumes, &o.ro_volumes) {
+        if let Err(e) =
+            crate::userns::bind_volumes(rootfs, &o.volumes, &o.ro_volumes, o.volume_base.as_deref())
+        {
             eprintln!("podvm {verb}: {e}");
             return Err(podvm_image::error::EXIT_RUNTIME_ERROR);
         }
     }
-    super::binds::push_env(&o.volumes, &o.ro_volumes, userland.is_none(), env); // T-1920
+    super::binds::push_env(
+        &o.volumes,
+        &o.ro_volumes,
+        userland.is_none(),
+        o.volume_base.as_deref(),
+        env,
+    ); // T-1920
     let Some(name) = o.hostname.clone() else {
         return Ok(());
     };

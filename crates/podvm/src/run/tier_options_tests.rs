@@ -28,6 +28,7 @@ const TABLE: &[(&[&str], bool, bool)] = &[
     (&["-w", "/tmp"], false, false),
     (&["-v", "/tmp:/data"], false, false),
     (&["--podvm-net", "none"], false, false),
+    (&["--podvm-volume-base", "/tmp"], true, true),
 ];
 
 #[test]
@@ -83,6 +84,9 @@ fn every_field_of_opts_is_classified(o: Opts) {
         channel: _,           // machine and incus
         sealed: _,            // machine only; incus refuses
         engine: _,            // machine only; incus refuses
+        volume_base: _,       // a bind of the namespace rung; each guest tier refuses
+        volume_given: _,      // the check of --podvm-volume-base at the parse
+        volume_base_given: _, // the check of --podvm-volume-base at the parse
         profile: _,           // the parse
         sets: _,              // the parse
         wrap: _,              // the argv of each tier

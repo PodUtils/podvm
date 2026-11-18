@@ -51,6 +51,15 @@ pub(crate) struct Opts {
     /// `--podvm-engine`: the guest loads the modules of a container
     /// engine (T-1780, PodUtils/podrunner#92).
     pub(crate) engine: bool,
+    /// `--podvm-volume-base DIR`: each `-v` source under DIR opens under it
+    /// with no symbolic link, and the bind takes that descriptor
+    /// (PodUtils/podrunner#277, T-1945).
+    pub(crate) volume_base: Option<String>,
+    /// The host path of each `-v` as the caller gave it, in its order, for
+    /// the check of `--podvm-volume-base` (`values::check_volume_base`).
+    pub(crate) volume_given: Vec<String>,
+    /// `--podvm-volume-base` as the caller gave it.
+    pub(crate) volume_base_given: Option<String>,
     /// `--profile` and `-s`: the profile of the run and its overrides.
     /// TODO/cli.md T-1654.
     pub(crate) profile: Option<String>,
@@ -141,6 +150,9 @@ impl Opts {
             net_none: false,
             sealed: false,
             engine: false,
+            volume_base: None,
+            volume_given: Vec::new(),
+            volume_base_given: None,
             interactive: false,
             channel: None,
             profile: None,

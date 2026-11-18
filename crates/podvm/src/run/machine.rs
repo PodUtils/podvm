@@ -325,6 +325,7 @@ pub(super) fn unhonoured_flags(o: &Opts) -> Vec<&'static str> {
             "--security-opt no-new-privileges or --cap-drop ALL",
         ),
         (!h.labels.is_empty(), "--label"),
+        (o.volume_base.is_some(), "--podvm-volume-base"),
     ]
     .into_iter()
     .filter_map(|(given, flag)| given.then_some(flag))

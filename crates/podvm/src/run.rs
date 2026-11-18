@@ -175,6 +175,12 @@ pub const RUN_OPTIONS: &str = "\
                    part of it (256M gives 85 % to MemTotal). A
                    guest over the RLIMIT_FSIZE ceiling is refused before it
                    starts, naming both numbers (TODO/machine.md T-1305)
+  --podvm-volume-base DIR
+                   podvm's own, namespace rung only: each -v source under
+                   DIR opens under it with no symbolic link, and the bind
+                   takes that descriptor; a link under DIR is a refusal
+                   (exit 125). The userland rung and each guest tier
+                   refuse it (PodUtils/podrunner#277)
   --podvm-cpus N  podvm's own, machine tier only and refused elsewhere: the
                    guest's vCPUs, 1 to 64 (TODO/cli.md T-1654)
   --podvm-net none  podvm's own, machine and incus tiers: the guest has

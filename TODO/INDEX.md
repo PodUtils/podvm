@@ -596,7 +596,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1931](cli.md) | P2 | S | none | cli | done | A run connects to the hosts of the package sources of the image, and no document names it |
 | [T-1932](machine.md) | P2 | S | none | machine | done | A foreground `run windows:NAME` writes its overlay into the tmpfs of the runtime directory |
 | [T-1933](machine.md) | P1 | S | none | machine | done | The first `run windows:NAME` of a fresh golden image can miss its agent on 2 CPUs |
-| [T-1934](enter.md) | P2 | S | none | enter | blocked | A unit on the namespace rung has no usable pty: no `/dev/ptmx`, and the host's `/dev/pts` |
+| [T-1934](enter.md) | P2 | S | none | enter | done | A unit on the namespace rung has no usable pty: no `/dev/ptmx`, and the host's `/dev/pts` |
 | [T-1935](enter.md) | P1 | M | none | enter | partial | `run -d` on the userland rung: a raw path call of a dynamic program reaches the host |
 | [T-1936](gate.md) | P1 | S | none | gate | done | A gate of the tools of a CI job: a raw syscall, a spawn, a pty, `uv` and `ruff` in a unit |
 | [T-1937](cli.md) | P2 | M | none | cli | partial | The external QA of `0.2.0-beta.31`: the argument checks of the CLI |
@@ -607,7 +607,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1942](gate.md) | P1 | M | none | gate | done | The external QA of `0.2.0-beta.31`: verify the second batch of reports |
 | [T-1943](cli.md) | P1 | M | none | cli | partial | The external QA of `0.2.0-beta.31`, second batch: panics, flags and messages |
 | [T-1944](cli.md) | P2 | M | none | cli | partial | The external QA of `0.2.0-beta.31`, second batch: `cp`, `import` and the helpers of credentials |
-| [T-1945](cli.md) | P1 | M | none | cli | partial | `exec --env-file`, and a `-v` source that is opened with no symbolic link (PodUtils/podrunner#277) |
+| [T-1945](cli.md) | P1 | M | none | cli | done | `exec --env-file`, and a `-v` source that is opened with no symbolic link (PodUtils/podrunner#277) |
 | [T-1946](gate.md) | P1 | M | none | gate | done | The contract of the CLI: one table-driven harness of each verb |
 | [T-1947](gate.md) | P1 | M | none | gate | partial | Fail safe at the edges: a panic hook, checked numbers, and the writes of the store |
 | [T-1948](gate.md) | P2 | M | none | gate | partial | Each banner and each inspect field says what the entered mechanism did |
@@ -621,7 +621,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-552 entries: 10 open, 25 partial, 4 blocked, 513 done.
+552 entries: 10 open, 24 partial, 3 blocked, 515 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -631,10 +631,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 1 | 9 | 0 | 221 | 231 |
-| P2 | 6 | 12 | 3 | 175 | 196 |
+| P1 | 1 | 8 | 0 | 222 | 231 |
+| P2 | 6 | 12 | 2 | 176 | 196 |
 | P3 | 3 | 4 | 1 | 42 | 50 |
-| **All** | 10 | 25 | 4 | 513 | 552 |
+| **All** | 10 | 24 | 3 | 515 | 552 |
 
 ## Work order
 

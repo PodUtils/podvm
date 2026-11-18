@@ -6124,7 +6124,7 @@ Verified by T-1942 (the reproduction of each, or the code for 502).
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -6144,9 +6144,11 @@ podrunner gives the secrets of a job as `-e K=V`, which `/proc/PID/cmdline` of `
 
 ## Prove
 
-As uid 1000: `exec --env-file F NAME sh -c 'echo $SECRET'` prints the value, and no `/proc/*/cmdline` holds it while the exec runs.
+As uid 1000: `exec --env-file F NAME sh -c 'echo $SECRET'` prints the value, and no `/proc/*/cmdline` holds it while the exec runs. With `--podvm-volume-base BASE`, a `-v BASE/LINK:/w` whose `LINK` is a symbolic link out of `BASE` exits 125 on `run` and `run -d` and names the volume, and a `-v BASE/DIR:/w` binds and takes a write.
 
 ## Done
+
+**Done (2026-11-18).** `--podvm-volume-base DIR` of `run`, `run -d` and `create`: each `-v` source under DIR opens under it with `openat2(RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS)`, and the bind takes that descriptor. `run -d` and `create` pass DIR in `PODVM_BINDS_BASE` of the record, and the launcher sets `VolumeBind::host_base` of pod-enter (podcrates `v0.70.0`, podcrates@T-876); a foreground run opens the source itself and binds `/proc/self/fd/N` (`userns::host::beneath`). The parser compares the spelled source with its canonical path, so a link under DIR that the parse would follow is a refusal before any bind (`run/parse/volume_base.rs`). The userland rung and each guest tier refuse the flag by name. Measured as uid 1000 on the cloud host with `python:3.13-slim`: `-v BASE/link:/w` (a link to a directory out of BASE) exits 125 with "its host path holds a symbolic link under its base" on `run` and on `run -d`, also as `--podvm-volume-base=BASE`; `-v BASE/work:/w` binds, and a write of the payload of `run -d` lands in `BASE/work`.
 
 **Partial (2026-11-17).** `exec --env-file PATH` (and `--env-file=`), with the reader of `run` and a parity row. With alpine 3.20 of mirror.gcr.io, as uid 1000: the payload of `exec --env-file` prints the value, and no `/proc/*/cmdline` of the host holds it while the exec runs. Remaining: the source of a volume with no symbolic link.
 

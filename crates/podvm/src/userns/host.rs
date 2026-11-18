@@ -77,6 +77,81 @@ pub fn bind_devices(rootfs: &std::path::Path) {
             )
         };
     }
+    new_pts(&dev);
+}
+
+/// PodUtils/podrunner#216: a new devpts instance for the tree and its
+/// `ptmx` on `/dev/ptmx`, so that `openpty` works in a foreground run, with
+/// the options of pod-enter's own instance (`pod_enter::DEVPTS_OPTIONS`)
+/// that `run -d` gets. A link at the `/dev/ptmx` of the image is left
+/// alone; a refusal of the kernel is one line.
+///
+/// The instance goes on the `/dev/pts` of the mount namespace of pid 2,
+/// which the user namespace owns, so no mount reaches the host: pod-enter
+/// binds that `/dev/pts` on the tree, and its `ptmx` goes on the `/dev/ptmx`
+/// of the tree here.
+fn new_pts(dev: &std::path::Path) {
+    const MS_BIND: u64 = 0x1000;
+    let pts = std::path::Path::new("/dev/pts");
+    let ptmx = dev.join("ptmx");
+    if !std::fs::symlink_metadata(pts).is_ok_and(|m| m.is_dir()) {
+        return;
+    }
+    let (Ok(target), Ok(opts)) = (
+        std::ffi::CString::new(pts.as_os_str().as_encoded_bytes()),
+        std::ffi::CString::new(podvm_enter::DEVPTS_OPTIONS),
+    ) else {
+        return;
+    };
+    // SAFETY: NUL-ended strings; devpts reads its options as a C string.
+    let r = unsafe {
+        mount(
+            c"devpts".as_ptr(),
+            target.as_ptr(),
+            c"devpts".as_ptr(),
+            podvm_enter::DEVPTS_FLAGS,
+            opts.as_ptr().cast(),
+        )
+    };
+    if r != 0 {
+        eprintln!(
+            "podvm: the run has no terminal of its own: the mount of a new devpts \
+             instance failed: {}",
+            std::io::Error::last_os_error()
+        );
+        return;
+    }
+    match std::fs::symlink_metadata(&ptmx) {
+        Ok(m) if m.file_type().is_symlink() => return,
+        Ok(_) => {}
+        Err(_) => {
+            if std::fs::File::create(&ptmx).is_err() {
+                return;
+            }
+        }
+    }
+    let (Ok(src), Ok(dst)) = (
+        std::ffi::CString::new(pts.join("ptmx").as_os_str().as_encoded_bytes()),
+        std::ffi::CString::new(ptmx.as_os_str().as_encoded_bytes()),
+    ) else {
+        return;
+    };
+    // SAFETY: NUL-ended paths; a bind takes no type and no data.
+    let r = unsafe {
+        mount(
+            src.as_ptr(),
+            dst.as_ptr(),
+            core::ptr::null(),
+            MS_BIND,
+            core::ptr::null(),
+        )
+    };
+    if r != 0 {
+        eprintln!(
+            "podvm: the run has no /dev/ptmx: the bind of the ptmx of its devpts failed: {}",
+            std::io::Error::last_os_error()
+        );
+    }
 }
 
 /// TODO/enter.md T-1920: bind each volume onto the tree, in the mount
@@ -93,11 +168,21 @@ pub fn bind_volumes(
     rootfs: &std::path::Path,
     volumes: &[podvm_enter::userland::Volume],
     ro: &[String],
+    base: Option<&str>,
 ) -> Result<(), String> {
     if !active() {
         return Ok(());
     }
     for v in volumes {
+        // PodUtils/podrunner#277: a source under `--podvm-volume-base`
+        // opens under it with no symbolic link; the bind takes that
+        // descriptor, so a link made after the check redirects nothing.
+        let held = match base {
+            Some(b) => {
+                beneath(b, &v.host).map_err(|why| format!("-v {}:{}: {why}", v.host, v.guest))?
+            }
+            None => None,
+        };
         let host = std::path::Path::new(&v.host);
         let meta = std::fs::metadata(host).map_err(|e| format!("-v {}: {e}", v.host))?;
         let rel = v.guest.trim_start_matches('/');
@@ -142,8 +227,12 @@ pub fn bind_volumes(
                 kind(t.is_dir())
             ));
         }
+        let source = match &held {
+            Some(fd) => std::path::PathBuf::from(format!("/proc/self/fd/{}", fd.0)),
+            None => host.to_path_buf(),
+        };
         let (Ok(src), Ok(dst)) = (
-            std::ffi::CString::new(host.as_os_str().as_encoded_bytes()),
+            std::ffi::CString::new(source.as_os_str().as_encoded_bytes()),
             std::ffi::CString::new(target.as_os_str().as_encoded_bytes()),
         ) else {
             return Err(format!("-v {}: a NUL byte in a path", v.guest));
@@ -220,4 +309,73 @@ fn locked_flags(p: &std::path::Path) -> u64 {
         }
     }
     f
+}
+
+/// A descriptor that closes when it goes.
+struct Held(i32);
+
+impl Drop for Held {
+    fn drop(&mut self) {
+        // SAFETY: the descriptor of this value, closed once.
+        unsafe { close(self.0) };
+    }
+}
+
+/// `host` opened with `O_PATH` under `base` with no symbolic link
+/// (`openat2(RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS)`), or `None` where
+/// `host` is not under `base` (PodUtils/podrunner#277).
+fn beneath(base: &str, host: &str) -> Result<Option<Held>, String> {
+    let b = base.trim_end_matches('/');
+    let rel = if host == b {
+        "."
+    } else {
+        match host.strip_prefix(b).and_then(|r| r.strip_prefix('/')) {
+            Some(r) if !r.is_empty() => r,
+            _ => return Ok(None),
+        }
+    };
+    const O_PATH: i32 = 0o10000000;
+    const O_DIRECTORY: i32 = 0o200000;
+    const O_CLOEXEC: i32 = 0o2000000;
+    const RESOLVE_NO_SYMLINKS: u64 = 0x04;
+    const RESOLVE_BENEATH: u64 = 0x08;
+    const SYS_OPENAT2: i64 = 437;
+    let (Ok(cb), Ok(cr)) = (std::ffi::CString::new(b), std::ffi::CString::new(rel)) else {
+        return Err("a NUL byte in a path".to_string());
+    };
+    // SAFETY: a NUL-ended path and integer flags.
+    let bfd = unsafe { open(cb.as_ptr(), O_PATH | O_DIRECTORY | O_CLOEXEC) };
+    if bfd < 0 {
+        return Err(format!(
+            "the volume base {b} does not open: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+    let bfd = Held(bfd);
+    let how: [u64; 3] = [
+        (O_PATH | O_CLOEXEC) as u64,
+        0,
+        RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS,
+    ];
+    // SAFETY: openat2 reads the NUL-ended path and the 24-byte `open_how`.
+    let fd = unsafe {
+        syscall(
+            SYS_OPENAT2,
+            bfd.0 as i64,
+            cr.as_ptr(),
+            how.as_ptr(),
+            24usize,
+        )
+    };
+    if fd < 0 {
+        let e = std::io::Error::last_os_error();
+        let why = match e.raw_os_error() {
+            Some(40) | Some(18) => "holds a symbolic link".to_string(), // ELOOP, EXDEV
+            _ => format!("does not open ({e})"),
+        };
+        return Err(format!(
+            "the volume is refused: its host path {why} under its base {b} (--podvm-volume-base)"
+        ));
+    }
+    Ok(Some(Held(fd as i32)))
 }

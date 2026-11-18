@@ -4400,7 +4400,7 @@ Before: the blocker was the plan option of `pod-enter` (COORD-164, #457), then t
 **Milestone:** none
 **Priority:** P2
 **Effort:** S
-**Status:** blocked
+**Status:** done
 
 ## Problem
 
@@ -4422,9 +4422,11 @@ pod-enter mounts a new devpts instance (`newinstance,ptmxmode=0666,mode=0620`) o
 
 As uid 1000 on the cloud host, `run -d` of `python:3.13-slim` and `podvm exec UNIT python3 -c 'import pty; pty.spawn(["true"])'` exit 0, `script -qec 'echo pty-ok' /dev/null` prints `pty-ok` (an image with `script`), and the foreground run gives the same.
 
-## Blocker
+## Done
 
-The device nodes and the devpts of the namespace rung are pod-enter's code. COORD-176 (PodUtils/podvm#469) asks podcrates for the devpts instance and `/dev/ptmx`; COORD-177 (PodUtils/podvm#470) answers podrunner. Clears when a podcrates tag carries it.
+**Done (2026-11-18).** podcrates `v0.70.0` (PodUtils/podcrates#222, podcrates@T-864 and @T-868) mounts a new devpts instance (`newinstance,ptmxmode=0666,mode=0620`) on the `/dev/pts` of the image and binds its `ptmx` on `/dev/ptmx` in the user namespace of `run -d`, `create` and `start`; where the kernel refuses the instance, pod-enter binds the host's `/dev/pts` and writes one line. A foreground run enters no user namespace of pod-enter (C21): podvm mounts the instance with the same options on the `/dev/pts` of the mount namespace of its pid 2, which pod-enter binds on the tree, and binds its `ptmx` on the `/dev/ptmx` of the tree (`userns::host::new_pts`). Measured as uid 1000 on the cloud host with `python:3.13-slim`: `run -d` then `podvm exec UNIT python3 -c 'import pty; pty.spawn(["true"])'` gives 0, and so does the payload of `run -d` itself (`logs`: `pty 0`); the foreground run gives `pty 0`, and `script -qec 'echo pty-ok' /dev/null` prints `pty-ok`; `run -t` still gives the payload `/dev/pts/0`. The host's mount table is the same before and after.
+
+Before: blocked on COORD-176 (PodUtils/podvm#469). Remaining for a later entry: the run report does not name a unit whose devpts the kernel refused; the line of pod-enter on the standard error of the payload names it.
 
 # T-1935: `run -d` on the userland rung: a raw path call of a dynamic program reaches the host
 
