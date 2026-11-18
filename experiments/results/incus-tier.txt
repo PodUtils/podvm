@@ -1,5 +1,5 @@
 == conditions
-date              2026-11-18T11:39:38Z
+date              2026-11-18T11:47:09Z
 host kernel       Linux 6.18.44-fc-v595
 cgroup            tmpfs
 incus package     6.0.0-1ubuntu0.3
@@ -9,15 +9,15 @@ runs              5
 == 1. a run
   stdout  hello
   exit    0
-  ms      1058 (with the import)
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-427322cd63185c23-v3 imported now (TODO/machine.md T-1718)
+  ms      1132 (with the import)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-99394def155b142b-v3 imported now (TODO/machine.md T-1718)
 
 == 2. the exit code
   exit    7
 
 == 3. stdout and stderr
   stdout  out
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-427322cd63185c23-v3 from incus (TODO/machine.md T-1718)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-99394def155b142b-v3 from incus (TODO/machine.md T-1718)
   stderr  err
 
 == 4. stdin
@@ -30,11 +30,11 @@ runs              5
   PID 1                 /.podvm/podvm guest-hold 
   owner of /etc/passwd  0:0
   owner of /etc/shadow  0:42
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-427322cd63185c23-v3 from incus (TODO/machine.md T-1718)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-99394def155b142b-v3 from incus (TODO/machine.md T-1718)
 
 == 7. the cached image
-  run true ms  805 (median of 5)
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-427322cd63185c23-v3 from incus (TODO/machine.md T-1718)
+  run true ms  894 (median of 5)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-99394def155b142b-v3 from incus (TODO/machine.md T-1718)
 
 == 8. a name that is no instance
   exec exit    125
@@ -100,16 +100,11 @@ runs              5
   root     0 in the instance
   rm       eng434
 == 17. --storage-opt size= on a pool of the driver dir
-  run -d   rc 125: podvm run --help prints each option
+  run -d   rc 125: podvm run: incus tier: --storage-opt size=1073741824B: the storage pool of the instance holds no size of its root disk (incusd reports no limit; a pool of the driver `dir` bounds nothing), and podvm does not run it as if it held one
   left     0
-  native   podvm run: unknown option "--storage-opt". It has no row in the parity table; `podvm system info` lists every flag this verb takes
-usage: podvm run [options] <image> [command] [arg...]
-podvm run --help prints each option
- rc 125
-17: a size that the pool does not hold did not refuse by name
-17: a native run did not refuse --storage-opt by name
+  native   podvm run: --storage-opt size= sizes the root disk of an instance of the incus tier (--podvm-tier=incus); this tier has no root disk to size (TODO/machine.md T-1964, T-1968)  rc 125
 == 18. the CPU time and the peak memory in inspect
-  usage    1.115 61853696 0
+  usage    1.149 61370368 0
 
 == 9. nothing stays
   instances in incus              0
@@ -119,4 +114,4 @@ podvm run --help prints each option
   exit    125
   stderr  podvm run: incus tier: no incusd answers at /workspace/podvm/experiments/.sweep434-work/no-incus/unix.socket: set PODVM_INCUS_SOCKET or INCUS_DIR, or start one (docs/incus.md, route A)
 
-verdict           A CLAUSE DISAGREED
+verdict           THE INCUS TIER RUNS
