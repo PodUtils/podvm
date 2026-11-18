@@ -9,9 +9,16 @@ start.
 
 573 entries: 17 open, 31 partial, 3 blocked, 522 done.
 
-The state on 2026-11-16 (`docs/HANDOFF.md` has the detail):
+The state on 2026-11-18 (`docs/HANDOFF.md` has the detail):
 
-* The newest release is `v0.2.0-beta.32` (2026-11-18, release run
+* The newest release is `v0.2.0-beta.33` (2026-11-18, release run
+  44324846613 on `2bec174`): `--env-file0` (T-1971), the volume base and
+  the Unix sockets of the syscall tier (T-1972 partial, T-1973), links
+  across volumes (T-1975), the size and the usage of an incus instance
+  (T-1964 partial, T-1965, T-1969 partial), the faults of the second
+  outside pass (T-1974 partial), the exec of the syscall tier on a stack
+  of its own (T-1976 partial) and podcrates `v0.71.0`. Before it:
+* `v0.2.0-beta.32` (2026-11-18, release run
   44278551133 on `566f833`, the first behind the beta gate of T-1949): the
   asks of podrunner (T-1934, T-1945, T-1966, T-1967, T-1969 partial), the P1
   faults of the outside pass (T-1970) and podcrates `v0.70.0`. Before it:
@@ -29,8 +36,9 @@ The state on 2026-11-16 (`docs/HANDOFF.md` has the detail):
   dispatches each workflow. A newer push cancels the gate of an older
   commit. The issue `[gh action] requested` is the fallback only
   (`docs/decisions.md`, 2026-11-13, "Workflow fallback").
-* podvm takes the crates of PodUtils/podcrates at `v0.68.0`
-  (PodUtils/podcrates#219, COORD-172: the source fixup reads no comment,
+* podvm takes the crates of PodUtils/podcrates at `v0.71.0`
+  (PodUtils/podcrates#228, COORD-191, #587; before it `v0.70.0`,
+  PodUtils/podcrates#222; `v0.68.0`, PodUtils/podcrates#219, COORD-172: the source fixup reads no comment,
   T-1931; `v0.67.0`, PodUtils/podcrates#218, COORD-169; `v0.66.0`, PodUtils/podcrates#216:
   the PID namespace of `run -d`, T-1930;
   `v0.65.0`, PodUtils/podcrates#215; before it `v0.64.0`, PodUtils/podcrates#214, COORD-166: the roots of the host in a lab with a

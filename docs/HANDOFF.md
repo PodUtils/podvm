@@ -1,10 +1,12 @@
 # Handoff
 
-The state on 2026-11-18, 10:30 (UTC), at the end of a session. `main` is
-at the commit that adds this file. `0.2.0-beta.32` is the last release
-(release run 44278551133 on `566f833`). A fresh session with no memory
-reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
-`docs/decisions.md`. Remove this file when each step below is done.
+The state on 2026-11-18, 14:55 (UTC), at the end of a session. `main` is
+at the commit that adds this file. `0.2.0-beta.33` is the last release
+(release run 44324846613 on `2bec174`; the gate 44320118793, `arm.yml`
+44320135003, the nightly trial 44320128418 and `workloads.yml` on
+`536a66f` passed first). A fresh session with no memory reads this file
+first, then `AGENTS.md`, `TODO/PROGRESS.md` and `docs/decisions.md`.
+Remove this file when each step below is done.
 
 ## The rulings of this day
 
@@ -69,22 +71,42 @@ reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
 * The donor study (the zip of the owner): issues #573 to #581, entries
   T-1956 to T-1963. #573 names an owner decision: a seccomp
   user-notification rung, which T-0606 refused once.
+* PodUtils/podrunner#301 (COORD-190, #586): the syscall tier maps the
+  path of a Unix socket for `connect` and `bind` (T-1973, done).
+* The second outside pass of 2026-11-18 (T-1974, partial): OR-01 to OR-06
+  fixed (exec opens volumes under the base, Ctrl-C of `-t` and `-it`,
+  `exec` in a bound `-w`, `-v H:/tmp` of the syscall tier, links across
+  volumes: T-1975); OR-07, OR-08 and OR-10 to OR-17 are in "Known gaps"
+  of beta.33.
+* C24 (`docs/decisions.md`): the size ceiling of the binary is 9 000 000
+  bytes.
+* T-1976 (partial): the gate of beta.33 died of SIGSEGV in
+  `exec_loads_the_next_program_in_the_root` on CI only. The SIGSYS
+  handler runs on the payload's alternate signal stack (8 KiB from Rust's
+  std on a CPU without AMX; the cloud host has AMX, so the test passed
+  there). `exec::execveat` now runs on a stack of its own; the remainder
+  is a stack of its own for each call of the handler.
+* Released `0.2.0-beta.33`; #583, #585 and #586 name the tag for
+  podrunner; #587 (COORD-191) is closed (podcrates lists the take).
 
 ## Next steps, in order
 
 1. Start the session (`AGENTS.md`, section 8), with the watcher. Amend
    COORD-184 (#571) with the state of the session.
-2. A new COORD issue `(to podvm)` of podrunner first. Watch #572, #583
-   and #585 for podrunner's answers (it pins beta.32 and closes its
-   asks). Then the T-1972 remainder (the loader family).
-3. T-1969 remainder (the run report of the incus tier, a machine guest),
-   then T-1968; the T-1964 remainder waits for a measure on a host with a
-   quota pool (podrunner).
-5. When podcrates answers COORD-188: set the controlling terminal for `-t`
-   and remove `run::pty::send`.
-6. T-1970 remainder (OQ-04, OQ-06 to OQ-17), T-1935 (the syscall tier by
-   default after its cost, T-1740), T-1955 remainder, then the work order
-   of `TODO/PROGRESS.md`.
+2. A new COORD issue `(to podvm)` of podrunner first. Watch #572, #583,
+   #585 and #586 for podrunner's answers (it takes beta.33 and closes its
+   asks #296, #300 and #301). Then the T-1972 remainder (the loader
+   family).
+3. T-1969 remainder (a machine guest), then T-1968; the T-1964 remainder
+   waits for a measure on a host with a quota pool (podrunner).
+4. T-1976 remainder: a stack of its own for each call of the handler (a
+   pool of stacks, as `pool::Buf`).
+5. When podcrates answers COORD-188 (#584): set the controlling terminal
+   for `-t` and remove `run::pty::send`.
+6. T-1974 remainder (OR-07, OR-08, OR-10 to OR-17), T-1970 remainder
+   (OQ-04, OQ-06 to OQ-17), T-1935 (the syscall tier by default after its
+   cost, T-1740), T-1955 remainder, then the work order of
+   `TODO/PROGRESS.md`.
 
 ## Rules learned
 
@@ -97,3 +119,7 @@ reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
   build the release while it runs.
 * The release takes the head of `main`: hold each push from the version
   bump until the release run ends (call C22).
+* A test that passes on the cloud host and fails on CI can depend on the
+  CPU: the cloud host has AMX, which makes `AT_MINSIGSTKSZ` and each
+  alternate signal stack of a Rust thread larger. Measure with the probe
+  verb `exec-alt SIZE` of `podvm-dispatch`.
