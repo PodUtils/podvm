@@ -396,15 +396,22 @@ const IMAGE_USAGE: &str = "usage: podvm image ls | rm | prune | tag | inspect | 
 /// of the store unlinks the blobs only, so the extracted root of a removed
 /// image stayed (8.2 MiB for alpine, 811 MiB for golang), and with it the
 /// spare tree. A digest that another tag still names keeps its extraction.
-pub(crate) fn drop_extractions(store: &podvm_image::Store, before: &[String]) {
+/// It gives the bytes that it removed (PodUtils/podvm#526: `prune` counts
+/// them in its total).
+pub(crate) fn drop_extractions(store: &podvm_image::Store, before: &[String]) -> u64 {
     let Ok(now) = store.list() else {
-        return;
+        return 0;
     };
+    let mut freed = 0u64;
     for d in before {
         if !now.iter().any(|r| &r.manifest_digest == d) {
-            let _ = podvm_extract::remove_extracted(store, d);
+            let bytes = podvm_image::space::dir_bytes(&podvm_extract::paths(store, d).0);
+            if podvm_extract::remove_extracted(store, d).is_ok() {
+                freed = freed.saturating_add(bytes);
+            }
         }
     }
+    freed
 }
 
 /// TODO/image.md T-1787 (PodUtils/podvm#329): each extraction of the store

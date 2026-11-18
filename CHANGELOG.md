@@ -48,6 +48,10 @@ Deployed: none yet.
   (#503, #515, #525). `rmi` of one of several names of an image is an
   untag, also while a container uses the image (#548). `man --roff` and
   `--llms` write each usage line once (#518).
+- A SIGINT that a process sends to podvm reaches the payload (#535).
+  `run -t` with no `-i` attaches no stdin (#545). A `cp` destination
+  that ends with `/` names a directory (#555). `system df` and `image
+  prune` count each extraction once and in full (#526).
 
 ### Added: the syscall tier for a detached container, 2026-11-17
 

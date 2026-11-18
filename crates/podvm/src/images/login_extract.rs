@@ -237,10 +237,12 @@ pub fn prune(verb: &str, args: &[String]) -> i32 {
     let digests: Vec<String> = rest.iter().map(|r| r.manifest_digest.clone()).collect();
     match store.delete(&rest, podvm_image::store::Held::Skip) {
         Ok(done) => {
-            super::drop_extractions(&store, &digests); // TODO/image.md T-1781
-                                                       // TODO/image.md T-1787: and each extraction that no record names.
+            // TODO/image.md T-1781, T-1787: the extractions of the removed
+            // records and each one that no record names, in the total (#526).
+            let mut freed = super::drop_extractions(&store, &digests);
             for (digest, bytes) in super::orphan_extractions(&store) {
                 if podvm_extract::remove_extracted(&store, &digest).is_ok() {
+                    freed = freed.saturating_add(bytes);
                     println!(
                         "deleted: an extraction no image names, {}",
                         podvm_image::space::mib(bytes)
@@ -271,7 +273,10 @@ pub fn prune(verb: &str, args: &[String]) -> i32 {
             }
             print!(
                 "{}",
-                prune_total(!done.deleted.is_empty(), done.freed_bytes)
+                prune_total(
+                    !done.deleted.is_empty(),
+                    done.freed_bytes.saturating_add(freed)
+                )
             );
             0
         }

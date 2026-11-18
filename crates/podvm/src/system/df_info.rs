@@ -163,7 +163,6 @@ pub fn df(verb: &str, args: &[String]) -> i32 {
             podvm_image::space::mib(*stored),
             podvm_image::space::mib(*rootfs_bytes)
         );
-        rootfs_total = rootfs_total.saturating_add(*rootfs_bytes);
         if *extracted {
             extracted_count += 1;
         }
@@ -172,6 +171,16 @@ pub fn df(verb: &str, args: &[String]) -> i32 {
     // how many tags need it. A totals line above the rows would disagree
     // with them by exactly the shared bytes; below, it is the store's
     // own accounting.
+    // PodUtils/podvm#526: two records of one manifest share one extraction,
+    // which the total bills once.
+    let mut seen_rootfs: Vec<&str> = Vec::new();
+    for r in &images {
+        if !seen_rootfs.contains(&r.manifest_digest.as_str()) {
+            seen_rootfs.push(&r.manifest_digest);
+            let (rootfs, _) = podvm_extract::paths(&store, &r.manifest_digest);
+            rootfs_total = rootfs_total.saturating_add(podvm_image::space::dir_bytes(&rootfs));
+        }
+    }
     let mut unique_stored = 0u64;
     let mut counted: Vec<String> = Vec::new();
     for r in &images {
