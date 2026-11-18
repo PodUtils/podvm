@@ -1,5 +1,5 @@
 == conditions
-date              2026-11-18T09:15:52Z
+date              2026-11-18T09:17:41Z
 host kernel       Linux 6.18.44-fc-v595
 cgroup            tmpfs
 incus package     6.0.0-1ubuntu0.3
@@ -9,7 +9,7 @@ runs              5
 == 1. a run
   stdout  hello
   exit    0
-  ms      1257 (with the import)
+  ms      1682 (with the import)
   stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-7e8408472629c8cd-v3 imported now (TODO/machine.md T-1718)
 
 == 2. the exit code
@@ -33,7 +33,7 @@ runs              5
   stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-7e8408472629c8cd-v3 from incus (TODO/machine.md T-1718)
 
 == 7. the cached image
-  run true ms  996 (median of 5)
+  run true ms  1333 (median of 5)
   stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-7e8408472629c8cd-v3 from incus (TODO/machine.md T-1718)
 
 == 8. a name that is no instance
@@ -94,13 +94,11 @@ runs              5
   rm       ch434
   socket   request /run434 request /detach434 
 == 16. --podvm-engine: a container engine in an instance
-  run -d   podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-4eea5f48923988bc-7e8408472629c8cd-v3 imported now (TODO/machine.md T-1718)
-eng434
+  run -d   eng434
   driver   overlayfs
   nesting  true
   root     0 in the instance
   rm       eng434
-16: run -d --podvm-engine did not start the instance
 
 == 9. nothing stays
   instances in incus              0
@@ -110,4 +108,4 @@ eng434
   exit    125
   stderr  podvm run: incus tier: no incusd answers at /workspace/podvm/experiments/.sweep434-work/no-incus/unix.socket: set PODVM_INCUS_SOCKET or INCUS_DIR, or start one (docs/incus.md, route A)
 
-verdict           A CLAUSE DISAGREED
+verdict           THE INCUS TIER RUNS

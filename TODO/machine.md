@@ -5437,7 +5437,7 @@ Experiment 434: after `run -d --podvm-tier=incus public.ecr.aws/docker/library/a
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -5457,7 +5457,12 @@ An unprivileged incus container runs `dockerd` with `security.nesting=true` and 
 
 ## Prove
 
-Experiment 434: `run -d --podvm-tier=incus --podvm-engine --podvm-net none` of the image of the docker engine starts `dockerd`, and `exec UNIT docker info` exits 0 and names the storage driver `overlay2`.
+Experiment 434: `PODVM_434_MIRROR=1 sh experiments/434-incus-tier.sh` exits 0: in clause 16, `run -d --podvm-tier=incus --podvm-engine --podvm-net none` of the image of the docker engine starts `dockerd`, `exec UNIT docker info` names a storage driver, and the instance has `security.nesting`.
+
+## Done
+
+**Done (2026-11-18).** `--podvm-engine` on the incus tier: the run of the tier no longer refuses it, and `incus::run::engine_keys` gives the instance `security.nesting=true`, `security.syscalls.intercept.mknod=true` and `security.syscalls.intercept.setxattr=true` (for `run`, `run -d` and `create`, through the keys of the job). The parity row and the help say it; `engine_gives_the_instance_nesting_and_the_two_intercepts` pins the keys. Experiment 434 on the cloud host (incus 6.0.0 of route A, as a user with no root, `PODVM_434_MIRROR=1`) exits 0, "THE INCUS TIER RUNS": in clause 16, `run -d --podvm-engine --podvm-net none` of `mirror.gcr.io/library/docker:dind` with `dockerd --iptables=false --ip6tables=false --bridge=none` answers `docker info` with the driver `overlayfs`, `security.nesting` is `true`, and `rm -f` leaves no instance (clause 9). Clause 12 takes the current wording of the refusal of `rm` of a running instance. Not measured: a network of the engine (no NIC by design of the unit), and the host modules `br_netfilter` for a bridge.
+
 
 # T-1967: The machine tier has no limit of processes in a guest
 

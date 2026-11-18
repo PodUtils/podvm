@@ -628,7 +628,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1963](complete.md) | P3 | L | none | complete | open | The donor study: research backlog |
 | [T-1964](machine.md) | P1 | M | none | machine | open | The incus tier cannot size the root disk of an instance |
 | [T-1965](machine.md) | P1 | M | none | machine | open | The incus tier gives no CPU time and no peak memory of an instance |
-| [T-1966](machine.md) | P2 | M | none | machine | open | The incus tier cannot run a container engine in an instance |
+| [T-1966](machine.md) | P2 | M | none | machine | done | The incus tier cannot run a container engine in an instance |
 | [T-1967](machine.md) | P1 | S | none | machine | done | The machine tier has no limit of processes in a guest |
 | [T-1968](machine.md) | P2 | L | none | machine | open | No tier gives a sized writable disk to a unit |
 | [T-1969](supervise.md) | P1 | M | none | supervise | partial | The run report holds no OOM fact of a unit |
@@ -636,7 +636,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-567 entries: 21 open, 27 partial, 3 blocked, 516 done.
+567 entries: 20 open, 27 partial, 3 blocked, 517 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -647,9 +647,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 10 | 0 | 223 | 236 |
-| P2 | 13 | 13 | 2 | 176 | 204 |
+| P2 | 12 | 13 | 2 | 177 | 204 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
-| **All** | 21 | 27 | 3 | 516 | 567 |
+| **All** | 20 | 27 | 3 | 517 | 567 |
 
 ## Work order
 
