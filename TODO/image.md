@@ -4529,7 +4529,7 @@ podvm load_prints` exits 0.
 **Milestone:** none
 **Priority:** P2
 **Effort:** S
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -4553,6 +4553,10 @@ Measured as uid 1000 on `main` (`list.rs`, `layout.rs`, `complete/add_host.rs`, 
 ## Prove
 
 The repro of each issue, as uid 1000: the filter lists no `windows:dos`; a packed-again layout loads; `/etc/hosts` holds `127.0.0.1 bar` and `::1 six`; after `pull`, `verify` finds no mismatch.
+
+## Done
+
+**Partial (2026-11-18).** 480: `--add-host NAME:host-gateway` writes 127.0.0.1 (each rung of a run shares the network of this machine), and an IPv6 address loses its brackets (`/etc/hosts` holds `127.0.0.1 bar` and `::1 six`). 477: `load` takes the directory entries of a layout that `tar` packed again (`.`, `blobs`, `blobs/sha256`); both re-packed tarballs load. `import` moved to `layout/import_tar.rs`, for the limit of 500 lines. Remaining: 476 and 490.
 
 # T-1952: The external QA of `0.2.0-beta.31`, third batch: images, `import`, `cp` and the store
 

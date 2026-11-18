@@ -14,8 +14,34 @@ pub fn add_host(ask: &mut Ask, verb: &str, value: &str) -> Result<(), i32> {
         );
         return Err(EXIT_FLAG_ERROR);
     }
-    ask.add_hosts.push(value.to_string());
+    ask.add_hosts.push(normal(value));
     Ok(())
+}
+
+/// PodUtils/podvm#480: the entry that `/etc/hosts` takes. `host-gateway` is
+/// the address at which the payload reaches this machine: each rung of a
+/// run shares the network of this machine, so it is 127.0.0.1 (the machine
+/// tier refuses `--add-host`). An IPv6 address loses its brackets.
+pub fn normal(value: &str) -> String {
+    let Some((name, ip)) = value.split_once(':') else {
+        return value.to_string();
+    };
+    let ip = if ip == "host-gateway" {
+        "127.0.0.1"
+    } else {
+        ip.strip_prefix('[')
+            .and_then(|i| i.strip_suffix(']'))
+            .unwrap_or(ip)
+    };
+    format!("{name}:{ip}")
+}
+
+#[cfg(test)]
+#[test]
+fn the_entry_is_an_address_of_the_hosts_file() {
+    assert_eq!(normal("bar:host-gateway"), "bar:127.0.0.1");
+    assert_eq!(normal("six:[::1]"), "six:::1");
+    assert_eq!(normal("a:10.0.0.1"), "a:10.0.0.1");
 }
 
 /// TODO/cli.md T-1828: the name is a host name and the address an IPv4 or
