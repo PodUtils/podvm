@@ -387,13 +387,27 @@ pub(super) fn copy_one(
     } else {
         (outside.to_path_buf(), target)
     };
+    let dst_was_dir = dst.is_dir();
     // TODO/supervise.md T-1822: a file onto a directory goes into it under
     // its own name, as docker does; the checks below see the joined path.
     if !src.is_dir()
-        && dst.is_dir()
+        && dst_was_dir
         && let Some(name) = src.file_name()
     {
         dst = dst.join(name);
+    }
+    // PodUtils/podvm#555: a destination that ends with `/` names a
+    // directory; where none is there, nothing is written as a file.
+    let named = if out_of {
+        outside.to_string_lossy().into_owned()
+    } else {
+        inside.to_string()
+    };
+    if named.ends_with('/') && !dst_was_dir && !src.is_dir() {
+        eprintln!(
+            "podvm cp: {named} ends with '/', which names a directory, and no directory is there"
+        );
+        return EXIT_CLI_ERROR;
     }
     // ⛔ Never write through a pre-existing symlink: the path is gated but
     // the write would land where the link points.
