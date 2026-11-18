@@ -434,3 +434,31 @@ pub(crate) fn orphan_extractions(store: &podvm_image::Store) -> Vec<(String, u64
         })
         .collect()
 }
+
+/// PodUtils/podvm#527: remove the blobs that no record names, print one
+/// line for each kind, and return the bytes removed.
+pub(crate) fn prune_strays(store: &podvm_image::Store) -> u64 {
+    match store.strays(true) {
+        Ok(s) if s.writer_alive => {
+            println!("kept: blobs no image names (a pull runs)");
+            0
+        }
+        Ok(s) => {
+            let (n, mib) = (s.blobs.len(), podvm_image::space::mib(s.bytes()));
+            if n > 0 {
+                println!("deleted: {n} blobs no image names, {mib}");
+            }
+            if s.young > 0 {
+                println!(
+                    "kept: {} blobs no image names, of the last 10 minutes",
+                    s.young
+                );
+            }
+            s.bytes()
+        }
+        Err(e) => {
+            eprintln!("podvm image prune: blobs no image names: {e}");
+            0
+        }
+    }
+}

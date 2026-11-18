@@ -104,7 +104,8 @@ pub fn df(verb: &str, args: &[String]) -> i32 {
     let orphans: u64 = crate::images::orphan_extractions(&store)
         .iter()
         .map(|(_, b)| b)
-        .sum();
+        .sum::<u64>()
+        .saturating_add(store.strays(false).map(|s| s.bytes()).unwrap_or(0));
     let reclaimable = match store.reclaimable_bytes(&rest) {
         Ok(b) => b.saturating_add(orphans),
         Err(e) => {
@@ -227,7 +228,7 @@ pub fn df(verb: &str, args: &[String]) -> i32 {
         podvm_image::space::mib(spares)
     );
     println!(
-        "Extractions no image names: {}",
+        "Extractions and blobs no image names: {}",
         podvm_image::space::mib(orphans)
     );
     println!(

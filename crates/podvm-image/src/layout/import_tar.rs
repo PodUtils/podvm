@@ -46,6 +46,8 @@ fn escaping_member(tar: &Path) -> Result<Option<String>> {
 /// tar's own digest; a compressed file is refused, as the media type says
 /// plain.
 pub fn import(store: &Store, tar: &Path, reference: Option<&str>) -> Result<Record> {
+    // PodUtils/podvm#527: a sweep keeps each blob until the record.
+    let _writing = store.writing()?;
     // PodUtils/podvm#515: the magic of a compressed file is read from what
     // is there, also under 512 bytes, and xz and bzip2 are named too.
     let mut head = [0u8; 512];

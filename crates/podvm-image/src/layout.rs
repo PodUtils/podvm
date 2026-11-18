@@ -122,6 +122,8 @@ struct StagedBlob {
 /// committed, so a tarball whose bytes changed in transit is refused the
 /// way a bad pull is. Staging files are removed on every path out.
 pub fn load(store: &Store, src: &Path) -> Result<Record> {
+    // PodUtils/podvm#527: a sweep keeps each blob until the record.
+    let _writing = store.writing()?;
     let file = std::fs::File::open(src).map_err(|e| Error::io(src.display().to_string(), e))?;
     let mut archive = tar::Archive::new(file);
     let mut index_bytes: Option<Vec<u8>> = None;

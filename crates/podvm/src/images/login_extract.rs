@@ -249,6 +249,8 @@ pub fn prune(verb: &str, args: &[String]) -> i32 {
                     );
                 }
             }
+            // PodUtils/podvm#527: the blobs of a pull that a signal stopped.
+            freed = freed.saturating_add(super::prune_strays(&store));
             if !done.deleted.is_empty() {
                 println!("Deleted Images:");
                 for name in &done.untagged {

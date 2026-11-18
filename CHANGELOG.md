@@ -55,6 +55,8 @@ Deployed: none yet.
 - `pull` hashes a blob that the store holds and fetches a corrupt one
   again (#490). A record takes the platform that the registry served, so
   `linux/arm64` and `linux/arm64/v8` make one record (#528, #544).
+  `image prune` removes the blobs of a pull that a signal stopped, and
+  `system df` counts them (#527).
   `--add-host NAME:host-gateway` writes 127.0.0.1 (#480). `load` takes a
   layout that `tar` packed again (#477). The Windows rows of `images`
   take `--filter` (#476).

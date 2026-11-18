@@ -269,7 +269,7 @@ impl Store {
 pub const STAGING_AGE: std::time::Duration = std::time::Duration::from_secs(600);
 
 /// True where the file at `p` was last written [`STAGING_AGE`] or more ago.
-fn abandoned_by_age(p: &Path) -> bool {
+pub(super) fn abandoned_by_age(p: &Path) -> bool {
     std::fs::metadata(p)
         .and_then(|m| m.modified())
         .ok()

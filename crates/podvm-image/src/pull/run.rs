@@ -105,6 +105,10 @@ pub fn pull(
     // every file on its own: a blob that declares under the room and over
     // the ceiling would otherwise pull until SIGXFSZ kills the process
     // mid-transfer (T-1342).
+    // PodUtils/podvm#527: a sweep keeps each blob until the record. Taken
+    // here, before the first blob, so a pull that waits on the network holds
+    // no slot of a lock.
+    let _writing = store.writing()?;
     if let Some(ceiling) = space::file_ceiling() {
         let room = space::read(&store.root().to_string_lossy())
             .map(|h| h.free.bytes)

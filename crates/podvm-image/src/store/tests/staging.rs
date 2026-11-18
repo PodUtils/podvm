@@ -356,3 +356,37 @@ fn an_image_a_container_holds_is_refused_by_rmi_and_skipped_by_prune() {
     );
     let _ = std::fs::remove_dir_all(s.root());
 }
+
+/// PodUtils/podvm#527: a blob that no record names goes only where no
+/// writer is alive and where it is old; else the sweep keeps it.
+#[test]
+fn a_stray_goes_only_where_no_writer_is_alive_and_it_is_old() {
+    let _serialised = super::STORE_TESTS.lock().unwrap_or_else(|e| e.into_inner());
+    // (a writer holds the lock, the blob is old, a sweep removes it)
+    for (writer, old, removed) in [
+        (false, true, true),
+        (true, true, false),
+        (false, false, false),
+    ] {
+        let s = scratch(&format!("strays-{writer}-{old}"));
+        let d = crate::digest::Digest::of(b"stray");
+        let blob = s.blob_path(&d);
+        std::fs::create_dir_all(blob.parent().unwrap()).unwrap();
+        std::fs::write(&blob, b"stray").unwrap();
+        if old {
+            backdate(&blob);
+        }
+        // A file that is no digest is no blob of podvm.
+        std::fs::write(blob.with_file_name("not-a-digest"), b"x").unwrap();
+        let held = writer.then(|| s.writing().unwrap());
+        let seen = s.strays(false).unwrap();
+        assert_eq!(seen.writer_alive, writer);
+        assert_eq!(seen.bytes(), if writer { 0 } else { 5 });
+        let gone = s.strays(true).unwrap();
+        assert_eq!(gone.blobs.len(), usize::from(removed));
+        assert_eq!(gone.young, usize::from(!writer && !old));
+        assert_eq!(blob.exists(), !removed);
+        assert!(blob.with_file_name("not-a-digest").exists());
+        drop(held);
+    }
+}

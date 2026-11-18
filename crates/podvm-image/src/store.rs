@@ -400,7 +400,9 @@ impl Store {
 mod blobs;
 mod files;
 mod records;
+mod strays;
 pub use files::*;
+pub use strays::Strays;
 
 /// Create the store root with mode 0700 where it does not exist yet; its
 /// parents get the default modes. ⛔ TODO/supervise.md T-1715: the
