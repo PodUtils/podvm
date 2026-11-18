@@ -478,5 +478,6 @@
 586 issue closed
 587 issue closed
 588 issue closed
-589 issue open
+589 issue closed
 590 issue open
+591 issue open

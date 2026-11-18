@@ -482,8 +482,9 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #586 | COORD-190: the answer to PodUtils/podrunner#301: the syscall tier now maps the path of a Unix socket (on main, for the next beta) (to podrunner) | closed (podrunner closed PodUtils/podrunner#301 with `v0.2.0-beta.33`) | T-1973 |
 | #587 | COORD-191: podvm took podcrates v0.71.0 in c213375 (and v0.70.0 in 6b5a6cb) (to podcrates) | closed (PodUtils/podcrates#228 lists the take; `v0.2.0-beta.33` released) | T-1955 |
 | #588 | COORD-192: the answer to PodUtils/podrunner#303: the syscall tier took glibc's AT_FDCWD for a descriptor; fixed on main (to podrunner) | closed (podrunner closed PodUtils/podrunner#303 with `v0.2.0-beta.34`) | T-1977 |
-| #589 | COORD-193: pod-enter: abi interp() refuses a PT_INTERP past the head read; Fedora 42's bash has it at 0xf2000 (to podcrates) | open | T-1981 |
+| #589 | COORD-193: pod-enter: abi interp() refuses a PT_INTERP past the head read; Fedora 42's bash has it at 0xf2000 (to podcrates) | closed (podcrates `v0.72.0` carries it; podvm took it in b3ff9c3) | T-1981 |
 | #590 | COORD-194: the answer to PodUtils/podrunner#304: the tier hides no host process; run -d with --podvm-confine on the tier failed to start (fixed on main) (to podrunner) | open | T-1982 |
+| #591 | COORD-195: podvm took podcrates v0.72.0 in b3ff9c3 (to podcrates) | open | T-1981 |
 
 ## Messages whose title does not start with COORD-NNN
 
