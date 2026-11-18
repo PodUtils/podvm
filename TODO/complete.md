@@ -1937,3 +1937,34 @@ it also gives something up; under `--strict` it warns as a substitution.
 `cargo test -p podvm-complete skipped_by_choice` exits 0: `--no-steps`
 on a root with `pacman.conf`, `pacman-key` and no keyring gives the
 `pacman-keyring` row in `degradations` and in the banner.
+
+# T-1963: The donor study: research backlog
+
+**Source:** PodUtils/podvm#580, the donor study of 2026-11-17
+**Category:** complete
+**Milestone:** none
+**Priority:** P3
+**Effort:** L
+**Status:** open
+
+## Problem
+
+The donors show mechanisms for a User-Mode Linux rung, VM islands, VM template pools, process checkpoint, translators and record and replay. No measurement exists for any of them.
+
+## Premise
+
+Research entries. Build nothing before a measurement. Label each estimate.
+
+## Approach
+
+1. TH-09: measure UML against TCG on a CI host.
+2. FD-07: write a decision entry on a minimal in-tree KVM VMM.
+3. TH-36, TH-35/FE-02, TH-33, TH-44/TH-45, TH-57, TH-58, TH-26, TH-27, TH-37, TH-43 as the issue lists them.
+
+## Decision
+
+-
+
+## Prove
+
+Each item ends with a measured note in `docs/` or a recorded decision, and no item adds code before that note.

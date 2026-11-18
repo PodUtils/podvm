@@ -24,6 +24,26 @@ The other rules of git (the branch, the identity, the remote) are in
 A release starts from `.github/workflows/release.yml`; dispatch
 `nightly.yml` with `trial=true` on `main` first ([handoff](HANDOFF.md)).
 
+The gate of a beta (T-1949, [Quality](methodology/quality.md), rules 1
+and 5). Do each step on the commit that the release takes:
+
+1. The gate run of the commit passes, and `sh scripts/dev/checks.sh`
+   passes (it runs `tests/cli_contract.rs`).
+2. Dispatch `workloads.yml` on `main`; its run passes.
+3. Run the integration tests as uid 1000 (`docs/HANDOFF.md`, the command
+   of the tests); each failure is one that the handoff names as a fault
+   of the host.
+4. An outside pass: an agent with the release binary and `podvm man`
+   only, no source, tests the surface for about one hour as uid 1000 and
+   writes its findings. Each finding becomes an issue or an entry. No P0
+   or P1 finding stays open.
+5. Dispatch `nightly.yml` with `trial=true` and `arm.yml` on `main`; both
+   pass.
+6. The section of the version in `CHANGELOG.md` has a part "Known gaps":
+   what the checks prove, and each open fault that a user can meet.
+7. Bump the version, then dispatch `release.yml`. Push nothing to `main`
+   until the release run ends (call C22).
+
 ## Dependencies and vendoring
 
 podvm takes the crates of PodUtils/podcrates by tag (`AGENTS.md`,

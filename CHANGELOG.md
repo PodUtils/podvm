@@ -8,6 +8,21 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Added: the asks of podrunner, 2026-11-18
+
+Record: T-1934, T-1945.
+Deployed: none yet.
+
+- Each unit has a terminal of its own: `run -d`, `create`, `start` and a
+  foreground run on the namespace rung mount a new devpts instance and
+  its `ptmx`, so `openpty`, Python's `pty.spawn` and `script` work
+  (PodUtils/podrunner#216).
+- `--podvm-volume-base DIR` of `run`, `run -d` and `create`: each `-v`
+  source under DIR opens with no symbolic link, and the bind takes that
+  descriptor. A link under DIR is a refusal with exit 125. The userland
+  rung and each guest tier refuse the flag (PodUtils/podrunner#277).
+- podcrates `v0.70.0`.
+
 ### Fixed: the first reports of the external QA of `0.2.0-beta.31`, 2026-11-17
 
 Record: T-1937, T-1938.

@@ -5,47 +5,15 @@
 //! format that will never string-compare against an ISO column silently returns
 //! false forever, and `podvm images` sorts by this field.
 //!
-//! Written by hand rather than taking a date crate: `TODO/deps.md`'s default
-//! answer to a dependency is no, and this is thirty lines with a proof.
+//! The calendar is `pod_core::clock` (the ruling "Shared code",
+//! TODO/deps.md T-1955); this module keeps the docker wording of an age.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Days since 1970-01-01 into `(year, month, day)`.
-///
-/// Howard Hinnant's `civil_from_days`, which is exact for the proleptic
-/// Gregorian calendar over the whole range this can produce. ⚠ It shifts the
-/// year to start in March so the leap day is the last day of the cycle, which
-/// is why the month arithmetic below looks displaced.
-fn civil_from_days(z: i64) -> (i64, u32, u32) {
-    let z = z + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-    let doe = (z - era * 146_097) as u64;
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
-    let y = yoe as i64 + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
-    (if m <= 2 { y + 1 } else { y }, m, d)
-}
-
+/// `YYYY-MM-DDTHH:MM:SSZ`; a time before the epoch is the epoch, which sorts
+/// before each real entry and says that the reading could not be made.
 pub fn iso8601(t: SystemTime) -> String {
-    let secs = match t.duration_since(UNIX_EPOCH) {
-        Ok(d) => d.as_secs() as i64,
-        // ⛔ A clock before the epoch is reported as the epoch rather than as a
-        // negative that would sort before every real entry. It is a reading
-        // this code cannot make, and it says so.
-        Err(_) => 0,
-    };
-    let days = secs.div_euclid(86_400);
-    let rem = secs.rem_euclid(86_400);
-    let (y, m, d) = civil_from_days(days);
-    format!(
-        "{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z",
-        rem / 3600,
-        (rem % 3600) / 60,
-        rem % 60
-    )
+    pod_core::clock::rfc3339(t)
 }
 
 pub fn now() -> String {
@@ -95,18 +63,7 @@ fn parse_iso8601(s: &str) -> Option<i64> {
     if !(1..=12).contains(&mo) || !(1..=31).contains(&d) {
         return None;
     }
-    Some(days_from_civil(y, mo as u32, d as u32) * 86_400 + h * 3600 + mi * 60 + sec)
-}
-
-/// The inverse of [`civil_from_days`], same source.
-fn days_from_civil(y: i64, m: u32, d: u32) -> i64 {
-    let y = if m <= 2 { y - 1 } else { y };
-    let era = if y >= 0 { y } else { y - 399 } / 400;
-    let yoe = (y - era * 400) as u64;
-    let mp = if m > 2 { m - 3 } else { m + 9 } as u64;
-    let doy = (153 * mp + 2) / 5 + d as u64 - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    era * 146_097 + doe as i64 - 719_468
+    Some(pod_core::clock::days_from_civil(y, mo, d) * 86_400 + h * 3600 + mi * 60 + sec)
 }
 
 #[cfg(test)]
@@ -126,16 +83,6 @@ mod tests {
             iso8601(UNIX_EPOCH + Duration::from_secs(1_709_164_800)),
             "2024-02-29T00:00:00Z"
         );
-    }
-
-    #[test]
-    fn the_two_calendar_conversions_are_inverses_across_a_century() {
-        // ⭐ A test that cannot fail is not evidence: this walks real days
-        // rather than asserting one known pair.
-        for day in (-10_000..30_000).step_by(37) {
-            let (y, m, d) = civil_from_days(day);
-            assert_eq!(days_from_civil(y, m, d), day, "{y}-{m}-{d}");
-        }
     }
 
     #[test]

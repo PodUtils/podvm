@@ -4527,3 +4527,69 @@ podvm's items in podvm; pod-enter, pod-supervise, pod-rootfs, pod-hostprobe and 
 ## Done
 
 **Partial (2026-11-17).** 534: the pump of stdout blocks SIGPIPE in its own thread (the payload keeps the default), and at a broken pipe it stops and closes its end, so the payload gets the broken pipe as in a pipeline with no podvm. As uid 1000: `run --rm --name sp alpine sh -c 'yes hello' | head -1` prints `hello`, podvm exits 141 in 0.3 s, and `ps -a` lists nothing; with no `--rm` the record is `Exited (141)` (before: podvm died, the record stayed `Created`). COORD-182 (#569) asks podcrates for the items of pod-enter, pod-supervise, pod-rootfs, pod-hostprobe and pod-guest. 552: `--env-file` and `--report` keep the caller's own rule in podvm's user namespace (`run/parse/access.rs`: on a file of the caller, its owner bits decide); as uid 1000 a mode-000 env file of the caller and a report into a directory of mode 0500 are refused before the payload. 553: `--unsafe-host-paths` is refused by name where no loader family runs (a rung with its own root). 565: a `-v` whose host and guest sides differ in kind names both paths and both kinds, before the bind. 549: `install-names` decides the refusal of `docker` before any link, and names `install-names podman`. 535: in podvm's user namespace a SIGINT or SIGQUIT that a process sent (`si_code` 0 or below) is forwarded to the payload, and one of the terminal (SI_KERNEL) is not, as the terminal reached the group already (`userns/sigrelay.rs`; where `sigaction` fails, the old rule stays). As uid 1000, a SIGINT to podvm alone made the payload's trap exit 7. A `kill -INT` to the whole group still reaches the payload twice. 554: a detached entry of the emulate tier is refused with a line that names the tier, not the text of a denied chroot. Remaining: 560, 566's podvm half.
+
+# T-1956: The donor study: syscall tiers
+
+**Source:** PodUtils/podvm#573, the donor study of 2026-11-17
+**Category:** enter
+**Milestone:** none
+**Priority:** P2
+**Effort:** L
+**Status:** open
+
+## Problem
+
+A raw `syscall` of a dynamic program reaches the host on the userland rung (T-1935, T-1740). The handler sends each unlisted call to the host, and no test lists the path calls. io_uring passes the handler when no broker hold is on. A host that refuses the Syscall User Dispatch prctl gets exit 125 (T-1648).
+
+## Premise
+
+Items that serve podrunner (rootless CI units) come first. The donor evidence is static analysis. Re-verify each claim in the tree before work.
+
+## Approach
+
+1. FA-03: answer ENOSYS for io_uring on the syscall tier when no hold is on.
+2. FA-02/TH-24: add one coverage table test of path-taking syscall numbers.
+3. FA-01/TH-01: add a seccomp-TRAP rung that traps only path calls; use it where the SUD prctl is refused.
+4. TH-02: study a user-notification rung; the owner rules first (T-0606).
+5. TH-03/FA-07: pin each volume path with an O_PATH descriptor.
+6. FA-04, FA-05, FA-06, TH-07, TH-56, TH-06, TH-22, TH-08 as the issue lists them.
+
+## Decision
+
+-
+
+## Prove
+
+A table test lists each path-taking kernel syscall number of the dispatch table and the interposer table, each mapped, refused or exempt with a reason; a raw `io_uring_setup` on the syscall tier with no hold returns ENOSYS and libuv falls back to epoll.
+
+# T-1957: The donor study: limits and cgroup kill
+
+**Source:** PodUtils/podvm#574, the donor study of 2026-11-17
+**Category:** enter
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+No code writes `cgroup.kill` or `memory.oom.group`, so an OOM kill ends one process and leaves a half-dead job. The syscall tier counts `/tmp` growth only for write-family calls. `--cpu-shares` and related flags have no mapping. The `wasmtime` profile passes no limit.
+
+## Premise
+
+T-1747 gives the cgroup2 leaf. The donors show how to end a whole job and how to count bytes at each boundary.
+
+## Approach
+
+1. FG-01: write `memory.oom.group=1` and `cgroup.kill` where a leaf exists.
+2. TH-20: count `/tmp` bytes for mmap, sendfile, splice, copy_file_range and rename.
+3. FH-01: pass fuel, memory and time limits to the `wasmtime` profile.
+4. FG-03, FA-08, FH-02, FH-04 as the issue lists them.
+
+## Decision
+
+-
+
+## Prove
+
+On a host with a delegated cgroup2 subtree, a shell that forks and reparents a sleeper ends with no sleeper left after `rm -f`; mmap growth in `/tmp` gives ENOSPC at the cap.

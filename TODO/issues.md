@@ -360,9 +360,9 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #464 | COORD-171: the answer to PodUtils/podrunner#202: the connections are the source fixup; pass --no-source-fixup (to podrunner) | closed (PodUtils/podrunner#202 closed: podrunner passes `--no-source-fixup` since `2d481dd`) | T-1931 |
 | #465 | COORD-172: podvm took podcrates v0.68.0; COORD-170 is answered (the answer to PodUtils/podcrates#219) (to podcrates) | closed (podcrates read it: the takes of PodUtils/podcrates#219) | T-1931 |
 | #466 | COORD-173: six answers of podvm wait for podrunner to close its asks #115, #177, #178, #180, #182, #189 (to podrunner) | open | T-1908, T-1914, T-1915, T-1916, T-1920 |
-| #467 | COORD-174: pod-enter stage::copy_tree refuses the device nodes of a tree of root, so PODVM_MODE=rundir and tmpfs never stage (podvm T-1929) (to podcrates) | open | T-1929 |
-| #468 | COORD-175: pod-guest: evidence of a mailbox run that times out before WQREADY (podvm T-1933) (to podcrates) | open | T-1933 |
-| #469 | COORD-176: pod-enter: a new devpts instance and /dev/ptmx on the namespace rung, so that openpty works in a unit (podvm T-1934, PodUtils/podrunner#216) (to podcrates) | open | T-1934 |
+| #467 | COORD-174: pod-enter stage::copy_tree refuses the device nodes of a tree of root, so PODVM_MODE=rundir and tmpfs never stage (podvm T-1929) (to podcrates) | closed (podcrates@T-857 in podcrates `v0.70.0`, PodUtils/podcrates#222, taken in `6b5a6cb`) | T-1929 |
+| #468 | COORD-175: pod-guest: evidence of a mailbox run that times out before WQREADY (podvm T-1933) (to podcrates) | closed (podcrates@T-861 in podcrates `v0.70.0`, PodUtils/podcrates#222, taken in `6b5a6cb`) | T-1933 |
+| #469 | COORD-176: pod-enter: a new devpts instance and /dev/ptmx on the namespace rung, so that openpty works in a unit (podvm T-1934, PodUtils/podrunner#216) (to podcrates) | closed (podcrates@T-864 and @T-868 in podcrates `v0.70.0`, PodUtils/podcrates#222, taken in `6b5a6cb`; T-1934 done) | T-1934 |
 | #470 | COORD-177: the answers to PodUtils/podrunner#216 (no pty: namespace rung) and #189 (raw renameat2 on the userland rung) (to podrunner) | open | T-1934, T-1935 |
 | #471 | COORD-178: the answer to PodUtils/podnet#649: what the gates of podvm prove, and the gap that real tools found (to podnet) | open | T-1936 |
 | #472 | `run -d` of a payload that exits immediately is recorded `Dead` with no exit code, and `wait` refuses | open | T-1938 |
@@ -461,10 +461,20 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #565 | `-v` with a file, FIFO or device host path fails with `bind: Not a directory` and names the guest path | open | T-1953 |
 | #566 | SIGTERM to a foreground Windows/DOS guest kills podvm and leaves QEMU running, and Ctrl-C to the group does not stop it | open | T-1953 |
 | #567 | COORD-180: podvm called beta.31 ready and an outside tester confirmed 37 faults in one hour; what podvm changes (to all) | open | T-1946, T-1947, T-1948, T-1949 |
-| #568 | COORD-181: five faults of the external QA of podvm that are in crates of podcrates: the table's temp file, the exec probe's name, a helper's ServerURL, run -d --rm, a -v source with no link (to podcrates) | open | T-1938, T-1939, T-1944, T-1945 |
-| #569 | COORD-182: ten more faults of the external QA of podvm in crates of podcrates: signals, the entered rung, logs, mtab, the probe key, census and guest (to podcrates) | open | T-1953 |
+| #568 | COORD-181: five faults of the external QA of podvm that are in crates of podcrates: the table's temp file, the exec probe's name, a helper's ServerURL, run -d --rm, a -v source with no link (to podcrates) | closed (podcrates@T-872 to @T-876 in podcrates `v0.70.0`, PodUtils/podcrates#222, taken in `6b5a6cb`) | T-1938, T-1939, T-1944, T-1945 |
+| #569 | COORD-182: ten more faults of the external QA of podvm in crates of podcrates: signals, the entered rung, logs, mtab, the probe key, census and guest (to podcrates) | closed (podcrates@T-884 to @T-895 in podcrates `v0.70.0`, PodUtils/podcrates#222, taken in `6b5a6cb`) | T-1953 |
 | #570 | COORD-183: the answer to PodUtils/podcrates#221: the two rulings are in podvm's AGENTS.md; the four copies go at the next take (to podcrates) | open | T-1955 |
 | #571 | COORD-184: the state of podvm at the start of its session of 2026-11-18, for the coordinator (to podcrates) | open | T-1955 |
+| #572 | COORD-185: the answers to PodUtils/podrunner#277, #216, #189, #168 and #110: each is on podvm main; a beta follows (to podrunner) | open | T-1934, T-1935, T-1945 |
+| #573 | [Donor] Syscall tiers: selective trap, coverage guard, io_uring, raw paths | open | T-1956 |
+| #574 | [Donor] Limits: byte accounting, cgroup kill, resource flags, WASM | open | T-1957 |
+| #575 | [Donor] Confinement and policy: verdicts, ELF closure, credentials, seccomp profile | open | T-1958 |
+| #576 | [Donor] Machine tier: QEMU quoting, guest limits, guest agent, warm start, confine | open | T-1959 |
+| #577 | [Donor] Images and store: unique base archive, block image, lazy pull, layers | open | T-1960 |
+| #578 | [Donor] Network gateway: ICMP relay, runtime expose, RST, MTU | open | T-1961 |
+| #579 | [Donor] Host probes and namespaces: inward probe, per-namespace probe, nsfs handle | open | T-1962 |
+| #580 | [Donor] Research backlog: UML, VM islands, checkpoint, translators, record and replay | open | T-1963 |
+| #581 | [Donor] Index: the podvm donor study of 2026-11-17 | open | T-1956 to T-1963 |
 
 ## Messages whose title does not start with COORD-NNN
 

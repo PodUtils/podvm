@@ -2005,3 +2005,35 @@ As uid 1000: 10 `run -d IMAGE /bin/true` give 10 `Exited (0)` and `wait` gives 0
 ## Done
 
 **Partial (2026-11-17).** `store/blobs.rs`: the sweep keeps a young unlocked `.partial` (test `the_sweep_keeps_a_young_unlocked_partial`); `exec_probe.rs`: the probe runs in a directory of its own. Measured as uid 1000 with mirror.gcr.io/library/alpine:3.20: 10 `run -d ... /bin/true` give 10 `Exited (0)` (before: 6 of 10 `Dead`), and `wait` gives 0; 12 parallel `run --rm` exit 0 in each of two rounds (before: 6 of 12 failed). 475: `interpose::MemoGuard` removes the memo of a run that `prepare` refuses after it made the memo; three refused `run --rm --strict=all` leave no `memo-*.tmp` (before: one each). COORD-181 (#568) asks podcrates for the lock of the table's writer and a probe name that does not repeat. Remaining: those podcrates items, at their tag.
+
+# T-1958: The donor study: confinement and policy
+
+**Source:** PodUtils/podvm#575, the donor study of 2026-11-17
+**Category:** supervise
+**Milestone:** none
+**Priority:** P2
+**Effort:** L
+**Status:** open
+
+## Problem
+
+`pod-confine` records no verdict of what the kernel enforced, so `inspect` cannot say "partial". The operator writes the confine read list by hand (T-1764). The broker cannot keep a secret out of the unit. `--security-opt seccomp=FILE` is refused.
+
+## Premise
+
+Most items have their home in podcrates; ask by COORD issue first (AGENTS.md 2a).
+
+## Approach
+
+1. TH-11/FB-01: report a Landlock verdict and add refusal levels.
+2. TH-13/FB-02: derive the read-exec list from the payload ELF.
+3. TH-14/FB-04: mask broker credentials with sentinel values.
+4. FG-02, TH-12, TH-17, TH-25 as the issue lists them; then the P3 items.
+
+## Decision
+
+-
+
+## Prove
+
+A `--podvm-confine` run on a kernel with a lower Landlock ABI prints the applied ABI, the handled rights and a spec digest, and says "partial" where a right is not enforced.

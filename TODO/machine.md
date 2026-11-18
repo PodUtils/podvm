@@ -5339,3 +5339,35 @@ One change for each item; each is measured on `kvm.yml` (a cloud session starts 
 ## Prove
 
 `kvm.yml` runs the repro of each issue, and each gives the result of the fix.
+
+# T-1959: The donor study: the machine tier
+
+**Source:** PodUtils/podvm#576, the donor study of 2026-11-17
+**Category:** machine
+**Milestone:** none
+**Priority:** P2
+**Effort:** L
+**Status:** open
+
+## Problem
+
+Path values in QEMU options have no comma escape, so a comma in a host path adds an option. The machine tier refuses `--memory`, `--cpus`, `--pids-limit` and `--ulimit` (T-1808). The guest has no typed agent and boots cold each run. The QEMU child keeps the invoking user's file view.
+
+## Premise
+
+Take `pod-guest` `escape()` for the quoting. Do not repeat T-1723, T-1874, T-1890 or T-1868.
+
+## Approach
+
+1. FD-03/TH-41: escape each QEMU path value; refuse a non-UTF-8 path.
+2. FD-01: hold `--memory`, `--cpus` and `--pids-limit` in the guest.
+3. TH-28/FD-02: typed guest agent (podcrates: ask by COORD).
+4. FE-01/TH-32, FE-03, FD-04/TH-30 and the P2 and P3 items of the issue.
+
+## Decision
+
+-
+
+## Prove
+
+One table test: a `-v` host path with a comma gives one `-virtfs` option with the comma doubled, and a non-UTF-8 path gives a named refusal.

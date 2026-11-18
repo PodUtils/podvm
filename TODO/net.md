@@ -754,3 +754,35 @@ Not in the take of `v0.61.0`: a new flag needs its help, its parity row and its 
 **Done, amended (2026-11-17).** podcrates `v0.64.0` answers COORD-162: the certificate file of a lab with a way out carries the roots of the host (podcrates@T-792), and the stand-in ignores SIGPIPE (podcrates@T-796). podvm took the tag and removed its own SIGPIPE handler. Measured as uid 1000 on the cloud host: `lab run --way-out proxy-only -- podvm pull mirror.gcr.io/library/alpine:3.20` exits 0 with no `SSL_CERT_FILE` in CMD, and the same with no `--way-out` exits 125. A host `SSL_CERT_FILE` that the user cannot read gives the lab no roots of the host (named in COORD-166, #459).
 
 **Done (2026-11-16).** `podvm lab run --way-out` (`crates/podvm/src/lab/host.rs`, `run_flags`) sets `Options::way_out` for the lab of the stand-in proxy, and passes `--way-out` to an inner lab of a list that has one; a list with no such profile is a flag error (2). The usage and the parity table have the flag (and `--allow-connect`, which had no row). The lab process makes the process not dumpable before the way out starts, as `podlab` does. Measured as uid 1000 on the cloud host (`proxy-only`): `lab run --way-out proxy-only -- sh -c 'SSL_CERT_FILE=HOST-CA podvm pull mirror.gcr.io/library/alpine:3.20'` exits 0 ("Downloaded newer image"); the same with no `--way-out` exits 125 (the server of the lab answers). Two findings: (1) the stand-in died of SIGPIPE in each run of `proxy-only` on this host (a probe closed its socket before the answer; podvm sets SIGPIPE to its default, T-1769), so each later probe got "Connection refused" and the lab did not hold, also with no `--way-out`. The lab process now has a SIGPIPE handler that does nothing, which an `exec` of CMD sets back to the default. (2) The certificate file of the lab (`SSL_CERT_FILE`) holds only the CAs of the lab, and podvm, curl and most clients take that file in place of their roots, so a TLS client in a class that does not terminate TLS cannot check a real server through the way out. The Prove sets the CA of the host in CMD; COORD-162 asks podcrates to add the roots of the host to the file where the lab has a way out. Unit tests: `lab::host::tests` (6).
+
+# T-1961: The donor study: the network gateway
+
+**Source:** PodUtils/podvm#578, the donor study of 2026-11-17
+**Category:** net
+**Milestone:** none
+**Priority:** P3
+**Effort:** M
+**Status:** open
+
+## Problem
+
+The gateway has no ICMP echo relay (T-1664 is blocked), no way to publish a host port after start, no mark on its own sockets and no RST on a failed dial. The code lives in `pod-netstack`, `pod-proxy` and `pod-warp`.
+
+## Premise
+
+No item serves podrunner directly. Ask podcrates by COORD issue first.
+
+## Approach
+
+1. TH-50: relay ICMP echo through ping sockets.
+2. TH-51: add runtime expose and unexpose.
+3. TH-52: mark the gateway's sockets; answer RST.
+4. TH-53, TH-54, TH-55 as the issue lists them.
+
+## Decision
+
+-
+
+## Prove
+
+In a lab guest with no `CAP_NET_RAW`, `ping` to a host address gets an echo reply through the relay.

@@ -2074,3 +2074,35 @@ The row of the crate, not a second probe of podvm.
 ## Done
 
 **Done (2026-11-16).** `ns_reachable` needs the `chroot` row of the user namespace where the table has it; the unit test holds the fixture of 356 (each `chroot` refused, the leg `Ok`) to false. Measured: the unit test passes; `arm.yml` runs experiment 356 on the commit of the change.
+
+# T-1962: The donor study: host probes and namespaces
+
+**Source:** PodUtils/podvm#579, the donor study of 2026-11-17
+**Category:** probe
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+`pod-hostprobe` asks which mechanism podvm can use. It does not ask which confinement primitives a job can nest inside the chosen rung. The probe selects by mechanism, not by namespace. The chroot rung shows the host's `/proc/kcore`. The namespace rung has no durable handle between runs.
+
+## Premise
+
+Re-verify each claim in `pod-hostprobe` first. Ask podcrates by COORD issue.
+
+## Approach
+
+1. TH-18: probe inward.
+2. TH-04: probe anonymous exec memory.
+3. TH-05: probe each namespace alone; mask host `/proc` entries.
+4. TH-39, TH-10, TH-42 as the issue lists them.
+
+## Decision
+
+-
+
+## Prove
+
+On a rung that denies user namespaces, `probe` states that a nested Landlock works and a nested user namespace does not, with one line for each.

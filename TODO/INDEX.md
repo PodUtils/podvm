@@ -617,11 +617,19 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1952](image.md) | P2 | M | none | image | partial | The external QA of `0.2.0-beta.31`, third batch: images, `import`, `cp` and the store |
 | [T-1953](enter.md) | P1 | M | none | enter | partial | The external QA of `0.2.0-beta.31`, third batch: signals, rungs and runs |
 | [T-1954](machine.md) | P2 | M | none | machine | open | The external QA of `0.2.0-beta.31`, third batch: the machine tier |
-| [T-1955](deps.md) | P2 | M | none | deps | open | Remove the copies of shared code that podcrates names (COORD-131 of podcrates) |
+| [T-1955](deps.md) | P2 | M | none | deps | partial | Remove the copies of shared code that podcrates names (COORD-131 of podcrates) |
+| [T-1956](enter.md) | P2 | L | none | enter | open | The donor study: syscall tiers |
+| [T-1957](enter.md) | P2 | M | none | enter | open | The donor study: limits and cgroup kill |
+| [T-1958](supervise.md) | P2 | L | none | supervise | open | The donor study: confinement and policy |
+| [T-1959](machine.md) | P2 | L | none | machine | open | The donor study: the machine tier |
+| [T-1960](image.md) | P2 | L | none | image | open | The donor study: images and store |
+| [T-1961](net.md) | P3 | M | none | net | open | The donor study: the network gateway |
+| [T-1962](probe.md) | P2 | M | none | probe | open | The donor study: host probes and namespaces |
+| [T-1963](complete.md) | P3 | L | none | complete | open | The donor study: research backlog |
 
 ## Counts
 
-552 entries: 10 open, 24 partial, 3 blocked, 515 done.
+560 entries: 17 open, 25 partial, 3 blocked, 515 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -632,9 +640,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 1 | 8 | 0 | 222 | 231 |
-| P2 | 6 | 12 | 2 | 176 | 196 |
-| P3 | 3 | 4 | 1 | 42 | 50 |
-| **All** | 10 | 24 | 3 | 515 | 552 |
+| P2 | 11 | 13 | 2 | 176 | 202 |
+| P3 | 5 | 4 | 1 | 42 | 52 |
+| **All** | 17 | 25 | 3 | 515 | 560 |
 
 ## Work order
 

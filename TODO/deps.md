@@ -2322,7 +2322,7 @@ kernel sum.
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -2343,3 +2343,8 @@ At the next take of podcrates: take `pod-guest`'s squashfs reader, `pod_core::cl
 ## Prove
 
 `grep -rn "fn civil_from_days\|fn rfc3339" crates/podvm-image/src` finds nothing, `crates/podvm/src/machine/guest/squashfs.rs` is gone, and the uid-1000 suite and `kvm.yml` experiment 390 pass.
+
+## Done
+
+**Partial (2026-11-18).** podcrates `v0.70.0` taken (`6b5a6cb`). `crates/podvm-image/src/clock.rs` keeps only the docker wording of an age and the parse of an image timestamp; its calendar is `pod_core::clock` (`rfc3339`, `days_from_civil`), and `grep -rn "fn civil_from_days\|fn rfc3339" crates/podvm-image/src` finds nothing. `host_bundle_bytes` of `podvm-image` is already `pod_oci::trust::host_bundle`, which reads the variables of the environment in podcrates; it is no copy. Remaining: the squashfs reader of `machine/guest/squashfs.rs` and the proxy variables of `machine/proxy.rs`, with `kvm.yml` experiment 390 as their proof; they come after the asks of podrunner.
+
