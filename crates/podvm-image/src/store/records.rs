@@ -83,7 +83,7 @@ impl Store {
         // wrong architecture and said nothing. A count is not a match.
         let matched: Vec<Record> = hits
             .iter()
-            .filter(|r| r.platform == want_p.to_string())
+            .filter(|r| fits(want_p, &r.platform))
             .cloned()
             .collect();
         Ok(Found {
@@ -131,11 +131,21 @@ impl Store {
         }
         let host = crate::platform::Platform::host();
         let prefer = platform.unwrap_or(&host);
-        let narrowed: Vec<Record> = hits
+        // PodUtils/podvm#528, #544: an exact platform first, then one that
+        // `Platform::matches` takes (a missing variant on either side).
+        let exact: Vec<Record> = hits
             .iter()
             .filter(|r| r.platform == prefer.to_string())
             .cloned()
             .collect();
+        let narrowed: Vec<Record> = if exact.is_empty() {
+            hits.iter()
+                .filter(|r| fits(prefer, &r.platform))
+                .cloned()
+                .collect()
+        } else {
+            exact
+        };
         match narrowed.len() {
             1 => Ok(narrowed.into_iter().next().expect("length checked")),
             0 if platform.is_some() => {
@@ -376,4 +386,13 @@ pub(crate) fn one_per_manifest(mut hits: Vec<Record>) -> Vec<Record> {
     });
     hits.dedup_by(|b, a| a.manifest_digest == b.manifest_digest && a.platform == b.platform);
     hits
+}
+
+/// PodUtils/podvm#528, #544: a record of the platform `recorded` serves a
+/// request of `want`: the same text, or the same OS and architecture where
+/// one side names no variant.
+pub(crate) fn fits(want: &crate::platform::Platform, recorded: &str) -> bool {
+    recorded == want.to_string()
+        || crate::platform::Platform::parse(recorded)
+            .is_ok_and(|p| want.matches(&p.os, &p.arch, p.variant.as_deref()))
 }

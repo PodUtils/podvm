@@ -52,6 +52,12 @@ Deployed: none yet.
   `run -t` with no `-i` attaches no stdin (#545). A `cp` destination
   that ends with `/` names a directory (#555). `system df` and `image
   prune` count each extraction once and in full (#526).
+- `pull` hashes a blob that the store holds and fetches a corrupt one
+  again (#490). A record takes the platform that the registry served, so
+  `linux/arm64` and `linux/arm64/v8` make one record (#528, #544).
+  `--add-host NAME:host-gateway` writes 127.0.0.1 (#480). `load` takes a
+  layout that `tar` packed again (#477). The Windows rows of `images`
+  take `--filter` (#476).
 
 ### Added: the syscall tier for a detached container, 2026-11-17
 

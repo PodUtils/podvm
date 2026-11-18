@@ -67,10 +67,18 @@ pub fn pull(
     // that is the index digest, not the per-platform manifest digest, and
     // recording the wrong one is exactly the parity M1 is accepted on.
     let resolved = top.digest.clone();
+    let mut served: Option<String> = None;
     let (manifest_digest, manifest_bytes, manifest) = match parsed {
         Fetched::Manifest(m) => (resolved.clone(), top.bytes.clone(), m),
         Fetched::Index(index) => {
             let picked = oci::select_platform(&index, platform)?;
+            // PodUtils/podvm#528, #544: the record takes the platform that the
+            // index gave, not the spelling asked: `linux/arm64` and
+            // `linux/arm64/v8` are one manifest and one record.
+            served = picked.platform.as_ref().map(|p| match &p.variant {
+                Some(v) => format!("{}/{}/{v}", p.os, p.architecture),
+                None => format!("{}/{}", p.os, p.architecture),
+            });
             let d = picked.parsed_digest()?;
             let inner = client.manifest(&endpoint, &repository, &d.to_string())?;
             match Fetched::parse(&inner.bytes, Some(&inner.media_type))? {
@@ -312,7 +320,7 @@ pub fn pull(
         &manifest_digest,
         &manifest,
         &config,
-        &platform.to_string(),
+        &served.unwrap_or_else(|| platform.to_string()),
     )?;
     store.put_record(record.clone())?;
     // ⭐ TODO/image.md T-1321. How the bytes got here, recorded at pull
