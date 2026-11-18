@@ -4629,3 +4629,35 @@ As uid 1000 under the seccomp filter that denies user namespaces (`scripts/dev/n
 
 **Partial (2026-11-18, the syscall tier).** On a host with no user namespace, podrunner's units take `--podvm-tier=syscall` (T-1935), which `--podvm-volume-base` now serves: the handler of `podvm-dispatch` opens each volume under `PODVM_VOLUME_BASE` with `openat2(RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS)` (`vols::beneath`), where it opened the canonical path before, and resolves each later path under that descriptor with `RESOLVE_IN_ROOT` as before; `run::binds::refuse_base_off_binds` refuses only the loader family now. The "supervise" selection enters through the chroot sequence (`pod_enter::spawn_selected`), so no entry of a supervise rung holds volumes of its own. Measured as uid 1000 under `scripts/dev/nouserns.c` (`inspect`: `userland syscall`) with `docker.io/library/python:3.13-slim`: the loader family refuses the flag with exit 125 and one line; `-v BASE/work:/w` writes and reads; `-v BASE/link:/w` (a link out of BASE) exits 125; in a `run -d`, a link that the host makes at `BASE/work/sub` to a directory out of BASE after the start gives the payload `No such file or directory` for `/w/sub/f`, not the file out of BASE. `a_volume_opens_under_its_base_with_no_link` pins the open. Remaining: the loader family (step 3 of the Approach).
 
+# T-1973: On the syscall tier, a payload cannot connect to a Unix socket of a volume
+
+**Source:** PodUtils/podrunner#301 (COORD-091 of podrunner, podrunner@T-261)
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+podrunner's units on a host with no user namespace take `--podvm-tier=syscall` (T-1935). In such a unit, `curl --unix-socket /run/podrunner/ctl.sock` fails with "Couldn't connect to server": the handler maps the path of each file call, but it passed `connect(2)` and `bind(2)` of an `AF_UNIX` address as given, so the kernel looked up the guest path on the host. podrunner removed the flag again.
+
+## Premise
+
+A socket path in `struct sockaddr_un` holds at most 108 bytes, and the kernel resolves it as a path, also through `/proc/self/fd/N`.
+
+## Approach
+
+The handler takes `connect` and `bind` of an `AF_UNIX` address with a path: it resolves the directory of the socket in the root or its volume (`calls::split`, as each path call), and gives the kernel `/proc/self/fd/N/NAME`. An abstract or unnamed address, and a path of the host, pass as they are.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 under `scripts/dev/nouserns.c`, with a host process that listens on `D/ctl.sock`: `run --podvm-tier=syscall -v D:/run/podrunner IMAGE` connects to `/run/podrunner/ctl.sock` and reads the answer; `exec` of a `run -d` unit does the same; a socket that the payload binds in `/tmp` takes a connection and is not in the `/tmp` of the host.
+
+## Done
+
+**Done (2026-11-18).** `podvm-dispatch/src/sock.rs`, called first in `calls::path_call`. Measured as uid 1000 under `scripts/dev/nouserns.c` (`inspect`: `userland syscall`) with `docker.io/library/python:3.13-slim`: the payload of a foreground run and an `exec` of a `run -d` unit connect to the host's socket in the volume and read its answer; the payload binds `/tmp/own.sock`, connects to it and reads `own-ok`; the host has no `/tmp/own.sock`. `a_socket_path_of_the_guest_becomes_a_short_proc_path` pins the address and the refusal of a name that does not fit.

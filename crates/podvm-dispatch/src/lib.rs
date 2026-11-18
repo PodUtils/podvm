@@ -39,6 +39,7 @@ mod procself;
 mod ro; // TODO/enter.md T-1901
 #[cfg(target_arch = "x86_64")]
 mod signals;
+mod sock; // TODO/enter.md T-1973
 #[cfg(target_arch = "x86_64")]
 mod state;
 #[cfg(target_arch = "x86_64")]

@@ -64,7 +64,7 @@ fn object(dirfd: i64, p: i64, follow: bool) -> Result<Option<Obj>, i64> {
 /// The parent and the last name of `(dirfd, path)`: the descriptor and a
 /// pointer to the name, or the payload's own dirfd and path for a host
 /// target. `name` holds the name.
-fn split(dirfd: i64, p: i64, name: &mut [u8; 256]) -> Result<(Parent, i64), i64> {
+pub(crate) fn split(dirfd: i64, p: i64, name: &mut [u8; 256]) -> Result<(Parent, i64), i64> {
     let path = arg(p)?;
     let mut __g2 = crate::pool::Buf::get().ok_or(-sys::ENOMEM)?;
     let buf = __g2.buf();
@@ -336,6 +336,9 @@ fn two(n: i64, od: i64, op: i64, nd: i64, np: i64, flags: i64) -> i64 {
 /// The result of a call that carries a path, or `None` for any other call.
 pub fn path_call(n: i64, a: [i64; 6]) -> Option<i64> {
     let f = AT_FDCWD;
+    if let Some(r) = crate::sock::unix(n, a) {
+        return Some(r); // PodUtils/podrunner#301
+    }
     Some(match n {
         nr::OPEN => open(f, a[0], a[1], a[2]),
         nr::CREAT => open(f, a[0], 0o1101, a[1]),

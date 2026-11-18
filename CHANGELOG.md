@@ -8,6 +8,16 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: a Unix socket of a volume on the syscall tier, 2026-11-18
+
+Record: T-1973.
+Deployed: none yet.
+
+- On `--podvm-tier=syscall`, `connect` and `bind` of a Unix socket take the
+  path in the container, as each other path call does: a payload reaches
+  a socket of a `-v` directory, and a socket that it binds stays in the
+  container (PodUtils/podrunner#301).
+
 ### Added: the size of the root disk and the usage of an incus instance, 2026-11-18
 
 Record: T-1964, T-1965.

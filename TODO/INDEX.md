@@ -635,10 +635,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1970](cli.md) | P1 | M | none | cli | partial | The outside pass of 2026-11-18: three P1 and seven P2 faults on the path of a unit |
 | [T-1971](cli.md) | P1 | S | none | cli | done | `--env-file` cannot hold a value with a newline |
 | [T-1972](enter.md) | P1 | L | none | enter | partial | `--podvm-volume-base` holds on the namespace rung only, and job containers of podrunner run on the userland and supervise rungs |
+| [T-1973](enter.md) | P1 | S | none | enter | done | On the syscall tier, a payload cannot connect to a Unix socket of a volume |
 
 ## Counts
 
-569 entries: 17 open, 29 partial, 3 blocked, 520 done.
+570 entries: 17 open, 29 partial, 3 blocked, 521 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -648,10 +649,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 0 | 12 | 0 | 226 | 238 |
+| P1 | 0 | 12 | 0 | 227 | 239 |
 | P2 | 12 | 13 | 2 | 177 | 204 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
-| **All** | 17 | 29 | 3 | 520 | 569 |
+| **All** | 17 | 29 | 3 | 521 | 570 |
 
 ## Work order
 
