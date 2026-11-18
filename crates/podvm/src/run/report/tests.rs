@@ -216,3 +216,25 @@ fn report_path_is_the_parsers() {
         Some("r.json".into())
     );
 }
+
+/// T-1969: `oom_kills` is an optional field of layout 1: absent where the
+/// run has no leaf, and an integer of the schema where it has one.
+#[test]
+fn the_oom_count_is_an_optional_field_of_the_same_layout() {
+    let schema: serde_json::Value = serde_json::from_str(SCHEMA_DOC).unwrap();
+    let prop = &schema["properties"]["oom_kills"];
+    assert!(!schema["required"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|r| r == "oom_kills"));
+    let mut r = Report::begin();
+    r.ran = true;
+    r.end(137);
+    r.oom_kills = Some(2);
+    let j = r.json();
+    assert_eq!(j["oom_kills"], 2);
+    assert!(allows(prop, &j["oom_kills"]), "{prop}");
+    r.oom_kills = None;
+    assert!(r.json().get("oom_kills").is_none());
+}

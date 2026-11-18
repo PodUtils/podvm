@@ -244,6 +244,13 @@ pub(crate) fn leave() {
     }
 }
 
+/// TODO/supervise.md T-1969: the OOM kills of the leaf of this run, for
+/// the run report; `None` where the run has no leaf.
+pub fn oom_kills() -> Option<u64> {
+    let leaf = LEAF.lock().ok()?.as_ref()?.0.clone();
+    podvm_supervise::report::oom_kills_of(&leaf)
+}
+
 /// At podvm's exit: name an OOM kill, move back, and remove the leaf.
 extern "C" fn release() {
     let Some((leaf, home, pid)) = LEAF.lock().ok().and_then(|l| l.clone()) else {

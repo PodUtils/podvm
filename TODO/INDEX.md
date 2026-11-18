@@ -631,11 +631,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1966](machine.md) | P2 | M | none | machine | open | The incus tier cannot run a container engine in an instance |
 | [T-1967](machine.md) | P1 | S | none | machine | done | The machine tier has no limit of processes in a guest |
 | [T-1968](machine.md) | P2 | L | none | machine | open | No tier gives a sized writable disk to a unit |
-| [T-1969](supervise.md) | P1 | M | none | supervise | open | The run report holds no OOM fact of a unit |
+| [T-1969](supervise.md) | P1 | M | none | supervise | partial | The run report holds no OOM fact of a unit |
 
 ## Counts
 
-566 entries: 22 open, 25 partial, 3 blocked, 516 done.
+566 entries: 21 open, 26 partial, 3 blocked, 516 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -645,10 +645,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 4 | 8 | 0 | 223 | 235 |
+| P1 | 3 | 9 | 0 | 223 | 235 |
 | P2 | 13 | 13 | 2 | 176 | 204 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
-| **All** | 22 | 25 | 3 | 516 | 566 |
+| **All** | 21 | 26 | 3 | 516 | 566 |
 
 ## Work order
 

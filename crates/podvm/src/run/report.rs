@@ -42,6 +42,8 @@ pub struct Report {
     pub user_ms: Option<u64>,
     pub system_ms: Option<u64>,
     pub max_rss_kib: Option<u64>,
+    /// The OOM kills of the cgroup leaf of the run (T-1969).
+    pub oom_kills: Option<u64>,
     pub timed_out: bool,
     pub timeout_s: Option<u64>,
     pub limits: Vec<String>,
@@ -80,6 +82,7 @@ impl Report {
             user_ms: None,
             system_ms: None,
             max_rss_kib: None,
+            oom_kills: None,
             timed_out: false,
             timeout_s: None,
             limits: Vec::new(),
@@ -144,6 +147,8 @@ impl Report {
         } else if !self.detached {
             self.exit_code = Some(code);
             self.signal = (129..=192).contains(&code).then(|| code - 128);
+            // T-1969: the launcher of `run -d` writes its own at the end.
+            self.oom_kills = super::cgroup::oom_kills();
             if self.measured_by.starts_with("the tier") {
                 // A guest: no rusage of the payload (T-1803).
             } else if let Ok(u) = podvm_probe::sys::rusage_children() {
@@ -156,7 +161,7 @@ impl Report {
 
     /// The document.
     pub fn json(&self) -> serde_json::Value {
-        serde_json::json!({
+        let mut j = serde_json::json!({
             "schema": self.schema,
             "podvm": self.podvm,
             "image": self.image,
@@ -182,7 +187,12 @@ impl Report {
             "confine": self.confine,
             "labels": self.labels,
             "degradations": self.degradations,
-        })
+        });
+        // T-1969: an added optional field; the schema id stays.
+        if let Some(n) = self.oom_kills {
+            j["oom_kills"] = n.into();
+        }
+        j
     }
 
     /// Write the document to `path`: a file beside it, then a rename.

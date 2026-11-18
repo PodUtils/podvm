@@ -149,6 +149,11 @@
       "minimum": 0,
       "description": "The peak resident set of the reaped children."
     },
+    "oom_kills": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Optional: the oom_kill count of memory.events of the cgroup leaf of the run, where the run has one (--memory in a delegated cgroup2 subtree). Absent where the run has no leaf."
+    },
     "timed_out": {
       "type": "boolean",
       "description": "--timeout ended the run."

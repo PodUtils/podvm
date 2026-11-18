@@ -30,6 +30,11 @@ pub fn finish(path: &Path, c: &Container) -> Result<(), String> {
     };
     r["timed_out"] = end.is_some_and(|e| e.reason == Reason::Wall).into();
     r["ended"] = c.finished_at.clone().into();
+    // PodUtils/podrunner#296 ask 6 (TODO/supervise.md T-1969): the OOM
+    // kills of the leaf of the run, where the run has one.
+    if let Some(n) = own_leaf().and_then(|l| oom_kills_of(&l)) {
+        r["oom_kills"] = n.into();
+    }
     if let Some(e) = end {
         r["wall_ms"] = e.run_ms.into();
         r["user_ms"] = e.user_ms.into();
@@ -51,4 +56,45 @@ pub fn finish(path: &Path, c: &Container) -> Result<(), String> {
         let _ = std::fs::remove_file(&tmp);
         format!("{}: {e}", path.display())
     })
+}
+
+/// The count `oom_kill` of `memory.events` of the cgroup `dir`, or `None`
+/// where the file or the line is not there.
+pub fn oom_kills_of(dir: &Path) -> Option<u64> {
+    std::fs::read_to_string(dir.join("memory.events"))
+        .ok()?
+        .lines()
+        .find_map(|l| l.strip_prefix("oom_kill "))
+        .and_then(|n| n.trim().parse().ok())
+}
+
+/// The cgroup of this process where it is a leaf of podvm (`podvm-ID`,
+/// TODO/cli.md T-1747), else `None`: a cgroup of another owner has no
+/// count of this run.
+pub fn own_leaf() -> Option<std::path::PathBuf> {
+    let text = std::fs::read_to_string("/proc/self/cgroup").ok()?;
+    let rel = text.lines().find_map(|l| l.strip_prefix("0::"))?;
+    let leaf = Path::new("/sys/fs/cgroup").join(rel.trim_start_matches('/'));
+    let name = leaf.file_name()?.to_str()?;
+    (name.starts_with("podvm-") && !rel.contains("..")).then_some(leaf)
+}
+
+#[cfg(test)]
+mod tests {
+    /// T-1969: the count of `oom_kill`, and none where the line is not there.
+    #[test]
+    fn the_oom_count_comes_from_memory_events() {
+        let d = std::env::temp_dir().join(format!("podvm-oom-{}", std::process::id()));
+        std::fs::create_dir_all(&d).unwrap();
+        assert_eq!(super::oom_kills_of(&d), None);
+        std::fs::write(
+            d.join("memory.events"),
+            "low 0\nhigh 0\nmax 4\noom 2\noom_kill 2\n",
+        )
+        .unwrap();
+        assert_eq!(super::oom_kills_of(&d), Some(2));
+        std::fs::write(d.join("memory.events"), "low 0\n").unwrap();
+        assert_eq!(super::oom_kills_of(&d), None);
+        let _ = std::fs::remove_dir_all(&d);
+    }
 }

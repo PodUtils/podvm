@@ -2045,7 +2045,7 @@ A `--podvm-confine` run on a kernel with a lower Landlock ABI prints the applied
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -2066,3 +2066,8 @@ A field `oom_kills` of the run report (an added optional field: the schema id st
 ## Prove
 
 `kvm.yml` (job cgroup, experiment 459): `run -d --memory 32m --report R public.ecr.aws/docker/library/python:3.13-slim python3 -c 'b=bytearray(256<<20)'` ends, and R has `oom_kills` greater than 0.
+
+## Done
+
+**Partial (2026-11-18).** The run report has the optional field `oom_kills` (layout 1 stays: `crates/podvm/schemas/run-report.v1.schema.json` lists it, not as required). A foreground run reads `memory.events` of its leaf at the end (`run::cgroup::oom_kills`); the end of `run -d` that the launcher writes into the report reads the leaf of its own process (`podvm_supervise::report::own_leaf`, only a cgroup named `podvm-*`). The unit tests `the_oom_count_comes_from_memory_events` and `the_oom_count_is_an_optional_field_of_the_same_layout` pass. Experiment 459 has clause 5 for both; the cloud host has no delegated cgroup2 subtree, so `kvm.yml` job `cgroup` measures it. Remaining: that run, the incus tier (COORD-186 ask 3) and a machine guest.
+
