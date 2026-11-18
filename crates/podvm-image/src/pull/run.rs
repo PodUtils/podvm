@@ -179,7 +179,18 @@ pub fn pull(
         .chain(std::iter::once(&manifest.config))
     {
         let d = descriptor.parsed_digest()?;
-        if store.has_blob(&d) {
+        // PodUtils/podvm#490: a blob that is there is hashed too, and one that
+        // does not match its digest is fetched again, not kept.
+        let sound = store.has_blob(&d)
+            && store
+                .verify_blobs(&[d.to_string()])
+                .is_ok_and(|m| m.is_empty());
+        if store.has_blob(&d) && !sound {
+            eprintln!(
+                "podvm: the blob {d} in the store does not match its digest; fetching it again"
+            );
+        }
+        if sound {
             present.push(true);
             reused.push(d.to_string());
         } else {
