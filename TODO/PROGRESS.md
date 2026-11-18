@@ -46,8 +46,9 @@ The state on 2026-11-18 (`docs/HANDOFF.md` has the detail):
   dispatches each workflow. A newer push cancels the gate of an older
   commit. The issue `[gh action] requested` is the fallback only
   (`docs/decisions.md`, 2026-11-13, "Workflow fallback").
-* podvm takes the crates of PodUtils/podcrates at `v0.72.0`
-  (PodUtils/podcrates#229; before it `v0.71.0`, PodUtils/podcrates#228,
+* podvm takes the crates of PodUtils/podcrates at `v0.73.0`
+  (PodUtils/podcrates#231, COORD-198; before it `v0.72.0`,
+  PodUtils/podcrates#229; `v0.71.0`, PodUtils/podcrates#228,
   COORD-191, #587; `v0.70.0`,
   PodUtils/podcrates#222; `v0.68.0`, PodUtils/podcrates#219, COORD-172: the source fixup reads no comment,
   T-1931; `v0.67.0`, PodUtils/podcrates#218, COORD-169; `v0.66.0`, PodUtils/podcrates#216:
