@@ -2037,3 +2037,32 @@ Most items have their home in podcrates; ask by COORD issue first (AGENTS.md 2a)
 ## Prove
 
 A `--podvm-confine` run on a kernel with a lower Landlock ABI prints the applied ABI, the handled rights and a spec digest, and says "partial" where a right is not enforced.
+
+# T-1969: The run report holds no OOM fact of a unit
+
+**Source:** PodUtils/podrunner#296 (COORD-089 of podrunner, ask 6)
+**Category:** supervise
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+githome's G-12 needs the exit reason `limit` when the OOM killer ended a unit (podrunner@T-515). A foreground run with `--memory` names an OOM kill on stderr only (T-1747); `run -d`, an incus instance and a guest name nothing.
+
+## Premise
+
+The leaf of a run in a delegated cgroup2 subtree has `memory.events` with `oom_kill`; the launcher of `run -d` lives in the leaf until the payload ends.
+
+## Approach
+
+A field `oom_kills` of the run report (an added optional field: the schema id stays, the ruling "Schema ids"): the foreground run and the launcher of `run -d` read `memory.events` of the leaf at the end of the payload; the incus tier reads it from the state of the instance (COORD-186 ask 3); the init of a guest writes its own count to the channel.
+
+## Decision
+
+-
+
+## Prove
+
+`kvm.yml` (job cgroup, experiment 459): `run -d --memory 32m --report R public.ecr.aws/docker/library/python:3.13-slim python3 -c 'b=bytearray(256<<20)'` ends, and R has `oom_kills` greater than 0.

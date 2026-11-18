@@ -5371,3 +5371,148 @@ Take `pod-guest` `escape()` for the quoting. Do not repeat T-1723, T-1874, T-189
 ## Prove
 
 One table test: a `-v` host path with a comma gives one `-virtfs` option with the comma doubled, and a non-UTF-8 path gives a named refusal.
+
+# T-1964: The incus tier cannot size the root disk of an instance
+
+**Source:** PodUtils/podrunner#296 (COORD-089 of podrunner, ask 1), COORD-186 (PodUtils/podvm#582)
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+githome's units on the `incus` kind need a bounded root disk (40 GB), so that a job past it gets `ENOSPC` and the pool of the host stays bounded (podrunner@T-482).
+
+## Premise
+
+The `root` device of a new instance must name the pool of its profile, and `pod-incus` of `v0.70.0` has no read of a profile. COORD-186 (PodUtils/podvm#582) asks podcrates for `Client::profile` or a device update.
+
+## Approach
+
+`run -d --podvm-tier=incus --storage-opt size=N`: podvm copies the `root` device of the default profile, adds `size`, and creates the instance with it. A pool driver with no quota is a refusal that names the driver (exit 125). The native tiers and the machine tier refuse `--storage-opt` by name until T-1968.
+
+## Decision
+
+-
+
+## Prove
+
+Experiment 434 with the incusd of experiment 433: `run -d --podvm-tier=incus --storage-opt size=1GiB public.ecr.aws/docker/library/alpine:3.20 sh -c 'dd if=/dev/zero of=/f bs=1M count=2000'` ends with `No space left on device`.
+
+# T-1965: The incus tier gives no CPU time and no peak memory of an instance
+
+**Source:** PodUtils/podrunner#296 (COORD-089 of podrunner, ask 2), COORD-186 (PodUtils/podvm#582)
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+The processes of an incus instance belong to incusd, so podrunner cannot sample them on the host; githome needs the CPU time and the peak memory of each unit (podrunner@T-483).
+
+## Premise
+
+`GET /1.0/instances/NAME/state` gives `cpu.usage` and `memory.usage_peak`; `pod-incus` of `v0.70.0` has no read of it. COORD-186 (PodUtils/podvm#582) asks podcrates for `Client::instance_state`.
+
+## Approach
+
+`inspect` of an instance of the incus tier gives `CpuSeconds` and `PeakMemoryBytes` at each read; the run report of `run -d` takes them at the end of the run, from the last state that podvm read before the instance went.
+
+## Decision
+
+-
+
+## Prove
+
+Experiment 434: after `run -d --podvm-tier=incus public.ecr.aws/docker/library/alpine:3.20 sh -c 'yes >/dev/null & sleep 5; kill %1'`, `inspect --format '{{.CpuSeconds}} {{.PeakMemoryBytes}}'` prints two numbers greater than 0.
+
+# T-1966: The incus tier cannot run a container engine in an instance
+
+**Source:** PodUtils/podrunner#296 (COORD-089 of podrunner, ask 3)
+**Category:** machine
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+githome's G-21 needs `dockerd` in a unit of the `incus` kind with no NIC and one channel (podrunner@T-485). The incus tier refuses `--podvm-engine`, and podvm sets no `security.nesting`.
+
+## Premise
+
+An unprivileged incus container runs `dockerd` with `security.nesting=true` and the intercepts of `mknod` and `setxattr`, where the host loads `overlay` and `br_netfilter`.
+
+## Approach
+
+`--podvm-engine` on the incus tier sets `security.nesting=true`, `security.syscalls.intercept.mknod=true` and `security.syscalls.intercept.setxattr=true` on the instance; the refusal of the table of T-1854 goes for it; `inspect` names the keys.
+
+## Decision
+
+-
+
+## Prove
+
+Experiment 434: `run -d --podvm-tier=incus --podvm-engine --podvm-net none` of the image of the docker engine starts `dockerd`, and `exec UNIT docker info` exits 0 and names the storage driver `overlay2`.
+
+# T-1967: The machine tier has no limit of processes in a guest
+
+**Source:** PodUtils/podrunner#296 (COORD-089 of podrunner, ask 4)
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** open
+
+## Problem
+
+githome's G-12 needs `pids.max` for a unit of the `microvm` kind (podrunner@T-488). The machine tier refuses `--pids-limit`.
+
+## Premise
+
+The init of each guest mounts cgroup2 on `/sys/fs/cgroup` (T-1780), and the guest runs as root, so it can enable `pids` and make a child.
+
+## Approach
+
+`--pids-limit N` on the machine tier: the init writes `+pids` to `cgroup.subtree_control`, makes `/sys/fs/cgroup/payload`, writes `pids.max`, and moves the payload into it before the exec. The parity row and the table of T-1854 change with it.
+
+## Decision
+
+-
+
+## Prove
+
+`kvm.yml` (job guest): `run --podvm-tier=machine --pids-limit 16 public.ecr.aws/docker/library/alpine:3.20 sh -c 'for i in $(seq 40); do sleep 5 & done; wait'` prints a failed fork and exits non-zero.
+
+# T-1968: No tier gives a sized writable disk to a unit
+
+**Source:** PodUtils/podrunner#296 (COORD-089 of podrunner, ask 5)
+**Category:** machine
+**Milestone:** none
+**Priority:** P2
+**Effort:** L
+**Status:** open
+
+## Problem
+
+githome's G-18 needs `limits.disk`: a job past the size of the writable layer and the work directory gets `ENOSPC` (podrunner@T-496).
+
+## Premise
+
+incus: T-1964. Machine tier: the guest has a writable disk that podvm makes. Namespace rung with no root: no quota and no loop device are open; only a tmpfs with `size=` (memory) or a FUSE file system can hold a size.
+
+## Approach
+
+Machine tier: a flag that sizes the writable disk of the guest. Namespace rung: `--tmpfs PATH:size=N` on the work directory, named as memory in the report; podrunner chooses. Each case that cannot hold a size refuses by name.
+
+## Decision
+
+-
+
+## Prove
+
+`kvm.yml`: a machine guest with a 1 GiB writable disk gives `No space left on device` to a write of 2 GiB; as uid 1000, `run -d --tmpfs /w:size=64m` gives the same to a write of 100 MiB in `/w`.

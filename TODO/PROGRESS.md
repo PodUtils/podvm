@@ -7,7 +7,7 @@ start.
 
 ## State
 
-560 entries: 17 open, 25 partial, 3 blocked, 515 done.
+566 entries: 23 open, 25 partial, 3 blocked, 515 done.
 
 The state on 2026-11-16 (`docs/HANDOFF.md` has the detail):
 
@@ -62,7 +62,9 @@ status with `podvm-count` in the same commit as the work.
 00. podrunner first (the owner's ruling, 2026-11-18, `docs/decisions.md`;
    PodUtils/podcrates#225): after a red run of podvm's CI, each ask of
    podrunner comes first (PodUtils/podrunner#277, #216, #189, #168, #110,
-   and each new COORD issue `(to podvm)` of podrunner), then the asks of
+   and each new COORD issue `(to podvm)` of podrunner: #296 is T-1964 to
+   T-1969, in the order T-1967, T-1969, T-1966, then T-1964 and T-1965
+   with the tag that answers COORD-186, then T-1968), then the asks of
    githome and cfb for their CI, then the items below. A quality item
    that a podrunner unit meets counts as an ask of podrunner.
 0. Quality first (the owner's ruling, 2026-11-17; `docs/methodology/quality.md`):
