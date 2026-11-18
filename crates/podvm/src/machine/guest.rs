@@ -23,6 +23,7 @@ mod drive;
 pub(crate) mod engine;
 pub(crate) mod exec; // TODO/machine.md T-1750
 pub(crate) mod init;
+mod input;
 pub(crate) mod kernel;
 pub(crate) mod kernel_arm64; // TODO/machine.md T-1890
 mod mem; // TODO/machine.md T-1922
@@ -44,6 +45,7 @@ use podvm_windows::plan::Accel;
 pub use archive::run_archive;
 use archive::tools;
 use drive::drive;
+pub use input::{read_stdin, MAX_STDIN};
 
 /// The version of the base archive format; a change of [`cpio`] bumps it,
 /// so an old cached archive is not reused. 2 keeps the hard links; 3 the
@@ -100,35 +102,9 @@ pub struct Request<'a> {
     /// `--podvm-engine`: the guest loads the modules of a container
     /// engine ([`engine`], T-1780).
     pub engine: bool,
-}
-
-/// The most bytes of stdin that a guest takes.
-pub const MAX_STDIN: u64 = 64 << 20;
-
-/// podvm's stdin for the guest: its bytes where it is a pipe or a regular
-/// file; `None` for a terminal or anything else, which gives the guest
-/// `/dev/null`. More than [`MAX_STDIN`] bytes is an error.
-pub fn read_stdin() -> Result<Option<Vec<u8>>, String> {
-    use std::io::Read;
-    use std::os::unix::fs::FileTypeExt;
-    let Ok(md) = std::fs::metadata("/proc/self/fd/0") else {
-        return Ok(None);
-    };
-    if !(md.file_type().is_fifo() || md.is_file()) {
-        return Ok(None);
-    }
-    let mut buf = Vec::new();
-    std::io::stdin()
-        .lock()
-        .take(MAX_STDIN + 1)
-        .read_to_end(&mut buf)
-        .map_err(|e| format!("stdin: {e}"))?;
-    if buf.len() as u64 > MAX_STDIN {
-        return Err(format!(
-            "stdin holds more than {MAX_STDIN} bytes, the most that the guest takes"
-        ));
-    }
-    Ok(Some(buf))
+    /// `--pids-limit`: the `pids.max` of the cgroup of the payload in the
+    /// guest ([`init::with_pids`], TODO/machine.md T-1967).
+    pub pids: Option<String>,
 }
 
 /// The cache file of the base archive of `digest`.
@@ -347,6 +323,7 @@ pub fn boot(r: &Request) -> i32 {
                     sealed: r.sealed.is_some(),
                 }),
             );
+            let script = init::with_pids(script, r.pids.as_deref(), &nonce);
             let script = exec::with_server_if(script, r.keeper.is_some());
             run_archive(&script, tools.as_ref(), &copies, r.stdin.as_deref())
         })

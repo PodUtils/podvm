@@ -5466,7 +5466,7 @@ Experiment 434: `run -d --podvm-tier=incus --podvm-engine --podvm-net none` of t
 **Milestone:** none
 **Priority:** P1
 **Effort:** S
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -5486,7 +5486,12 @@ The init of each guest mounts cgroup2 on `/sys/fs/cgroup` (T-1780), and the gues
 
 ## Prove
 
-`kvm.yml` (job guest): `run --podvm-tier=machine --pids-limit 16 public.ecr.aws/docker/library/alpine:3.20 sh -c 'for i in $(seq 40); do sleep 5 & done; wait'` prints a failed fork and exits non-zero.
+As uid 1000, under KVM or TCG: `run --podvm-tier=machine --pids-limit 16 public.ecr.aws/docker/library/alpine:3.20 sh -c 'for i in $(seq 40); do sleep 5 & done; wait'` prints a failed fork and exits non-zero.
+
+## Done
+
+**Done (2026-11-18).** `--pids-limit N` on the machine tier: `run::cgroup::limits` takes the tier and lets `limits.processes` through for the machine tier only (each other limit there stays a refusal); the request of the guest carries it, and `machine::guest::init::with_pids` puts the shell of the init in the cgroup `/sys/fs/cgroup/podvm-payload` with `pids.max` before the ready marker, so the command and each child count. A guest that cannot hold it ends the run with 125 and one line. Measured as uid 1000 on the cloud host under TCG (`PODVM_MACHINE_ACCEL=tcg`, no `/dev/kvm` there) with `docker.io/library/alpine:3.20`: `--pids-limit 8` and a loop of 20 `sleep &` print `8` from `pids.max`, then `sh: can't fork: Resource temporarily unavailable`, and the run exits 2; no emulator stays. `--memory 64m` on the machine tier still exits 125 by name. The unit test `pids_limit_goes_into_a_cgroup_of_the_guest_before_the_ready_marker` pins the place of the block and the refusal of a value that is not digits.
+
 
 # T-1968: No tier gives a sized writable disk to a unit
 

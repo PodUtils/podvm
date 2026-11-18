@@ -10,7 +10,7 @@ They describe their recorded revision, not the current build.
 
 ### Added: the asks of podrunner, 2026-11-18
 
-Record: T-1934, T-1945.
+Record: T-1934, T-1945, T-1967.
 Deployed: none yet.
 
 - Each unit has a terminal of its own: `run -d`, `create`, `start` and a
@@ -21,6 +21,8 @@ Deployed: none yet.
   source under DIR opens with no symbolic link, and the bind takes that
   descriptor. A link under DIR is a refusal with exit 125. The userland
   rung and each guest tier refuse the flag (PodUtils/podrunner#277).
+- `--pids-limit N` on the machine tier: the guest holds `pids.max` for
+  the command and each child (PodUtils/podrunner#296, ask 4).
 - podcrates `v0.70.0`.
 
 ### Fixed: the first reports of the external QA of `0.2.0-beta.31`, 2026-11-17

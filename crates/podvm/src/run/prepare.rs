@@ -22,7 +22,7 @@ pub(crate) fn prepare(
         crate::tier::Tier::Machine | crate::tier::Tier::Incus | crate::tier::Tier::Runsc
     );
     if tier != crate::tier::Tier::Incus {
-        super::cgroup::limits(verb, guest, &o.limits)?; // T-1897, T-1747
+        super::cgroup::limits(verb, tier, &o.limits)?; // T-1897, T-1747, T-1967
     }
     // ⭐ TODO/packaging.md T-1003. A forced launch rung is refused here, before
     // anything is fetched, where the verb cannot honor it: only foreground

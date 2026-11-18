@@ -363,6 +363,7 @@ fn banner_quiet_hides_the_machine_notice() {
     let mut r = Request {
         verb: "run",
         keeper: None,
+        pids: None,
         arch: super::arch::Arch::Amd64,
         loud: false,
         store_root: p,
@@ -418,4 +419,23 @@ fn an_early_end_gives_the_marker_and_a_reason() {
         "{line}"
     );
     assert!(!s.contains("|| exit 125"), "{s}");
+}
+
+/// TODO/machine.md T-1967: `--pids-limit` puts the shell of the init in a
+/// cgroup with `pids.max` before the ready marker; a value that is not a
+/// number of digits adds nothing.
+#[test]
+fn pids_limit_goes_into_a_cgroup_of_the_guest_before_the_ready_marker() {
+    let s = init::script("n", &["true".into()], &[], "/", false, &[], None, None);
+    let with = init::with_pids(s.clone(), Some("16"), "n");
+    let block = with
+        .find("echo 16 > /sys/fs/cgroup/podvm-payload/pids.max")
+        .expect("the block");
+    let ready = with.find("\necho PODVM-READY-n\n").expect("the marker");
+    assert!(block < ready, "{with}");
+    assert!(with.contains("echo $$ > /sys/fs/cgroup/podvm-payload/cgroup.procs"));
+    assert!(with.contains("PODVM-EXIT-n 125"));
+    for junk in [None, Some(""), Some("1; reboot"), Some("-1")] {
+        assert_eq!(init::with_pids(s.clone(), junk, "n"), s, "{junk:?}");
+    }
 }

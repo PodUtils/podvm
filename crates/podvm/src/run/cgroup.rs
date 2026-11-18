@@ -114,13 +114,24 @@ fn sweep(dir: &Path) {
 /// refuses by name.
 pub(super) fn limits(
     verb: &str,
-    guest: bool,
+    tier: crate::tier::Tier,
     limits: &[(String, &'static str, String)],
 ) -> Result<(), i32> {
+    use crate::tier::Tier;
     if limits.is_empty() {
         return Ok(());
     }
-    if guest {
+    // PodUtils/podrunner#296 ask 4 (TODO/machine.md T-1967): the init of a
+    // machine guest holds `--pids-limit` in a cgroup of the guest.
+    if tier == Tier::Machine {
+        let rest: Vec<_> = limits
+            .iter()
+            .filter(|(_, k, _)| *k != "limits.processes")
+            .cloned()
+            .collect();
+        return super::parse::limits::refuse_off_incus(verb, &rest);
+    }
+    if matches!(tier, Tier::Incus | Tier::Runsc) {
         return super::parse::limits::refuse_off_incus(verb, limits);
     }
     if verb == "create" {

@@ -283,6 +283,11 @@ pub(super) fn machine_tier(
         channel: o.channel.clone(),
         sealed,
         engine: o.engine,
+        pids: o
+            .limits
+            .iter()
+            .find(|(_, k, _)| *k == "limits.processes")
+            .map(|(_, _, v)| v.clone()),
     });
     if let Some(d) = probe {
         let _ = std::fs::remove_dir_all(d);

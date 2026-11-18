@@ -228,3 +228,34 @@ fn early_exit(nonce: &str, why: &str) -> String {
          echo b > /proc/sysrq-trigger; }}"
     )
 }
+
+/// PodUtils/podrunner#296 ask 4 (TODO/machine.md T-1967): `--pids-limit N`
+/// in the guest. Before the ready marker, the init enables the `pids`
+/// controller, makes the cgroup `podvm-payload` with `pids.max`, and moves
+/// itself into it, so the command and each of its children count. A guest
+/// that cannot hold it ends the run with 125 and the reason; the command
+/// does not run without its limit.
+pub fn with_pids(script: String, pids: Option<&str>, nonce: &str) -> String {
+    let Some(n) = pids.filter(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit())) else {
+        return script;
+    };
+    let c = "/sys/fs/cgroup";
+    let block = format!(
+        "{{ echo +pids > {c}/cgroup.subtree_control && mkdir -p {c}/podvm-payload && \
+         echo {n} > {c}/podvm-payload/pids.max && echo $$ > {c}/podvm-payload/cgroup.procs; \
+         }} 2>/dev/null || {}\n",
+        early_exit(
+            nonce,
+            "--pids-limit: the guest has no cgroup2 pids controller to hold it"
+        )
+    );
+    // Before the ready marker: the early exit prints the marker itself.
+    match script.find(&format!("\necho PODVM-READY-{nonce}\n")) {
+        Some(at) => {
+            let mut s = script;
+            s.insert_str(at + 1, &block);
+            s
+        }
+        None => script,
+    }
+}
