@@ -270,6 +270,7 @@ pub(crate) mod spare;
 pub(crate) mod probe_cache;
 pub(crate) use prepare::*;
 
+mod home; // TODO/enter.md T-1986
 mod tree;
 pub(crate) use tree::drop_unrecorded;
 

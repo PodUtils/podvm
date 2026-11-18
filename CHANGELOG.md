@@ -8,6 +8,9 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- On the userland rung, the home of the run is writable to the payload, as
+  to uid 0 of the image: `dnf` of Fedora 42 runs (T-1986).
+
 - On the syscall tier, a `-v` volume whose guest path the image does not
   have can be `stat`ed: `ls -d`, `stat`, `cp -r` and `find` of it work
   (T-1988).

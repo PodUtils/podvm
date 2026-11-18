@@ -444,8 +444,9 @@ pub(crate) fn prepare(
             memo_host,
         );
     }
-    // TODO/enter.md T-1658: the confine layer, after the fixups: a node that
-    // the completion layer made (`/dev/null`) gets its rule.
+    super::home::writable(entered, &rootfs, &env); // TODO/enter.md T-1986
+                                                   // TODO/enter.md T-1658: the confine layer, after the fixups: a node that
+                                                   // the completion layer made (`/dev/null`) gets its rule.
     let confine = crate::lifecycle::confine::decide(
         verb,
         o.confine.as_ref(),

@@ -4987,7 +4987,7 @@ As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm --podvm-confine 'rea
 **Milestone:** none
 **Priority:** P1
 **Effort:** S
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -4999,7 +4999,7 @@ On a rung with no user namespace the payload is uid 1000, the owner of the tree;
 
 ## Approach
 
-Where the payload runs as the owner of the tree, the home of the user of the run (`/root` for uid 0 of the image) gets the owner's write bit, as uid 0 of the image would have.
+On the userland rung, `run::home::writable` gives the home of the run (`HOME` of the environment, else `/root`, as `pod-enter` sets it) the owner's write bit, in the container's own copy of the tree (T-1709). A home that is a link, under a link, or a path with `..` stays as it is; each other mode stays the image's.
 
 ## Decision
 
@@ -5008,6 +5008,10 @@ Where the payload runs as the owner of the tree, the home of the user of the run
 ## Prove
 
 As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm quay.io/fedora/fedora:42 dnf --version` exits 0, and with `--podvm-tier=syscall`.
+
+## Done
+
+**Done (2026-11-18).** `the_home_of_the_run_gets_the_owners_write_bit_and_nothing_else` passes. Measured as in the Prove with `quay.io/fedora/fedora:42`: `dnf --version` exits 0 on the userland rung and with `--podvm-tier=syscall` (`/root` is `drwxr-x---` in the tree of the run); on the namespace rung `/root` keeps `dr-xr-x---` and `dnf` works as before.
 
 # T-1987: On AlmaLinux 9, `ls -l` dies with SIGSEGV in the interposer's `lgetxattr`
 
