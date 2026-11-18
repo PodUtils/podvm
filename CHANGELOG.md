@@ -8,6 +8,40 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+## 0.2.0-beta.34 (2026-11-18)
+
+### Known gaps: what the checks of 0.2.0-beta.34 prove, and what stays open, 2026-11-18
+
+Record: T-1949, T-1980, T-1981.
+Deployed: version 0.2.0-beta.34.
+
+What the checks of this beta prove: the gate, the integration tests as uid
+1000, `workloads.yml`, `arm.yml`, the nightly trial and an outside pass with
+the binary and `podvm man` only (T-1980), whose P1 faults (T-1978, T-1979)
+are fixed.
+
+Each open fault that a user can meet:
+
+- On a host with no `chroot(2)` and no user namespace, a program whose
+  `PT_INTERP` lies past its first 64 KiB is refused with 125: the shells of
+  `quay.io/fedora/fedora:42` (T-1981; COORD-193 asks podcrates).
+- The P2 and P3 faults of the third outside pass (T-1980): on the default
+  userland rung with alpine, `ls -l` shows a link that the payload makes in
+  the tree as `-> /`; on the syscall tier a file as a `-v` source and a
+  command that is not runnable exit 125 or 127 with a message that names
+  the wrong cause, and a refused run leaves `tmpfs/PID/0` in the store;
+  `--podvm-volume-base` takes a source with `..` that leaves the base;
+  `-t` sets no `TERM`.
+- The run report of an incus unit has no `oom_kills` (`inspect` gives
+  `OomKills`, T-1969).
+- The faults of `0.2.0-beta.33`'s known gaps stay open where this list does
+  not name them as fixed.
+
+### Fixed: the syscall tier for podrunner's jobs, 2026-11-18
+
+Record: T-1974, T-1976, T-1977, T-1978, T-1979.
+Deployed: version 0.2.0-beta.34.
+
 - On the syscall tier, a child of `posix_spawn` runs a link in `/tmp` or
   in a volume: the handler keeps the descriptors of the volumes through
   the child's `close_range` (T-1978). `python3 -m venv` with pip works.
@@ -24,6 +58,12 @@ They describe their recorded revision, not the current build.
   absolute link resolves in the root, not on the host: the handler takes
   `AT_FDCWD` as the kernel does, from the low 32 bits of the register
   (T-1977, PodUtils/podrunner#303).
+
+### Added: the OOM kills of a machine guest, 2026-11-18
+
+Record: T-1969.
+Deployed: version 0.2.0-beta.34.
+
 - The run report of a machine guest has `oom_kills`: the guest init gives
   the count `oom_kill` of its kernel with the exit marker (T-1969,
   PodUtils/podrunner#296 ask 6). Measured under TCG with `--podvm-mem
