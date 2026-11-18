@@ -40,6 +40,8 @@ pub struct Prepared {
     pub rm: bool,
     /// `-t`: a foreground `run` gives the payload a pty (TODO/cli.md T-1760).
     pub tty: bool,
+    /// `-i`: with `-t`, stdin goes to the pty (PodUtils/podvm#545).
+    pub interactive: bool,
     /// `--timeout` in milliseconds: the wall bound of the run, or `None`.
     /// TODO/cli.md T-1655.
     pub wall_ms: Option<u64>,

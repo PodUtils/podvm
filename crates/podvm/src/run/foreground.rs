@@ -269,7 +269,7 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
     // From here the payload is entered: its code is its own (T-1695).
     r.ran = true;
     r.container = Some(fg.id.clone());
-    let relay = pty.map(|(t, slaves)| (t.relay(), slaves));
+    let relay = pty.map(|(t, slaves)| (t.relay(p.interactive), slaves)); // #545
     let code = match p.ladder {
         Some(mode) => {
             let _ = writeln!(

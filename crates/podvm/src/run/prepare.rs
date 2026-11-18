@@ -47,8 +47,7 @@ pub(crate) fn prepare(
     let volumes_refused = // T-1722: `create` of the incus tier takes -v
         verb != "run" && !o.volumes.is_empty() && tier != crate::tier::Tier::Incus;
     if guest && (!o.devices.is_empty() || volumes_refused) {
-        // ⛔ Refused, not dropped: no host descriptor reaches the guest
-        // (T-0501, T-1653). #542: the line names only the flag given.
+        // ⛔ Refused, not dropped (T-0501, T-1653); #542: the flag given only.
         let dev = usize::from(!o.devices.is_empty());
         let what = ["-v needs", "--device needs", "--device and -v need"]
             [dev + dev * usize::from(volumes_refused)];
@@ -474,6 +473,7 @@ pub(crate) fn prepare(
         detach: o.detach,
         rm: o.rm,
         tty: o.tty,
+        interactive: o.interactive,
         wall_ms: o.timeout.map(|s| s * 1000),
         hardening: super::report::with_detached_path(o.hardening.clone(), o.detach),
         memo_host_path,

@@ -83,7 +83,9 @@ impl Pty {
 
     /// Start the relay. The caller drops the slaves that it passed after
     /// the payload exits, then calls [`Relay::finish`].
-    pub fn relay(self) -> std::io::Result<Relay> {
+    /// PodUtils/podvm#545: stdin reaches the pty only with `stdin` (`-i`), as
+    /// docker's `-t` with no `-i` attaches none.
+    pub fn relay(self, stdin: bool) -> std::io::Result<Relay> {
         let mut from = self.master.try_clone()?;
         let mut to = self.master;
         let raw = Raw::new();
@@ -101,6 +103,11 @@ impl Pty {
             let _ = done.send(());
         });
         std::thread::spawn(move || {
+            if !stdin {
+                // The master stays open for the payload's writes; no input.
+                let _keep = to;
+                return;
+            }
             let mut buf = [0u8; 4096];
             let mut input = std::io::stdin().lock();
             let mut last: Option<u8> = None;
