@@ -295,10 +295,6 @@ access_int!(eaccess, next_eaccess);
 access_int!(euidaccess, next_euidaccess);
 path_int!(statfs, next_statfs, (path: *const c_char, buf: *mut c_void), path);
 path_int!(statvfs, next_statvfs, (path: *const c_char, buf: *mut c_void), path);
-path_int!(setxattr, next_setxattr, (path: *const c_char, name: *const c_char, value: *const c_void, size: usize, flags: c_int), path);
-path_int!(lsetxattr, next_lsetxattr, (path: *const c_char, name: *const c_char, value: *const c_void, size: usize, flags: c_int), path);
-path_int!(removexattr, next_removexattr, (path: *const c_char, name: *const c_char), path);
-path_int!(lremovexattr, next_lremovexattr, (path: *const c_char, name: *const c_char), path);
 path_int!(glob, next_glob, (pattern: *const c_char, flags: c_int, errfunc: ErrFunc, pglob: *mut c_void), pattern);
 path_int!(glob64, next_glob64, (pattern: *const c_char, flags: c_int, errfunc: ErrFunc, pglob: *mut c_void), pattern);
 path_int!(ftw, next_ftw, (path: *const c_char, func: FtwFunc, nfds: c_int), path);
@@ -309,10 +305,6 @@ path_int!(nftw64, next_nftw64, (path: *const c_char, func: NftwFunc, nfds: c_int
 path_nonneg!(creat, next_creat, (path: *const c_char, mode: c_uint), path, c_int);
 path_nonneg!(creat64, next_creat64, (path: *const c_char, mode: c_uint), path, c_int);
 path_nonneg!(scandir, next_scandir, (dir: *const c_char, list: *mut *mut c_void, filter: Filter, compar: Compar), dir, c_int);
-path_nonneg!(getxattr, next_getxattr, (path: *const c_char, name: *const c_char, value: *mut c_void, size: usize), path, isize);
-path_nonneg!(lgetxattr, next_lgetxattr, (path: *const c_char, name: *const c_char, value: *mut c_void, size: usize), path, isize);
-path_nonneg!(listxattr, next_listxattr, (path: *const c_char, list: *mut c_char, size: usize), path, isize);
-path_nonneg!(llistxattr, next_llistxattr, (path: *const c_char, list: *mut c_char, size: usize), path, isize);
 
 path_ptr!(opendir, next_opendir, (path: *const c_char), path);
 path_ptr!(fopen, next_fopen, (path: *const c_char, mode: *const c_char), path, mode = mode);

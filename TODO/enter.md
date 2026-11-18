@@ -5016,7 +5016,7 @@ As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm quay.io/fedora/fedor
 **Milestone:** none
 **Priority:** P1
 **Effort:** S
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -5024,11 +5024,11 @@ As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm quay.io/fedora/fedor
 
 ## Premise
 
--
+AlmaLinux 9's `libattr.so.1` exports its own `lgetxattr` (and the other calls of an attribute), which calls the symbol `lgetxattr` again. The interposer's wrapper took that one as its "next" symbol (`RTLD_NEXT`), which bound back to the wrapper: a recursion until the stack ended.
 
 ## Approach
 
-Find the fault of the wrapper of `lgetxattr` (and its kin) in `crates/podvm-interpose` with the call that libattr makes, and fix it with a test of that call.
+The eight wrappers of an attribute (`getxattr`, `lgetxattr`, `listxattr`, `llistxattr`, `setxattr`, `lsetxattr`, `removexattr`, `lremovexattr`) map the path and make the system call themselves (`path_syscall!`, `raw_calls::forward`), with no next symbol.
 
 ## Decision
 
@@ -5037,6 +5037,11 @@ Find the fault of the wrapper of `lgetxattr` (and its kin) in `crates/podvm-inte
 ## Prove
 
 As uid 1000: `podvm run --rm quay.io/almalinuxorg/almalinux:9 ls -l /etc/hostname` exits 0, under `scripts/dev/nouserns.c` too.
+
+## Done
+
+**Done (2026-11-18).** Measured as in the Prove with `quay.io/almalinuxorg/almalinux:9`, on the namespace rung and under `scripts/dev/nouserns.c`: `ls -l /etc/hostname` exits 0; `getfattr -d`, `setfattr -n user.a` and `getfattr -n user.a` work. The interposer tests (100) pass.
+
 
 # T-1988: On the syscall tier, a volume whose guest path is not in the image cannot be stat-ed
 

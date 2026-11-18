@@ -349,10 +349,6 @@ fn next_free() -> Option<unsafe extern "C" fn(*mut c_void)> {
         core::mem::transmute::<*mut c_void, unsafe extern "C" fn(*mut c_void)>(p)
     })
 }
-crate::real!(pub fn next_getxattr = "getxattr"(*const c_char, *const c_char, *mut c_void, usize) -> isize);
-crate::real!(pub fn next_lgetxattr = "lgetxattr"(*const c_char, *const c_char, *mut c_void, usize) -> isize);
-crate::real!(pub fn next_setxattr = "setxattr"(*const c_char, *const c_char, *const c_void, usize, c_int) -> c_int);
-crate::real!(pub fn next_lsetxattr = "lsetxattr"(*const c_char, *const c_char, *const c_void, usize, c_int) -> c_int);
 // T-0708: the emulated operations. All single-version on glibc (measured
 // with objdump -T on the build host's libc: mknod@2.33, mount@2.2.5,
 // unshare@2.4, clone@2.2.5, none with a compat beside the default), so
@@ -365,10 +361,6 @@ crate::real!(pub fn next_mount = "mount"(*const c_char, *const c_char, *const c_
 crate::real!(pub fn next_unshare = "unshare"(c_int) -> c_int);
 crate::real!(pub fn next_clone = "clone"(*mut c_void, *mut c_void, c_int, *mut c_void, *mut c_void, *mut c_void, *mut c_void) -> c_int);
 crate::real!(pub fn next_close = "close"(c_int) -> c_int);
-crate::real!(pub fn next_listxattr = "listxattr"(*const c_char, *mut c_char, usize) -> isize);
-crate::real!(pub fn next_llistxattr = "llistxattr"(*const c_char, *mut c_char, usize) -> isize);
-crate::real!(pub fn next_removexattr = "removexattr"(*const c_char, *const c_char) -> c_int);
-crate::real!(pub fn next_lremovexattr = "lremovexattr"(*const c_char, *const c_char) -> c_int);
 crate::real!(pub fn next_link = "link"(*const c_char, *const c_char) -> c_int);
 crate::real!(pub fn next_linkat = "linkat"(c_int, *const c_char, c_int, *const c_char, c_int) -> c_int);
 crate::real!(pub fn next_symlink = "symlink"(*const c_char, *const c_char) -> c_int);
@@ -447,7 +439,9 @@ pub use owner_calls::*;
 
 #[macro_use]
 mod stat_calls;
+mod xattr_calls; // TODO/enter.md T-1987
 pub use stat_calls::*;
+pub use xattr_calls::*;
 
 mod link_calls; // TODO/interpose.md T-1915
 pub use link_calls::*;

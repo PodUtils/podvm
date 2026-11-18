@@ -8,6 +8,10 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- On AlmaLinux 9, `ls -l` no longer dies with SIGSEGV on the namespace and
+  the userland rung: the interposer makes the system call of each
+  attribute call itself (T-1987).
+
 - On a host with no `chroot(2)` and no user namespace, a program whose
   `PT_INTERP` lies past its first 64 KiB runs: the shells of
   `quay.io/fedora/fedora:42` (T-1981; podcrates `v0.72.0`).
