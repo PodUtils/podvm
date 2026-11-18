@@ -465,7 +465,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #569 | COORD-182: ten more faults of the external QA of podvm in crates of podcrates: signals, the entered rung, logs, mtab, the probe key, census and guest (to podcrates) | closed (podcrates@T-884 to @T-895 in podcrates `v0.70.0`, PodUtils/podcrates#222, taken in `6b5a6cb`) | T-1953 |
 | #570 | COORD-183: the answer to PodUtils/podcrates#221: the two rulings are in podvm's AGENTS.md; the four copies go at the next take (to podcrates) | open | T-1955 |
 | #571 | COORD-184: the state of podvm at the start of its session of 2026-11-18, for the coordinator (to podcrates) | open | T-1955 |
-| #572 | COORD-185: the answers to PodUtils/podrunner#277, #216, #189, #168 and #110: each is on podvm main; a beta follows (to podrunner) | open | T-1934, T-1935, T-1945 |
+| #572 | COORD-185: the answers to PodUtils/podrunner#277, #216, #189, #168 and #110: each is in podvm 0.2.0-beta.32 (to podrunner) | open | T-1934, T-1935, T-1945 |
 | #573 | [Donor] Syscall tiers: selective trap, coverage guard, io_uring, raw paths | open | T-1956 |
 | #574 | [Donor] Limits: byte accounting, cgroup kill, resource flags, WASM | open | T-1957 |
 | #575 | [Donor] Confinement and policy: verdicts, ELF closure, credentials, seccomp profile | open | T-1958 |

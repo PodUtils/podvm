@@ -5826,7 +5826,7 @@ As uid 1000: the repro of 507, 508 and 510 gives a banner or a field that matche
 **Milestone:** none
 **Priority:** P1
 **Effort:** S
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -5847,6 +5847,11 @@ Before `release.yml` of a beta: `workloads.yml` (T-1936) and the harness of T-19
 ## Prove
 
 The next beta has a run of `workloads.yml` on its commit, an outside pass whose findings are in the record, and a section "Known gaps" in its notes.
+
+## Done
+
+**Done (2026-11-18).** `0.2.0-beta.32` (release run 44278551133 on `566f833`) is the first beta behind the gate of `docs/maintenance.md`, "Releases": the gate 44275525277, `workloads.yml` 44275537973, `arm.yml` 44275549014 and the nightly trial 44275543194 passed on the commit of the release; the integration tests as uid 1000 passed (29 binaries); an outside pass with the binary and `podvm man` only found 3 P1, 7 P2 and 7 P3 faults, each in the record (T-1970), and the three P1 faults are fixed in `cbbfb4e`; the notes have the entry "Known gaps" with what the checks prove and each open fault. `docs/maintenance.md` names the seven steps.
+
 
 # T-1950: The external QA of `0.2.0-beta.31`: verify the third batch of reports
 

@@ -611,7 +611,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1946](gate.md) | P1 | M | none | gate | done | The contract of the CLI: one table-driven harness of each verb |
 | [T-1947](gate.md) | P1 | M | none | gate | partial | Fail safe at the edges: a panic hook, checked numbers, and the writes of the store |
 | [T-1948](gate.md) | P2 | M | none | gate | partial | Each banner and each inspect field says what the entered mechanism did |
-| [T-1949](gate.md) | P1 | S | none | gate | open | The gate of a beta: workloads, the harness, an outside pass, and the known gaps |
+| [T-1949](gate.md) | P1 | S | none | gate | done | The gate of a beta: workloads, the harness, an outside pass, and the known gaps |
 | [T-1950](gate.md) | P1 | M | none | gate | done | The external QA of `0.2.0-beta.31`: verify the third batch of reports |
 | [T-1951](cli.md) | P1 | M | none | cli | partial | The external QA of `0.2.0-beta.31`, third batch: the output contract |
 | [T-1952](image.md) | P2 | M | none | image | partial | The external QA of `0.2.0-beta.31`, third batch: images, `import`, `cp` and the store |
@@ -636,7 +636,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-567 entries: 20 open, 27 partial, 3 blocked, 517 done.
+567 entries: 19 open, 27 partial, 3 blocked, 518 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -646,10 +646,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 10 | 0 | 223 | 236 |
+| P1 | 2 | 10 | 0 | 224 | 236 |
 | P2 | 12 | 13 | 2 | 177 | 204 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
-| **All** | 20 | 27 | 3 | 517 | 567 |
+| **All** | 19 | 27 | 3 | 518 | 567 |
 
 ## Work order
 
