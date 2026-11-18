@@ -366,7 +366,7 @@ DIND=${PODVM_434_DIND:-mirror.gcr.io/library/docker:dind}
 echo ""; echo "== 16. --podvm-engine: a container engine in an instance" >>"$REPORT"
 {
 P pull -q "$DIND" >/dev/null 2>&1
-echo "  run -d   $(P run -d --name eng434 --podvm-tier=incus --podvm-engine --podvm-net none "$DIND" dockerd --iptables=false --ip6tables=false --bridge=none </dev/null 2>&1)"
+echo "  run -d   $(P run -d --name eng434 --podvm-tier=incus --podvm-engine --podvm-net none "$DIND" dockerd --iptables=false --ip6tables=false --bridge=none </dev/null 2>/dev/null)"
 i=0; drv=""
 while [ $i -lt 60 ] && [ -z "$drv" ]; do drv=$(P exec --podvm-tier=incus eng434 docker info --format '{{.Driver}}' 2>/dev/null); i=$((i+1)); [ -n "$drv" ] || sleep 2; done
 echo "  driver   ${drv:--}"

@@ -1,5 +1,5 @@
 == conditions
-date              2026-11-18T09:07:54Z
+date              2026-11-18T09:15:52Z
 host kernel       Linux 6.18.44-fc-v595
 cgroup            tmpfs
 incus package     6.0.0-1ubuntu0.3
@@ -9,15 +9,15 @@ runs              5
 == 1. a run
   stdout  hello
   exit    0
-  ms      1491 (with the import)
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-fc4dbb5617ac545a-v3 imported now (TODO/machine.md T-1718)
+  ms      1257 (with the import)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-7e8408472629c8cd-v3 imported now (TODO/machine.md T-1718)
 
 == 2. the exit code
   exit    7
 
 == 3. stdout and stderr
   stdout  out
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-fc4dbb5617ac545a-v3 from incus (TODO/machine.md T-1718)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-7e8408472629c8cd-v3 from incus (TODO/machine.md T-1718)
   stderr  err
 
 == 4. stdin
@@ -30,11 +30,11 @@ runs              5
   PID 1                 /.podvm/podvm guest-hold 
   owner of /etc/passwd  0:0
   owner of /etc/shadow  0:42
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-fc4dbb5617ac545a-v3 from incus (TODO/machine.md T-1718)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-7e8408472629c8cd-v3 from incus (TODO/machine.md T-1718)
 
 == 7. the cached image
-  run true ms  1026 (median of 5)
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-fc4dbb5617ac545a-v3 from incus (TODO/machine.md T-1718)
+  run true ms  996 (median of 5)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-7e8408472629c8cd-v3 from incus (TODO/machine.md T-1718)
 
 == 8. a name that is no instance
   exec exit    125
@@ -94,14 +94,13 @@ runs              5
   rm       ch434
   socket   request /run434 request /detach434 
 == 16. --podvm-engine: a container engine in an instance
-  run -d   podvm run: --podvm-cpus, --podvm-sealed and --podvm-engine need --podvm-tier=machine; --podvm-net and --podvm-channel need --podvm-tier=machine or incus
-  driver   -
-  nesting  Error: Failed to fetch instance "eng434" in project "default": Instance not found
-  root     Error: Failed to fetch instance "eng434" in project "default": Instance not found in the instance
-  rm       podvm rm: eng434: GET /1.0/instances/eng434: incus refused the call (404, error_code 404): Failed to fetch instance "eng434" in project "default": Instance not found
+  run -d   podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-4eea5f48923988bc-7e8408472629c8cd-v3 imported now (TODO/machine.md T-1718)
+eng434
+  driver   overlayfs
+  nesting  true
+  root     0 in the instance
+  rm       eng434
 16: run -d --podvm-engine did not start the instance
-16: dockerd did not answer docker info in the instance
-16: the instance has no security.nesting
 
 == 9. nothing stays
   instances in incus              0
