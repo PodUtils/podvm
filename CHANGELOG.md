@@ -8,6 +8,10 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- `run -d --podvm-tier=syscall --podvm-confine SPEC` starts its payload:
+  the launcher gives podvm's own binary read and execute in the layer, as
+  a foreground run does (T-1982, PodUtils/podrunner#304).
+
 ## 0.2.0-beta.34 (2026-11-18)
 
 ### Known gaps: what the checks of 0.2.0-beta.34 prove, and what stays open, 2026-11-18

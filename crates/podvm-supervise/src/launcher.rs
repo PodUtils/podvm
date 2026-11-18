@@ -180,7 +180,12 @@ fn enter_in_launcher(
                 .map_err(|why| format!("starting with -v: {why}"))?;
         // TODO/enter.md T-1658: no chroot here, so the layer takes host
         // paths, each guest path through the table.
-        plan.confine = container.of.hardening.confine_host_spec(&maps)?;
+        // The emulator of the emulate tier, as the drive names it.
+        let emu = container
+            .userland_exec
+            .iter()
+            .find_map(|a| a.strip_prefix("--podvm-dispatch-emu="));
+        plan.confine = container.of.hardening.confine_host_spec(&maps, emu)?;
         podvm_enter::spawn_userland(
             &root,
             &plan,

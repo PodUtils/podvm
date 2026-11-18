@@ -101,13 +101,17 @@ impl Hardening {
     pub fn confine_host_spec(
         &self,
         maps: &podvm_enter::userland::Maps,
+        emulator: Option<&str>,
     ) -> Result<Option<podvm_enter::confine::Spec>, String> {
         let Some(s) = &self.confine else {
             return Ok(None);
         };
         let ask = podvm_enter::confine::parse(s)
             .map_err(|e| format!("the confine layer of the record ({s:?}): {e}"))?;
-        podvm_enter::confine::host_spec(&ask, maps).map(Some)
+        // PodUtils/podrunner#304 (TODO/enter.md T-1982): the launcher of
+        // `run -d` takes the same rules as a foreground run; without podvm's
+        // own binary the exec of the syscall tier was denied (EACCES, 125).
+        userland_host_spec(&ask, maps, emulator).map(Some)
     }
 
     /// The confine layer of the record for the tree at `rootfs`, or None.
@@ -256,3 +260,61 @@ pub fn find(store: &Store, table: &Table, want: &str) -> crate::Result<Container
 
 #[cfg(test)]
 mod tests;
+
+/// The confine layer of a family of the userland rung, in host paths: the
+/// paths of `ask` through the table `maps`, and what the payload's process
+/// runs beside the image (TODO/enter.md T-1819, T-1892, T-1902, T-1982).
+///
+/// - podvm's own binary, read and execute: the native-static rung and the
+///   syscall tier exec podvm itself, and a static child of the loader
+///   family enters through it (T-1724);
+/// - the host emulator of the emulate tier (`MACHINE:HOST`), the same;
+/// - the files that musl opens with its own `syscall` instruction
+///   (`/etc/resolv.conf`, `/etc/hosts`, `/etc/services`), read, where the
+///   spec lets the payload read the guest path (PodUtils/podvm#396).
+///
+/// A foreground run (`lifecycle::confine::decide`) and the launcher of
+/// `run -d` both take it, so the two cannot differ.
+pub fn userland_host_spec(
+    ask: &podvm_enter::confine::Ask,
+    maps: &podvm_enter::userland::Maps,
+    emulator: Option<&str>,
+) -> Result<podvm_enter::confine::Spec, String> {
+    use podvm_enter::confine::Access;
+    let rx = Access::READ | Access::EXECUTE;
+    let mut spec = podvm_enter::confine::host_spec(ask, maps)?;
+    if let Ok(me) = std::env::current_exe() {
+        spec = spec.allow(me.to_string_lossy().to_string(), rx);
+    }
+    if let Some((_, host)) = emulator.and_then(|e| e.split_once(':')) {
+        spec = spec.allow(host.to_string(), rx);
+    }
+    for host in raw_reads(ask) {
+        spec = spec.allow(host, Access::READ);
+    }
+    Ok(spec)
+}
+
+/// PodUtils/podvm#396 (TODO/enter.md T-1902): the files that musl opens
+/// past each symbol of the interposer, so the kernel resolves them on the
+/// host. Where the spec lets the payload read the guest path, the host
+/// file (its link resolved) gets read too; without it the resolver of musl
+/// found no name server, and each name failed with EAI_AGAIN.
+fn raw_reads(ask: &podvm_enter::confine::Ask) -> Vec<String> {
+    const RAW: [&str; 3] = ["/etc/resolv.conf", "/etc/hosts", "/etc/services"];
+    RAW.iter()
+        .filter(|g| guest_readable(ask, g))
+        .filter_map(|g| std::fs::canonicalize(g).ok())
+        .filter(|p| p.is_file())
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect()
+}
+
+/// True where a rule of the spec covers the guest path `g` (each kind of
+/// rule gives read).
+pub fn guest_readable(ask: &podvm_enter::confine::Ask, g: &str) -> bool {
+    ask.read.iter().chain(&ask.write).chain(&ask.exec).any(|p| {
+        let p = p.trim_end_matches('/');
+        p.is_empty() || g == p || g.strip_prefix(p).is_some_and(|r| r.starts_with('/'))
+    })
+}

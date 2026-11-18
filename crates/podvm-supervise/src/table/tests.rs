@@ -121,3 +121,39 @@ fn the_tally_scan_counts_complete_records_only() {
     );
     let _ = std::fs::remove_dir_all(&d);
 }
+
+/// PodUtils/podrunner#304 (TODO/enter.md T-1982): the confine layer of a
+/// family of the userland rung lets the payload's process run podvm itself
+/// and the emulator; the launcher of `run -d` takes the same spec, and the
+/// exec of the syscall tier was denied without it.
+#[test]
+fn the_userland_layer_runs_podvm_itself_and_the_emulator() {
+    use podvm_enter::confine::Access;
+    let d = std::env::temp_dir().join(format!("podvm-t1982-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&d);
+    std::fs::create_dir_all(d.join("tmp")).unwrap();
+    let root = d.to_string_lossy().to_string();
+    let maps = podvm_enter::userland::Maps::new(&podvm_enter::NAMES, &root, &[]).unwrap();
+    let ask = podvm_enter::confine::parse("read=/;write=/tmp").unwrap();
+    let rx = Access::READ | Access::EXECUTE;
+    let me = std::env::current_exe()
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
+    for (emu, want_emu) in [
+        (None, None),
+        (Some("62:/opt/qemu-x86_64"), Some("/opt/qemu-x86_64")),
+    ] {
+        let spec = userland_host_spec(&ask, &maps, emu).unwrap();
+        let has = |p: &str| {
+            spec.paths
+                .iter()
+                .any(|r| r.path == p && r.access.contains(rx))
+        };
+        assert!(has(&me), "podvm itself: {:?}", spec.paths);
+        if let Some(e) = want_emu {
+            assert!(has(e), "the emulator: {:?}", spec.paths);
+        }
+    }
+    let _ = std::fs::remove_dir_all(&d);
+}

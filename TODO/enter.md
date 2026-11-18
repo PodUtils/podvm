@@ -4859,3 +4859,36 @@ As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm quay.io/fedora/fedor
 ## Blocker
 
 The reader is podcrates' code (`AGENTS.md`, section 2a). COORD-193 (#589) asks podcrates to read the path of `PT_INTERP` at its offset from a file source. Clears when a podcrates tag carries it.
+
+# T-1982: `run -d` with `--podvm-confine` on the syscall tier cannot start its payload
+
+**Source:** PodUtils/podrunner#304 (COORD-094 of podrunner); answer COORD-194 (#590)
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+`run -d --podvm-tier=syscall --podvm-confine SPEC` exited 125: "the payload could not be started: execve of the userland entry argv failed with EACCES (13)". A foreground run with the same flags started. podrunner's self-test of the confine layer failed under the tier for this reason: its held run never started.
+
+## Premise
+
+On the tier, podvm starts the payload by an exec of podvm itself, so the layer must give podvm's own binary read and execute.
+
+## Approach
+
+`lifecycle::confine::decide` gave podvm's binary, the emulator and musl's raw reads to a foreground run; the launcher of `run -d` built the layer with `confine_host_spec`, which had none of them. Both now take `podvm_supervise::table::userland_host_spec`.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test -p podvm-supervise`: `the_userland_layer_runs_podvm_itself_and_the_emulator`. As uid 1000 under `scripts/dev/nouserns.c`: `podvm run -d --podvm-tier=syscall -w /podrunner --podvm-confine 'read=/;write=/podrunner,/tmp;exec=/podrunner,/tmp,/usr,/bin' public.ecr.aws/ubuntu/ubuntu:24.04 sleep 60` exits 0, and `podvm exec` into it cannot read `/proc/PID/environ` of a host process of the same uid.
+
+## Done
+
+**Done (2026-11-18).** Measured as in the Prove with `mirror.gcr.io/library/ubuntu:24.04`: with the layer, `run -d` exits 0, the payload writes its own file, and neither it nor `exec` reads the host process's canary (`Permission denied`); with no layer, both read it. A foreground run on the tier and on the default rung give the same answers.

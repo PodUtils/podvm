@@ -48,56 +48,16 @@ pub fn decide(
     // Landlock never checks EXECUTE on the program itself. The interposer
     // checks each program against the table of host paths that `pod-enter`
     // writes from this spec (`PODVM_EXEC_HOST`), the one table it reads.
-    let rx = confine::Access::READ | confine::Access::EXECUTE;
-    let mut spec = match confine::host_spec(ask, &u.maps) {
-        Ok(s) => s,
+    // T-1982: the rules of a family of the userland rung, which the
+    // launcher of `run -d` takes too.
+    match podvm_supervise::table::userland_host_spec(ask, &u.maps, u.emulator.as_deref()) {
+        Ok(s) => Ok(Some(s)),
         // TODO/enter.md T-1888: `create` keeps the SPEC in the record, and
         // `start` resolves the paths on the tree that it starts, which can
         // hold a path by then. `start` refuses where it still does not.
-        Err(_) if verb == "create" => return Ok(Some(Spec::new())),
-        Err(why) => return Err(refuse(verb, why)),
-    };
-    // TODO/enter.md T-1819: the loader family too: a static child enters
-    // the native-static rung through podvm itself (T-1724), so podvm's own
-    // binary gets read and execute on each family. A static program that
-    // an `exec=` rule grants was denied (126) without it.
-    if let Ok(me) = std::env::current_exe() {
-        spec = spec.allow(me.to_string_lossy().to_string(), rx);
+        Err(_) if verb == "create" => Ok(Some(Spec::new())),
+        Err(why) => Err(refuse(verb, why)),
     }
-    if let Some((_, host)) = u.emulator.as_deref().and_then(|e| e.split_once(':')) {
-        spec = spec.allow(host.to_string(), rx);
-    }
-    for host in raw_reads(ask) {
-        spec = spec.allow(host, confine::Access::READ);
-    }
-    Ok(Some(spec))
-}
-
-/// PodUtils/podvm#396 (TODO/enter.md T-1902): the files that musl opens
-/// with its own `syscall` instruction, past each symbol of the interposer,
-/// so the kernel resolves them on the host: `/etc/resolv.conf`,
-/// `/etc/hosts` and `/etc/services` (`__fopen_rb_ca`). podvm writes the
-/// same `resolv.conf` and `hosts` into the tree. Where the spec lets the
-/// payload read the guest path, the host file (its link resolved) gets
-/// read too; without it the resolver of musl found no name server, asked
-/// 127.0.0.1, and each name failed with EAI_AGAIN.
-fn raw_reads(ask: &Ask) -> Vec<String> {
-    const RAW: [&str; 3] = ["/etc/resolv.conf", "/etc/hosts", "/etc/services"];
-    RAW.iter()
-        .filter(|g| guest_readable(ask, g))
-        .filter_map(|g| std::fs::canonicalize(g).ok())
-        .filter(|p| p.is_file())
-        .map(|p| p.to_string_lossy().into_owned())
-        .collect()
-}
-
-/// True where a rule of the spec covers the guest path `g` (each kind of
-/// rule gives read).
-fn guest_readable(ask: &Ask, g: &str) -> bool {
-    ask.read.iter().chain(&ask.write).chain(&ask.exec).any(|p| {
-        let p = p.trim_end_matches('/');
-        p.is_empty() || g == p || g.strip_prefix(p).is_some_and(|r| r.starts_with('/'))
-    })
 }
 
 /// The refusals of the layer, as a pure function of its inputs.
@@ -160,6 +120,7 @@ mod tests {
     /// writes the one table at the spawn.
     #[test]
     fn a_rule_over_etc_reads_the_raw_files_of_musl() {
+        use podvm_supervise::table::guest_readable;
         let ask = confine::parse("read=/;write=/tmp").unwrap();
         assert!(guest_readable(&ask, "/etc/resolv.conf"));
         let ask = confine::parse("read=/usr,/etcetera;write=/tmp").unwrap();
