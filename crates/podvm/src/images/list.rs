@@ -194,8 +194,17 @@ pub fn images(verb: &str, args: &[String]) -> i32 {
         row.extend([get("ID"), get("CreatedSince"), get("Size")]);
         rows.push(row);
     }
-    rows.extend(crate::windows::pull::image_rows(o.digests)); // T-1861
-                                                              // TODO/cli.md T-1816: a lost table is 125, not 0.
+    // T-1861; PodUtils/podvm#476: the rows of Windows take the filter too.
+    rows.extend(
+        crate::windows::pull::image_rows(o.digests)
+            .into_iter()
+            .filter(|w| {
+                o.filters
+                    .iter()
+                    .all(|f| f.key == "name" && w.iter().take(2).any(|c| c.contains(&f.value)))
+            }),
+    );
+    // TODO/cli.md T-1816: a lost table is 125, not 0.
     match write!(out, "{}", table(&rows)).and_then(|()| out.flush()) {
         Ok(()) => 0,
         Err(e) => crate::names::stdout::failed(&e),
