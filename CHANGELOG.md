@@ -8,10 +8,45 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+## 0.2.0-beta.32 (2026-11-18)
+
+### Known gaps: what the checks of 0.2.0-beta.32 prove, and what stays open, 2026-11-18
+
+Record: T-1949, T-1970.
+Deployed: version 0.2.0-beta.32.
+
+What the checks of this beta prove: the gate (fmt, clippy, the unit and
+contract tests, the static build), the integration tests as uid 1000, a
+run of `workloads.yml`, experiment 434 (the incus tier, with a container
+engine in an instance), and an outside pass of about 30 minutes with the
+binary and `podvm man` only (T-1970). Its three P1 faults are fixed.
+
+Each open fault that a user can meet:
+
+- Ctrl-C under `run -it` works through podvm, but the pty is still no
+  controlling terminal: `^\`, `^Z` and the job control of a shell do not
+  work (COORD-188 asks pod-enter for a session).
+- `run -t` with no `-i` hangs where the payload reads stdin (OQ-04).
+- `inspect` of a container has no `.Config.*` fields (OQ-06); some
+  refusals exit 125 where the exit table says 1 or 2 (OQ-07); `pull -q`
+  can hide a registry error (OQ-08).
+- `run -d --rm` keeps the record and its tree until `rm` (OQ-09, #474).
+- Each `rm` starts a copy of a spare tree, with no bound on the number at
+  once (OQ-10); `PODVM_SPARE_TREE=0` turns the copies off.
+- The incus tier has no size of the root disk and no CPU time or peak
+  memory of an instance yet (PodUtils/podrunner#296, asks 1 and 2: they
+  wait for `pod-incus`); no tier gives a sized writable disk (ask 5).
+- `oom_kills` of the run report is measured by unit tests only; the run
+  of a host with a delegated cgroup2 subtree (`kvm.yml`) comes next.
+- A dynamic program that issues raw system calls on the userland rung
+  needs `--podvm-tier=syscall` (T-1935, T-1740).
+- The other reports of the external QA of `0.2.0-beta.31` that stay open
+  are in the record (T-1937 to T-1954).
+
 ### Added: the asks of podrunner, 2026-11-18
 
 Record: T-1934, T-1945, T-1966, T-1967, T-1969, T-1970.
-Deployed: none yet.
+Deployed: version 0.2.0-beta.32.
 
 - Each unit has a terminal of its own: `run -d`, `create`, `start` and a
   foreground run on the namespace rung mount a new devpts instance and
@@ -39,7 +74,7 @@ Deployed: none yet.
 ### Fixed: the first reports of the external QA of `0.2.0-beta.31`, 2026-11-17
 
 Record: T-1937, T-1938.
-Deployed: none yet.
+Deployed: version 0.2.0-beta.32.
 
 - Two podvm commands at once no longer lose the table of containers: a
   fast `run -d` no longer ends `Dead` with no exit code, and `run` no
@@ -92,7 +127,7 @@ Deployed: none yet.
 ### Added: the syscall tier for a detached container, 2026-11-17
 
 Record: T-1935.
-Deployed: none yet.
+Deployed: version 0.2.0-beta.32.
 
 - `podvm run -d --podvm-tier=syscall` and `create` keep the tier. `exec`
   in such a container enters the tier, and `inspect` has the field
@@ -110,7 +145,7 @@ Deployed: none yet.
 ### Fixed: the first run of a fresh Windows golden image, 2026-11-17
 
 Record: T-1933.
-Deployed: none yet.
+Deployed: version 0.2.0-beta.32.
 
 - `podvm pull windows:NAME` boots the installed disk once more before it
   becomes the golden image, and so proves that the installed disk boots.
@@ -124,7 +159,7 @@ Deployed: none yet.
 ### Fixed: a Windows run keeps its overlay in the store, 2026-11-17
 
 Record: T-1932.
-Deployed: none yet.
+Deployed: version 0.2.0-beta.32.
 
 - A foreground `podvm run windows:NAME CMD` writes the overlay of the guest
   beside the catalog, not into the runtime directory, which is a small
