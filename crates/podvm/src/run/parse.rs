@@ -145,7 +145,7 @@ fn parse_flags_with(
                 "--podvm-cpus" => o.cpus = Some(cpus(verb, a)?),
                 "--podvm-volume-base" => volume_base::set(verb, a, &mut o)?,
                 "--publish" => o.publish.push(publish::parse(verb, a)?),
-                "--memory" | "--cpus" | "--pids-limit" => {
+                "--memory" | "--cpus" | "--pids-limit" | "--storage-opt" => {
                     let (key, val) = limits::incus_limit(verb, flag, a)?;
                     o.limits.push((flag.to_string(), key, val)); // T-1897
                 }
@@ -239,6 +239,7 @@ fn parse_flags_with(
             "-m" | "--memory" => expecting = Some("--memory"),
             "--cpus" => expecting = Some("--cpus"),
             "--pids-limit" => expecting = Some("--pids-limit"),
+            "--storage-opt" => expecting = Some("--storage-opt"), // T-1964
             "--log-driver" => expecting = Some("--log-driver"),
             "-p" | "--publish" => expecting = Some("--publish"), // T-1869
             // ⚠ Stub by the table, and each takes its value as docker's

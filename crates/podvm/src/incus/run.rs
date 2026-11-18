@@ -51,6 +51,67 @@ pub struct Job<'a> {
     pub channel: Option<(PathBuf, u16)>,
 }
 
+/// The limits of `job` on `new`: each key goes into the configuration,
+/// except the size of the root disk (`--storage-opt size=N`,
+/// PodUtils/podrunner#296 ask 1, TODO/machine.md T-1964), which is a copy of
+/// the `root` device of the default profile with `size`. A pool driver that
+/// cannot size it refuses the create with the words of incusd.
+pub async fn apply_limits(
+    c: &Client,
+    new: &mut pod_incus::NewInstance,
+    limits: &[(&'static str, String)],
+) -> Result<(), String> {
+    for (k, v) in limits {
+        if *k != crate::run::limits::ROOT_SIZE {
+            new.config.insert(k.to_string(), v.clone());
+            continue;
+        }
+        let profile = c
+            .profile("default")
+            .await
+            .map_err(|e| format!("--storage-opt: the default profile: {e}"))?;
+        let Some(mut root) = profile.devices.get("root").cloned() else {
+            return Err(
+                "--storage-opt: the default profile of incusd has no `root` disk \
+                        device to size"
+                    .to_string(),
+            );
+        };
+        root.insert("size".to_string(), v.clone());
+        new.devices.insert("root".to_string(), root);
+    }
+    Ok(())
+}
+
+/// After the start of an instance with `--storage-opt size=N`: the state
+/// of its root disk must name a size, or the pool does not hold one (the
+/// driver `dir` takes `size` and bounds nothing). The quality rule: no flag
+/// that a host cannot hold runs as if it held (TODO/machine.md T-1964).
+pub async fn size_held(
+    c: &Client,
+    name: &str,
+    limits: &[(&'static str, String)],
+) -> Result<(), String> {
+    let Some((_, v)) = limits
+        .iter()
+        .find(|(k, _)| *k == crate::run::limits::ROOT_SIZE)
+    else {
+        return Ok(());
+    };
+    let s = c
+        .instance_state(name)
+        .await
+        .map_err(|e| format!("--storage-opt: the state of the instance: {e}"))?;
+    match s.disk.get("root") {
+        Some(d) if d.total > 0 => Ok(()),
+        _ => Err(format!(
+            "--storage-opt size={v}: the storage pool of the instance holds no size of \
+             its root disk (incusd reports no limit; a pool of the driver `dir` bounds \
+             nothing), and podvm does not run it as if it held one"
+        )),
+    }
+}
+
 /// PodUtils/podrunner#296 ask 3 (TODO/machine.md T-1966): the keys that
 /// let a container engine run in an unprivileged instance with
 /// `--podvm-engine`: a nested `proc` and `sysfs`, and the intercepts of
@@ -239,8 +300,9 @@ async fn run_in(c: &Client, job: &Job<'_>, image: &str, inst: &str) -> i32 {
     };
     let mut new = NewInstance::container(inst, Source::Alias(image.to_string()));
     new.devices = job_devices(job);
-    new.config
-        .extend(job.limits.iter().map(|(k, v)| (k.to_string(), v.clone())));
+    if let Err(e) = apply_limits(c, &mut new, &job.limits).await {
+        return fail(e);
+    }
     new.config.insert(
         "raw.lxc".into(),
         "lxc.init.cmd = /.podvm/podvm guest-hold".into(),
@@ -266,6 +328,9 @@ async fn run_in(c: &Client, job: &Job<'_>, image: &str, inst: &str) -> i32 {
     }
     if let Err(e) = c.start(inst).await {
         return fail(e.to_string());
+    }
+    if let Err(e) = size_held(c, inst, &job.limits).await {
+        return fail(e); // T-1964
     }
     if let Err(e) = super::net::wait_ready(c, inst, job.channel.as_ref()).await {
         return fail(e);

@@ -65,6 +65,11 @@
 #  16. `--podvm-engine` (T-1966, PodUtils/podrunner#296 ask 3): `run -d`
 #      of `docker:dind` with no NIC starts `dockerd`, which answers
 #      `docker info`; the instance has `security.nesting`.
+#  17. `--storage-opt size=` (T-1964): on this pool of the driver `dir`,
+#      which bounds nothing, `run -d` refuses by name and leaves no
+#      instance; a native run refuses the flag by name.
+#  18. `inspect` of an instance (T-1965) gives `CpuSeconds` and
+#      `PeakMemoryBytes` as numbers.
 #
 # Exit: 0 every clause matched, 1 a clause disagreed, 2 the lane could not
 # run (not root, no user namespaces, no package).
@@ -379,6 +384,30 @@ c16() { grep -q "$1" "$WORK/c16.txt" || { note "16: $2"; fail=1; }; }
 c16 "^  run -d   eng434$" "run -d --podvm-engine did not start the instance"
 c16 "^  driver   [a-z]" "dockerd did not answer docker info in the instance"
 c16 "^  nesting  true$" "the instance has no security.nesting"
+
+# ---- clauses 17 and 18 --------------------------------------------------
+# TODO/machine.md T-1964, T-1965 (PodUtils/podrunner#296 asks 1 and 2).
+echo ""; echo "== 17. --storage-opt size= on a pool of the driver dir" >>"$REPORT"
+{
+out=$(P run -d --name sz434 --podvm-tier=incus --storage-opt size=1GiB "$OCI" sleep 30 </dev/null 2>&1); rc=$?
+echo "  run -d   rc $rc: $(printf '%s' "$out" | tail -1)"
+echo "  left     $(RI list --format csv -c n 2>/dev/null | grep -c '^sz434$')"
+echo "  native   $(P run --rm --storage-opt size=1GiB "$OCI" true 2>&1; echo " rc $?")"
+} >"$WORK/c17.txt" 2>&1
+cat "$WORK/c17.txt" >>"$REPORT"
+c17() { grep -q "$1" "$WORK/c17.txt" || { note "17: $2"; fail=1; }; }
+c17 "^  run -d   rc 125: .*holds no size of its root disk" "a size that the pool does not hold did not refuse by name"
+c17 "^  left     0$" "a refused size left an instance"
+c17 "^  native   .*has no root disk to size.* rc 125$" "a native run did not refuse --storage-opt by name"
+echo ""; echo "== 18. the CPU time and the peak memory in inspect" >>"$REPORT"
+{
+P run -d --name use434 --podvm-tier=incus "$OCI" sh -c 'i=0; while [ $i -lt 300000 ]; do i=$((i+1)); done; x=$(head -c 30000000 /dev/zero | tr "\0" a); sleep 60' </dev/null >/dev/null 2>&1
+sleep 12
+echo "  usage    $(P inspect --podvm-tier=incus use434 --format '{{.CpuSeconds}} {{.PeakMemoryBytes}} {{.OomKills}}' 2>&1)"
+P rm -f --podvm-tier=incus use434 >/dev/null 2>&1
+} >"$WORK/c18.txt" 2>&1
+cat "$WORK/c18.txt" >>"$REPORT"
+grep -Eq "^  usage    [0-9]+\.[0-9]+ [0-9]+ " "$WORK/c18.txt" || { note "18: inspect gave no CPU time or peak memory"; fail=1; }
 
 # ---- clause 9 -----------------------------------------------------------
 left_i=$(RI list --format csv -c n 2>&1 | grep -c .)

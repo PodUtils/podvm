@@ -20,7 +20,36 @@ pub const FIELDS: &[&str] = &[
     "Created",
     "Cmd",
     "EnteredRung",
+    "CpuSeconds",
+    "PeakMemoryBytes",
+    "OomKills",
 ];
+
+/// What incusd measured of an instance (PodUtils/podrunner#296 asks 2 and
+/// 6, TODO/machine.md T-1965, TODO/supervise.md T-1969); `None` where it
+/// gave nothing.
+#[derive(Default)]
+pub struct Usage {
+    pub cpu_s: Option<f64>,
+    pub peak_bytes: Option<i64>,
+    pub oom_kills: Option<u64>,
+}
+
+/// The usage of the instance `name` from its state and the metrics.
+pub async fn usage_of(c: &pod_incus::Client, name: &str) -> Usage {
+    let mut u = Usage::default();
+    if let Ok(s) = c.instance_state(name).await {
+        u.cpu_s = (s.cpu.usage > 0).then(|| s.cpu.usage as f64 / 1e9);
+        u.peak_bytes = (s.memory.usage_peak > 0).then_some(s.memory.usage_peak);
+    }
+    u.oom_kills = c.oom_kills(name).await.ok().flatten();
+    u
+}
+
+/// A measured value, or a dash.
+fn or_dash<T: ToString>(v: Option<T>) -> String {
+    v.map_or_else(|| "-".to_string(), |v| v.to_string())
+}
 
 /// `inspect` of each name; the exit is 1 where a name is not an instance.
 pub fn inspect(args: &[String]) -> i32 {
@@ -100,7 +129,8 @@ pub fn inspect(args: &[String]) -> i32 {
                 },
                 Err(_) => Vec::new(),
             };
-            let fields = fields(&i, &exit, &cmd);
+            let usage = usage_of(&c, n).await;
+            let fields = fields(&i, &exit, &cmd, &usage);
             match &template {
                 Some(t) => match crate::format::render(t, &fields) {
                     Ok(line) => println!("{line}"),
@@ -109,7 +139,7 @@ pub fn inspect(args: &[String]) -> i32 {
                         return EXIT_CLI_ERROR;
                     }
                 },
-                None => docs.push(json(&i, &exit, &cmd)),
+                None => docs.push(json(&i, &exit, &cmd, &usage)),
             }
         }
         if template.is_none() && !docs.is_empty() {
@@ -123,7 +153,12 @@ pub fn inspect(args: &[String]) -> i32 {
 }
 
 /// The fields of an instance for `--format`.
-pub fn fields(i: &pod_incus::Instance, exit: &str, cmd: &[String]) -> Vec<(&'static str, String)> {
+pub fn fields(
+    i: &pod_incus::Instance,
+    exit: &str,
+    cmd: &[String],
+    u: &Usage,
+) -> Vec<(&'static str, String)> {
     let image = i
         .config
         .get(IMAGE_KEY)
@@ -140,11 +175,14 @@ pub fn fields(i: &pod_incus::Instance, exit: &str, cmd: &[String]) -> Vec<(&'sta
         ("Created", i.created_at.clone()),
         ("Cmd", cmd.join(" ")),
         ("EnteredRung", "incus".to_string()),
+        ("CpuSeconds", or_dash(u.cpu_s.map(|s| format!("{s:.3}")))),
+        ("PeakMemoryBytes", or_dash(u.peak_bytes)),
+        ("OomKills", or_dash(u.oom_kills)),
     ]
 }
 
 /// The JSON of an instance, in docker's shape where a field has one.
-pub fn json(i: &pod_incus::Instance, exit: &str, cmd: &[String]) -> serde_json::Value {
+pub fn json(i: &pod_incus::Instance, exit: &str, cmd: &[String], u: &Usage) -> serde_json::Value {
     serde_json::json!({
         "Id": i.name,
         "Name": i.name,
@@ -157,5 +195,8 @@ pub fn json(i: &pod_incus::Instance, exit: &str, cmd: &[String]) -> serde_json::
         },
         "Config": { "Cmd": cmd },
         "EnteredRung": "incus",
+        "CpuSeconds": u.cpu_s,
+        "PeakMemoryBytes": u.peak_bytes,
+        "OomKills": u.oom_kills,
     })
 }

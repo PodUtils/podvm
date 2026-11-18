@@ -6,6 +6,11 @@
 
 use podvm_image::error::EXIT_FLAG_ERROR;
 
+/// The key of `--storage-opt size=N`: the size of the root disk of an
+/// incus instance, a device and not a key of its configuration
+/// (PodUtils/podrunner#296 ask 1, TODO/machine.md T-1964).
+pub(crate) const ROOT_SIZE: &str = "podvm.root.size";
+
 /// One flag and its value as the incus key and value.
 pub(crate) fn incus_limit(verb: &str, flag: &str, v: &str) -> Result<(&'static str, String), i32> {
     let bad = |why: &str| {
@@ -42,6 +47,27 @@ pub(crate) fn incus_limit(verb: &str, flag: &str, v: &str) -> Result<(&'static s
                     format!("{}%", (c * 100.0).round() as u64),
                 ))
             }
+        }
+        "--storage-opt" => {
+            let Some(size) = v.strip_prefix("size=") else {
+                return Err(bad(
+                    "takes size=N (docker's form); podvm knows no other option",
+                ));
+            };
+            let t = size.trim_end_matches(['b', 'B']);
+            let (num, mult) = match t.chars().last().map(|c| c.to_ascii_lowercase()) {
+                Some('k') => (&t[..t.len() - 1], 1u64 << 10),
+                Some('m') => (&t[..t.len() - 1], 1 << 20),
+                Some('g') => (&t[..t.len() - 1], 1 << 30),
+                Some('t') => (&t[..t.len() - 1], 1 << 40),
+                _ => (t, 1),
+            };
+            let n: u64 = num
+                .parse()
+                .map_err(|_| bad("takes size=N with k, m, g or t"))?;
+            let bytes = n.checked_mul(mult).filter(|b| *b >= 64 << 20);
+            let bytes = bytes.ok_or_else(|| bad("takes a size of at least 64m"))?;
+            Ok((ROOT_SIZE, format!("{bytes}B")))
         }
         _ => {
             let n: u64 = v.parse().map_err(|_| bad("takes a count of processes"))?;

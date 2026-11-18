@@ -268,6 +268,7 @@ pub fn run(args: &[String]) -> i32 {
     let opts = Options {
         partial: false,
         stdout: None,
+        stderr: None,
         allow_connect: allow_connect.clone(),
         way_out,
         // podcrates `v0.62.0` (podcrates@T-759): no served port of the

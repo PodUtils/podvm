@@ -147,6 +147,12 @@ pub const RUN_OPTIONS: &str = "\
                    limits of a native run where the host delegates a cgroup2
                    subtree, and of the incus tier; else refused by name
                    (TODO/machine.md T-1747, T-1897)
+  --storage-opt size=N
+                   the incus tier: the size of the root disk of the
+                   instance (a copy of the root device of the default
+                   profile); a pool that holds no size (the driver dir)
+                   refuses the run. Each other tier refuses it by name
+                   (TODO/machine.md T-1964)
   --network broker, --allow HOST, --ports P
                    an egress broker that allows HOST on the ports P (443 by
                    default); it needs --podvm-tier=syscall or machine

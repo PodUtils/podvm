@@ -121,6 +121,19 @@ pub(super) fn limits(
     if limits.is_empty() {
         return Ok(());
     }
+    // TODO/machine.md T-1964: the size of a root disk is a device of an
+    // incus instance; no other tier has one to size.
+    if limits
+        .iter()
+        .any(|(_, k, _)| *k == super::parse::limits::ROOT_SIZE)
+    {
+        eprintln!(
+            "podvm {verb}: --storage-opt size= sizes the root disk of an instance of the \
+             incus tier (--podvm-tier=incus); this tier has no root disk to size \
+             (TODO/machine.md T-1964, T-1968)"
+        );
+        return Err(EXIT_FLAG_ERROR);
+    }
     // PodUtils/podrunner#296 ask 4 (TODO/machine.md T-1967): the init of a
     // machine guest holds `--pids-limit` in a cgroup of the guest.
     if tier == Tier::Machine {

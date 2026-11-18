@@ -121,8 +121,9 @@ pub(super) async fn detached(c: &Client, job: &Job<'_>, image: &str, d: &Detach)
     };
     let mut new = NewInstance::container(&name, Source::Alias(image.to_string()));
     new.devices = job_devices(job);
-    new.config
-        .extend(job.limits.iter().map(|(k, v)| (k.to_string(), v.clone()))); // T-1897
+    if let Err(e) = super::run::apply_limits(c, &mut new, &job.limits).await {
+        return fail(e); // T-1897, T-1964
+    }
     new.config.insert("raw.lxc".into(), INIT.into());
     new.config.insert(LABEL.into(), "1".into());
     new.config.insert(IMAGE_KEY.into(), d.image.clone());
@@ -163,6 +164,12 @@ pub(super) async fn detached(c: &Client, job: &Job<'_>, image: &str, d: &Detach)
         && let Err(e) = c.start(&name).await
     {
         // TODO/machine.md T-1846: a failed start leaves no instance.
+        let left = discard(c, &name).await;
+        return fail(format!("{e}{left}"));
+    }
+    if d.start
+        && let Err(e) = super::run::size_held(c, &name, &job.limits).await
+    {
         let left = discard(c, &name).await;
         return fail(format!("{e}{left}"));
     }
