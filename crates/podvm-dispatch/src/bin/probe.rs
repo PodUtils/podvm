@@ -23,6 +23,7 @@ fn cat(p: &str) -> String {
 }
 
 unsafe extern "C" {
+    fn sigaltstack(new: *const [i64; 3], old: *mut [i64; 3]) -> i32;
     fn fork() -> i32;
     fn waitpid(pid: i32, status: *mut i32, opt: i32) -> i32;
     fn signal(sig: i32, h: extern "C" fn(i32)) -> usize;
@@ -103,6 +104,19 @@ fn main() {
                 raise(10);
             }
             println!("usr1 {}", GOT.load(Ordering::SeqCst));
+        }
+        // exec on an alternate signal stack of SIZE bytes (gate 44312445769).
+        "exec-alt" => {
+            let size: usize = arg(2).parse().unwrap_or(8192);
+            let mem: &'static mut [u8] = Box::leak(vec![0u8; size].into_boxed_slice());
+            let st = [mem.as_mut_ptr() as i64, 0, size as i64];
+            // SAFETY: a stack_t of a leaked buffer, which lives to the exec.
+            if unsafe { sigaltstack(&st, std::ptr::null_mut()) } != 0 {
+                println!("ERR sigaltstack");
+                return;
+            }
+            let e = std::process::Command::new(arg(3)).args(&args[4..]).exec();
+            println!("ERR {e}");
         }
         "exec" => {
             let e = std::process::Command::new(arg(2)).args(&args[3..]).exec();

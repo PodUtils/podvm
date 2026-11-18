@@ -4,8 +4,10 @@
 //! musl's `posix_spawn` has about 5 KiB. A buffer of `PATH_MAX` on that stack
 //! wrote over the parent's frame (measured: the exec of such a child
 //! faulted at address 59). The handler also cannot move to a stack of its
-//! own: a nested signal with `SA_ONSTACK` would then start at the top of the
-//! alternate stack, over the frame of the SIGSYS. So the buffers come from
+//! own for each call: a nested signal with `SA_ONSTACK` would then start at
+//! the top of an alternate stack that is not disarmed, over the frame of the
+//! SIGSYS (`exec::execveat` moves, as `SS_AUTODISARM` holds; TODO/enter.md
+//! T-1976). So the buffers come from
 //! this pool: a bitmap of 128 buffers, taken with a compare-and-swap, and an
 //! anonymous map of its own for each buffer past that.
 

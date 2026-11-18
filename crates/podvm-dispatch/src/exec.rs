@@ -97,8 +97,62 @@ fn check(buf: &[u8; PATH_MAX], n: usize) -> i64 {
     verdict
 }
 
-/// The payload's execveat(2).
+/// The bytes of the stack of [`execveat`], above one guard page.
+const OWN_STACK: usize = 256 << 10;
+
+/// The payload's execveat(2), on a stack of its own.
+///
+/// ⛔ The handler runs on the payload's alternate signal stack, and Rust's
+/// std gives each thread one of `max(SIGSTKSZ, AT_MINSIGSTKSZ)` bytes: 8 KiB
+/// on a CPU without AMX. The exec path needs more than 8 KiB in a debug
+/// build and 4 to 5 KiB in a release build, with the frame of the kernel
+/// (measured on 2026-11-18: gate 44312445769 died of SIGSEGV in the test
+/// `exec_loads_the_next_program_in_the_root`). An exec is rare, so it runs
+/// on a map of its own; a successful exec drops the map with the process.
+/// A nested signal stays safe: [`crate::signals::sigaltstack`] arms each
+/// alternate stack with `SS_AUTODISARM`, so the kernel delivers it on this
+/// stack, not over the frame of the SIGSYS. Where the map fails, the call
+/// runs on the stack that it has.
 pub fn execveat(dirfd: i64, p: i64, argv: i64, envp: i64, flags: i64) -> i64 {
+    let args = [dirfd, p, argv, envp, flags];
+    // SAFETY: an anonymous map with no reserve; its first page is the guard.
+    let m = unsafe { sc6(nr::MMAP, 0, (OWN_STACK + 4096) as i64, 3, 0x4022, -1, 0) };
+    if m < 0 {
+        return execveat_here(&args);
+    }
+    // SAFETY: the first page of the map.
+    unsafe { sc(nr::MPROTECT, m, 4096, 0) };
+    let top = m + 4096 + OWN_STACK as i64;
+    let r: i64;
+    // SAFETY: `top` is the 16-aligned end of a map that nothing else uses;
+    // r12 keeps the old stack across the call (callee-saved), and the call
+    // keeps the C ABI.
+    unsafe {
+        core::arch::asm!(
+            "mov r12, rsp",
+            "mov rsp, {top}",
+            "call {f}",
+            "mov rsp, r12",
+            top = in(reg) top,
+            f = sym on_own_stack,
+            in("rdi") args.as_ptr(),
+            out("r12") _,
+            lateout("rax") r,
+            clobber_abi("C"),
+        );
+        sc(nr::MUNMAP, m, (OWN_STACK + 4096) as i64, 0);
+    }
+    r
+}
+
+extern "C" fn on_own_stack(a: *const i64) -> i64 {
+    // SAFETY: `a` points at the five arguments of [`execveat`].
+    let a = unsafe { core::slice::from_raw_parts(a, 5) };
+    execveat_here(a)
+}
+
+fn execveat_here(a: &[i64]) -> i64 {
+    let (dirfd, p, argv, envp, flags) = (a[0], a[1], a[2], a[3], a[4]);
     let Some(mut g) = crate::pool::Buf::get() else {
         return -sys::ENOMEM;
     };

@@ -279,3 +279,21 @@ fn the_hold_lets_the_payload_reach_the_broker_only() {
     );
     assert_eq!(probe(&r, &["connect", &to(other_port)]).0, "connect 111");
 }
+
+/// The handler runs on the payload's alternate signal stack: 8 KiB from
+/// Rust's std on a CPU without AMX. The exec path ran out of it in a debug
+/// build (gate 44312445769, SIGSEGV); it runs on a stack of its own now.
+#[test]
+fn exec_runs_on_a_small_alternate_signal_stack() {
+    let Some(r) = root("alt") else { return };
+    for size in ["8192", "16384"] {
+        assert_eq!(
+            probe(
+                &r,
+                &["exec-alt", size, "/bin/probe", "cat", "/etc/podvm-marker"]
+            ),
+            ("inroot".into(), 0),
+            "an alternate signal stack of {size} bytes"
+        );
+    }
+}

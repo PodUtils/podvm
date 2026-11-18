@@ -4694,3 +4694,36 @@ As uid 1000 under `scripts/dev/nouserns.c`, `--podvm-tier=syscall`: `cd /tmp; ln
 ## Done
 
 **Done (2026-11-18).** `podvm-dispatch/src/follow.rs`, called from `path::open_in`. Measured as in the Prove with `docker.io/library/python:3.13-slim`: `link-ok`, `venv-tmp-ok`, `venv-vol-ok /w/v`, `rel-ok`, and `ls /w/nope` gives "No such file or directory". The walk opens only at the root and at the volumes (`path::base_of`), never at the host.
+
+# T-1976: The handler of the syscall tier overflows a small alternate signal stack of the payload
+
+**Source:** gate run 44312445769 (2026-11-18, `bab0ea1`): the test `exec_loads_the_next_program_in_the_root` died of SIGSEGV on CI twice, and passed on the cloud host
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+The SIGSYS handler has `SA_ONSTACK`, so it runs on the alternate signal stack of the payload's thread. Rust's std gives each thread one of `max(SIGSTKSZ, AT_MINSIGSTKSZ)` bytes: 8 KiB on a CPU without AMX, more on a CPU with AMX (the cloud host). The kernel puts its frame (about 3 KiB with AVX-512) on the same stack. Measured with the probe verb `exec-alt SIZE`: before the fix, the exec path needed more than 8 KiB in a debug build and more than 4 KiB in a release build. T-1975 added a few hundred bytes to `path::open_in`, and the debug test went over the edge on CI.
+
+## Premise
+
+`signals::sigaltstack` arms each alternate stack of the payload with `SS_AUTODISARM`, so while the handler runs on it, the kernel delivers a nested signal on the current stack, not at the top of the alternate stack.
+
+## Approach
+
+`exec::execveat` runs its body on an anonymous map of 256 KiB with a guard page (an exec is rare; a successful exec drops the map). Where the map fails, it runs on the stack that it has. The remainder: the other calls of the handler, which use about 5 KiB in a debug build before an exec, move to a stack of their own too, from a pool as `pool::Buf`, so that a payload with an alternate stack of `MINSIGSTKSZ` plus the frame of the kernel is safe.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test -p podvm-dispatch`: `exec_runs_on_a_small_alternate_signal_stack` (8 KiB and 16 KiB) passes in a debug build. The sweep of `exec-alt` from 4 KiB to 64 KiB: after the fix, a debug build passes from 6 KiB and a release build from 5 KiB (before: from 9 KiB and from 5 KiB). The remainder: each call of the handler passes on an alternate stack of 4 KiB.
+
+## Done
+
+Partial (2026-11-18): the exec path runs on a stack of its own; the test guards it. Remaining: the stack of its own for the other calls of the handler.
