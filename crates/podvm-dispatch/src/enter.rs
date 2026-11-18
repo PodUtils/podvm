@@ -59,81 +59,6 @@ fn without_interposer(e: Vec<u8>) -> Option<Vec<u8>> {
     Some(out)
 }
 
-/// The volumes of `PODVM_MAPS` in `envp` (`guest:host` pairs joined by
-/// commas; the root pair `/:ROOTFS` is the root): each host directory
-/// opened above the payload's usual range (TODO/enter.md T-1724).
-fn volumes(envp: &[OsString]) -> Result<(), String> {
-    let Some(table) = envp
-        .iter()
-        .find_map(|e| e.as_bytes().strip_prefix(b"PODVM_MAPS="))
-    else {
-        return Ok(());
-    };
-    let mut n = 0usize;
-    for pair in table.split(|&c| c == b',').filter(|p| !p.is_empty()) {
-        let Some(cut) = pair.iter().position(|&c| c == b':') else {
-            continue;
-        };
-        let (guest, host) = (&pair[..cut], &pair[cut + 1..]);
-        if guest == b"/" {
-            continue;
-        }
-        if n == state::MAX_VOLS {
-            return Err(format!("more than {} volumes", state::MAX_VOLS));
-        }
-        let host = std::fs::canonicalize(std::ffi::OsStr::from_bytes(host))
-            .map_err(|e| format!("the volume {}: {e}", String::from_utf8_lossy(pair)))?;
-        let mut z = host.as_os_str().as_bytes().to_vec();
-        z.push(0);
-        let fd = sys::openat2(
-            sys::AT_FDCWD,
-            &z,
-            sys::O_PATH | sys::O_DIRECTORY | sys::O_CLOEXEC,
-            0,
-            0,
-        );
-        // TODO/image.md T-1774: podvm maps a shimmed device of the tree to
-        // the host's device for the loader. This rung serves directory
-        // volumes only, so the pair stays out and the tree's node serves.
-        if fd == -20 && guest == &pair[cut + 1..] && guest.starts_with(b"/dev/") {
-            continue;
-        }
-        if fd < 0 {
-            return Err(format!("the volume {}: errno {}", host.display(), -fd));
-        }
-        // SAFETY: fcntl and close read no memory.
-        let high = unsafe { sc(nr::FCNTL, fd, 1030, 1001) };
-        let fd = if high >= 0 {
-            sys::close(fd);
-            high
-        } else {
-            fd
-        };
-        let v = &state::VOLS[n];
-        v.guest.set(guest.strip_suffix(b"/").unwrap_or(guest));
-        v.host.set(&z[..z.len() - 1]);
-        v.fd.store(fd, Ordering::Relaxed);
-        n += 1;
-    }
-    state::NVOLS.store(n, Ordering::Release);
-    // TODO/enter.md T-1901: the `:ro` volumes of `PODVM_RO`.
-    if let Some(ro) = envp
-        .iter()
-        .find_map(|e| e.as_bytes().strip_prefix(b"PODVM_RO="))
-    {
-        crate::ro::mark(ro);
-    }
-    // TODO/enter.md T-1908: the name of `--hostname`.
-    if let Some(name) = envp
-        .iter()
-        .find_map(|e| e.as_bytes().strip_prefix(b"PODVM_HOSTNAME="))
-        && !crate::uts::set(name)
-    {
-        return Err("PODVM_HOSTNAME is empty or longer than 64 bytes".into());
-    }
-    Ok(())
-}
-
 fn read_head(fd: i64) -> [u8; 256] {
     let mut h = [0u8; 256];
     // SAFETY: h lives for the call.
@@ -384,7 +309,7 @@ fn try_enter(
         fd
     };
     state::ROOT_FD.store(fd, Ordering::Relaxed);
-    volumes(&envp)?;
+    crate::vols::volumes(&envp)?;
     let argv: Vec<Vec<u8>> = argv.into_iter().map(OsStringExt::into_vec).collect();
     let (prog, pfd, head, argv) = resolve(exe.to_vec(), argv)?;
     EXE.set(&prog);

@@ -4601,7 +4601,7 @@ On a host with a delegated cgroup2 subtree, a shell that forks and reparents a s
 **Milestone:** none
 **Priority:** P1
 **Effort:** L
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -4624,3 +4624,8 @@ On the namespace rung the flag holds (T-1945): pod-enter binds the descriptor. T
 ## Prove
 
 As uid 1000 under the seccomp filter that denies user namespaces (`scripts/dev/nouserns.c`), on the supervise and the userland rung: with `--podvm-volume-base BASE -v BASE/w:/w`, a link that the host makes at `BASE/w/sub` to a directory out of BASE after the start gives the payload `ELOOP` or `EXDEV` for `/w/sub/f`, never the file out of BASE; a plain file under `BASE/w` reads and writes.
+
+## Done
+
+**Partial (2026-11-18, the syscall tier).** On a host with no user namespace, podrunner's units take `--podvm-tier=syscall` (T-1935), which `--podvm-volume-base` now serves: the handler of `podvm-dispatch` opens each volume under `PODVM_VOLUME_BASE` with `openat2(RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS)` (`vols::beneath`), where it opened the canonical path before, and resolves each later path under that descriptor with `RESOLVE_IN_ROOT` as before; `run::binds::refuse_base_off_binds` refuses only the loader family now. The "supervise" selection enters through the chroot sequence (`pod_enter::spawn_selected`), so no entry of a supervise rung holds volumes of its own. Measured as uid 1000 under `scripts/dev/nouserns.c` (`inspect`: `userland syscall`) with `docker.io/library/python:3.13-slim`: the loader family refuses the flag with exit 125 and one line; `-v BASE/work:/w` writes and reads; `-v BASE/link:/w` (a link out of BASE) exits 125; in a `run -d`, a link that the host makes at `BASE/work/sub` to a directory out of BASE after the start gives the payload `No such file or directory` for `/w/sub/f`, not the file out of BASE. `a_volume_opens_under_its_base_with_no_link` pins the open. Remaining: the loader family (step 3 of the Approach).
+

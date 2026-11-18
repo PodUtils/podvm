@@ -10,13 +10,17 @@ They describe their recorded revision, not the current build.
 
 ### Added: `--env-file0` for a value with a newline, 2026-11-18
 
-Record: T-1971.
+Record: T-1971, T-1972.
 Deployed: none yet.
 
 - `run`, `run -d`, `create` and `exec` take `--env-file0 PATH`: entries
   `KEY=VALUE` with a NUL after each, as `env -0` writes them, so that a
   multi-line secret stays out of the argv of podvm
   (PodUtils/podrunner#300).
+- `--podvm-volume-base` holds on the syscall tier too
+  (`--podvm-tier=syscall`, a host with no user namespace): each volume
+  under the base opens with no symbolic link, and the handler resolves
+  each path under it (PodUtils/podrunner#300, ask 3).
 
 ## 0.2.0-beta.32 (2026-11-18)
 

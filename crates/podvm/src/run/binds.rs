@@ -81,18 +81,38 @@ pub(super) fn push_env(
     }
 }
 
-/// PodUtils/podrunner#277: only a bind holds a descriptor of a source; the
-/// userland rung maps each path at each call.
-pub(super) fn refuse_base_off_binds(verb: &str, base: bool, on_userland: bool) -> Result<(), i32> {
-    if base && on_userland {
+/// PodUtils/podrunner#277: a bind holds a descriptor of a source, and so
+/// does the handler of the syscall tier, which opens each volume once
+/// (T-1972); the loader family of the userland rung maps each path at each
+/// call and holds none.
+pub(super) fn refuse_base_off_binds(
+    verb: &str,
+    base: bool,
+    userland: Option<&crate::lifecycle::Userland>,
+) -> Result<(), i32> {
+    if base && userland.is_some_and(|u| u.dispatch_exe.is_none()) {
         eprintln!(
             "podvm {verb}: --podvm-volume-base needs a bind of each volume (the namespace \
-             rung), and this run entered the userland rung, which maps each path at each \
-             call and holds no descriptor of a source"
+             rung) or the syscall tier (--podvm-tier=syscall), and this run entered the \
+             loader family of the userland rung, which maps each path at each call and \
+             holds no descriptor of a source"
         );
         return Err(podvm_image::error::EXIT_RUNTIME_ERROR);
     }
     Ok(())
+}
+
+/// The base of `--podvm-volume-base` for the handler of the syscall tier,
+/// which opens each volume under it (`PODVM_VOLUME_BASE`, T-1972).
+pub(super) fn push_dispatch_base(
+    userland: Option<&crate::lifecycle::Userland>,
+    base: Option<&str>,
+    env: &mut Vec<String>,
+) {
+    env.retain(|e| !e.starts_with("PODVM_VOLUME_BASE="));
+    if let (Some(b), true) = (base, userland.is_some_and(|u| u.dispatch_exe.is_some())) {
+        env.push(format!("PODVM_VOLUME_BASE={b}"));
+    }
 }
 
 /// The volumes at or under `/tmp`, and the others: in the user namespace of
