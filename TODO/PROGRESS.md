@@ -59,6 +59,12 @@ first entry that is not done. Read its Prove before you start. Check
 each claim that an entry waits against the code and the crates. Set its
 status with `podvm-count` in the same commit as the work.
 
+00. podrunner first (the owner's ruling, 2026-11-18, `docs/decisions.md`;
+   PodUtils/podcrates#225): after a red run of podvm's CI, each ask of
+   podrunner comes first (PodUtils/podrunner#277, #216, #189, #168, #110,
+   and each new COORD issue `(to podvm)` of podrunner), then the asks of
+   githome and cfb for their CI, then the items below. A quality item
+   that a podrunner unit meets counts as an ask of podrunner.
 0. Quality first (the owner's ruling, 2026-11-17; `docs/methodology/quality.md`):
    no beta until T-1949 holds. Verify and work the reports of the external
    QA (T-1937 to T-1945, T-1951 to T-1954), each by its class, with T-1947 (fail

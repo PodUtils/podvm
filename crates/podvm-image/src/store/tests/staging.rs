@@ -388,5 +388,6 @@ fn a_stray_goes_only_where_no_writer_is_alive_and_it_is_old() {
         assert_eq!(blob.exists(), !removed);
         assert!(blob.with_file_name("not-a-digest").exists());
         drop(held);
+        let _ = std::fs::remove_dir_all(s.root());
     }
 }
