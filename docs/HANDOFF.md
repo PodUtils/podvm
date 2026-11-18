@@ -1,6 +1,6 @@
 # Handoff
 
-The state on 2026-11-17, 18:00 (UTC), during a session. `main` is at the commit that adds
+The state on 2026-11-18, 01:20 (UTC), at the end of a session. `main` is at the commit that adds
 this file. `0.2.0-beta.31` is the last release (release run 44069288805
 on `a3370f59`). A fresh session with no memory reads this file first,
 then `AGENTS.md`, `TODO/PROGRESS.md` and `docs/decisions.md`. Remove this
@@ -133,7 +133,30 @@ file when each step below is done.
 * COORD-180 (#567, to all) says what went wrong. COORD-183 (#570) answers
   podcrates' COORD-131 (the copies of shared code, T-1955).
 
+## Done after that (2026-11-18, the night)
+
+* T-1952: #526 (`df` and `prune` count each extraction once), #528 and
+  #544 (a record takes the platform that the index served; a lookup takes
+  a variant), #527 (`image prune` removes the blobs that no record names:
+  each writer holds a shared lock on `writers.lock` of the store from the
+  first blob to the record, and a sweep keeps each blob younger than 10
+  minutes). T-1940: #490, #480, #477, #476 (Windows rows). The gate of
+  `acbde2b` passed (run 44209044675); `0623f98` is pushed, its gate not
+  yet read.
+* Push policy: commit behind `sh scripts/dev/checks.sh`, and push only
+  after the gate of the previous push ends (a newer push cancels it).
+* A test of `podvm-image` that takes a lock serialises on `STORE_TESTS`:
+  each lock takes one of 16 slots of the process.
+
 ## Next steps, in order
+
+0. Read the gate of `0623f98`. Then the remaining items of the quality
+   pass: T-1952 529 and 551 (`--tmpfs`); T-1951 517, 519, 524, 531, 546;
+   T-1953 560 and the podvm half of 566; T-1954 (machine tier, on
+   `kvm.yml`); T-1939 473, 474; T-1940 the `--format` path of 476; T-1944
+   495, 502; T-1937 `lab profiles extra`; T-1948 510; T-1947 the bounded
+   numbers of the other flags; T-1955 at the next take of podcrates
+   (`v0.69.0` holds the fix of #568); then T-1949 (the beta gate).
 
 1. Start the session (`AGENTS.md`, section 8), with the watcher.
 2. A new ask of a peer first. T-1931 is done (COORD-170 and COORD-171
