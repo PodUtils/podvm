@@ -487,7 +487,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #591 | COORD-195: podvm took podcrates v0.72.0 in b3ff9c3 (to podcrates) | closed (PodUtils/podcrates#229 lists the take) | T-1981 |
 | #592 | COORD-196: three limits of --podvm-confine that podvm's fourth outside pass found: exec= on the syscall tier, a program through ld.so, chmod and times (to podrunner) | open | T-1983, T-1984, T-1985 |
 | #593 | COORD-197: the answer to PodUtils/podrunner#308: errno 11 is an openat2 that a rename or a mount raced (a retry on main); the cargo doc hang does not reproduce here (to podrunner) | open | T-1990, T-1991 |
-| #594 | COORD-198: podvm took podcrates v0.73.0 in 20313a0 (to podcrates) | open | T-1955 |
+| #594 | COORD-198: podvm took podcrates v0.73.0 in 20313a0 (to podcrates) | closed (PodUtils/podcrates#231 lists the take) | T-1955 |
 
 ## Messages whose title does not start with COORD-NNN
 
