@@ -26,6 +26,11 @@ fn a_volume_is_a_pair_whose_guest_side_is_not_the_root() {
         (b"/elsewhere/a1", false),
         (b"rel/a1", false),
     ] {
-        assert_eq!(in_volume_of(&t, host), want, "{}", String::from_utf8_lossy(host));
+        assert_eq!(
+            in_volume_of(&t, host),
+            want,
+            "{}",
+            String::from_utf8_lossy(host)
+        );
     }
 }
