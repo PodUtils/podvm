@@ -42,6 +42,10 @@
       "Bash(git push --force-with-lease*)",
       "Bash(git push * --force*)",
       "Bash(git push * -f*)"
+    ],
+    "additionalDirectories": [
+      "/var/tmp",
+      "/tmp"
     ]
   },
   "includeCoAuthoredBy": false,
