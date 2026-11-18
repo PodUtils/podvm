@@ -5123,7 +5123,7 @@ Partial (2026-11-18): the retry is on `main`. On the cloud host (kernel 6.18) ne
 **Source:** PodUtils/podrunner#308 (COORD-098 of podrunner), item 3
 **Category:** enter
 **Milestone:** none
-**Priority:** P2
+**Priority:** P1
 **Effort:** M
 **Status:** open
 
@@ -5133,7 +5133,7 @@ podrunner's job `docs` (`cargo doc` of ripgrep at `178cc027`) on the syscall tie
 
 ## Premise
 
--
+Not reproduced on the cloud host: ripgrep at `178cc027` in a volume, `rust:1-slim`, `cargo doc --offline` on the tier ends with exit 0 in 17.5 s with `0.2.0-beta.34` and in 12.1 s with `main`. COORD-197 (#593) asks podrunner for `uname -r`, the processes of the unit with their `wchan`, and the stack of the one that waits.
 
 ## Approach
 

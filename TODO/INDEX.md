@@ -653,7 +653,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1988](enter.md) | P1 | S | none | enter | done | On the syscall tier, a volume whose guest path is not in the image cannot be stat-ed |
 | [T-1989](cli.md) | P2 | M | none | cli | open | The faults of the fourth outside pass (2026-11-18, the gate of beta.35) |
 | [T-1990](enter.md) | P1 | S | none | enter | partial | On the syscall tier, a dynamic program sometimes fails to start with "errno 11" |
-| [T-1991](enter.md) | P2 | M | none | enter | open | On the syscall tier, `cargo doc` of ripgrep prints "Compiling ripgrep" and then nothing for 45 min |
+| [T-1991](enter.md) | P1 | M | none | enter | open | On the syscall tier, `cargo doc` of ripgrep prints "Compiling ripgrep" and then nothing for 45 min |
 
 ## Counts
 
@@ -667,8 +667,8 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 0 | 14 | 0 | 238 | 252 |
-| P2 | 17 | 13 | 2 | 177 | 209 |
+| P1 | 1 | 14 | 0 | 238 | 253 |
+| P2 | 16 | 13 | 2 | 177 | 208 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
 | **All** | 22 | 31 | 3 | 532 | 588 |
 

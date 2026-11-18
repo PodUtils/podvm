@@ -1,10 +1,10 @@
 # Handoff
 
-The state on 2026-11-18, 17:55 (UTC), at the end of a session. `main` is
-at the commit that adds this file. `0.2.0-beta.34` is the last release
-(release run 44359818961 on `54d17eb`; the gate 44355776603, `workloads.yml`
-44355811110, `arm.yml` 44355803700, the nightly trial 44355796977, the
-uid-1000 tests and the third outside pass passed first). A fresh session
+The state on 2026-11-18, 22:45 (UTC), at the end of a session. `main` is
+at the commit that adds this file. `0.2.0-beta.35` is the last release
+(release run 44406181198 on `9e1e2e7`; the gate 44400983081, `workloads.yml`
+44400995816, `arm.yml` 44400989122, the nightly trial 44400982967, the
+uid-1000 tests and the fourth outside pass passed first). A fresh session
 with no memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md`
 and `docs/decisions.md`. Remove this file when each step below is done.
 
@@ -101,21 +101,39 @@ and `docs/decisions.md`. Remove this file when each step below is done.
   family). T-1981 (P1, blocked): Fedora 42's `PT_INTERP` lies past the
   64 KiB that pod-enter reads; COORD-193 (#589) asks podcrates.
 * Released `0.2.0-beta.34`; #588 and #583 name the tag.
+* After beta.34: podrunner closed #303. #304 (COORD-194, #590): T-1982,
+  `run -d` with `--podvm-confine` on the tier started nothing. podcrates
+  `v0.72.0` taken (`b3ff9c3`, COORD-195): T-1981, Fedora 42's `PT_INTERP`
+  past the head. The fourth outside pass (T-1989) found six P1 faults, each
+  in beta.34 already: T-1983 (`exec=` on the tier), T-1986 (`/root` of
+  Fedora), T-1987 (AlmaLinux's `ls -l` in the interposer), T-1988 (`stat`
+  of a volume on the tier), all fixed; T-1984 and T-1985 (Landlock checks
+  no program through `ld.so`, no `chmod` or times) named in the help by
+  call C25 and set to P2. COORD-196 (#592) told podrunner; podrunner's
+  kind does not rest on them (PodUtils/podrunner#307).
+* Released `0.2.0-beta.35`; #590 and #592 name the tag.
+* #308 (COORD-197, #593): "errno 11" on the tier is an `openat2` that a
+  rename or a mount raced; `b00c07c` tries again (T-1990, partial: not
+  reproduced here, podrunner's CI measures it with the next beta). The
+  hang of `cargo doc` of ripgrep (T-1991, P1) does not reproduce here;
+  #593 asks podrunner for its processes. podrunner keeps the tier off
+  until both are fixed.
 
 ## Next steps, in order
 
-1. Start the session (`AGENTS.md`, section 8), with the watcher.
-2. A new COORD issue `(to podvm)` of podrunner first. Watch #588 (podrunner
-   gives the syscall tier again with beta.34 and closes #303) and #583,
-   #585. Watch #589 for podcrates' tag (T-1981).
+1. Start the session (`AGENTS.md`, section 8), with the watcher (filter
+   its output to the event lines: a network retry prints a traceback).
+2. podrunner first: watch #593 (its data of the hang of T-1991, and the
+   measure of T-1990 with the next beta), #590 and #592. The next beta
+   carries T-1990; its gate needs a new outside pass.
 3. T-1972 remainder (the loader family), T-1969 remainder (the run report
    of an incus unit), then T-1968; the T-1964 remainder waits for a
    measure on a host with a quota pool (podrunner).
-4. When podcrates answers COORD-188 (#584): set the controlling terminal
+4. T-1984 and T-1985 (P2): enforce them where podvm sees the call.
+5. When podcrates answers COORD-188 (#584): set the controlling terminal
    for `-t` and remove `run::pty::send`.
-5. T-1980 (OS-03 to OS-17), T-1974 remainder (OR-07, OR-08, OR-10 to
-   OR-17), T-1970 remainder, T-1935, T-1955 remainder, then the work order
-   of `TODO/PROGRESS.md`.
+6. T-1989, T-1980, T-1974 remainders, T-1970 remainder, T-1935, T-1955
+   remainder, then the work order of `TODO/PROGRESS.md`.
 
 ## Rules learned
 
@@ -138,3 +156,6 @@ and `docs/decisions.md`. Remove this file when each step below is done.
   after an edit there.
 * A release commit is the version bump: run the nightly trial and
   `arm.yml` on it, not on the commit before.
+* A `cargo` in a payload cannot pass the proxy of the cloud host (a
+  self-signed certificate): fetch the crates on the host into a
+  `CARGO_HOME` in the volume, then `cargo ... --offline` in the payload.

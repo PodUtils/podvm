@@ -11,7 +11,12 @@ start.
 
 The state on 2026-11-18 (`docs/HANDOFF.md` has the detail):
 
-* The newest release is `v0.2.0-beta.34` (2026-11-18, release run
+* The newest release is `v0.2.0-beta.35` (2026-11-18, release run
+  44406181198 on `9e1e2e7`): the confine layer on the syscall tier
+  (T-1982, T-1983), Fedora 42 (T-1981, T-1986), AlmaLinux 9's `ls -l`
+  (T-1987), `stat` of a volume on the tier (T-1988), podcrates `v0.72.0`;
+  call C25 names two limits of Landlock (T-1984, T-1985). Before it:
+* `v0.2.0-beta.34` (2026-11-18, release run
   44359818961 on `54d17eb`): the syscall tier for podrunner's jobs (T-1976,
   T-1977, T-1978), a link in a volume on the loader family (T-1979), the
   OOM kills of a machine guest (T-1969 partial), `exec` after `--tmpfs`
