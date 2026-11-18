@@ -4727,3 +4727,36 @@ The SIGSYS handler has `SA_ONSTACK`, so it runs on the alternate signal stack of
 ## Done
 
 Partial (2026-11-18): the exec path runs on a stack of its own; the test guards it. Remaining: the stack of its own for the other calls of the handler.
+
+# T-1977: On the syscall tier, a relative path of a glibc program through an absolute link resolves on the host
+
+**Source:** PodUtils/podrunner#303 (COORD-093 of podrunner); answer COORD-192 (#588)
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+podrunner's `links.rs` failed under `--podvm-tier=syscall` on its runner image (Ubuntu): `cat link`, with `link -> /NAME` in the work directory and `/NAME` in the rootfs, gave ENOENT. `cat /podrunner/link` worked, and a static program or an alpine (musl) program worked with the same relative path.
+
+## Premise
+
+A descriptor is an `int`: the kernel reads the low 32 bits of its register. glibc fills the register of `AT_FDCWD` as `0x00000000FFFFFF9C`; musl and Rust's std give it sign-extended.
+
+## Approach
+
+`path::fd_link` compared the whole register with `AT_FDCWD`, so for glibc it read `/proc/self/fd/4294967196`, which does not exist, and `path::target` passed the call to the kernel, which resolved the link against the host's root (`strace`: `readlinkat(AT_FDCWD, "/proc/self/fd/4294967196") = -ENOENT`). `fd_link` now takes the descriptor as the kernel does (`fd as i32 as i64`). Each path call of the handler reads its descriptor through it.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test -p podvm-dispatch`: `a_relative_path_through_an_absolute_link_resolves_in_the_root` (the probe verb `cat-zx` calls `openat` with the register as glibc fills it; it fails before the fix and passes after it). As uid 1000 under `scripts/dev/nouserns.c`, `run -d --podvm-tier=syscall -w /podrunner public.ecr.aws/ubuntu/ubuntu:24.04`, a host-made `/NAME` and `podrunner/link -> /NAME`: the payload's `cat link` reads the file.
+
+## Done
+
+**Done (2026-11-18).** The test above fails before the fix and passes after it. Measured on the cloud host with `mirror.gcr.io/library/ubuntu:24.04`: podrunner's case reads the body; `cat`, `grep` and `stat -L` through a relative absolute link pass in a directory of the rootfs and from `/`; `cd /tmp; ln -s /etc/hostname h; cat h` passes.

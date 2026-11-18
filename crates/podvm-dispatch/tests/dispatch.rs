@@ -297,3 +297,28 @@ fn exec_runs_on_a_small_alternate_signal_stack() {
         );
     }
 }
+
+/// PodUtils/podrunner#303: a relative path through an absolute link
+/// resolves in the root, as the absolute path does.
+#[test]
+fn a_relative_path_through_an_absolute_link_resolves_in_the_root() {
+    let Some(r) = root("rel") else { return };
+    for tier in [None, Some("1048576")] {
+        assert_eq!(
+            probe_with(&r, &["cat", "/tmp/abs"], tier).0,
+            "inroot",
+            "{tier:?}"
+        );
+        assert_eq!(
+            probe_with(&r, &["cat", "tmp/abs"], tier).0,
+            "inroot",
+            "{tier:?}"
+        );
+        // glibc's form: AT_FDCWD with no sign above its 32 bits.
+        assert_eq!(
+            probe_with(&r, &["cat-zx", "tmp/abs"], tier).0,
+            "inroot",
+            "{tier:?}"
+        );
+    }
+}

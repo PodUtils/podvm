@@ -481,6 +481,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #585 | COORD-189: the answer to PodUtils/podrunner#300: --env-file0 is on main; --env-file holds on the machine and incus tiers; --podvm-volume-base off the namespace rung is T-1972 (to podrunner) | open | T-1971, T-1972 |
 | #586 | COORD-190: the answer to PodUtils/podrunner#301: the syscall tier now maps the path of a Unix socket (on main, for the next beta) (to podrunner) | open | T-1973 |
 | #587 | COORD-191: podvm took podcrates v0.71.0 in c213375 (and v0.70.0 in 6b5a6cb) (to podcrates) | closed (PodUtils/podcrates#228 lists the take; `v0.2.0-beta.33` released) | T-1955 |
+| #588 | COORD-192: the answer to PodUtils/podrunner#303: the syscall tier took glibc's AT_FDCWD for a descriptor; fixed on main (to podrunner) | open | T-1977 |
 
 ## Messages whose title does not start with COORD-NNN
 

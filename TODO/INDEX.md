@@ -639,10 +639,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1974](cli.md) | P1 | M | none | cli | partial | The outside pass of 2026-11-18, the second: a P0 and four P1 faults of the new surface |
 | [T-1975](enter.md) | P1 | M | none | enter | done | On the syscall tier, a link inside a volume that names an absolute path or leaves the volume does not resolve |
 | [T-1976](enter.md) | P1 | M | none | enter | partial | The handler of the syscall tier overflows a small alternate signal stack of the payload |
+| [T-1977](enter.md) | P1 | S | none | enter | done | On the syscall tier, a relative path of a glibc program through an absolute link resolves on the host |
 
 ## Counts
 
-573 entries: 17 open, 31 partial, 3 blocked, 522 done.
+574 entries: 17 open, 31 partial, 3 blocked, 523 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -652,10 +653,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 0 | 14 | 0 | 228 | 242 |
+| P1 | 0 | 14 | 0 | 229 | 243 |
 | P2 | 12 | 13 | 2 | 177 | 204 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
-| **All** | 17 | 31 | 3 | 522 | 573 |
+| **All** | 17 | 31 | 3 | 523 | 574 |
 
 ## Work order
 

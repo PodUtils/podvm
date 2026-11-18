@@ -8,6 +8,10 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- On the syscall tier, a relative path of a glibc program through an
+  absolute link resolves in the root, not on the host: the handler takes
+  `AT_FDCWD` as the kernel does, from the low 32 bits of the register
+  (T-1977, PodUtils/podrunner#303).
 - The run report of a machine guest has `oom_kills`: the guest init gives
   the count `oom_kill` of its kernel with the exit marker (T-1969,
   PodUtils/podrunner#296 ask 6). Measured under TCG with `--podvm-mem

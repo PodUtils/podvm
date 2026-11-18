@@ -23,6 +23,7 @@ fn cat(p: &str) -> String {
 }
 
 unsafe extern "C" {
+    fn syscall(n: i64, ...) -> i64;
     fn sigaltstack(new: *const [i64; 3], old: *mut [i64; 3]) -> i32;
     fn fork() -> i32;
     fn waitpid(pid: i32, status: *mut i32, opt: i32) -> i32;
@@ -38,6 +39,22 @@ fn main() {
     let arg = |i: usize| args.get(i).cloned().unwrap_or_default();
     match verb {
         "cat" => println!("{}", cat(&arg(2))),
+        // PodUtils/podrunner#303: openat as glibc calls it, with AT_FDCWD
+        // in the low 32 bits of the register and zeros above.
+        "cat-zx" => {
+            let path = std::ffi::CString::new(arg(2)).unwrap_or_default();
+            // SAFETY: openat(2) with a NUL-ended path that lives for the call.
+            let fd = unsafe { syscall(257, 0xFFFF_FF9Ci64, path.as_ptr(), 0i64, 0i64) };
+            if fd < 0 {
+                println!("ERR {}", std::io::Error::last_os_error());
+            } else {
+                use std::os::fd::FromRawFd;
+                let mut s = String::new();
+                // SAFETY: fd is a new descriptor that this File owns.
+                let _ = unsafe { std::fs::File::from_raw_fd(fd as i32) }.read_to_string(&mut s);
+                println!("{}", s.trim_end());
+            }
+        }
         "cwd" => println!(
             "{}",
             std::env::current_dir()

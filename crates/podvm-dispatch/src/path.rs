@@ -26,6 +26,12 @@ pub enum Target {
 
 /// `/proc/self/fd/N`, or `/proc/self/cwd` for `AT_FDCWD`, with its NUL.
 pub fn fd_link(fd: i64, out: &mut [u8; 32]) -> &[u8] {
+    // ⛔ A descriptor is an `int`: the kernel reads the low 32 bits of the
+    // register. glibc gives `AT_FDCWD` as 0xFFFFFF9C with no sign above it,
+    // so a compare of the whole register missed it, the path stayed the
+    // host's, and a relative path through an absolute link resolved on the
+    // host (PodUtils/podrunner#303, TODO/enter.md T-1977).
+    let fd = fd as i32 as i64;
     if fd == AT_FDCWD {
         return b"/proc/self/cwd\0";
     }
