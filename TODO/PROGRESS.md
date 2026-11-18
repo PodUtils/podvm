@@ -11,7 +11,12 @@ start.
 
 The state on 2026-11-18 (`docs/HANDOFF.md` has the detail):
 
-* The newest release is `v0.2.0-beta.33` (2026-11-18, release run
+* The newest release is `v0.2.0-beta.34` (2026-11-18, release run
+  44359818961 on `54d17eb`): the syscall tier for podrunner's jobs (T-1976,
+  T-1977, T-1978), a link in a volume on the loader family (T-1979), the
+  OOM kills of a machine guest (T-1969 partial), `exec` after `--tmpfs`
+  (T-1974). Its known gaps name T-1980 and T-1981. Before it:
+* `v0.2.0-beta.33` (2026-11-18, release run
   44324846613 on `2bec174`): `--env-file0` (T-1971), the volume base and
   the Unix sockets of the syscall tier (T-1972 partial, T-1973), links
   across volumes (T-1975), the size and the usage of an incus instance

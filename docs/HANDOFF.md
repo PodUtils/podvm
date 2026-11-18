@@ -1,12 +1,12 @@
 # Handoff
 
-The state on 2026-11-18, 14:55 (UTC), at the end of a session. `main` is
-at the commit that adds this file. `0.2.0-beta.33` is the last release
-(release run 44324846613 on `2bec174`; the gate 44320118793, `arm.yml`
-44320135003, the nightly trial 44320128418 and `workloads.yml` on
-`536a66f` passed first). A fresh session with no memory reads this file
-first, then `AGENTS.md`, `TODO/PROGRESS.md` and `docs/decisions.md`.
-Remove this file when each step below is done.
+The state on 2026-11-18, 17:55 (UTC), at the end of a session. `main` is
+at the commit that adds this file. `0.2.0-beta.34` is the last release
+(release run 44359818961 on `54d17eb`; the gate 44355776603, `workloads.yml`
+44355811110, `arm.yml` 44355803700, the nightly trial 44355796977, the
+uid-1000 tests and the third outside pass passed first). A fresh session
+with no memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md`
+and `docs/decisions.md`. Remove this file when each step below is done.
 
 ## The rulings of this day
 
@@ -88,25 +88,34 @@ Remove this file when each step below is done.
   is a stack of its own for each call of the handler.
 * Released `0.2.0-beta.33`; #583, #585 and #586 name the tag for
   podrunner; #587 (COORD-191) is closed (podcrates lists the take).
+* After beta.33: podrunner took it (PodUtils/podrunner#296, #300, #301
+  closed). Its CI found PodUtils/podrunner#303: T-1977 (glibc's
+  `AT_FDCWD` in the low 32 bits; answer COORD-192, #588). T-1969: a
+  machine guest gives `oom_kills`. T-1976 done: each call of the
+  syscall-tier handler runs on a stack of its own (the gate died of
+  SIGSEGV on CI twice; the cloud host's CPU has AMX, so its tests passed).
+* The gate of beta.34: the uid-1000 tests found a regression of OR-04
+  (`exec` after `--tmpfs`, fixed in T-1974); the third outside pass (T-1980)
+  found two P1 faults, fixed: T-1978 (`posix_spawn` of a link in a volume
+  on the syscall tier) and T-1979 (a link in a volume on the loader
+  family). T-1981 (P1, blocked): Fedora 42's `PT_INTERP` lies past the
+  64 KiB that pod-enter reads; COORD-193 (#589) asks podcrates.
+* Released `0.2.0-beta.34`; #588 and #583 name the tag.
 
 ## Next steps, in order
 
-1. Start the session (`AGENTS.md`, section 8), with the watcher. Amend
-   COORD-184 (#571) with the state of the session.
-2. A new COORD issue `(to podvm)` of podrunner first. Watch #572, #583,
-   #585 and #586 for podrunner's answers (it takes beta.33 and closes its
-   asks #296, #300 and #301). Then the T-1972 remainder (the loader
-   family).
-3. T-1969 remainder (a machine guest), then T-1968; the T-1964 remainder
-   waits for a measure on a host with a quota pool (podrunner).
-4. T-1976 remainder: a stack of its own for each call of the handler (a
-   pool of stacks, as `pool::Buf`).
-5. When podcrates answers COORD-188 (#584): set the controlling terminal
+1. Start the session (`AGENTS.md`, section 8), with the watcher.
+2. A new COORD issue `(to podvm)` of podrunner first. Watch #588 (podrunner
+   gives the syscall tier again with beta.34 and closes #303) and #583,
+   #585. Watch #589 for podcrates' tag (T-1981).
+3. T-1972 remainder (the loader family), T-1969 remainder (the run report
+   of an incus unit), then T-1968; the T-1964 remainder waits for a
+   measure on a host with a quota pool (podrunner).
+4. When podcrates answers COORD-188 (#584): set the controlling terminal
    for `-t` and remove `run::pty::send`.
-6. T-1974 remainder (OR-07, OR-08, OR-10 to OR-17), T-1970 remainder
-   (OQ-04, OQ-06 to OQ-17), T-1935 (the syscall tier by default after its
-   cost, T-1740), T-1955 remainder, then the work order of
-   `TODO/PROGRESS.md`.
+5. T-1980 (OS-03 to OS-17), T-1974 remainder (OR-07, OR-08, OR-10 to
+   OR-17), T-1970 remainder, T-1935, T-1955 remainder, then the work order
+   of `TODO/PROGRESS.md`.
 
 ## Rules learned
 
@@ -123,3 +132,9 @@ Remove this file when each step below is done.
   CPU: the cloud host has AMX, which makes `AT_MINSIGSTKSZ` and each
   alternate signal stack of a Rust thread larger. Measure with the probe
   verb `exec-alt SIZE` of `podvm-dispatch`.
+* `scripts/dev/checks.sh` does not run `cargo fmt` of
+  `crates/podvm-interpose` (it is not in the workspace); the gate does.
+  Run `cargo fmt --manifest-path crates/podvm-interpose/Cargo.toml --all`
+  after an edit there.
+* A release commit is the version bump: run the nightly trial and
+  `arm.yml` on it, not on the commit before.
