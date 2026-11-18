@@ -277,7 +277,16 @@ pub fn refuse_detached_userland(
                 && u.family != podvm_enter::userland::Family::Loader
                 && native_drive(u).is_none() =>
         {
-            eprintln!("{}", detached_userland_refusal(verb, u.family.name()));
+            // PodUtils/podvm#554: the emulate tier names itself; the text of
+            // a denied chroot was false on a host where chroot works.
+            if u.emulator.is_some() {
+                eprintln!(
+                    "podvm {verb}: --podvm-tier=emulate serves a foreground `run` only; it \
+                     has no detached form (TODO/enter.md T-1651)"
+                );
+            } else {
+                eprintln!("{}", detached_userland_refusal(verb, u.family.name()));
+            }
             Err(podvm_image::error::EXIT_RUNTIME_ERROR)
         }
         _ => Ok(()),
