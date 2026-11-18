@@ -8,10 +8,37 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+## 0.2.0-beta.33 (2026-11-18)
+
+### Known gaps: what the checks of 0.2.0-beta.33 prove, and what stays open, 2026-11-18
+
+Record: T-1949, T-1974.
+Deployed: version 0.2.0-beta.33.
+
+What the checks of this beta prove: the gate, the integration tests as uid
+1000, `workloads.yml`, `arm.yml`, the nightly trial, experiment 434 (the
+incus tier, clauses 1 to 18) and an outside pass with the binary and
+`podvm man` only (T-1974), whose P0 and P1 faults are fixed.
+
+Each open fault that a user can meet:
+
+- `--storage-opt size=` is measured only where the pool holds no size (a
+  refusal); a pool with a quota (btrfs, zfs, lvm) is not measured.
+- On the syscall tier: `getsockname` of a socket in the container names
+  `/proc/self/fd/N/...` (OR-07); a file as a `-v` source, a directory as
+  the command and an environment over the kernel's limit exit 127 with a
+  message that names the wrong cause (OR-10 to OR-12).
+- `--podvm-volume-base` accepts a `-v` source that is not under DIR with no
+  word (OR-08); the loader family of the userland rung refuses the flag.
+- The pty of `-t` is still no controlling terminal: Ctrl-C works, `^Z` and
+  the job control of a shell do not (COORD-188).
+- The faults of `0.2.0-beta.32`'s known gaps stay open where this list does
+  not name them as fixed (OQ-04, OQ-06 to OQ-10).
+
 ### Fixed: the faults of the second outside pass, 2026-11-18
 
 Record: T-1974, T-1975.
-Deployed: none yet.
+Deployed: version 0.2.0-beta.33.
 
 - On the syscall tier, `exec` opens each volume under the base of the run:
   a link that replaced a source after the start is refused (exit 125), not
@@ -28,7 +55,7 @@ Deployed: none yet.
 ### Fixed: a Unix socket of a volume on the syscall tier, 2026-11-18
 
 Record: T-1973.
-Deployed: none yet.
+Deployed: version 0.2.0-beta.33.
 
 - On `--podvm-tier=syscall`, `connect` and `bind` of a Unix socket take the
   path in the container, as each other path call does: a payload reaches
@@ -38,7 +65,7 @@ Deployed: none yet.
 ### Added: the size of the root disk and the usage of an incus instance, 2026-11-18
 
 Record: T-1964, T-1965.
-Deployed: none yet.
+Deployed: version 0.2.0-beta.33.
 
 - `--storage-opt size=N` of the incus tier sizes the root disk of the
   instance; a storage pool that holds no size (the driver `dir`) refuses
@@ -50,7 +77,7 @@ Deployed: none yet.
 ### Added: `--env-file0` for a value with a newline, 2026-11-18
 
 Record: T-1971, T-1972.
-Deployed: none yet.
+Deployed: version 0.2.0-beta.33.
 
 - `run`, `run -d`, `create` and `exec` take `--env-file0 PATH`: entries
   `KEY=VALUE` with a NUL after each, as `env -0` writes them, so that a
