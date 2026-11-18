@@ -55,8 +55,9 @@ reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
   open; ask 7 was done (T-1890).
 * PodUtils/podrunner#300 (COORD-189, #585): `--env-file0` (T-1971) done
   for the next beta; `--env-file` holds on the machine and incus tiers;
-  ask 3, `--podvm-volume-base` on the supervise and userland rungs, is
-  T-1972 (P1, open).
+  ask 3, `--podvm-volume-base` off the namespace rung, is T-1972 (P1,
+  partial): the syscall tier holds it (`a8e856f`); the loader family of
+  the userland rung remains.
 * The outside pass (T-1970): the three P1 faults and OQ-05 fixed; the
   others are in "Known gaps" of beta.32. COORD-188 (#584) asks pod-enter
   for a controlling terminal (the `-it` relay turns `^C` into SIGINT until
@@ -72,7 +73,7 @@ reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
    COORD-184 (#571) with the state of the session.
 2. A new COORD issue `(to podvm)` of podrunner first. Watch #572, #583
    and #585 for podrunner's answers (it pins beta.32 and closes its
-   asks). Then T-1972 (the volume base on the supervise rung first).
+   asks). Then the T-1972 remainder (the loader family).
 3. Dispatch `kvm.yml` with `only=cgroup` on `main`: experiment 459 clause 5
    proves `oom_kills` (T-1969).
 4. When podcrates answers COORD-186: T-1964 and T-1965, then T-1969 on
