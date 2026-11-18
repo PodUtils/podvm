@@ -4834,7 +4834,7 @@ The interposer tests: `a_volume_is_a_pair_whose_guest_side_is_not_the_root`. As 
 **Milestone:** none
 **Priority:** P1
 **Effort:** S
-**Status:** blocked
+**Status:** done
 
 ## Problem
 
@@ -4846,7 +4846,7 @@ On a host that denies `chroot(2)` and user namespaces, `podvm run quay.io/fedora
 
 ## Approach
 
-podcrates reads the path at its `p_offset` from a file source (COORD-193, #589). podvm takes the tag and measures it.
+podcrates reads the path at its `p_offset` from a file source (COORD-193, #589; podcrates `v0.72.0`, podcrates@T-944: `memfd::eligible_payload`, `ladder::Payload::interp`). podvm classifies each payload with the open file: `lifecycle::script::Followed` keeps the `Payload`, and `lifecycle::entry`, `lifecycle::userland` and `ladder::memfd_payload` call `eligible_payload`.
 
 ## Decision
 
@@ -4856,9 +4856,9 @@ podcrates reads the path at its `p_offset` from a file source (COORD-193, #589).
 
 As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm quay.io/fedora/fedora:42 sh -c 'echo ok'` prints `ok` and exits 0.
 
-## Blocker
+## Done
 
-The reader is podcrates' code (`AGENTS.md`, section 2a). COORD-193 (#589) asks podcrates to read the path of `PT_INTERP` at its offset from a file source. Clears when a podcrates tag carries it.
+**Done (2026-11-18).** podvm takes podcrates `v0.72.0`. Measured as in the Prove with `quay.io/fedora/fedora:42`: `sh -c 'echo ok'` prints `ok` and exits 0; the same with `--podvm-tier=syscall`; alpine still runs.
 
 # T-1982: `run -d` with `--podvm-confine` on the syscall tier cannot start its payload
 

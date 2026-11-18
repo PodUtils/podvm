@@ -8,6 +8,10 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- On a host with no `chroot(2)` and no user namespace, a program whose
+  `PT_INTERP` lies past its first 64 KiB runs: the shells of
+  `quay.io/fedora/fedora:42` (T-1981; podcrates `v0.72.0`).
+
 - `run -d --podvm-tier=syscall --podvm-confine SPEC` starts its payload:
   the launcher gives podvm's own binary read and execute in the layer, as
   a foreground run does (T-1982, PodUtils/podrunner#304).

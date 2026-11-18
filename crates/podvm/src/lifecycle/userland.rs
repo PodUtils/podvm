@@ -183,7 +183,7 @@ pub fn enter_userland_with(
                         return failed(e.exit_code());
                     }
                 };
-            if podvm_enter::memfd::eligible(&payload.head).is_err() {
+            if podvm_enter::memfd::eligible_payload(&payload).is_err() {
                 // Fixups changed what the decision read: loud, never
                 // silent, and the fixups stay (they are the image's now,
                 // not this run's).

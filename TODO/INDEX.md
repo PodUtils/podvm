@@ -643,12 +643,12 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1978](enter.md) | P1 | S | none | enter | done | On the syscall tier, a child of posix_spawn cannot run a link in a volume |
 | [T-1979](enter.md) | P1 | S | none | enter | done | On the default userland rung, a link that the payload makes in a volume holds the host path of the tree of the run |
 | [T-1980](cli.md) | P2 | M | none | cli | open | The faults of the third outside pass (2026-11-18, the gate of beta.34) |
-| [T-1981](enter.md) | P1 | S | none | enter | blocked | On the userland rung, a program whose PT_INTERP lies past the first 64 KiB is refused (Fedora 42) |
+| [T-1981](enter.md) | P1 | S | none | enter | done | On the userland rung, a program whose PT_INTERP lies past the first 64 KiB is refused (Fedora 42) |
 | [T-1982](enter.md) | P1 | S | none | enter | done | `run -d` with `--podvm-confine` on the syscall tier cannot start its payload |
 
 ## Counts
 
-579 entries: 18 open, 30 partial, 4 blocked, 527 done.
+579 entries: 18 open, 30 partial, 3 blocked, 528 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -658,10 +658,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 0 | 13 | 1 | 233 | 247 |
+| P1 | 0 | 13 | 0 | 234 | 247 |
 | P2 | 13 | 13 | 2 | 177 | 205 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
-| **All** | 18 | 30 | 4 | 527 | 579 |
+| **All** | 18 | 30 | 3 | 528 | 579 |
 
 ## Work order
 

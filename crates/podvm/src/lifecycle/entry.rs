@@ -331,7 +331,7 @@ pub fn decide_entry_prefer(
     let routed = !f.scripts.is_empty();
     let script_note = script::banner_note(&f);
     let argv0 = f.argv.first().map(String::as_str).unwrap_or("");
-    let interp = match podvm_enter::memfd::eligible(&f.bytes) {
+    let interp = match podvm_enter::memfd::eligible_payload(&f.payload) {
         Ok(()) => None,
         // `follow` returns no script, so the first arm reads as not ELF.
         Err(

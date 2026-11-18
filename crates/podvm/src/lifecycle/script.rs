@@ -32,11 +32,13 @@ pub(super) struct Followed {
     pub argv: Vec<String>,
     /// The program file by host path.
     pub resolved: String,
-    /// The head of that file (`podvm_enter::abi::HEAD_BYTES`): the `#!`
-    /// line and the ELF headers are there.
-    pub bytes: Vec<u8>,
     /// Each script followed: its host path and its `#!` line.
     pub scripts: Vec<(String, String)>,
+    /// The open program file with its head (`podvm_enter::abi::HEAD_BYTES`:
+    /// the `#!` line and the ELF headers): `memfd::eligible_payload`
+    /// reads a `PT_INTERP` past the head from it (podcrates `v0.72.0`,
+    /// TODO/enter.md T-1981: Fedora 42's shells).
+    pub payload: podvm_enter::ladder::Payload,
 }
 
 /// A refusal of the route: the exit code, the note for the no-chroot
@@ -119,8 +121,8 @@ pub(super) fn follow<G: podvm_enter::abi::GuestRoot + ?Sized>(
                 });
             }
         };
-        let bytes = match podvm_enter::ladder::payload_head(root, &name, path_dirs) {
-            Ok(p) => p.head,
+        let payload = match podvm_enter::ladder::payload_head(root, &name, path_dirs) {
+            Ok(p) => p,
             Err(e) => {
                 // ⚠ T-0802's errno split: a directory is found-but-not-
                 // invocable (EISDIR is a 126), while an unreadable file is a
@@ -135,12 +137,13 @@ pub(super) fn follow<G: podvm_enter::abi::GuestRoot + ?Sized>(
                 return Err((code, note, routed));
             }
         };
+        let bytes = payload.head.clone();
         if !podvm_enter::memfd::has_shebang(&bytes) {
             return Ok(Followed {
                 argv,
                 resolved,
-                bytes,
                 scripts,
+                payload,
             });
         }
         let line = podvm_enter::memfd::script_refusal(&resolved, &bytes).shebang;

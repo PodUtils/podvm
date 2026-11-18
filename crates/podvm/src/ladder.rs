@@ -222,7 +222,7 @@ fn memfd_payload(
 ) -> Result<(ladder::Payload, Option<MemfdRefusal>), podvm_enter::Error> {
     let payload = ladder::payload_head(rootfs, argv0, path_dirs)
         .map_err(|e| podvm_enter::runtime(format!("PODVM_MODE=memfd was forced but {e}")))?;
-    let why = memfd::eligible(&payload.head).err();
+    let why = memfd::eligible_payload(&payload).err();
     Ok((payload, why))
 }
 
