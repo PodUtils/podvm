@@ -44,6 +44,8 @@ mod signals;
 #[cfg(target_arch = "x86_64")]
 mod sock; // TODO/enter.md T-1973
 #[cfg(target_arch = "x86_64")]
+mod stacks; // TODO/enter.md T-1976
+#[cfg(target_arch = "x86_64")]
 mod state;
 #[cfg(target_arch = "x86_64")]
 mod sys;

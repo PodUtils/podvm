@@ -347,6 +347,7 @@ fn try_enter(
         .collect();
     let execfn = exe.to_vec();
     let sp = stack(&img, &argv, &envp, &execfn)?;
+    crate::stacks::init(); // T-1976
     if !crate::pool::init() {
         return Err("the pool of path buffers cannot be mapped".into());
     }

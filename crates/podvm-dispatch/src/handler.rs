@@ -341,7 +341,27 @@ pub unsafe extern "C" fn on_sigsys(_sig: i32, info: *mut u8, uc: *mut u8) {
             *g.add(reg::R8),
             *g.add(reg::R9),
         ];
-        let r = call(n, a, g);
+        // T-1976: a call that returns runs on a stack of the handler's
+        // pool. A call that does not return here (clone, the exits, an
+        // exec, which has its own) or that reads the stack it runs on
+        // (munmap) stays on the payload's.
+        let stays = matches!(
+            n,
+            nr::CLONE
+                | nr::FORK
+                | nr::VFORK
+                | nr::EXECVE
+                | nr::EXECVEAT
+                | nr::MUNMAP
+                | nr::RT_SIGRETURN
+                | nr::EXIT
+                | nr::EXIT_GROUP
+        );
+        let r = if stays {
+            call(n, a, g)
+        } else {
+            crate::stacks::run(call, n, a, g).unwrap_or_else(|| call(n, a, g))
+        };
         *g.add(reg::RAX) = r;
         if r >= 0 {
             keep_thread_state(n, a, uc);

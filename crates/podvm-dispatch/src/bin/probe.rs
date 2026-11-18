@@ -34,6 +34,19 @@ unsafe extern "C" {
 }
 
 fn main() {
+    // T-1976: each verb on an alternate signal stack of this many bytes.
+    if let Some(size) = std::env::var("PODVM_PROBE_ALT")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+    {
+        let mem: &'static mut [u8] = Box::leak(vec![0u8; size].into_boxed_slice());
+        let st = [mem.as_mut_ptr() as i64, 0, size as i64];
+        // SAFETY: a stack_t of a leaked buffer, which lives to the end.
+        if unsafe { sigaltstack(&st, std::ptr::null_mut()) } != 0 {
+            println!("ERR sigaltstack");
+            return;
+        }
+    }
     let args: Vec<String> = std::env::args().collect();
     let verb = args.get(1).map(String::as_str).unwrap_or("");
     let arg = |i: usize| args.get(i).cloned().unwrap_or_default();

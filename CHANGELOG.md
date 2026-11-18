@@ -8,6 +8,9 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- The handler of the syscall tier runs each call on a stack of its own, not
+  on the payload's alternate signal stack, which Rust's std sizes to 8 KiB
+  on a CPU without AMX (T-1976).
 - `exec` into a container whose foreground run had `--tmpfs` works again;
   since `0.2.0-beta.33` it refused the ended run's tmpfs directory with
   125 (T-1974).

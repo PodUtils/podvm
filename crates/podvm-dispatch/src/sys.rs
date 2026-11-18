@@ -53,6 +53,7 @@ pub mod nr {
     pub const DUP2: i64 = 33;
     pub const GETPID: i64 = 39;
     pub const CLONE: i64 = 56;
+    pub const EXIT: i64 = 60;
     pub const FORK: i64 = 57;
     pub const VFORK: i64 = 58;
     pub const EXECVE: i64 = 59;
@@ -106,6 +107,7 @@ pub mod nr {
     pub const UTIMENSAT: i64 = 280;
     pub const DUP3: i64 = 292;
     pub const RENAMEAT2: i64 = 316;
+    pub const EXIT_GROUP: i64 = 231;
     pub const EXECVEAT: i64 = 322;
     pub const STATX: i64 = 332;
     pub const CLOSE_RANGE: i64 = 436;

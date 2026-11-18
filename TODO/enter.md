@@ -4702,7 +4702,7 @@ As uid 1000 under `scripts/dev/nouserns.c`, `--podvm-tier=syscall`: `cd /tmp; ln
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -4726,7 +4726,7 @@ The SIGSYS handler has `SA_ONSTACK`, so it runs on the alternate signal stack of
 
 ## Done
 
-Partial (2026-11-18): the exec path runs on a stack of its own; the test guards it. Remaining: the stack of its own for the other calls of the handler.
+**Done (2026-11-18).** The exec path first ran on a map of its own (`exec::execveat`, 256 KiB). Then gate 44345876471 died of SIGSEGV in the probe's `write` (a rename) on CI: the same fault on another path. Now each call of the handler that returns runs on a stack of a pool (`stacks.rs`: 64 stacks of 128 KiB, each above a guard page, taken with a compare-and-swap; the payload's stack where none is free). `clone`, `fork`, `vfork`, the exits, `munmap` (it reads the stack that it runs on), `rt_sigreturn` and an exec stay on the stack that they have. The probe takes `PODVM_PROBE_ALT=SIZE`: each verb on an alternate stack of SIZE bytes. `each_call_runs_on_a_small_alternate_signal_stack` runs exec, write and rename, a link, `cat-zx`, spawn, fork and a thread on 8 KiB, with and without the tier: it passes, and it fails with the pool off. As uid 1000 under `scripts/dev/nouserns.c` on the syscall tier: podrunner's link case of T-1977 reads the file, and `python:3.13-slim` makes a venv in `/tmp` whose Python runs 8 threads that each spawn a process.
 
 # T-1977: On the syscall tier, a relative path of a glibc program through an absolute link resolves on the host
 

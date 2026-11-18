@@ -281,20 +281,52 @@ fn the_hold_lets_the_payload_reach_the_broker_only() {
 }
 
 /// The handler runs on the payload's alternate signal stack: 8 KiB from
-/// Rust's std on a CPU without AMX. The exec path ran out of it in a debug
-/// build (gate 44312445769, SIGSEGV); it runs on a stack of its own now.
+/// Rust's std on a CPU without AMX. A deep call ran out of it in a debug
+/// build (gate 44312445769: an exec; gate 44345876471: a rename), so each
+/// call runs on a stack of the handler (T-1976). Each row runs on 8 KiB.
 #[test]
-fn exec_runs_on_a_small_alternate_signal_stack() {
+fn each_call_runs_on_a_small_alternate_signal_stack() {
     let Some(r) = root("alt") else { return };
-    for size in ["8192", "16384"] {
-        assert_eq!(
-            probe(
-                &r,
-                &["exec-alt", size, "/bin/probe", "cat", "/etc/podvm-marker"]
-            ),
-            ("inroot".into(), 0),
-            "an alternate signal stack of {size} bytes"
-        );
+    for (args, want) in [
+        (
+            &["exec-alt", "8192", "/bin/probe", "cat", "/etc/podvm-marker"][..],
+            "inroot",
+        ),
+        (&["write", "/tmp/a", "hello", "/tmp/b"][..], "hello"),
+        (&["cat", "/tmp/abs"][..], "inroot"),
+        (&["cat-zx", "tmp/abs"][..], "inroot"),
+        (
+            &["exec", "/bin/probe", "cat", "/etc/podvm-marker"][..],
+            "inroot",
+        ),
+        (
+            &["spawn", "/bin/probe", "cat", "/etc/podvm-marker"][..],
+            "spawn 0 inroot",
+        ),
+        (
+            &["fork-cat", "/etc/podvm-marker"][..],
+            "child inroot\nparent status 7",
+        ),
+        (&["thread-cat", "/etc/podvm-marker"][..], "thread inroot"),
+    ] {
+        for tier in [None, Some("1048576")] {
+            let mut cmd = Command::new(env!("CARGO_BIN_EXE_podvm-dispatch-run"));
+            match tier {
+                Some(t) => cmd.env(podvm_dispatch::TIER_VAR, t),
+                None => cmd.env_remove(podvm_dispatch::TIER_VAR),
+            };
+            let out = cmd
+                .env("PODVM_PROBE_ALT", "8192")
+                .arg(&r.0)
+                .arg("/bin/probe")
+                .arg("probe")
+                .args(args)
+                .current_dir(&r.0)
+                .output()
+                .unwrap();
+            let text = String::from_utf8_lossy(&out.stdout).trim_end().to_string();
+            assert_eq!(text, want, "{args:?} {tier:?} {:?}", out.status);
+        }
     }
 }
 
