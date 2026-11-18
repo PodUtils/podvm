@@ -4900,7 +4900,7 @@ On the tier, podvm starts the payload by an exec of podvm itself, so the layer m
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -4912,7 +4912,7 @@ On the tier each program runs through podvm itself, which the layer allows, so L
 
 ## Approach
 
-The handler checks each `execve` and `execveat` against the exec table of the layer, as the interposer does, and answers EACCES for a program that no `exec=` rule names.
+The handler keeps the exec table of the layer from the environment of its entry (`exec::table`; a table that does not fit is a refusal, 125). `exec::check` resolves the program's host path (the link of its descriptor) and answers EACCES where `pod_confine::exec::allows_in` (the rule of `pod-enter` and the interposer) does not cover it. On each exec the handler drops the payload's `PODVM_EXEC_HOST` and sets its own, so `env -i` neither loses the table nor widens it.
 
 ## Decision
 
@@ -4921,6 +4921,10 @@ The handler checks each `execve` and `execveat` against the exec table of the la
 ## Prove
 
 As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm --podvm-tier=syscall --podvm-confine 'write=/tmp;exec=/usr/bin/sh,/usr/bin/cp' public.ecr.aws/ubuntu/ubuntu:24.04 sh -c 'cp /usr/bin/id /tmp/i2; /tmp/i2'` exits 126 with "Permission denied".
+
+## Done
+
+**Done (2026-11-18).** `the_exec_table_of_the_confine_layer_holds_on_each_exec` passes (a program in the table runs; one out of it and each one under an empty table get EACCES; with no table each runs). Measured as in the Prove with `mirror.gcr.io/library/ubuntu:24.04`: the copy of `id` in `/tmp` gives "Permission denied" (126), `/usr/bin/echo` of `exec=` runs, `env -i /tmp/i2` and `PODVM_EXEC_HOST=/ /tmp/i2` give 126; the same through `run -d` + `exec` and `create` + `start`; with no `--podvm-confine` the copy runs.
 
 # T-1984: `--podvm-confine exec=` is bypassed through the dynamic loader
 

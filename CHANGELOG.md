@@ -8,6 +8,10 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- On the syscall tier, `--podvm-confine exec=` holds: the handler checks
+  each exec against the exec table of the layer, as the interposer does,
+  and a payload can neither drop nor widen the table (T-1983).
+
 - On the userland rung, the home of the run is writable to the payload, as
   to uid 0 of the image: `dnf` of Fedora 42 runs (T-1986).
 

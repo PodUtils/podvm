@@ -57,6 +57,11 @@ impl Fixed {
 pub static ROOT: Fixed = Fixed::new();
 /// The guest path of the payload (`/proc/self/exe` answers it).
 pub static EXE: Fixed = Fixed::new();
+/// TODO/enter.md T-1983: the exec table of the confine layer
+/// (`PODVM_EXEC_HOST`, host paths joined by `:`), where [`EXEC_ON`].
+pub static EXEC_TABLE: Fixed = Fixed::new();
+/// Whether the run has an exec table: an empty one lets nothing run.
+pub static EXEC_ON: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
 /// The host path of podvm itself, for the re-exec of `execve`.
 pub static SELF: Fixed = Fixed::new();
 /// An `O_PATH` descriptor of the root, above the payload's usual range.

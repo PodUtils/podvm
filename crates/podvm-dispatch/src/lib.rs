@@ -229,7 +229,9 @@ pub fn main_if_entered(product: &str) {
     // A volume that the entry refuses (a link under the base, OR-01 of the
     // outside pass of 2026-11-18) is a refusal of podvm, 125; else the
     // program could not be entered, 127.
-    let refused = why.starts_with("the volume") || why.starts_with("more than");
+    let refused = why.starts_with("the volume")
+        || why.starts_with("more than")
+        || why.starts_with("the exec table");
     std::process::exit(if refused { 125 } else { 127 });
 }
 

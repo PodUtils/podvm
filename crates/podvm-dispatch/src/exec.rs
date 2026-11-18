@@ -14,6 +14,46 @@ pub const ROOT_VAR: &[u8] = b"PODVM_DISPATCH_ROOT=";
 pub const EXE_VAR: &[u8] = b"PODVM_DISPATCH_EXE=";
 pub const EMU_VAR: &[u8] = b"PODVM_DISPATCH_EMU=";
 pub const TIER_VAR: &[u8] = b"PODVM_DISPATCH_TIER=";
+/// TODO/enter.md T-1983: the exec table of the confine layer, which
+/// `pod-enter` writes for the first entry and the handler for each exec.
+pub const EXEC_TABLE_VAR: &[u8] = b"PODVM_EXEC_HOST=";
+
+/// Keep the exec table of the confine layer from the environment of the
+/// entry (OT-01 of the fourth outside pass: on the tier each program runs
+/// through podvm, so Landlock never checks EXECUTE on it). A table that
+/// does not fit is a refusal: a run never goes on without its table.
+pub(crate) fn table(envp: &[std::ffi::OsString]) -> Result<(), String> {
+    use std::os::unix::ffi::OsStrExt;
+    let Some(t) = envp
+        .iter()
+        .find_map(|e| e.as_bytes().strip_prefix(EXEC_TABLE_VAR))
+    else {
+        return Ok(());
+    };
+    if !crate::state::EXEC_TABLE.set(t) {
+        return Err(format!(
+            "the exec table of the confine layer has {} bytes, over the {} that the handler holds",
+            t.len(),
+            PATH_MAX - 1
+        ));
+    }
+    crate::state::EXEC_ON.store(true, core::sync::atomic::Ordering::Release);
+    Ok(())
+}
+
+/// Whether the exec table lets the program of the descriptor link `pp`
+/// run: no table, or a path of the table covers its host path.
+fn exec_allowed(pp: &[u8]) -> bool {
+    if !crate::state::EXEC_ON.load(core::sync::atomic::Ordering::Acquire) {
+        return true;
+    }
+    let Some(mut g) = crate::pool::Buf::get() else {
+        return false;
+    };
+    let h = g.buf();
+    let n = sys::readlinkat(AT_FDCWD, pp, &mut h[..]);
+    n > 0 && pod_confine::exec::allows_in(crate::state::EXEC_TABLE.get(), &h[..n as usize])
+}
 const X_OK: i64 = 1;
 const MAP_PRIVATE_ANON: i64 = 0x22;
 
@@ -56,6 +96,11 @@ fn check(buf: &[u8; PATH_MAX], n: usize) -> i64 {
     if r < 0 {
         sys::close(fd);
         return r;
+    }
+    // T-1983: the confine layer's `exec=`, as the interposer checks it.
+    if !exec_allowed(pp) {
+        sys::close(fd);
+        return -sys::EACCES;
     }
     let rd = sys::openat2(AT_FDCWD, pp, sys::O_RDONLY | sys::O_CLOEXEC, 0, 0);
     sys::close(fd);
@@ -196,8 +241,11 @@ fn execveat_here(a: &[i64]) -> i64 {
         + emu_spec_len
         + TIER_VAR.len()
         + tier_len
+        + 1
+        + EXEC_TABLE_VAR.len()
+        + crate::state::EXEC_TABLE.get().len()
         + 1;
-    let size = ((count + 5) * 8 + strings + 4095) & !4095;
+    let size = ((count + 6) * 8 + strings + 4095) & !4095;
     // SAFETY: an anonymous map for the new array; it ends with the exec.
     let mem = unsafe { sc6(nr::MMAP, 0, size as i64, 3, MAP_PRIVATE_ANON, -1, 0) };
     if mem < 0 {
@@ -214,6 +262,7 @@ fn execveat_here(a: &[i64]) -> i64 {
                 || s.starts_with(EXE_VAR)
                 || s.starts_with(EMU_VAR)
                 || s.starts_with(TIER_VAR)
+                || s.starts_with(EXEC_TABLE_VAR)
             {
                 continue;
             }
@@ -221,7 +270,7 @@ fn execveat_here(a: &[i64]) -> i64 {
             k += 1;
         }
         let mut at = mem as *mut u8;
-        at = at.add((count + 5) * 8);
+        at = at.add((count + 6) * 8);
         for (name, value) in [(ROOT_VAR, root), (EXE_VAR, &buf[..n])] {
             *arr.add(k) = at as i64;
             k += 1;
@@ -268,6 +317,18 @@ fn execveat_here(a: &[i64]) -> i64 {
             at = at.add(TIER_VAR.len());
             core::ptr::copy_nonoverlapping(tier.as_ptr(), at, tier_len);
             at = at.add(tier_len);
+            *at = 0;
+            at = at.add(1);
+        }
+        // T-1983: the handler's own exec table, never the payload's.
+        if crate::state::EXEC_ON.load(core::sync::atomic::Ordering::Acquire) {
+            let t = crate::state::EXEC_TABLE.get();
+            *arr.add(k) = at as i64;
+            k += 1;
+            core::ptr::copy_nonoverlapping(EXEC_TABLE_VAR.as_ptr(), at, EXEC_TABLE_VAR.len());
+            at = at.add(EXEC_TABLE_VAR.len());
+            core::ptr::copy_nonoverlapping(t.as_ptr(), at, t.len());
+            at = at.add(t.len());
             *at = 0;
         }
         *arr.add(k) = 0;

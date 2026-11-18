@@ -379,3 +379,39 @@ fn a_volume_whose_guest_path_is_not_in_the_root_stats_as_a_directory() {
     }
     let _ = std::fs::remove_dir_all(&host);
 }
+
+/// OT-01 (TODO/enter.md T-1983): the exec table of the confine layer holds
+/// on the handler's exec: a program out of the table gets EACCES, one in it
+/// runs, and the table goes on across an exec whatever the payload sets.
+#[test]
+fn the_exec_table_of_the_confine_layer_holds_on_each_exec() {
+    let Some(r) = root("exectable") else { return };
+    std::fs::copy(r.0.join("bin/probe"), r.0.join("tmp/probe2")).unwrap();
+    let bin = format!("{}/bin", r.0.display());
+    let run = |table: Option<&str>, args: &[&str]| {
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_podvm-dispatch-run"));
+        match table {
+            Some(t) => cmd.env("PODVM_EXEC_HOST", t),
+            None => cmd.env_remove("PODVM_EXEC_HOST"),
+        };
+        let out = cmd
+            .env_remove(podvm_dispatch::TIER_VAR)
+            .arg(&r.0)
+            .arg("/bin/probe")
+            .arg("probe")
+            .args(args)
+            .current_dir(&r.0)
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&out.stdout).trim_end().to_string()
+    };
+    for (table, prog, want) in [
+        (Some(bin.as_str()), "/bin/probe", "spawn 0 inroot"),
+        (Some(bin.as_str()), "/tmp/probe2", "ERR Permission denied"),
+        (Some(""), "/bin/probe", "ERR Permission denied"),
+        (None, "/tmp/probe2", "spawn 0 inroot"),
+    ] {
+        let got = run(table, &["spawn", prog, "cat", "/etc/podvm-marker"]);
+        assert!(got.starts_with(want), "{table:?} {prog}: {got:?}");
+    }
+}

@@ -310,6 +310,7 @@ fn try_enter(
     };
     state::ROOT_FD.store(fd, Ordering::Relaxed);
     crate::vols::volumes(&envp)?;
+    crate::exec::table(&envp)?; // TODO/enter.md T-1983
     let argv: Vec<Vec<u8>> = argv.into_iter().map(OsStringExt::into_vec).collect();
     let (prog, pfd, head, argv) = resolve(exe.to_vec(), argv)?;
     EXE.set(&prog);

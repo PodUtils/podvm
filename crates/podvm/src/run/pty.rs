@@ -263,8 +263,16 @@ mod tests {
         let mut f = unsafe { std::fs::File::from_raw_fd(std::os::fd::IntoRawFd::into_raw_fd(a)) };
         f.write_all(b"hi\n").unwrap();
         let mut m = p.master.try_clone().unwrap();
+        // Under load one read can give part of the line before the line
+        // discipline sends the rest (checks of 2026-11-18): read to 4 bytes.
         let mut buf = [0u8; 16];
-        let n = m.read(&mut buf).unwrap();
+        let mut n = 0;
+        for _ in 0..8 {
+            n += m.read(&mut buf[n..]).unwrap();
+            if n >= 4 {
+                break;
+            }
+        }
         assert_eq!(&buf[..n], b"hi\r\n", "the line discipline maps NL to CR NL");
     }
 

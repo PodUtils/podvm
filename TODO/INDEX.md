@@ -645,7 +645,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1980](cli.md) | P2 | M | none | cli | open | The faults of the third outside pass (2026-11-18, the gate of beta.34) |
 | [T-1981](enter.md) | P1 | S | none | enter | done | On the userland rung, a program whose PT_INTERP lies past the first 64 KiB is refused (Fedora 42) |
 | [T-1982](enter.md) | P1 | S | none | enter | done | `run -d` with `--podvm-confine` on the syscall tier cannot start its payload |
-| [T-1983](enter.md) | P1 | M | none | enter | open | On the syscall tier, `--podvm-confine exec=` is not enforced |
+| [T-1983](enter.md) | P1 | M | none | enter | done | On the syscall tier, `--podvm-confine exec=` is not enforced |
 | [T-1984](enter.md) | P1 | M | none | enter | open | `--podvm-confine exec=` is bypassed through the dynamic loader |
 | [T-1985](enter.md) | P1 | M | none | enter | open | A payload under `--podvm-confine` changes the mode and the times of a file that no rule names |
 | [T-1986](enter.md) | P1 | S | none | enter | done | On the userland rung, `dnf` of Fedora 42 cannot write its state under `/root` |
@@ -655,7 +655,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-586 entries: 22 open, 30 partial, 3 blocked, 531 done.
+586 entries: 21 open, 30 partial, 3 blocked, 532 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -665,10 +665,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 13 | 0 | 237 | 253 |
+| P1 | 2 | 13 | 0 | 238 | 253 |
 | P2 | 14 | 13 | 2 | 177 | 206 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
-| **All** | 22 | 30 | 3 | 531 | 586 |
+| **All** | 21 | 30 | 3 | 532 | 586 |
 
 ## Work order
 
