@@ -8,6 +8,10 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- On the syscall tier, a `-v` volume whose guest path the image does not
+  have can be `stat`ed: `ls -d`, `stat`, `cp -r` and `find` of it work
+  (T-1988).
+
 - On AlmaLinux 9, `ls -l` no longer dies with SIGSEGV on the namespace and
   the userland rung: the interposer makes the system call of each
   attribute call itself (T-1987).

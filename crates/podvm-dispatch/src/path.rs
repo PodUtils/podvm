@@ -267,7 +267,12 @@ pub fn parent(t: Target, buf: &mut [u8; PATH_MAX], name: &mut [u8; 256]) -> Resu
     if last.len() >= name.len() {
         return Err(-sys::ENAMETOOLONG);
     }
-    if last.is_empty() || last == b"." || last == b".." {
+    // OT-06 (TODO/enter.md T-1988): a path that is a volume's own guest
+    // path names the volume, also where the image has no such name: its
+    // parent is the volume itself, as for `.`.
+    let whole = &buf[..end];
+    let volume = in_root && state::vols().iter().any(|v| v.guest.get() == whole);
+    if last.is_empty() || last == b"." || last == b".." || volume {
         name[0] = b'.';
         name[1] = 0;
         let fd = open_path(AT_FDCWD, &[], t, &buf[..], true, false);

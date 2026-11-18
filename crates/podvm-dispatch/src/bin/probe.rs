@@ -88,6 +88,35 @@ fn main() {
                 .map(|p| p.display().to_string())
                 .unwrap_or_else(|e| format!("ERR {e}"))
         ),
+        // T-1988: the kind of PATH through statx(2) as coreutils' `ls -d`
+        // and `stat` call it: AT_FDCWD as glibc fills the register, with
+        // AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT.
+        "kind" => {
+            let path = std::ffi::CString::new(arg(2)).unwrap_or_default();
+            let mut st = [0u8; 256];
+            // SAFETY: statx(2) writes one struct statx of 256 bytes.
+            let r = unsafe {
+                syscall(
+                    332,
+                    0xFFFF_FF9Ci64,
+                    path.as_ptr(),
+                    0x900i64,
+                    0x7ffi64,
+                    st.as_mut_ptr(),
+                )
+            };
+            let mode = u16::from_ne_bytes([st[28], st[29]]);
+            println!(
+                "{}",
+                if r < 0 {
+                    format!("ERR {}", std::io::Error::last_os_error())
+                } else if mode & 0o170000 == 0o040000 {
+                    "dir".to_string()
+                } else {
+                    "other".to_string()
+                }
+            );
+        }
         "ls" => {
             let mut v: Vec<String> = std::fs::read_dir(arg(2))
                 .map(|d| {

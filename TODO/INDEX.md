@@ -650,12 +650,12 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1985](enter.md) | P1 | M | none | enter | open | A payload under `--podvm-confine` changes the mode and the times of a file that no rule names |
 | [T-1986](enter.md) | P1 | S | none | enter | open | On the userland rung, `dnf` of Fedora 42 cannot write its state under `/root` |
 | [T-1987](enter.md) | P1 | S | none | enter | done | On AlmaLinux 9, `ls -l` dies with SIGSEGV in the interposer's `lgetxattr` |
-| [T-1988](enter.md) | P1 | S | none | enter | open | On the syscall tier, a volume whose guest path is not in the image cannot be stat-ed |
+| [T-1988](enter.md) | P1 | S | none | enter | done | On the syscall tier, a volume whose guest path is not in the image cannot be stat-ed |
 | [T-1989](cli.md) | P2 | M | none | cli | open | The faults of the fourth outside pass (2026-11-18, the gate of beta.35) |
 
 ## Counts
 
-586 entries: 24 open, 30 partial, 3 blocked, 529 done.
+586 entries: 23 open, 30 partial, 3 blocked, 530 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -665,10 +665,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 5 | 13 | 0 | 235 | 253 |
+| P1 | 4 | 13 | 0 | 236 | 253 |
 | P2 | 14 | 13 | 2 | 177 | 206 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
-| **All** | 24 | 30 | 3 | 529 | 586 |
+| **All** | 23 | 30 | 3 | 530 | 586 |
 
 ## Work order
 

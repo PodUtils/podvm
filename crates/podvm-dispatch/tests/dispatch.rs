@@ -354,3 +354,28 @@ fn a_relative_path_through_an_absolute_link_resolves_in_the_root() {
         );
     }
 }
+
+/// OT-06 (TODO/enter.md T-1988): a volume whose guest path the root does
+/// not have is a directory to stat(2), as to open(2).
+#[test]
+fn a_volume_whose_guest_path_is_not_in_the_root_stats_as_a_directory() {
+    let Some(r) = root("volstat") else { return };
+    let host = r.0.with_extension("vol");
+    let _ = std::fs::remove_dir_all(&host);
+    std::fs::create_dir_all(host.join("sub")).unwrap();
+    for (path, want) in [("/pkg", "dir"), ("/pkg/sub", "dir"), ("/pkg/none", "ERR")] {
+        let out = Command::new(env!("CARGO_BIN_EXE_podvm-dispatch-run"))
+            .env("PODVM_MAPS", format!("/pkg:{}", host.display()))
+            .env_remove(podvm_dispatch::TIER_VAR)
+            .arg(&r.0)
+            .arg("/bin/probe")
+            .arg("probe")
+            .args(["kind", path])
+            .current_dir(&r.0)
+            .output()
+            .unwrap();
+        let text = String::from_utf8_lossy(&out.stdout).trim_end().to_string();
+        assert!(text.starts_with(want), "{path}: {text:?} {:?}", out.status);
+    }
+    let _ = std::fs::remove_dir_all(&host);
+}

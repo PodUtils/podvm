@@ -5050,7 +5050,7 @@ As uid 1000: `podvm run --rm quay.io/almalinuxorg/almalinux:9 ls -l /etc/hostnam
 **Milestone:** none
 **Priority:** P1
 **Effort:** S
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -5058,11 +5058,11 @@ With `--podvm-tier=syscall -v H:/pkg` and no `/pkg` in the image: `ls -d /pkg`, 
 
 ## Premise
 
--
+`path::parent` split a path into its parent and its last name; for a volume's own guest path, the parent was the root of the image, which has no such name. `open` resolves the whole path at the volume, so `ls /pkg` and `cd /pkg` worked, and `statx` with `AT_SYMLINK_NOFOLLOW` (coreutils' `ls -d` and `stat`) went through the parent.
 
 ## Approach
 
-The handler serves a path that equals a volume's guest path at the volume's descriptor, also where the image has no such name.
+`path::parent` takes a path that equals a volume's guest path as the volume itself, as for `.`: the parent is the volume's directory and the name is `.`. `mkdir` of it gives EEXIST.
 
 ## Decision
 
@@ -5071,3 +5071,8 @@ The handler serves a path that equals a volume's guest path at the volume's desc
 ## Prove
 
 As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm --podvm-tier=syscall -v H:/pkg public.ecr.aws/ubuntu/ubuntu:24.04 stat -c %F /pkg` prints `directory`.
+
+## Done
+
+**Done (2026-11-18).** `a_volume_whose_guest_path_is_not_in_the_root_stats_as_a_directory` (the probe verb `kind` calls `statx` as coreutils does) fails before the fix and passes after it. Measured as in the Prove with `mirror.gcr.io/library/ubuntu:24.04`: `ls -d /pkg`, `stat -c %F /pkg` (`directory`), `test -d /pkg`, `cp -r /pkg /tmp/p2` and `find /pkg` work; `mkdir /pkg` gives "File exists".
+
