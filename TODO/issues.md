@@ -484,7 +484,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #588 | COORD-192: the answer to PodUtils/podrunner#303: the syscall tier took glibc's AT_FDCWD for a descriptor; fixed on main (to podrunner) | closed (podrunner closed PodUtils/podrunner#303 with `v0.2.0-beta.34`) | T-1977 |
 | #589 | COORD-193: pod-enter: abi interp() refuses a PT_INTERP past the head read; Fedora 42's bash has it at 0xf2000 (to podcrates) | closed (podcrates `v0.72.0` carries it; podvm took it in b3ff9c3) | T-1981 |
 | #590 | COORD-194: the answer to PodUtils/podrunner#304: the tier hides no host process; run -d with --podvm-confine on the tier failed to start (fixed on main) (to podrunner) | open | T-1982 |
-| #591 | COORD-195: podvm took podcrates v0.72.0 in b3ff9c3 (to podcrates) | open | T-1981 |
+| #591 | COORD-195: podvm took podcrates v0.72.0 in b3ff9c3 (to podcrates) | closed (PodUtils/podcrates#229 lists the take) | T-1981 |
 
 ## Messages whose title does not start with COORD-NNN
 

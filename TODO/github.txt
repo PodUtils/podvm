@@ -480,4 +480,4 @@
 588 issue closed
 589 issue closed
 590 issue open
-591 issue open
+591 issue closed
