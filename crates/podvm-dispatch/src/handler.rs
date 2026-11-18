@@ -269,17 +269,38 @@ fn window_of(sp: i64) -> i64 {
     }
 }
 
-/// Keep the root's descriptor out of reach of close, dup2 and close_range.
+/// The descriptors of the handler that the payload must not close: the
+/// root's, the count of `/tmp` (T-1657) and each volume's (T-1724; OS-01
+/// of the outside pass of 2026-11-18: Python's `posix_spawn` closed them
+/// with `close_range` before its exec, which then gave EBADF). Unset ones
+/// are -1.
+fn kept() -> [i64; KEEP] {
+    let mut k = [-1i64; KEEP];
+    k[0] = state::root_fd();
+    k[1] = crate::tier::FD.load(core::sync::atomic::Ordering::Relaxed);
+    for (i, v) in state::vols().iter().enumerate() {
+        k[2 + i] = v.fd.load(core::sync::atomic::Ordering::Relaxed);
+    }
+    k
+}
+
+const KEEP: usize = 2 + state::MAX_VOLS;
+
+/// Keep the descriptors of [`kept`] out of reach of close, dup2, dup3 and
+/// close_range.
 fn guard_fd(n: i64, a: [i64; 6]) -> Option<i64> {
-    // T-1657: the memfd of the count of `/tmp` is kept as the root's is.
-    let count = crate::tier::FD.load(core::sync::atomic::Ordering::Relaxed);
-    let root = state::root_fd();
+    if !matches!(n, nr::CLOSE | nr::DUP2 | nr::DUP3 | nr::CLOSE_RANGE) {
+        return None;
+    }
+    let keep = kept();
+    let held = |fd: i64| fd >= 0 && keep.contains(&(fd as i32 as i64));
     match n {
-        nr::CLOSE if a[0] == root || (count >= 0 && a[0] == count) => Some(-sys::EBADF),
-        nr::DUP2 | nr::DUP3 if a[1] == root || (count >= 0 && a[1] == count) => Some(-sys::EBUSY),
+        nr::CLOSE if held(a[0]) => Some(-sys::EBADF),
+        nr::DUP2 | nr::DUP3 if held(a[1]) => Some(-sys::EBUSY),
         nr::CLOSE_RANGE => {
-            let gaps = range_gaps(a[0], a[1], [root, count])?;
-            for (lo, hi) in gaps.into_iter().flatten() {
+            let mut out = [(0i64, 0i64); KEEP + 1];
+            let n = range_gaps(a[0], a[1], &keep, &mut out)?;
+            for &(lo, hi) in &out[..n] {
                 // SAFETY: close_range of a range with no kept descriptor.
                 unsafe { sc(nr::CLOSE_RANGE, lo, hi, a[2]) };
             }
@@ -290,29 +311,37 @@ fn guard_fd(n: i64, a: [i64; 6]) -> Option<i64> {
 }
 
 /// TODO/enter.md T-1935: the parts of `lo..=hi` around the kept
-/// descriptors (a negative one is none), or `None` where the range holds
-/// none of them and the call goes to the kernel as it is. Python's
-/// `subprocess` closes each descriptor above 2 with one `close_range`, and
-/// before this the count of `/tmp` went with it, so its child could not map
-/// the count and exited 127.
-pub(crate) fn range_gaps(lo: i64, hi: i64, keep: [i64; 2]) -> Option<[Option<(i64, i64)>; 3]> {
-    let mut k = keep.map(|f| (f >= 0 && lo <= f && f <= hi).then_some(f));
-    if k == [None, None] {
+/// descriptors (a negative one is none) into `out`, and their count; or
+/// `None` where the range holds none of them and the call goes to the
+/// kernel as it is. Python's `subprocess` closes each descriptor above 2
+/// with one `close_range`.
+pub(crate) fn range_gaps(lo: i64, hi: i64, keep: &[i64], out: &mut [(i64, i64)]) -> Option<usize> {
+    let mut k = [i64::MAX; KEEP];
+    let mut m = 0usize;
+    for &f in keep {
+        if f >= 0 && lo <= f && f <= hi && m < KEEP && !k[..m].contains(&f) {
+            k[m] = f;
+            m += 1;
+        }
+    }
+    if m == 0 {
         return None;
     }
-    k.sort_unstable_by_key(|f| f.unwrap_or(i64::MAX));
-    let mut out = [None; 3];
+    k[..m].sort_unstable();
+    let mut n = 0usize;
     let mut from = lo;
-    for (i, f) in k.into_iter().flatten().enumerate() {
-        if from < f {
-            out[i] = Some((from, f - 1));
+    for &f in &k[..m] {
+        if from < f && n < out.len() {
+            out[n] = (from, f - 1);
+            n += 1;
         }
         from = f + 1;
     }
-    if from <= hi {
-        out[2] = Some((from, hi));
+    if from <= hi && n < out.len() {
+        out[n] = (from, hi);
+        n += 1;
     }
-    Some(out)
+    Some(n)
 }
 
 /// True where `munmap(addr, len)` takes the stack that this handler runs

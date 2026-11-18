@@ -6285,3 +6285,32 @@ As uid 1000: the repro of OR-01 to OR-06 of the pass gives the result of the fix
 ## Done
 
 **Partial (2026-11-18).** OR-01: the handler of `exec` on the syscall tier takes `PODVM_VOLUME_BASE` of the record (`lifecycle::syscall::exec_entry`), so a link that replaced a source is a refusal; a refused volume of the handler exits 125, not 127 (also OR-09). Measured: after `mv B/u B/u.old; ln -s OUT B/u`, `exec` exits 125 with "its host path holds a symbolic link under its base", reads nothing out of B and writes nothing there. OR-02: the relay of `-it` sends SIGINT to the payload (`run::pty::set_payload`); OR-03: with no `-i` the terminal stays cooked, and the relay threads block the signals that the waiter forwards. Measured with a payload whose handler logs SIGINT and exits 5: `-it` and `-t` each give the log line and exit 5. OR-04: `exec` passes the binds of the record to the plan of the joined entry and to its own check (`exec::in_bind`): `exec` of a unit of `-w /vol/sub -v V:/vol` prints `/vol/sub`, and a write lands in V. OR-05: a volume or `--tmpfs` at `/tmp` replaces the `/tmp` of the syscall tier (`run::binds::tmp_is_given`): `-v H:/tmp` writes into H. OR-06: T-1975. Remaining: OR-07, OR-08, OR-10 to OR-17. A fault of the OR-04 fix (found by the uid-1000 tests of the beta.34 gate, `tests/tmpfs_exec.rs`): the binds that `exec` gives the entry held the `--tmpfs` directory of an ended foreground run, and `exec` refused it with 125; the binds now leave out a `--tmpfs` directory that is gone, as the table of T-1830 does (`exec/enter.rs`). The 29 uid-1000 test binaries pass.
+
+# T-1980: The faults of the third outside pass (2026-11-18, the gate of beta.34)
+
+**Source:** the outside pass of the gate of `0.2.0-beta.34` (TODO/gate.md T-1949): an agent with the binary and `podvm man` only, as uid 1000
+**Category:** cli
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+The pass found 0 P0, 2 P1, 5 P2 and 10 P3 faults (OS-01 to OS-17). The P1 faults are T-1978 (OS-01, `posix_spawn` of a link in a volume on the syscall tier) and T-1979 (OS-02, a link in a volume on the loader family), both done. Open: OS-03 (P2, on the loader family with alpine, `ls -l` of a link that the payload makes in the tree shows `-> /`), OS-04 (P2, a file as `-v` source on the syscall tier: "native-static rung: the volume ...: errno 20"), OS-05 (P2, a refused run of the syscall tier leaves `tmpfs/PID/0` in the store), OS-06 (P2, `--podvm-volume-base` takes a source with `..` that leaves the base, and a source out of the base), OS-07 (P2, a command that is not runnable: 125 or 127 where the manual gives 126, and "names no file in the image" for a directory), OS-08 (P3, SIGQUIT to `run --rm` leaves a Dead record), OS-09 (P3, the removal of the tree goes on after podvm exits), OS-10 (P3, `-t` sets no `TERM`), OS-11 (P3, the line of a forwarded signal), OS-12 (P3, the last line of `-it` Ctrl-C on the syscall tier has no CR), OS-13 (P3, `--env-file` names are not checked), OS-14 (P3, the message of `--podvm-tier` names `runsc`), OS-15 (P3, the report: the syscall tier, `oom_kills` and `degradations` are not in the manual), OS-16 (P3, `cp` through a guest-absolute link), OS-17 (P3, `exec` into an exited container runs the command).
+
+## Premise
+
+Each finding was reproduced twice by the pass, on the binary of `65287500` (before T-1976 was done).
+
+## Approach
+
+Work each by its class with T-1947 (fail safe at the edges) and T-1948 (messages from the entered mechanism); OS-04 and OS-07 with OR-10 and OR-11 of T-1974, OS-06 with OR-08, OS-14 with OR-14.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm --podvm-tier=syscall -v FILE:/f quay.io/almalinuxorg/almalinux:9 true` refuses with 125 and a line that names the cause (OS-04), and leaves no `tmpfs/PID` directory in the store (OS-05); `podvm run --rm --podvm-volume-base B -v B/../x:/v quay.io/almalinuxorg/almalinux:9 true` refuses with 125 (OS-06); `podvm run --rm --podvm-tier=syscall quay.io/almalinuxorg/almalinux:9 /etc` exits 126 (OS-07); each other finding has a test of its class.

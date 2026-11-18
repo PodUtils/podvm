@@ -287,7 +287,12 @@ pub unsafe extern "C" fn symlink(target: *const c_char, linkpath: *const c_char)
     let mut linkb = [0u8; crate::map::OUT];
     let mut targb = [0u8; crate::map::OUT];
     let lp = unsafe { crate::map::prepare(b"symlink", crate::map::AT_FDCWD, linkpath, &mut linkb) };
-    let tp = unsafe { crate::map::prepare_literal(b"symlink", target, &mut targb) };
+    // OS-02: a link in a volume keeps the guest's target.
+    let tp = if unsafe { crate::map::in_volume(lp) } {
+        target
+    } else {
+        unsafe { crate::map::prepare_literal(b"symlink", target, &mut targb) }
+    };
     if lp.is_null() || tp.is_null() {
         return -1;
     }
@@ -309,7 +314,12 @@ pub unsafe extern "C" fn symlinkat(
     let mut linkb = [0u8; crate::map::OUT];
     let mut targb = [0u8; crate::map::OUT];
     let lp = unsafe { crate::map::prepare(b"symlinkat", newdirfd, linkpath, &mut linkb) };
-    let tp = unsafe { crate::map::prepare_literal(b"symlinkat", target, &mut targb) };
+    // OS-02: a link in a volume keeps the guest's target.
+    let tp = if unsafe { crate::map::in_volume(lp) } {
+        target
+    } else {
+        unsafe { crate::map::prepare_literal(b"symlinkat", target, &mut targb) }
+    };
     if lp.is_null() || tp.is_null() {
         return -1;
     }

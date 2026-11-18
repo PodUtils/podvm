@@ -282,7 +282,9 @@ pub use readonly::*;
 mod links;
 pub use links::{follows, resolve_links};
 mod literal;
-pub use literal::prepare_literal;
+pub use literal::{in_volume, in_volume_of, prepare_literal};
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_volume;

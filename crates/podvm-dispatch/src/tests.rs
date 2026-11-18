@@ -88,28 +88,46 @@ fn the_tier_counts_growth_and_names_its_release() {
     assert!(!crate::uts::set(&[b'a'; 65]), "a name of 65 bytes");
 }
 
-/// TODO/enter.md T-1935: `close_range` keeps the root's descriptor and the
-/// count of `/tmp`.
+/// TODO/enter.md T-1935, OS-01: `close_range` keeps the root's
+/// descriptor, the count of `/tmp` and each volume's.
 #[test]
 fn close_range_goes_around_the_kept_descriptors() {
     use crate::handler::range_gaps;
-    assert_eq!(range_gaps(3, 10, [-1, -1]), None);
-    assert_eq!(range_gaps(3, 10, [1000, 1001]), None);
-    assert_eq!(
-        range_gaps(3, u32::MAX as i64, [1000, 1001]),
-        Some([Some((3, 999)), None, Some((1002, u32::MAX as i64))])
-    );
-    assert_eq!(
-        range_gaps(3, 2000, [1001, 1000]),
-        Some([Some((3, 999)), None, Some((1002, 2000))])
-    );
-    assert_eq!(range_gaps(1000, 1000, [1000, -1]), Some([None, None, None]));
-    assert_eq!(
-        range_gaps(3, 1500, [1000, -1]),
-        Some([Some((3, 999)), None, Some((1001, 1500))])
-    );
-    assert_eq!(
-        range_gaps(3, 1500, [5, 1000]),
-        Some([Some((3, 4)), Some((6, 999)), Some((1001, 1500))])
-    );
+    let m = u32::MAX as i64;
+    for (lo, hi, keep, want) in [
+        (3, 10, &[-1, -1][..], None),
+        (3, 10, &[1000, 1001][..], None),
+        (3, m, &[1000, 1001][..], Some(vec![(3, 999), (1002, m)])),
+        (
+            3,
+            2000,
+            &[1001, 1000][..],
+            Some(vec![(3, 999), (1002, 2000)]),
+        ),
+        (1000, 1000, &[1000, -1][..], Some(vec![])),
+        (3, 1500, &[1000, -1][..], Some(vec![(3, 999), (1001, 1500)])),
+        (
+            3,
+            1500,
+            &[5, 1000][..],
+            Some(vec![(3, 4), (6, 999), (1001, 1500)]),
+        ),
+        // A root, a count and two volumes; a descriptor twice is one.
+        (
+            3,
+            m,
+            &[1000, 1001, 1002, 1003, 1002][..],
+            Some(vec![(3, 999), (1004, m)]),
+        ),
+        (
+            3,
+            m,
+            &[1000, -1, 1005, 1010][..],
+            Some(vec![(3, 999), (1001, 1004), (1006, 1009), (1011, m)]),
+        ),
+    ] {
+        let mut out = [(0, 0); 19];
+        let got = range_gaps(lo, hi, keep, &mut out).map(|n| out[..n].to_vec());
+        assert_eq!(got, want, "{lo} {hi} {keep:?}");
+    }
 }

@@ -4760,3 +4760,102 @@ A descriptor is an `int`: the kernel reads the low 32 bits of its register. glib
 ## Done
 
 **Done (2026-11-18).** The test above fails before the fix and passes after it. Measured on the cloud host with `mirror.gcr.io/library/ubuntu:24.04`: podrunner's case reads the body; `cat`, `grep` and `stat -L` through a relative absolute link pass in a directory of the rootfs and from `/`; `cd /tmp; ln -s /etc/hostname h; cat h` passes.
+
+# T-1978: On the syscall tier, a child of posix_spawn cannot run a link in a volume
+
+**Source:** OS-01 of the third outside pass of 2026-11-18 (T-1980)
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+`python3 -m venv` with pip failed on the syscall tier: `[Errno 9] Bad file descriptor: '/tmp/venv/bin/python3'`. `subprocess.run` (glibc `posix_spawn`) of a link in `/tmp` or in a `-v` volume gave EBADF; `os.execv` and a shell exec of the same link worked.
+
+## Premise
+
+Python's `posix_spawn` with `close_fds=True` runs `close_range(3, ~0)` in the child before its exec. The handler keeps the descriptor of each volume above the payload's usual range.
+
+## Approach
+
+The guard of `close`, `dup2`, `dup3` and `close_range` kept the root's descriptor and the count of `/tmp` only, so the child closed the descriptors of the volumes, and the exec's `openat2` at a volume gave EBADF. `handler::kept` now names the root's, the count's and each volume's descriptor; `range_gaps` closes the parts of the range around each of them.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test -p podvm-dispatch`: `close_range_goes_around_the_kept_descriptors` (a table of ranges with a root, a count and volumes). As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm --podvm-tier=syscall -v W:/vol quay.io/almalinuxorg/almalinux:9 python3 -c 'import os,subprocess; os.symlink("/usr/bin/python3","/tmp/l1"); os.symlink("/usr/bin/python3","/vol/l2"); print(subprocess.run(["/tmp/l1","-c","1"]).returncode, subprocess.run(["/vol/l2","-c","1"]).returncode)'` prints `0 0`.
+
+## Done
+
+**Done (2026-11-18).** The Prove prints `spawn 0 0` with `quay.io/almalinuxorg/almalinux:9`. With `mirror.gcr.io/library/python:3.13-slim` (the case of the pass): the spawn of `/tmp/l1 -> /usr/local/bin/python3` exits 0, and `python3 -m venv` with pip gives a `pip --version` of 26.2.2 in `/tmp/venv` and in `/vol/venv`.
+
+# T-1979: On the default userland rung, a link that the payload makes in a volume holds the host path of the tree of the run
+
+**Source:** OS-02 of the third outside pass of 2026-11-18 (T-1980)
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+On the loader family of the userland rung, `ln -s /etc/hostname /vol/a1` stored `a1 -> $HOME/.local/share/podvm/trees/ID/rootfs/etc/hostname` on the host. The tree goes with the container, so the link dangled on the host and in each later run, and it named the store's path. A venv made in a volume in one run did not run in the next.
+
+## Premise
+
+The interposer resolves a guest target of a link when the payload uses it (podrunner's `links.rs` test): a host-made link `x -> /etc/hostname` in a volume reads, stats, runs and spawns in the run.
+
+## Approach
+
+`symlink` and `symlinkat` of the interposer rewrote each absolute target through the table, so that the kernel could follow it. A link whose path lands in a volume (a pair whose guest side is not `/`, `map::in_volume`) now keeps the guest's target; a link in the tree of the run keeps the rewrite, as before.
+
+## Decision
+
+-
+
+## Prove
+
+The interposer tests: `a_volume_is_a_pair_whose_guest_side_is_not_the_root`. As uid 1000 under `scripts/dev/nouserns.c` (the loader family): `podvm run --rm -v W:/vol quay.io/almalinuxorg/almalinux:9 sh -c 'ln -s /etc/hostname /vol/a1; python3 -m venv --without-pip /vol/venv'` leaves `W/a1 -> /etc/hostname` on the host, and `podvm run --rm -v W:/vol quay.io/almalinuxorg/almalinux:9 /vol/venv/bin/python -c 1` exits 0.
+
+## Done
+
+**Done (2026-11-18).** The Prove holds with `quay.io/almalinuxorg/almalinux:9` (`a1 -> /etc/hostname`; the second run prints its `sys.prefix`, `/vol/venv`). With `mirror.gcr.io/library/python:3.13-slim`: the host shows `a1 -> /etc/hostname`, `rel -> /usr/bin` (a relative link path) and `venv/bin/python3 -> /usr/local/bin/python3`; the second run prints `venv-run2-ok /vol/venv`; a link in `/tmp` of the tree still reads in its run.
+
+# T-1981: On the userland rung, a program whose PT_INTERP lies past the first 64 KiB is refused (Fedora 42)
+
+**Source:** found on the gate of beta.34 (2026-11-18), on the way to the Prove of T-1978; COORD-193 (#589) asks podcrates
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** blocked
+
+## Problem
+
+On a host that denies `chroot(2)` and user namespaces, `podvm run quay.io/fedora/fedora:42 sh -c true` exits 125: "the PT_INTERP path lies past the 65536 bytes read, so the reader cannot tell a static file from a dynamic one". Fedora 42's `/usr/bin/bash` has `PT_INTERP` at file offset `0xf2000`. The fault is older than `0.2.0-beta.33`.
+
+## Premise
+
+`pod_enter::abi` (its `Elf::interp`, podcrates `v0.71.0`) reads a head of the file and answers "unknown" where the path of `PT_INTERP` lies past it.
+
+## Approach
+
+podcrates reads the path at its `p_offset` from a file source (COORD-193, #589). podvm takes the tag and measures it.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm quay.io/fedora/fedora:42 sh -c 'echo ok'` prints `ok` and exits 0.
+
+## Blocker
+
+The reader is podcrates' code (`AGENTS.md`, section 2a). COORD-193 (#589) asks podcrates to read the path of `PT_INTERP` at its offset from a file source. Clears when a podcrates tag carries it.

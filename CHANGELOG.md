@@ -8,6 +8,12 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- On the syscall tier, a child of `posix_spawn` runs a link in `/tmp` or
+  in a volume: the handler keeps the descriptors of the volumes through
+  the child's `close_range` (T-1978). `python3 -m venv` with pip works.
+- On the default userland rung, a link that the payload makes in a volume
+  keeps the guest's target, so it works in the next run and on the host
+  (T-1979).
 - The handler of the syscall tier runs each call on a stack of its own, not
   on the payload's alternate signal stack, which Rust's std sizes to 8 KiB
   on a CPU without AMX (T-1976).
