@@ -8,6 +8,18 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Added: the size of the root disk and the usage of an incus instance, 2026-11-18
+
+Record: T-1964, T-1965.
+Deployed: none yet.
+
+- `--storage-opt size=N` of the incus tier sizes the root disk of the
+  instance; a storage pool that holds no size (the driver `dir`) refuses
+  the run by name and leaves no instance (PodUtils/podrunner#296, ask 1).
+- `inspect` of an instance of the incus tier gives `CpuSeconds`,
+  `PeakMemoryBytes` and `OomKills` (asks 2 and 6).
+- podcrates `v0.71.0`.
+
 ### Added: `--env-file0` for a value with a newline, 2026-11-18
 
 Record: T-1971, T-1972.

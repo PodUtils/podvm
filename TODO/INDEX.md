@@ -626,8 +626,8 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1961](net.md) | P3 | M | none | net | open | The donor study: the network gateway |
 | [T-1962](probe.md) | P2 | M | none | probe | open | The donor study: host probes and namespaces |
 | [T-1963](complete.md) | P3 | L | none | complete | open | The donor study: research backlog |
-| [T-1964](machine.md) | P1 | M | none | machine | open | The incus tier cannot size the root disk of an instance |
-| [T-1965](machine.md) | P1 | M | none | machine | open | The incus tier gives no CPU time and no peak memory of an instance |
+| [T-1964](machine.md) | P1 | M | none | machine | partial | The incus tier cannot size the root disk of an instance |
+| [T-1965](machine.md) | P1 | M | none | machine | done | The incus tier gives no CPU time and no peak memory of an instance |
 | [T-1966](machine.md) | P2 | M | none | machine | done | The incus tier cannot run a container engine in an instance |
 | [T-1967](machine.md) | P1 | S | none | machine | done | The machine tier has no limit of processes in a guest |
 | [T-1968](machine.md) | P2 | L | none | machine | open | No tier gives a sized writable disk to a unit |
@@ -638,7 +638,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-569 entries: 19 open, 28 partial, 3 blocked, 519 done.
+569 entries: 17 open, 29 partial, 3 blocked, 520 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -648,10 +648,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 2 | 11 | 0 | 225 | 238 |
+| P1 | 0 | 12 | 0 | 226 | 238 |
 | P2 | 12 | 13 | 2 | 177 | 204 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
-| **All** | 19 | 28 | 3 | 519 | 569 |
+| **All** | 17 | 29 | 3 | 520 | 569 |
 
 ## Work order
 

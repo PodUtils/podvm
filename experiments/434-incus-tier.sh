@@ -392,7 +392,7 @@ echo ""; echo "== 17. --storage-opt size= on a pool of the driver dir" >>"$REPOR
 out=$(P run -d --name sz434 --podvm-tier=incus --storage-opt size=1GiB "$OCI" sleep 30 </dev/null 2>&1); rc=$?
 echo "  run -d   rc $rc: $(printf '%s' "$out" | tail -1)"
 echo "  left     $(RI list --format csv -c n 2>/dev/null | grep -c '^sz434$')"
-echo "  native   $(P run --rm --storage-opt size=1GiB "$OCI" true 2>&1; echo " rc $?")"
+echo "  native   $(P run --rm --storage-opt size=1GiB "$OCI" true 2>&1 | tr '\n' ' ') rc $(P run --rm --storage-opt size=1GiB "$OCI" true >/dev/null 2>&1; echo $?)"
 } >"$WORK/c17.txt" 2>&1
 cat "$WORK/c17.txt" >>"$REPORT"
 c17() { grep -q "$1" "$WORK/c17.txt" || { note "17: $2"; fail=1; }; }

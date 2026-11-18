@@ -5379,7 +5379,7 @@ One table test: a `-v` host path with a comma gives one `-virtfs` option with th
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -5401,6 +5401,11 @@ The `root` device of a new instance must name the pool of its profile, and `pod-
 
 Experiment 434 with the incusd of experiment 433: `run -d --podvm-tier=incus --storage-opt size=1GiB public.ecr.aws/docker/library/alpine:3.20 sh -c 'dd if=/dev/zero of=/f bs=1M count=2000'` ends with `No space left on device`.
 
+## Done
+
+**Partial (2026-11-18).** podcrates `v0.71.0` (PodUtils/podcrates#228, podcrates@T-925) gives `Client::profile` and `Client::instance_state`. `run -d --podvm-tier=incus --storage-opt size=N` (also `run` and `create`; `N` as `1G`, `1GB`, `1GiB`, `512MiB` or bytes, at least 64m) copies the `root` device of the default profile with `size` (`incus::run::apply_limits`); after the start, `incus::run::size_held` reads the state of the root disk, and a pool that reports no limit refuses the run and leaves no instance. Each other tier refuses the flag by name; docker's other options of the flag are refusals. Experiment 434 clause 17, on the `dir` pool of route A: `run -d --storage-opt size=1GiB` exits 125 with "the storage pool of the instance holds no size of its root disk", no instance stays, and a native run refuses the flag by name. The run found a fault, fixed in `d812a02`: `size=1GiB` was refused. `storage_opt_takes_each_spelling_of_a_size` pins the spellings. Remaining: a pool with a quota (btrfs, zfs, lvm) that bounds the disk; route A runs incusd in a user namespace, which can mount none of them, so podrunner's host or a hosted runner measures it.
+
+
 # T-1965: The incus tier gives no CPU time and no peak memory of an instance
 
 **Source:** PodUtils/podrunner#296 (COORD-089 of podrunner, ask 2), COORD-186 (PodUtils/podvm#582)
@@ -5408,7 +5413,7 @@ Experiment 434 with the incusd of experiment 433: `run -d --podvm-tier=incus --s
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -5429,6 +5434,11 @@ The processes of an incus instance belong to incusd, so podrunner cannot sample 
 ## Prove
 
 Experiment 434: after `run -d --podvm-tier=incus public.ecr.aws/docker/library/alpine:3.20 sh -c 'yes >/dev/null & sleep 5; kill %1'`, `inspect --format '{{.CpuSeconds}} {{.PeakMemoryBytes}}'` prints two numbers greater than 0.
+
+## Done
+
+**Done (2026-11-18).** `inspect --podvm-tier=incus NAME` gives `CpuSeconds` (the `cpu.usage` of the state, in seconds), `PeakMemoryBytes` (`memory.usage_peak`) and `OomKills` (`Client::oom_kills`, from the metrics of incusd), as fields of `--format` and in the JSON; a value that incusd does not give is a dash (`incus::inspect::usage_of`). Experiment 434 clause 18: a `run -d` that counts to 300000 and holds 30 MB gives `1.162 61513728 0`. The values are those of a running instance: the instance of a `run -d` stays after its command ends, so they stay readable until `rm`.
+
 
 # T-1966: The incus tier cannot run a container engine in an instance
 
