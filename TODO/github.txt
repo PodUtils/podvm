@@ -475,6 +475,6 @@
 583 issue open
 584 issue open
 585 issue open
-586 issue open
+586 issue closed
 587 issue closed
 588 issue open
