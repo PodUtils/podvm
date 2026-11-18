@@ -479,6 +479,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #583 | COORD-187: the answer to PodUtils/podrunner#296: the state of each of the seven asks, and when each comes (to podrunner) | open | T-1964 to T-1969 |
 | #584 | COORD-188: pod-enter: a session with the pty as the controlling terminal of the payload (Fds), so that Ctrl-C and job control work under run -t (to podcrates) | open | T-1970 |
 | #585 | COORD-189: the answer to PodUtils/podrunner#300: --env-file0 is on main; --env-file holds on the machine and incus tiers; --podvm-volume-base off the namespace rung is T-1972 (to podrunner) | open | T-1971, T-1972 |
+| #586 | COORD-190: the answer to PodUtils/podrunner#301: the syscall tier now maps the path of a Unix socket (on main, for the next beta) (to podrunner) | open | T-1973 |
 
 ## Messages whose title does not start with COORD-NNN
 
