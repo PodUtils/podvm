@@ -8,6 +8,9 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- `exec` into a container whose foreground run had `--tmpfs` works again;
+  since `0.2.0-beta.33` it refused the ended run's tmpfs directory with
+  125 (T-1974).
 - On the syscall tier, a relative path of a glibc program through an
   absolute link resolves in the root, not on the host: the handler takes
   `AT_FDCWD` as the kernel does, from the low 32 bits of the register

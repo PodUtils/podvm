@@ -396,8 +396,16 @@ pub(super) fn enter(
         die_with_parent: false,
         confine,
         hostname: None, // T-1908: `exec` joins the UTS namespace of the run
-        volumes: podvm_supervise::launcher::binds_of(&container.env), // T-1920, OR-04
-        userns_ids: None, // podcrates `v0.62.0`; T-1927 fills it for `run -d`
+        // T-1920, OR-04; T-1830: the `--tmpfs` directory of an ended run is
+        // gone, so its bind stays out, as in the table above.
+        volumes: podvm_supervise::launcher::binds_of(&container.env)
+            .into_iter()
+            .filter(|b| {
+                let h = std::path::Path::new(&b.host);
+                !h.starts_with(&tmpfs) || h.is_dir()
+            })
+            .collect(),
+        userns_ids: None,     // podcrates `v0.62.0`; T-1927 fills it for `run -d`
         pid_namespace: false, // podcrates `v0.65.0`; T-1930 sets it for `run -d`
     };
     if let Err(c) = serve_devices(&mut plan, &mut err) {
@@ -428,10 +436,10 @@ pub(super) fn enter(
             let joined = (state == State::Running && container.rung == "namespace")
                 .then_some(container.pid)
                 .flatten()
-                .and_then(|p| crate::userns::joined_pidfd().or_else(|| pidfd_open(p)));
+                .and_then(|p| crate::userns::joined_pidfd().or_else(|| super::ns::pidfd_open(p)));
             let r = match joined {
                 Some(fd) => {
-                    join_uts(&fd); // TODO/enter.md T-1908
+                    super::ns::join_uts(&fd); // TODO/enter.md T-1908
                     let r =
                         podvm_enter::spawn_joined(&root, &plan, fd.as_raw_fd() as i64, &mut err)
                             .and_then(|c| c.wait_forwarding(&mut err));
@@ -451,50 +459,4 @@ pub(super) fn enter(
     }
 }
 
-/// Join the UTS namespace of the payload of `pidfd`, so that `exec` sees
-/// the name of `--hostname` (T-1908). Where it is the namespace of this
-/// process already, or the join is refused, nothing changes.
-fn join_uts(pidfd: &std::os::fd::OwnedFd) {
-    use std::os::fd::AsRawFd;
-    unsafe extern "C" {
-        fn setns(fd: i32, nstype: i32) -> i32;
-    }
-    const CLONE_NEWUTS: i32 = 0x0400_0000;
-    // SAFETY: a pidfd and a namespace type; a UTS join has no rule of one
-    // thread.
-    unsafe { setns(pidfd.as_raw_fd(), CLONE_NEWUTS) };
-}
-
-/// A pidfd of `pid` (Linux 5.3), or `None`.
-pub(crate) fn pidfd_open(pid: i64) -> Option<std::os::fd::OwnedFd> {
-    use std::os::fd::FromRawFd;
-    unsafe extern "C" {
-        fn syscall(n: std::ffi::c_long, ...) -> std::ffi::c_long;
-    }
-    const SYS_PIDFD_OPEN: std::ffi::c_long = 434;
-    // SAFETY: pidfd_open takes a pid and flags and returns a descriptor.
-    let fd = unsafe {
-        syscall(
-            SYS_PIDFD_OPEN,
-            pid as std::ffi::c_long,
-            0 as std::ffi::c_long,
-        )
-    };
-    (fd >= 0).then(|| unsafe { std::os::fd::OwnedFd::from_raw_fd(fd as i32) })
-}
-
-/// Join the mount namespace of the payload `pid`; false where it is
-/// refused (T-1775).
-pub(crate) fn join_mounts(pid: Option<i64>) -> bool {
-    use std::os::fd::AsRawFd;
-    unsafe extern "C" {
-        fn setns(fd: i32, nstype: i32) -> i32;
-    }
-    const CLONE_NEWNS: i32 = 0x0002_0000;
-    crate::userns::rejoin(pid); // TODO/enter.md T-1910: `cp`
-    let Some(fd) = crate::userns::joined_pidfd().or_else(|| pid.and_then(pidfd_open)) else {
-        return false;
-    };
-    // SAFETY: a pidfd and a namespace type; podvm cp runs on one thread.
-    unsafe { setns(fd.as_raw_fd(), CLONE_NEWNS) == 0 }
-}
+pub(crate) use super::ns::join_mounts;

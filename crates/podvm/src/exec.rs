@@ -306,6 +306,7 @@ fn parse(args: &[String]) -> std::result::Result<Opts, i32> {
 }
 
 pub(crate) mod enter;
+pub(crate) mod ns;
 use enter::*;
 
 mod command;
