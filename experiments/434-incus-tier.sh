@@ -62,6 +62,9 @@
 #      127.0.0.1:3128), and the socket logs each request. The socket is a
 #      `disk` device of the instance, and podvm's init relays the port to
 #      it (PodUtils/podrunner#90: no `proxy` device).
+#  16. `--podvm-engine` (T-1966, PodUtils/podrunner#296 ask 3): `run -d`
+#      of `docker:dind` with no NIC starts `dockerd`, which answers
+#      `docker info`; the instance has `security.nesting`.
 #
 # Exit: 0 every clause matched, 1 a clause disagreed, 2 the lane could not
 # run (not root, no user namespaces, no package).
@@ -254,7 +257,7 @@ c12 "^  ps       web434 Running" "ps did not list the instance Running"
 c12 "^  exec     in-exec exit=5$" "exec did not give the output and the exit code"
 c12 "^  logs     started$" "logs did not give the output of the command"
 c12 "^  ps -a    web434 Stopped" "stop did not make it Stopped"
-c12 "^  rm       .*the instance runs.* exit=1$" "rm of a running instance did not refuse"
+c12 "^  rm       .*the instance is Running.* exit=1$" "rm of a running instance did not refuse"
 c12 "^  rm -f    web434 exit=0$" "rm -f did not remove it"
 c12 "^  ps -a    made434 Stopped" "create did not make a Stopped instance"
 c12 "^  ps -a    brief434 Stopped" "a command that ended did not stop its instance"
@@ -355,6 +358,27 @@ c15 "request /run434.*request /detach434" "the host socket did not log both requ
 if grep -q "^  profile  a NIC" "$WORK/c15.txt"; then
 	c15 "^  net      eth0 lo $" "a run with no flag did not show the NIC of the profile"
 fi
+
+# ---- clause 16 ----------------------------------------------------------
+# TODO/machine.md T-1966 (PodUtils/podrunner#296 ask 3): --podvm-engine on
+# the incus tier lets dockerd run in an unprivileged instance with no NIC.
+DIND=${PODVM_434_DIND:-mirror.gcr.io/library/docker:dind}
+echo ""; echo "== 16. --podvm-engine: a container engine in an instance" >>"$REPORT"
+{
+P pull -q "$DIND" >/dev/null 2>&1
+echo "  run -d   $(P run -d --name eng434 --podvm-tier=incus --podvm-engine --podvm-net none "$DIND" dockerd --iptables=false --ip6tables=false --bridge=none </dev/null 2>&1)"
+i=0; drv=""
+while [ $i -lt 60 ] && [ -z "$drv" ]; do drv=$(P exec --podvm-tier=incus eng434 docker info --format '{{.Driver}}' 2>/dev/null); i=$((i+1)); [ -n "$drv" ] || sleep 2; done
+echo "  driver   ${drv:--}"
+echo "  nesting  $(RI config get eng434 security.nesting 2>&1)"
+echo "  root     $(RI exec eng434 -- stat -c %u / 2>&1) in the instance"
+echo "  rm       $(P rm -f --podvm-tier=incus eng434 2>&1)"
+} >"$WORK/c16.txt" 2>&1
+cat "$WORK/c16.txt" >>"$REPORT"
+c16() { grep -q "$1" "$WORK/c16.txt" || { note "16: $2"; fail=1; }; }
+c16 "^  run -d   eng434$" "run -d --podvm-engine did not start the instance"
+c16 "^  driver   [a-z]" "dockerd did not answer docker info in the instance"
+c16 "^  nesting  true$" "the instance has no security.nesting"
 
 # ---- clause 9 -----------------------------------------------------------
 left_i=$(RI list --format csv -c n 2>&1 | grep -c .)

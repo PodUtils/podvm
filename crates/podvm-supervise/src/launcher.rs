@@ -220,7 +220,7 @@ fn under(host: &str, base: &str) -> bool {
 
 /// The volumes of `PODVM_BINDS` (`GUEST:HOST[:ro]`, comma separated), as
 /// pod-enter binds them (TODO/enter.md T-1920).
-fn binds_of(env: &[String]) -> Vec<podvm_enter::VolumeBind> {
+pub fn binds_of(env: &[String]) -> Vec<podvm_enter::VolumeBind> {
     let Some(v) = env.iter().find_map(|e| e.strip_prefix("PODVM_BINDS=")) else {
         return Vec::new();
     };

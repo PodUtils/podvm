@@ -92,6 +92,9 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
             Err(e) => {
                 eprintln!("podvm run: {e}");
                 let _ = std::fs::remove_file(&p.memo_host_path);
+                // OQ-03 of the outside pass (T-1970): a refused `run -d`
+                // (a name in use) leaves no tree, as `create` (T-1709).
+                super::drop_unrecorded(&store, &p.rootfs);
                 return podvm_image::error::EXIT_RUNTIME_ERROR;
             }
         };
@@ -168,6 +171,8 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
     // root changes, and it is the only thing that crosses the boundary.
     let mut pass = vec![(crate::interpose::MEMO_CHILD_FD, memo_host)];
     let mut env = p.env.clone();
+    let volumes = podvm_supervise::launcher::binds_of(&env);
+    env.retain(|e| !e.starts_with("PODVM_BINDS=") && !e.starts_with("PODVM_BINDS_BASE="));
     match podvm_enter::device::specs_of(&env).and_then(|s| podvm_enter::device::open_all(&s)) {
         Ok(opened) => {
             pass.extend(opened.pass.iter().copied());
@@ -232,8 +237,9 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
         })
         .flatten(),
         // TODO/enter.md T-1920: in the user namespace of a run, podvm
-        // binds the volumes itself (`userns::bind_volumes`).
-        volumes: Vec::new(),
+        // binds the volumes itself (`userns::bind_volumes`), except those
+        // at or under `/tmp`, which pod-enter binds after its tmpfs (OQ-01).
+        volumes,
         // TODO/enter.md T-1927: the ids of `--user` or the image's `USER`.
         userns_ids: podvm_supervise::table::userns_ids_of(&p.env),
         pid_namespace: false, // podcrates `v0.65.0`; T-1930 sets it for `run -d`

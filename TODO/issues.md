@@ -477,6 +477,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #581 | [Donor] Index: the podvm donor study of 2026-11-17 | open | T-1956 to T-1963 |
 | #582 | COORD-186: pod-incus: the state of an instance (CPU time, peak memory, disk) and the pool of its root disk, for asks 1, 2 and 6 of PodUtils/podrunner#296 (to podcrates) | open | T-1964, T-1965, T-1969 |
 | #583 | COORD-187: the answer to PodUtils/podrunner#296: the state of each of the seven asks, and when each comes (to podrunner) | open | T-1964 to T-1969 |
+| #584 | COORD-188: pod-enter: a session with the pty as the controlling terminal of the payload (Fds), so that Ctrl-C and job control work under run -t (to podcrates) | open | T-1970 |
 
 ## Messages whose title does not start with COORD-NNN
 

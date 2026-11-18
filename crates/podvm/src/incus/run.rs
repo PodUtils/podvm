@@ -51,6 +51,25 @@ pub struct Job<'a> {
     pub channel: Option<(PathBuf, u16)>,
 }
 
+/// PodUtils/podrunner#296 ask 3 (TODO/machine.md T-1966): the keys that
+/// let a container engine run in an unprivileged instance with
+/// `--podvm-engine`: a nested `proc` and `sysfs`, and the intercepts of
+/// `mknod` and `setxattr` that its layers need. The root of the instance
+/// stays an id of the subordinate range of the host.
+pub fn engine_keys(engine: bool) -> Vec<(&'static str, String)> {
+    if !engine {
+        return Vec::new();
+    }
+    [
+        "security.nesting",
+        "security.syscalls.intercept.mknod",
+        "security.syscalls.intercept.setxattr",
+    ]
+    .into_iter()
+    .map(|k| (k, "true".to_string()))
+    .collect()
+}
+
 /// The devices of an instance of `job`: the volumes, the mask of the NIC
 /// and the channel.
 pub fn job_devices(job: &Job<'_>) -> pod_incus::Devices {

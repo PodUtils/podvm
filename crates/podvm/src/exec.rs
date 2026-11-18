@@ -306,3 +306,13 @@ pub use command::*;
 
 #[cfg(test)]
 mod tests;
+
+/// The working directory of an `exec` with no `-w`: the one of the record
+/// (OQ-05 of the outside pass, TODO/cli.md T-1970), else `/`.
+pub(crate) fn workdir_of(recorded: &str) -> String {
+    if recorded.starts_with('/') {
+        recorded.to_string()
+    } else {
+        "/".to_string()
+    }
+}

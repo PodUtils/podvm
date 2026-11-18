@@ -21,6 +21,8 @@ use std::time::Duration;
 
 unsafe extern "C" {
     fn ioctl(fd: c_int, req: c_ulong, ...) -> c_int;
+    fn kill(pid: c_int, sig: c_int) -> c_int;
+    fn getpid() -> c_int;
 }
 
 use crate::machine::guest::tty::Raw;
@@ -126,7 +128,7 @@ impl Pty {
                     let _ = to.write_all(eof);
                     break;
                 }
-                if to.write_all(&buf[..n]).is_err() {
+                if send(&mut to, &buf[..n]).is_err() {
                     break;
                 }
                 last = Some(buf[n - 1]);
@@ -138,6 +140,41 @@ impl Pty {
             raw,
         })
     }
+}
+
+/// The outside pass of 2026-11-18, OQ-02 (TODO/cli.md T-1970): the slave
+/// is no controlling terminal (pod-enter makes no session), so the line
+/// discipline sends no SIGINT for the interrupt key. Where the pty has
+/// `ISIG`, podvm takes its `VINTR` byte out of the input and raises SIGINT
+/// on itself; the handler of a foreground run forwards it to the payload
+/// and names it. A payload that turns `ISIG` off (an editor) gets the byte.
+fn send(to: &mut std::fs::File, mut input: &[u8]) -> std::io::Result<()> {
+    while !input.is_empty() {
+        let at = intr_of(to.as_raw_fd()).and_then(|c| input.iter().position(|b| *b == c));
+        let Some(at) = at else {
+            return to.write_all(input);
+        };
+        to.write_all(&input[..at])?;
+        // SAFETY: a signal to this process, whose handler forwards it.
+        unsafe { kill(getpid(), 2) };
+        input = &input[at + 1..];
+    }
+    Ok(())
+}
+
+/// The `VINTR` byte of the pty of `fd` where its `ISIG` is on.
+fn intr_of(fd: c_int) -> Option<u8> {
+    const TCGETS: c_ulong = 0x5401;
+    const ISIG: u32 = 0o1;
+    // `struct termios` of the kernel: four flags, the line, 19 controls.
+    let mut t = [0u8; 4 * 4 + 1 + 19];
+    // SAFETY: TCGETS writes one `struct termios` of 36 bytes.
+    if unsafe { ioctl(fd, TCGETS, t.as_mut_ptr()) } != 0 {
+        return None;
+    }
+    let lflag = u32::from_ne_bytes([t[12], t[13], t[14], t[15]]);
+    let intr = t[17];
+    (lflag & ISIG != 0 && intr != 0).then_some(intr)
 }
 
 /// The VEOF character of a fresh pty (`^D`).

@@ -1,24 +1,23 @@
 == conditions
-date              2026-11-13T18:33:59Z
-host kernel       Linux 6.18.44-fc-v445
+date              2026-11-18T09:07:54Z
+host kernel       Linux 6.18.44-fc-v595
 cgroup            tmpfs
 incus package     6.0.0-1ubuntu0.3
-OCI               public.ecr.aws/docker/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+OCI               mirror.gcr.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
 runs              5
 
 == 1. a run
   stdout  hello
   exit    0
-  ms      1121 (with the import)
-  stderr  25f1d6b1951a: Extracted (517 entries, 0 whiteouts)
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-b3b9f8f3163396cf-v3 imported now (TODO/machine.md T-1718)
+  ms      1491 (with the import)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-fc4dbb5617ac545a-v3 imported now (TODO/machine.md T-1718)
 
 == 2. the exit code
   exit    7
 
 == 3. stdout and stderr
   stdout  out
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-b3b9f8f3163396cf-v3 from incus (TODO/machine.md T-1718)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-fc4dbb5617ac545a-v3 from incus (TODO/machine.md T-1718)
   stderr  err
 
 == 4. stdin
@@ -31,11 +30,11 @@ runs              5
   PID 1                 /.podvm/podvm guest-hold 
   owner of /etc/passwd  0:0
   owner of /etc/shadow  0:42
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-b3b9f8f3163396cf-v3 from incus (TODO/machine.md T-1718)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-fc4dbb5617ac545a-v3 from incus (TODO/machine.md T-1718)
 
 == 7. the cached image
-  run true ms  848 (median of 5)
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-b3b9f8f3163396cf-v3 from incus (TODO/machine.md T-1718)
+  run true ms  1026 (median of 5)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-fc4dbb5617ac545a-v3 from incus (TODO/machine.md T-1718)
 
 == 8. a name that is no instance
   exec exit    125
@@ -51,19 +50,19 @@ runs              5
 
 == 12. an instance that stays
   run -d   web434
-  ps       web434 Running public.ecr.aws/docker/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+  ps       web434 Running mirror.gcr.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
   exec     in-exec exit=5
   logs     started
   stop     web434
-  ps -a    web434 Stopped public.ecr.aws/docker/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+  ps -a    web434 Stopped mirror.gcr.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
   start    web434
-  ps       web434 Running public.ecr.aws/docker/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
-  rm       podvm rm: web434: the instance runs: stop it, or rm -f exit=1
+  ps       web434 Running mirror.gcr.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+  rm       podvm rm: web434: the instance is Running: stop it, or rm -f exit=1
   rm -f    web434 exit=0
   create   made434
-  ps -a    made434 Stopped public.ecr.aws/docker/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+  ps -a    made434 Stopped mirror.gcr.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
   run -d   brief434
-  ps -a    brief434 Stopped public.ecr.aws/docker/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+  ps -a    brief434 Stopped mirror.gcr.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
   logs     brief
   rm       made434 brief434 
   ps -a    0 of 434
@@ -77,7 +76,7 @@ runs              5
   follow   one two 
   exitcode 0
   rm       cfg434
-  ladder   userland
+  ladder   namespace
 
 == 14. run -d -i
   run -d   in434
@@ -94,6 +93,15 @@ runs              5
   logs     host434 
   rm       ch434
   socket   request /run434 request /detach434 
+== 16. --podvm-engine: a container engine in an instance
+  run -d   podvm run: --podvm-cpus, --podvm-sealed and --podvm-engine need --podvm-tier=machine; --podvm-net and --podvm-channel need --podvm-tier=machine or incus
+  driver   -
+  nesting  Error: Failed to fetch instance "eng434" in project "default": Instance not found
+  root     Error: Failed to fetch instance "eng434" in project "default": Instance not found in the instance
+  rm       podvm rm: eng434: GET /1.0/instances/eng434: incus refused the call (404, error_code 404): Failed to fetch instance "eng434" in project "default": Instance not found
+16: run -d --podvm-engine did not start the instance
+16: dockerd did not answer docker info in the instance
+16: the instance has no security.nesting
 
 == 9. nothing stays
   instances in incus              0
@@ -103,4 +111,4 @@ runs              5
   exit    125
   stderr  podvm run: incus tier: no incusd answers at /workspace/podvm/experiments/.sweep434-work/no-incus/unix.socket: set PODVM_INCUS_SOCKET or INCUS_DIR, or start one (docs/incus.md, route A)
 
-verdict           THE INCUS TIER RUNS
+verdict           A CLAUSE DISAGREED

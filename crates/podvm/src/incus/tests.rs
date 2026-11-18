@@ -434,3 +434,25 @@ fn eq_form_of_another_tier_on_a_lifecycle_verb_is_refused_by_name() {
         None
     );
 }
+
+/// TODO/machine.md T-1966: `--podvm-engine` gives the instance the keys of
+/// a nested engine, and no key without it.
+#[test]
+fn engine_gives_the_instance_nesting_and_the_two_intercepts() {
+    assert!(super::run::engine_keys(false).is_empty());
+    let k: Vec<&str> = super::run::engine_keys(true)
+        .iter()
+        .map(|(k, _)| *k)
+        .collect();
+    assert_eq!(
+        k,
+        [
+            "security.nesting",
+            "security.syscalls.intercept.mknod",
+            "security.syscalls.intercept.setxattr"
+        ]
+    );
+    assert!(super::run::engine_keys(true)
+        .iter()
+        .all(|(_, v)| v == "true"));
+}

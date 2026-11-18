@@ -386,16 +386,10 @@ pub(super) fn incus_tier(
         );
         return EXIT_FLAG_ERROR;
     }
-    if o.mem.is_some()
-        || o.cpus.is_some()
-        || !o.qemu_args.is_empty()
-        || o.broker
-        || o.sealed
-        || o.engine
-    {
+    if o.mem.is_some() || o.cpus.is_some() || !o.qemu_args.is_empty() || o.broker || o.sealed {
         eprintln!(
             "podvm {verb}: --podvm-tier=incus takes no --podvm-mem, --podvm-cpus, \
-             --podvm-qemu-arg, --podvm-sealed, --podvm-engine or --network broker yet \
+             --podvm-qemu-arg, --podvm-sealed or --network broker yet \
              (TODO/machine.md T-1718)"
         );
         return EXIT_FLAG_ERROR;
@@ -427,7 +421,12 @@ pub(super) fn incus_tier(
         env: p.env,
         workdir: p.workdir,
         stdin: p.stdin,
-        limits: o.limits.iter().map(|(_, k, v)| (*k, v.clone())).collect(),
+        limits: o
+            .limits
+            .iter()
+            .map(|(_, k, v)| (*k, v.clone()))
+            .chain(crate::incus::run::engine_keys(o.engine))
+            .collect(),
         // TODO/machine.md T-1722: create and run -d keep the instance.
         detach: (verb == "create" || o.detach).then(|| crate::incus::verbs::Detach {
             name: o.name.clone(),

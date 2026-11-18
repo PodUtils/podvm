@@ -94,3 +94,43 @@ pub(super) fn refuse_base_off_binds(verb: &str, base: bool, on_userland: bool) -
     }
     Ok(())
 }
+
+/// The volumes at or under `/tmp`, and the others: in the user namespace of
+/// a foreground run, the first go to pod-enter (OQ-01, T-1970).
+pub(super) fn split_tmp(
+    volumes: &[podvm_enter::userland::Volume],
+) -> (
+    Vec<podvm_enter::userland::Volume>,
+    Vec<podvm_enter::userland::Volume>,
+) {
+    let at_tmp = |g: &str| g == "/tmp" || g.starts_with("/tmp/");
+    if !crate::userns::active() {
+        return (Vec::new(), volumes.to_vec());
+    }
+    volumes.iter().cloned().partition(|v| at_tmp(&v.guest))
+}
+
+/// `PODVM_BINDS` of the volumes of a foreground run that pod-enter binds
+/// after its tmpfs on `/tmp` (OQ-01, T-1970).
+pub(super) fn push_foreground(
+    at_tmp: &[podvm_enter::userland::Volume],
+    ro: &[String],
+    base: Option<&str>,
+    env: &mut Vec<String>,
+) {
+    if at_tmp.is_empty() {
+        return;
+    }
+    let pairs: Vec<String> = at_tmp
+        .iter()
+        .map(|v| {
+            let ro = if ro.contains(&v.guest) { ":ro" } else { "" };
+            format!("{}:{}{ro}", v.guest, v.host)
+        })
+        .collect();
+    env.retain(|e| !e.starts_with("PODVM_BINDS=") && !e.starts_with("PODVM_BINDS_BASE="));
+    env.push(format!("{VAR}={}", pairs.join(",")));
+    if let Some(base) = base {
+        env.push(format!("{BASE_VAR}={base}"));
+    }
+}

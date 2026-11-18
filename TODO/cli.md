@@ -6186,3 +6186,36 @@ One change for each item; `tests/cli_contract.rs` (T-1946) checks the help of ea
 ## Done
 
 **Partial (2026-11-17).** 520: `podvm --help` names `port` and `logout` (the text moved to `usage_text.rs`), and the contract test checks that it names each one-word verb, with the names that redirect to `system` as named exceptions. 522: `save -o` writes no line on stdout, and its line on stderr names the file. 521: an unreadable file of `system abi` exits 125, a code of the table. 483 (T-1937): `podvm man` lists the redirects as `system df`, `image prune` and the others. 514 and 523 (T-1952): `inspect` prints one JSON array of each reference in the order given, a container before an image; measured with two containers, a container and an image, a name of both, and a missing name. 532: a bare `profile`, `lab` and `windows` print the help and exit 0. 530: `uname -v` of the syscall tier is `#1 SMP podvm syscall tier`. 533: `run --help` says that `-v` is a bind mount on the namespace rung and that a `-w` in a volume resolves there. 542: the refusal of the machine tier names only the flag given. 513: `--report` refuses an empty path, and its preflight probes the directory where the writer makes its temp file (`/dev/full` is refused before the payload). 519: `probe-inside`, `compare`, `port` and `profile show` answer a missing argument with exit 1 and a line that names it; `login` keeps 125 for a missing flag (a refusal of the flag parser, in the words of the table) and names the flag. 559: `login` keeps docker's `Login Succeeded` on stdout (scripts read it), and says on stderr that the registry checks the login at the next pull. 541 and 543: the `exec` help and `docs/limits.md` say that `exec NAME` enters a running guest, and that an arm64 guest runs. 556: `docs/limits.md` says that `-v` is a bind mount on the namespace rung. 518: the model of the manual takes the arguments of the usage line only (`man/model.rs` `split_usage`), and the rest of the help is a note; `man --roff` has 48 `Usage:` lines with none doubled, and `mandoc -Tlint -Wwarning` passes. 545: `run -t` with no `-i` gives the payload no stdin, as docker's; under `script` the output is `hi\r\n` with no `^@`, and `-i -t` still takes input. Remaining: 517, 519 (`notebook`, `machine ssh`), 524, 531, 546.
+
+# T-1970: The outside pass of 2026-11-18: three P1 and seven P2 faults on the path of a unit
+
+**Source:** the outside pass of the gate of a beta (T-1949, `docs/maintenance.md`), 2026-11-18: an agent with the binary of `6b5a6cb` and `podvm man` only, as uid 1000 on the cloud host
+**Category:** cli
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+The pass found 3 P1, 7 P2 and 7 P3 faults (OQ-01 to OQ-17). P1: a foreground `-v HOST:/tmp[/X]` is hidden by the tmpfs on `/tmp` (OQ-01); Ctrl-C in `run -t` does nothing, because the pty is no controlling terminal (OQ-02, in `0.2.0-beta.31` too); each refused `run -d --name DUP` leaves its tree of about 110 MiB (OQ-03). P2: `run -t` with no `-i` hangs on a read (OQ-04); `exec` starts in `/`, not in the `-w` of the container (OQ-05); `inspect` of a container has no `.Config.*` (OQ-06); exit codes outside the table (OQ-07); `pull -q` hides an error (OQ-08); `run -d --rm` keeps the record (OQ-09, #474); each `rm` starts an unbounded copy of a spare tree (OQ-10). P3: OQ-11 to OQ-17.
+
+## Premise
+
+Each finding was reproduced twice by the pass. OQ-02 reproduces with the released `0.2.0-beta.31`.
+
+## Approach
+
+The P1 faults and OQ-05 first, as each meets a unit of podrunner; then the P2 faults; the P3 faults with the quality entries of their class.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000: `run --rm -v H:/tmp IMAGE sh -c 'echo hi > /tmp/tw'` leaves `H/tw`; `(sleep 6; printf '\003'; sleep 20) | script -qec 'podvm run --rm -it IMAGE sleep 100' /dev/null` ends with 130; a refused `run -d --name DUP` adds no tree; `exec` of a container of `-w /usr/lib` prints `/usr/lib` for `pwd`.
+
+## Done
+
+**Partial (2026-11-18).** OQ-01: in the user namespace of a foreground run, each volume at or under `/tmp` goes to pod-enter's binds (`PODVM_BINDS` of the plan), which come after its tmpfs; podvm binds the others as before (`run::binds::split_tmp`). OQ-02: the relay of `-it` takes the `VINTR` byte of the pty out of the input where the pty has `ISIG`, and raises SIGINT on podvm, whose handler forwards it to the payload (`run::pty::send`); a controlling terminal needs a session in pod-enter (a COORD issue). OQ-03: a refused `run -d` drops its tree as `create` does (`run::drop_unrecorded`). OQ-05: `exec` takes the working directory of the record where `-w` names none. Measured as uid 1000 with `docker.io/library/python:3.13-slim`: `-v H:/tmp` lists and writes `H`, `-v H:/tmp/x:ro` reads and refuses a write, `-v H/one.txt:/tmp/one.txt` reads the file, `-v H:/data` still works; `-it` and a `^C` after 6 s end with 130; a refused `run -d --name dup` adds no directory under `trees/`; `exec` gives `/usr/lib` for a container of `-w /usr/lib`, `/etc` with `-w /etc`, and `/` for a container with no `-w`. Remaining: OQ-04, OQ-06 to OQ-17.

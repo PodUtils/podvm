@@ -10,7 +10,7 @@ They describe their recorded revision, not the current build.
 
 ### Added: the asks of podrunner, 2026-11-18
 
-Record: T-1934, T-1945, T-1967, T-1969.
+Record: T-1934, T-1945, T-1967, T-1969, T-1970.
 Deployed: none yet.
 
 - Each unit has a terminal of its own: `run -d`, `create`, `start` and a
@@ -25,6 +25,12 @@ Deployed: none yet.
   the command and each child (PodUtils/podrunner#296, ask 4).
 - The run report has `oom_kills` where the run has a cgroup leaf: the
   count of OOM kills of `--memory` (PodUtils/podrunner#296, ask 6).
+- A foreground `-v HOST:/tmp` (or a path under `/tmp`) is no longer
+  hidden by the tmpfs on `/tmp`.
+- Ctrl-C in `run -it` interrupts the payload (exit 130).
+- A `run -d` refused for a name in use leaves no rootfs tree.
+- `exec` starts in the working directory of the container where `-w`
+  names none, as docker's does.
 - podcrates `v0.70.0`.
 
 ### Fixed: the first reports of the external QA of `0.2.0-beta.31`, 2026-11-17
