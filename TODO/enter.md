@@ -4892,3 +4892,177 @@ On the tier, podvm starts the payload by an exec of podvm itself, so the layer m
 ## Done
 
 **Done (2026-11-18).** Measured as in the Prove with `mirror.gcr.io/library/ubuntu:24.04`: with the layer, `run -d` exits 0, the payload writes its own file, and neither it nor `exec` reads the host process's canary (`Permission denied`); with no layer, both read it. A foreground run on the tier and on the default rung give the same answers.
+
+# T-1983: On the syscall tier, `--podvm-confine exec=` is not enforced
+
+**Source:** OT-01 of the fourth outside pass of 2026-11-18 (the gate of beta.35, T-1989)
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+With `--podvm-tier=syscall`, `--podvm-confine 'write=/tmp;exec=/usr/bin/sh,/usr/bin/cp'` lets `cp /usr/bin/id /tmp/i2; /tmp/i2` run (exit 0), in `run`, `run -d` + `exec` and `create` + `start`. The loader family denies it (the interposer checks the exec table), and the namespace rung denies it (Landlock). The fault is in `0.2.0-beta.34` and before.
+
+## Premise
+
+On the tier each program runs through podvm itself, which the layer allows, so Landlock never checks EXECUTE on the program. `pod-enter` writes the exec table of the layer (`PODVM_EXEC_HOST`) at the spawn.
+
+## Approach
+
+The handler checks each `execve` and `execveat` against the exec table of the layer, as the interposer does, and answers EACCES for a program that no `exec=` rule names.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm --podvm-tier=syscall --podvm-confine 'write=/tmp;exec=/usr/bin/sh,/usr/bin/cp' public.ecr.aws/ubuntu/ubuntu:24.04 sh -c 'cp /usr/bin/id /tmp/i2; /tmp/i2'` exits 126 with "Permission denied".
+
+# T-1984: `--podvm-confine exec=` is bypassed through the dynamic loader
+
+**Source:** OT-02 of the fourth outside pass of 2026-11-18 (the gate of beta.35, T-1989)
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+`/lib64/ld-linux-x86-64.so.2 /tmp/prog` runs a program that `exec=` denies when started directly, on each rung (`direct=126`, `ldso=0`). The fault is in `0.2.0-beta.34` and before.
+
+## Premise
+
+Landlock checks EXECUTE at `execve`, not at `mmap(PROT_EXEC)`, and the layer lets each run read the files of the dynamic loader.
+
+## Approach
+
+Where podvm sees the exec (the interposer, the handler of the tier), an exec of the loader with a program argument takes the exec rule of that program. Where only Landlock holds (the namespace and chroot rungs), the manual names the limit.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000: `podvm run --rm --podvm-confine 'write=/tmp;exec=/usr/bin/sh,/usr/bin/cp' public.ecr.aws/ubuntu/ubuntu:24.04 sh -c 'cp /usr/bin/id /tmp/m; /lib64/ld-linux-x86-64.so.2 /tmp/m'` exits 126 on the userland rung and the syscall tier; the manual of `--podvm-confine` names what holds on the other rungs.
+
+# T-1985: A payload under `--podvm-confine` changes the mode and the times of a file that no rule names
+
+**Source:** OT-03 of the fourth outside pass of 2026-11-18 (the gate of beta.35, T-1989)
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+With `read=/sc;write=/tmp` and `-v H:/no`, the payload changes `/no/s` from mode 600 to 666 and resets its mtime, on each rung; reads, writes, `rm`, `mv` and `link` are denied. The fault is in `0.2.0-beta.34` and before.
+
+## Premise
+
+Landlock governs no change of mode, owner or times (no access right for them up to ABI 6).
+
+## Approach
+
+Where podvm sees the call (the interposer, the handler of the tier), `chmod`, `chown`, `utimensat` and their kin of a path that no `write=` rule names give EACCES. The seccomp filter of the layer cannot judge a path; on the namespace and chroot rungs the manual names the limit and the advice of a `:ro` volume.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm --podvm-confine 'read=/sc;write=/tmp' -v H:/no -v S:/sc public.ecr.aws/ubuntu/ubuntu:24.04 sh -c 'chmod 666 /no/s'` exits 1 with "Permission denied", and the mode of `H/s` stays 600.
+
+# T-1986: On the userland rung, `dnf` of Fedora 42 cannot write its state under `/root`
+
+**Source:** OT-04 of the fourth outside pass of 2026-11-18 (the gate of beta.35, T-1989)
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** open
+
+## Problem
+
+`podvm run --rm quay.io/fedora/fedora:42 dnf --version` exits 1 on the userland rung and the syscall tier: "cannot create directories: Permission denied [/root/.local/state]". `/root` is mode 0550 in the image, and the extraction makes it uid 1000's with that mode. The fault is in `0.2.0-beta.34` and before.
+
+## Premise
+
+On a rung with no user namespace the payload is uid 1000, the owner of the tree; a directory of mode 0550 denies its owner a write.
+
+## Approach
+
+Where the payload runs as the owner of the tree, the home of the user of the run (`/root` for uid 0 of the image) gets the owner's write bit, as uid 0 of the image would have.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm quay.io/fedora/fedora:42 dnf --version` exits 0, and with `--podvm-tier=syscall`.
+
+# T-1987: On AlmaLinux 9, `ls -l` dies with SIGSEGV in the interposer's `lgetxattr`
+
+**Source:** OT-05 of the fourth outside pass of 2026-11-18 (the gate of beta.35, T-1989)
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** open
+
+## Problem
+
+`podvm run --rm quay.io/almalinuxorg/almalinux:9 ls -l /etc/hostname` exits 139 on the namespace and the userland rung; the kernel names `interpose.so`, and `LD_DEBUG=bindings` ends at `lgetxattr` from `libattr.so.1`. The syscall tier, `ls -1` and `stat` work. The fault is in `0.2.0-beta.34` and before.
+
+## Premise
+
+-
+
+## Approach
+
+Find the fault of the wrapper of `lgetxattr` (and its kin) in `crates/podvm-interpose` with the call that libattr makes, and fix it with a test of that call.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000: `podvm run --rm quay.io/almalinuxorg/almalinux:9 ls -l /etc/hostname` exits 0, under `scripts/dev/nouserns.c` too.
+
+# T-1988: On the syscall tier, a volume whose guest path is not in the image cannot be stat-ed
+
+**Source:** OT-06 of the fourth outside pass of 2026-11-18 (the gate of beta.35, T-1989)
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** open
+
+## Problem
+
+With `--podvm-tier=syscall -v H:/pkg` and no `/pkg` in the image: `ls -d /pkg`, `stat /pkg`, `cp -r /pkg` and `find /pkg` give ENOENT, while `ls /pkg`, `cd /pkg` and `stat /pkg/x` work. A guest path that the image has works. The fault is in `0.2.0-beta.34` and before.
+
+## Premise
+
+-
+
+## Approach
+
+The handler serves a path that equals a volume's guest path at the volume's descriptor, also where the image has no such name.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm --podvm-tier=syscall -v H:/pkg public.ecr.aws/ubuntu/ubuntu:24.04 stat -c %F /pkg` prints `directory`.

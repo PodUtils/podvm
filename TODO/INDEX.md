@@ -645,10 +645,17 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1980](cli.md) | P2 | M | none | cli | open | The faults of the third outside pass (2026-11-18, the gate of beta.34) |
 | [T-1981](enter.md) | P1 | S | none | enter | done | On the userland rung, a program whose PT_INTERP lies past the first 64 KiB is refused (Fedora 42) |
 | [T-1982](enter.md) | P1 | S | none | enter | done | `run -d` with `--podvm-confine` on the syscall tier cannot start its payload |
+| [T-1983](enter.md) | P1 | M | none | enter | open | On the syscall tier, `--podvm-confine exec=` is not enforced |
+| [T-1984](enter.md) | P1 | M | none | enter | open | `--podvm-confine exec=` is bypassed through the dynamic loader |
+| [T-1985](enter.md) | P1 | M | none | enter | open | A payload under `--podvm-confine` changes the mode and the times of a file that no rule names |
+| [T-1986](enter.md) | P1 | S | none | enter | open | On the userland rung, `dnf` of Fedora 42 cannot write its state under `/root` |
+| [T-1987](enter.md) | P1 | S | none | enter | open | On AlmaLinux 9, `ls -l` dies with SIGSEGV in the interposer's `lgetxattr` |
+| [T-1988](enter.md) | P1 | S | none | enter | open | On the syscall tier, a volume whose guest path is not in the image cannot be stat-ed |
+| [T-1989](cli.md) | P2 | M | none | cli | open | The faults of the fourth outside pass (2026-11-18, the gate of beta.35) |
 
 ## Counts
 
-579 entries: 18 open, 30 partial, 3 blocked, 528 done.
+586 entries: 25 open, 30 partial, 3 blocked, 528 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -658,10 +665,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 0 | 13 | 0 | 234 | 247 |
-| P2 | 13 | 13 | 2 | 177 | 205 |
+| P1 | 6 | 13 | 0 | 234 | 253 |
+| P2 | 14 | 13 | 2 | 177 | 206 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
-| **All** | 18 | 30 | 3 | 528 | 579 |
+| **All** | 25 | 30 | 3 | 528 | 586 |
 
 ## Work order
 

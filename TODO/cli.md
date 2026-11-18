@@ -6314,3 +6314,32 @@ Work each by its class with T-1947 (fail safe at the edges) and T-1948 (messages
 ## Prove
 
 As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm --podvm-tier=syscall -v FILE:/f quay.io/almalinuxorg/almalinux:9 true` refuses with 125 and a line that names the cause (OS-04), and leaves no `tmpfs/PID` directory in the store (OS-05); `podvm run --rm --podvm-volume-base B -v B/../x:/v quay.io/almalinuxorg/almalinux:9 true` refuses with 125 (OS-06); `podvm run --rm --podvm-tier=syscall quay.io/almalinuxorg/almalinux:9 /etc` exits 126 (OS-07); each other finding has a test of its class.
+
+# T-1989: The faults of the fourth outside pass (2026-11-18, the gate of beta.35)
+
+**Source:** the outside pass of the gate of `0.2.0-beta.35` (TODO/gate.md T-1949): an agent with the binary and `podvm man` only, as uid 1000
+**Category:** cli
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+The pass found 0 P0, 6 P1, 3 P2 and 7 P3 faults (OT-01 to OT-16). The P1 faults are T-1983 to T-1988. Open here: OT-07 (P2, on the userland rung `..` after a link folds by its text), OT-08 (P2, on the syscall tier `..` at the root of a volume stays in the volume; OR-15 of T-1974), OT-09 (P2, `system abi`, `load`, `import`, `profile show` and `cp` of a directory without `-r` exit 125 where the manual gives 1 or 2), and OT-10 to OT-16 (P3: a refused start of the tier leaves `tmpfs/PID/0`, as OS-05 of T-1980; a banner of the namespace rung that says two things; and five more in the report of the pass).
+
+## Premise
+
+Each finding was reproduced twice by the pass, on the binary of `87f31bf`.
+
+## Approach
+
+Work each by its class with T-1980 and T-1974.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000: `podvm system abi --bogus` exits 2 (OT-09); each other finding has a test of its class.

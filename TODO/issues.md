@@ -485,6 +485,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #589 | COORD-193: pod-enter: abi interp() refuses a PT_INTERP past the head read; Fedora 42's bash has it at 0xf2000 (to podcrates) | closed (podcrates `v0.72.0` carries it; podvm took it in b3ff9c3) | T-1981 |
 | #590 | COORD-194: the answer to PodUtils/podrunner#304: the tier hides no host process; run -d with --podvm-confine on the tier failed to start (fixed on main) (to podrunner) | open | T-1982 |
 | #591 | COORD-195: podvm took podcrates v0.72.0 in b3ff9c3 (to podcrates) | closed (PodUtils/podcrates#229 lists the take) | T-1981 |
+| #592 | COORD-196: three limits of --podvm-confine that podvm's fourth outside pass found: exec= on the syscall tier, a program through ld.so, chmod and times (to podrunner) | open | T-1983, T-1984, T-1985 |
 
 ## Messages whose title does not start with COORD-NNN
 
