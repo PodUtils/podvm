@@ -23,6 +23,11 @@ They describe their recorded revision, not the current build.
   call, on the program's own signal stack. A Go program (`tsc` of
   TypeScript 7) hung at its first signal of preemption (T-1995,
   PodUtils/podrunner#315).
+- On the userland rung, `apt-get install` as `-u 0` works: a process
+  whose parent closed the descriptor of the ownership memo (apt marks
+  each one close-on-exec before it runs dpkg) opens the memo again from
+  its path, so dpkg's `tar` can set the owners (T-2000, found by the
+  fifth outside pass).
 
 ## 0.2.0-beta.35 (2026-11-18)
 

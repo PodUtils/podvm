@@ -53,6 +53,22 @@ pub const MEMO_FD_VAR: &[u8] = b"PODVM_MEMO_FD";
 /// memo at all.
 pub const MEMO_ID_VAR: &[u8] = b"PODVM_MEMO_ID";
 
+/// The variable naming the memo's host path (TODO/interpose.md T-2000).
+///
+/// ⛔ apt marks each descriptor above 2 close-on-exec before it runs dpkg
+/// (`ExecFork`), and npm 6 closes them: the `tar` under `dpkg-deb` then had
+/// no memo, and `apt-get install` on the userland rung failed with "Cannot
+/// change ownership" (the fifth outside pass, OP-04). Where the descriptor
+/// is gone, the process opens this path itself, by the raw call so that the
+/// path table does not map it, and uses the file only where it is the file
+/// of [`MEMO_ID_VAR`].
+pub const MEMO_PATH_VAR: &[u8] = b"PODVM_MEMO_PATH";
+
+/// The memo that this process opened from [`MEMO_PATH_VAR`]; -1 where it
+/// has not tried, and [`GONE`] where the path did not open (a chroot, where
+/// the host path is not there): each process tries once.
+static REOPENED: core::sync::atomic::AtomicI32 = core::sync::atomic::AtomicI32::new(-1);
+
 /// One record. ⛔ Fixed width and little-endian, so a reader can scan without
 /// parsing and without allocating.
 ///
@@ -132,14 +148,90 @@ fn u32_le(b: &[u8]) -> u32 {
 /// ⛔ T-1928: only where the descriptor is still the file of
 /// [`MEMO_ID_VAR`]. A missing or bad identity is no memo, never a guess.
 pub(crate) fn memo_fd() -> Option<c_int> {
-    let fd = handed_fd()?;
     let id = handed_id()?;
     // The check must not change what the payload sees: a failed `fstat`
     // sets `errno`, and this runs inside calls that succeeded.
     let saved = crate::errno();
-    let same = unsafe { file_id(fd) } == Some(id);
+    let r = memo_fd_of(id);
     crate::set_errno(saved);
-    same.then_some(fd)
+    r
+}
+
+const GONE: c_int = -2;
+
+/// Forget the descriptor of [`reopen`], for a test that changes the
+/// variables.
+#[cfg(test)]
+pub(crate) fn forget_reopened() {
+    REOPENED.store(-1, core::sync::atomic::Ordering::Release);
+}
+
+fn memo_fd_of(id: (u64, u64)) -> Option<c_int> {
+    use core::sync::atomic::Ordering;
+    if let Some(fd) = handed_fd()
+        && unsafe { file_id(fd) } == Some(id)
+    {
+        return Some(fd);
+    }
+    let have = REOPENED.load(Ordering::Acquire);
+    if have == GONE {
+        return None;
+    }
+    if have >= 0 && unsafe { file_id(have) } == Some(id) {
+        return Some(have);
+    }
+    let Some(fd) = reopen(id) else {
+        REOPENED.store(GONE, Ordering::Release);
+        return None;
+    };
+    match REOPENED.compare_exchange(have, fd, Ordering::AcqRel, Ordering::Acquire) {
+        Ok(_) => Some(fd),
+        Err(other) => {
+            // Another thread opened it first: keep one descriptor.
+            unsafe {
+                crate::raw_calls::forward(crate::raw_calls::SYS_CLOSE, [fd as _, 0, 0, 0, 0, 0])
+            };
+            (other >= 0 && unsafe { file_id(other) } == Some(id)).then_some(other)
+        }
+    }
+}
+
+/// Open the file of [`MEMO_PATH_VAR`] where it is the file `id`.
+fn reopen(id: (u64, u64)) -> Option<c_int> {
+    const O_RDWR: i64 = 2;
+    const O_APPEND: i64 = 0o2000;
+    const O_CLOEXEC: i64 = 0o2000000;
+    const AT_FDCWD: i64 = -100;
+    let (p, n) = unsafe { crate::map::lookup_env(MEMO_PATH_VAR) }?;
+    let mut path = [0u8; 4096];
+    if n == 0 || n >= path.len() {
+        return None;
+    }
+    let bytes = unsafe { core::slice::from_raw_parts(p, n) };
+    if bytes[0] != b'/' || bytes.contains(&0) {
+        return None;
+    }
+    path[..n].copy_from_slice(bytes);
+    let args = [
+        AT_FDCWD as _,
+        path.as_ptr() as _,
+        (O_RDWR | O_APPEND | O_CLOEXEC) as _,
+        0,
+        0,
+        0,
+    ];
+    // SAFETY: openat(2) of a NUL-ended path that lives for the call.
+    let fd = unsafe { crate::raw_calls::forward(crate::raw_calls::SYS_OPENAT, args) };
+    if fd < 0 || fd > c_int::MAX as _ {
+        return None;
+    }
+    let fd = fd as c_int;
+    if unsafe { file_id(fd) } == Some(id) {
+        Some(fd)
+    } else {
+        unsafe { crate::raw_calls::forward(crate::raw_calls::SYS_CLOSE, [fd as _, 0, 0, 0, 0, 0]) };
+        None
+    }
 }
 
 /// The device and inode of the file on `fd`, through the real `fstat`.

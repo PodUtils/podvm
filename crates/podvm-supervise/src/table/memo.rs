@@ -183,29 +183,44 @@ pub const MEMO_ID_VAR: &str = "PODVM_MEMO_ID";
 pub fn hand_memo(env: &mut Vec<String>, path: &std::path::Path) -> Result<(), String> {
     ensure_memo_file(path)?;
     let meta = std::fs::metadata(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    hand_memo_meta(env, &meta);
+    hand_memo_meta(env, &meta, path);
     Ok(())
 }
 
-/// [`hand_memo`] for a memo that is open: the identity of the file that the
-/// payload gets on its descriptor.
-pub fn hand_memo_file(env: &mut Vec<String>, memo: &std::fs::File) -> Result<(), String> {
+/// [`hand_memo`] for a memo that is open from `path`: the identity of the
+/// file that the payload gets on its descriptor.
+pub fn hand_memo_file(
+    env: &mut Vec<String>,
+    memo: &std::fs::File,
+    path: &std::path::Path,
+) -> Result<(), String> {
     let meta = memo
         .metadata()
         .map_err(|e| format!("the ownership memo: {e}"))?;
-    hand_memo_meta(env, &meta);
+    hand_memo_meta(env, &meta, path);
     Ok(())
 }
 
-fn hand_memo_meta(env: &mut Vec<String>, meta: &std::fs::Metadata) {
+/// The variable that names the memo's host path to the interposer, for a
+/// process whose descriptor a parent closed (TODO/interpose.md T-2000). One
+/// fact in two homes with `podvm-interpose`'s `MEMO_PATH_VAR`.
+pub const MEMO_PATH_VAR: &str = "PODVM_MEMO_PATH";
+
+fn hand_memo_meta(env: &mut Vec<String>, meta: &std::fs::Metadata, path: &std::path::Path) {
     use std::os::unix::fs::MetadataExt;
-    let (fd, id) = (
+    let (fd, id, at) = (
         format!("{}=", super::MEMO_FD_VAR),
         format!("{MEMO_ID_VAR}="),
+        format!("{MEMO_PATH_VAR}="),
     );
-    env.retain(|e| !e.starts_with(&fd) && !e.starts_with(&id));
+    env.retain(|e| !e.starts_with(&fd) && !e.starts_with(&id) && !e.starts_with(&at));
     env.push(super::memo_fd_env());
     env.push(format!("{id}{}:{}", meta.dev(), meta.ino()));
+    // An absolute path in UTF-8 only; else the descriptor is the one way.
+    let abs = std::path::absolute(path).ok();
+    if let Some(p) = abs.as_deref().and_then(|p| p.to_str()) {
+        env.push(format!("{at}{p}"));
+    }
 }
 
 /// The ids of the payload inside the user namespace of the namespace rung,

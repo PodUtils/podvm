@@ -4335,3 +4335,36 @@ The check on each use, not a descriptor out of reach: a program that closes each
 ## Done
 
 **Done (2026-11-16).** The host hands the identity of the memo, and the interposer uses descriptor 17 only while it is that file. Measured as uid 1000 on the cloud host: the reproducer of PodUtils/podrunner#197 reads 20 bytes with the offset at 20 in `run -d` and in a foreground `run` (0 bytes and the offset at 71 before); `chown 0:42` then `stat` gives `0:42` in both; a payload that closed 17 gets the refusal "podvm could not write the ownership memo" for its `chown`, in place of a write into its own file. The unit test holds a reused descriptor, a descriptor with no identity, and the memo itself.
+
+# T-2000: `apt-get install` fails on the userland rung: dpkg's `tar` has no ownership memo
+
+**Source:** the fifth outside pass (2026-11-19, the gate of beta.36), OP-04
+**Category:** interpose
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+On the userland rung, `apt-get install -y file` in `debian:12-slim` with `-u 0` exited 100: `tar: ./control: Cannot change ownership to uid 0, gid 0: Operation not permitted` under `dpkg-deb`, and the interposer printed "podvm could not write the ownership memo". `0.2.0-beta.35` fails the same way.
+
+## Premise
+
+The memo is a descriptor (17) that the host hands with `PODVM_MEMO_FD` and `PODVM_MEMO_ID` (T-1928). apt's `ExecFork` marks each descriptor above 2 close-on-exec before it runs dpkg, and npm 6 closes them, so a grandchild has no memo and each refused `chown` is the payload's error.
+
+## Approach
+
+The host also hands `PODVM_MEMO_PATH`, the absolute host path of the memo. Where the handed descriptor is not the file of `PODVM_MEMO_ID`, the interposer opens that path once for each process by the raw `openat` (the path table does not map it) and uses it only where its `DEV:INO` is the one of `PODVM_MEMO_ID`. In a chroot, where the host path is not there, the process tries once and stays as before.
+
+## Decision
+
+-
+
+## Prove
+
+The interposer test `a_closed_memo_descriptor_reopens_the_file_of_its_identity` (six states of the three variables); as uid 1000 with `PODVM_USERNS=0` and a volume (the userland rung): `apt-get install -y file` in `public.ecr.aws/debian/debian:bookworm-slim` with `-u 0` exits 0 and `file /bin/dash` runs.
+
+## Done
+
+**Done (2026-11-19).** `memo::{memo_fd_of, reopen}` and `MEMO_PATH_VAR` in `podvm-interpose`, and `PODVM_MEMO_PATH` from `hand_memo` and `hand_memo_file` of `podvm-supervise`. On the cloud host as uid 1000, in `mirror.gcr.io/library/debian:12-slim` (Debian 12, as the row; public.ecr.aws answered 429 that hour): `apt-get install -y file` with `-u 0` exits 0 on the userland rung (before: 100, also with the binary of `0.2.0-beta.35`) and on the namespace rung. With no `-u`, the userland rung runs the payload as the caller's uid, as documented, and dpkg refuses a user that is not root. The interposer tests pass.

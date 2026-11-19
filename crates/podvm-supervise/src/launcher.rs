@@ -97,7 +97,7 @@ fn enter_in_launcher(
     // rather than refusing a record that predates the rule.
     // TODO/interpose.md T-1928: and the identity of the file opened here,
     // which is the container's memo, not the one that `create` named.
-    table::hand_memo_file(&mut env, &memo)?;
+    table::hand_memo_file(&mut env, &memo, &memo_path)?;
     // TODO/enter.md T-1920: the volumes that pod-enter binds on the
     // namespace rung ride in `PODVM_BINDS`; the payload does not see it.
     let binds = binds_of(&env);

@@ -6376,3 +6376,32 @@ The form of call C789 of podcrates (PodUtils/podcrates#236, COORD-142), which po
 ## Done
 
 **Done (2026-11-19).** `image.yml`, `images/podvm/Dockerfile` and the job `image` of `release.yml` are on `main`. The dry run passed (run 44446041112). Two faults of the push were fixed: the check after the push takes the manifest of each platform from the index (`7d895ec`), and the login to ghcr.io stays for `actions/attest` (`930b37e`). Run 44452103325 pushed `ghcr.io/podutils/podvm:v0.2.0-beta.35` (index `sha256:e11a9a7054c4077c24add7ab9f078fd57b82977965a62c42d02c45894fd2cc3a`), compared each of the 7 platforms with its asset, attested the index in the registry, checked the attestation, and wrote the digests into the notes. From the cloud host with no login: the binary of the layer of `linux/amd64` and of `linux/arm64` is the asset byte for byte (SHA-256 `b39df0b1...` and `41377e93...`), and `podvm pull ghcr.io/podutils/podvm:v0.2.0-beta.35` gives that digest. The job of `release.yml` runs first at the next beta, under its gate.
+
+# T-2001: The faults of the fifth outside pass (2026-11-19, the gate of beta.36)
+
+**Source:** the outside pass of the gate of `0.2.0-beta.36` (TODO/gate.md T-1949): an agent with the binary and `podvm man` only, as uid 1000
+**Category:** cli
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+The pass found 0 P0, 1 P1 (OP-04, T-2000, fixed) and these: OP-01 (P2) `PODVM_USERNS=0` gives the userland rung only with a volume, else the namespace rung, and the banner says "namespaces: user+mount" beside `clone(NEWNS)=EPERM`; OP-02 (P2) the syscall tier refuses a `-v` of one file with "errno 20" and no line that names the limit; OP-03 (P2) `npm -v` and `npx` of `node:22-slim` end with SIGSEGV (139) on the syscall tier, while `node` runs; OP-05 (P3) a SIGUSR1 or SIGHUP to a foreground `podvm run --rm` ends podvm and leaves a record `Dead`; OP-06 (P3) `inspect` of a container has no `.State.ExitCode`; OP-07 (P3) the cap of `/tmp` of the syscall tier is not stated.
+
+## Premise
+
+Each finding was reproduced twice by the pass, on the binary of `23562a2`.
+
+## Approach
+
+Work each by its class with T-1989: OP-02 and OP-03 with the volumes and the exec of the syscall tier (T-1652), OP-05 with the signals of the waiter (T-1970), OP-01 with the ladder.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000: `podvm run --rm --podvm-tier=syscall -v FILE:/f IMAGE cat /f` prints the file or one line that names the limit (OP-02); `podvm run --rm --podvm-tier=syscall node:22-slim npm -v` prints the version (OP-03); each other finding has a test of its class.
