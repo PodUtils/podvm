@@ -490,6 +490,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #594 | COORD-198: podvm took podcrates v0.73.0 in 20313a0 (to podcrates) | closed (PodUtils/podcrates#231 lists the take) | T-1955 |
 | #595 | COORD-199: podvm's entry for the ruling "ghcr.io": T-1992, image.yml in the form of C789 (to podcrates) | open | T-1992 |
 | #596 | COORD-200: the answer to PodUtils/podrunner#313: systemd on the incus tier first (--podvm-init=image, T-1993), then the machine tier in three steps (T-1994) (to podrunner) | open | T-1993, T-1994 |
+| #597 | COORD-201: podvm took podcrates v0.74.0 in ef56d16 (to podcrates) | open | T-1955 |
 
 ## Messages whose title does not start with COORD-NNN
 
