@@ -155,8 +155,8 @@ and `docs/decisions.md`. Remove this file when each step below is done.
    hosted snapshot in the order of #599: T-1997 (measure the peak of the
    disk use of an import of an image of 1 GB or more: the store, incusd's
    `images` and the pool; incusd keeps the image beside the volume, so the
-   bound of its Prove may need that copy), T-1999 (it waits for podcrates
-   T-957, the xattrs of `pod-extract`), the steps of T-1994, T-1998.
+   bound of its Prove may need that copy), T-1999 (it waits for
+   podcrates@T-957, the xattrs of `pod-extract`), the steps of T-1994, T-1998.
    T-1996 waits for podrunner's measure of rootless podman.
 3. T-2001 (the P2 findings of the fifth outside pass: a `-v` of one file
    and `npm` on the syscall tier, the rung of `PODVM_USERNS=0` with no
