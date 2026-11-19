@@ -5630,7 +5630,7 @@ Experiment 434, a new clause with `--podvm-init=image --podvm-engine` of an imag
 
 ## Done
 
-Partial (2026-11-19): with `--podvm-init=image` the instance takes `security.idmap.isolated` and `security.idmap.size` 231072 (`incus::run::snapshot_keys`), the device `podvm-fuse` (`unix-char` `/dev/fuse`), and an empty `/etc/machine-id` before its start (`incus::verbs::detached`). The unit test `the_init_of_the_image_gets_the_ids_and_the_fuse_of_the_snapshot` passes. Remaining: clause 20 of experiment 434 (the ids, `/dev/fuse`, two machine-ids), and rootless `podman run` and `fuse-overlayfs` of a user with `165536:65536`, which ubi-init does not carry: podrunner's snapshot measures them.
+Partial (2026-11-19): with `--podvm-init=image` the instance takes `security.idmap.isolated` and `security.idmap.size` 231072 (`incus::run::snapshot_keys`), the device `podvm-fuse` (`unix-char` `/dev/fuse`), and an empty `/etc/machine-id` before its start (`incus::verbs::detached`). The unit test `the_init_of_the_image_gets_the_ids_and_the_fuse_of_the_snapshot` passes. Experiment 434 on `6a0c609` gives "THE INCUS TIER RUNS"; clause 20 with ubi-init: two instances map 231072 ids each, open `/dev/fuse`, and have the machine-ids `8c6d1642...` and `87bf538c...`. Where incusd has fewer free ids, the error of incusd names what the flag needs and `/etc/subuid`; a host with no `/dev/fuse` starts the instance with no device. Remaining: rootless `podman run` and a `fuse-overlayfs` mount of a user with `165536:65536`, which ubi-init does not carry: podrunner's snapshot measures them.
 
 # T-1997: On the incus tier, the import of a large image keeps no third copy
 
