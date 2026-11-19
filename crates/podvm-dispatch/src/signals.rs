@@ -82,6 +82,12 @@ unsafe extern "C" fn wrap(sig: i32, info: *mut u8, uc: *mut u8) {
     let s = (sig as usize).min(64);
     let h = HANDLER[s].load(Ordering::Relaxed);
     let fl = FLAGS[s].load(Ordering::Relaxed);
+    // SAFETY: the kernel's frame of this signal.
+    if unsafe { in_podvm(uc) } {
+        // SAFETY: as above.
+        unsafe { defer(sig, info, uc, fl) };
+        return;
+    }
     if fl & SA_RESETHAND != 0 {
         HANDLER[s].store(0, Ordering::Relaxed);
     }
@@ -106,6 +112,151 @@ unsafe extern "C" fn wrap(sig: i32, info: *mut u8, uc: *mut u8) {
     }
 }
 
+/// `uc_sigmask` and the saved `rip` in the x86_64 ucontext.
+const UC_MASK: usize = 296;
+const UC_RIP: usize = 40 + 16 * 8;
+const SI_TKILL: i32 = -6;
+
+/// Whether the signal stopped podvm's own code: the SIGSYS handler (on a
+/// stack of its pool, T-1976) or this wrapper.
+///
+/// # Safety
+/// `uc` is the kernel's frame of a signal.
+unsafe fn in_podvm(uc: *mut u8) -> bool {
+    let start = crate::state::REGION_START.load(Ordering::Relaxed) as u64;
+    let len = crate::state::REGION_LEN.load(Ordering::Relaxed) as u64;
+    // SAFETY: the saved rip of the frame.
+    let rip = unsafe { *(uc.add(UC_RIP) as *const u64) };
+    len != 0 && rip >= start && rip - start < len
+}
+
+/// PodUtils/podrunner#315 (TODO/enter.md T-1995): a signal that stops the
+/// SIGSYS handler waits until the handler returns. Go's handler found a
+/// stack that is not Go's (the pool's, with the alternate stack disarmed),
+/// took the path of a thread that is not Go's, and waited for ever: `tsc`
+/// of TypeScript 7 hung at its first SIGURG of preemption. The signal is
+/// blocked in the frame that this wrapper returns to and queued again,
+/// with its siginfo: to this thread where `tgkill` sent it, else to the
+/// process. The handler's own `rt_sigreturn` restores the payload's mask,
+/// and the kernel delivers it in the payload's code. A blocking call that
+/// it stopped returns EINTR or restarts as the payload's `SA_RESTART`
+/// says, before the payload's handler runs, as in a native run.
+///
+/// # Safety
+/// The kernel's `info` and `uc` of this signal.
+unsafe fn defer(sig: i32, info: *mut u8, uc: *mut u8, fl: u64) {
+    let bit = 1u64 << ((sig as u64 - 1) & 63);
+    // SAFETY: the frame's mask, and a set that lives for the call.
+    unsafe {
+        *(uc.add(UC_MASK) as *mut u64) |= bit;
+        sc6(nr::RT_SIGPROCMASK, 0, &bit as *const u64 as i64, 0, 8, 0, 0);
+    }
+    if fl & SA_RESETHAND != 0 {
+        // The kernel reset the action at this delivery; the payload's
+        // handler has not run yet.
+        install(sig as i64);
+    }
+    // SAFETY: plain calls; `info` is the kernel's siginfo of this signal.
+    unsafe {
+        let pid = sc6(nr::GETPID, 0, 0, 0, 0, 0, 0);
+        let tid = sc6(nr::GETTID, 0, 0, 0, 0, 0, 0);
+        let code = *(info.add(8) as *const i32);
+        let r = if code == SI_TKILL {
+            sc6(
+                nr::RT_TGSIGQUEUEINFO,
+                pid,
+                tid,
+                sig as i64,
+                info as i64,
+                0,
+                0,
+            )
+        } else {
+            sc6(nr::RT_SIGQUEUEINFO, pid, sig as i64, info as i64, 0, 0, 0)
+        };
+        if r < 0 {
+            // A full queue of real-time signals: the signal, with no info.
+            sc6(nr::TGKILL, pid, tid, sig as i64, 0, 0, 0);
+        }
+    }
+}
+
+/// Before the exec of the payload: each deferred signal that is still
+/// pending takes its default action, as the exec would give it, and the
+/// thread takes the payload's mask `frame` back, which the exec keeps.
+/// Returns the signals whose action it reset.
+pub(crate) fn before_exec(frame: u64) -> u64 {
+    let (mut cur, mut pending) = (0u64, 0u64);
+    // SAFETY: two sets that live for the calls.
+    unsafe {
+        sc6(
+            nr::RT_SIGPROCMASK,
+            0,
+            0,
+            &mut cur as *mut u64 as i64,
+            8,
+            0,
+            0,
+        );
+        sc6(
+            nr::RT_SIGPENDING,
+            &mut pending as *mut u64 as i64,
+            8,
+            0,
+            0,
+            0,
+            0,
+        );
+    }
+    let reset = cur & !frame & pending & !SYS_BIT;
+    for sig in 1..=64i64 {
+        if reset & (1 << (sig - 1)) != 0 {
+            let dfl = KAction {
+                handler: 0,
+                flags: SA_RESTORER,
+                restorer: podvm_dispatch_restorer as *const () as usize as u64,
+                mask: 0,
+            };
+            rt_sigaction(sig, Some(&dfl), None);
+        }
+    }
+    let set = frame & !SYS_BIT;
+    // SAFETY: the set lives for the call.
+    unsafe { sc6(nr::RT_SIGPROCMASK, 2, &set as *const u64 as i64, 0, 8, 0, 0) };
+    reset
+}
+
+/// After an exec that failed: the payload's actions of `reset` again.
+pub(crate) fn after_failed_exec(reset: u64) {
+    for sig in 1..=64i64 {
+        if reset & (1 << (sig - 1)) != 0 {
+            install(sig);
+        }
+    }
+}
+
+/// Put the payload's action of `sig`, as it set it, in the kernel.
+fn install(sig: i64) -> i64 {
+    let s = sig as usize;
+    let a = KAction {
+        handler: HANDLER[s].load(Ordering::Relaxed),
+        flags: FLAGS[s].load(Ordering::Relaxed),
+        restorer: 0,
+        mask: MASK[s].load(Ordering::Relaxed),
+    };
+    let mut k = KAction {
+        handler: a.handler,
+        flags: a.flags | SA_RESTORER,
+        restorer: podvm_dispatch_restorer as *const () as usize as u64,
+        mask: a.mask & !SYS_BIT,
+    };
+    if a.handler > 1 {
+        k.handler = wrap as *const () as usize as u64;
+        k.flags |= SA_SIGINFO;
+    }
+    rt_sigaction(sig, Some(&k), None)
+}
+
 pub(crate) fn sigaction(sig: i64, act: i64, oact: i64, size: i64) -> i64 {
     if !(1..=64).contains(&sig) || size != 8 {
         // SAFETY: the payload's own call; the kernel gives EINVAL.
@@ -121,25 +272,23 @@ pub(crate) fn sigaction(sig: i64, act: i64, oact: i64, size: i64) -> i64 {
     if act != 0 {
         // SAFETY: the payload gave act as a struct kernel_sigaction.
         let a = unsafe { *(act as *const KAction) };
-        if sig != SIGSYS {
-            let mut k = KAction {
-                handler: a.handler,
-                flags: a.flags | SA_RESTORER,
-                restorer: podvm_dispatch_restorer as *const () as usize as u64,
-                mask: a.mask & !SYS_BIT,
-            };
-            if a.handler > 1 {
-                k.handler = wrap as *const () as usize as u64;
-                k.flags |= SA_SIGINFO;
-            }
-            let r = rt_sigaction(sig, Some(&k), None);
-            if r < 0 {
-                return r;
-            }
-        }
+        let old = (
+            HANDLER[s].load(Ordering::Relaxed),
+            FLAGS[s].load(Ordering::Relaxed),
+            MASK[s].load(Ordering::Relaxed),
+        );
         HANDLER[s].store(a.handler, Ordering::Relaxed);
         FLAGS[s].store(a.flags, Ordering::Relaxed);
         MASK[s].store(a.mask, Ordering::Relaxed);
+        if sig != SIGSYS {
+            let r = install(sig);
+            if r < 0 {
+                HANDLER[s].store(old.0, Ordering::Relaxed);
+                FLAGS[s].store(old.1, Ordering::Relaxed);
+                MASK[s].store(old.2, Ordering::Relaxed);
+                return r;
+            }
+        }
     }
     if oact != 0 {
         // SAFETY: the payload gave oact for a struct kernel_sigaction.
@@ -176,10 +325,24 @@ pub(crate) fn sigprocmask(how: i64, set: i64, old: i64, size: i64) -> i64 {
 ///
 /// # Safety
 /// `uc` is the frame of this SIGSYS.
+///
+/// The mask comes from the frame and the call, not from the thread: a
+/// signal that [`defer`] holds is blocked on the thread until the handler
+/// returns, and must not stay blocked in the payload.
 pub(crate) unsafe fn keep_thread_state(n: i64, a: [i64; 6], uc: *mut u8) {
-    if n == nr::RT_SIGPROCMASK && a[1] != 0 {
-        // SAFETY: `uc_sigmask` is at 296 in the x86_64 ucontext.
-        unsafe { sc6(nr::RT_SIGPROCMASK, 0, 0, uc.add(296) as i64, 8, 0, 0) };
+    if n == nr::RT_SIGPROCMASK && a[1] != 0 && a[3] == 8 {
+        const FIXED: u64 = (1 << (SIGKILL - 1)) | (1 << (SIGSTOP - 1));
+        // SAFETY: the payload's set of 8 bytes, and `uc_sigmask` of the frame.
+        unsafe {
+            let set = *(a[1] as *const u64) & !FIXED;
+            let m = uc.add(UC_MASK) as *mut u64;
+            *m = match a[0] {
+                0 => (*m | set) & !SYS_BIT,
+                1 => *m & !set,
+                2 => set & !SYS_BIT,
+                _ => *m,
+            };
+        }
     }
 }
 

@@ -158,8 +158,8 @@ const OWN_STACK: usize = 256 << 10;
 /// alternate stack with `SS_AUTODISARM`, so the kernel delivers it on this
 /// stack, not over the frame of the SIGSYS. Where the map fails, the call
 /// runs on the stack that it has.
-pub fn execveat(dirfd: i64, p: i64, argv: i64, envp: i64, flags: i64) -> i64 {
-    let args = [dirfd, p, argv, envp, flags];
+pub fn execveat(dirfd: i64, p: i64, argv: i64, envp: i64, flags: i64, frame: u64) -> i64 {
+    let args = [dirfd, p, argv, envp, flags, frame as i64];
     // SAFETY: an anonymous map with no reserve; its first page is the guard.
     let m = unsafe { sc6(nr::MMAP, 0, (OWN_STACK + 4096) as i64, 3, 0x4022, -1, 0) };
     if m < 0 {
@@ -191,13 +191,13 @@ pub fn execveat(dirfd: i64, p: i64, argv: i64, envp: i64, flags: i64) -> i64 {
 }
 
 extern "C" fn on_own_stack(a: *const i64) -> i64 {
-    // SAFETY: `a` points at the five arguments of [`execveat`].
-    let a = unsafe { core::slice::from_raw_parts(a, 5) };
+    // SAFETY: `a` points at the six arguments of [`execveat`].
+    let a = unsafe { core::slice::from_raw_parts(a, 6) };
     execveat_here(a)
 }
 
 fn execveat_here(a: &[i64]) -> i64 {
-    let (dirfd, p, argv, envp, flags) = (a[0], a[1], a[2], a[3], a[4]);
+    let (dirfd, p, argv, envp, flags, frame) = (a[0], a[1], a[2], a[3], a[4], a[5] as u64);
     let Some(mut g) = crate::pool::Buf::get() else {
         return -sys::ENOMEM;
     };
@@ -332,7 +332,11 @@ fn execveat_here(a: &[i64]) -> i64 {
             *at = 0;
         }
         *arr.add(k) = 0;
+        // T-1995: the signals that the handler held go to the next program
+        // as the exec gives them, and it keeps the payload's mask.
+        let reset = crate::signals::before_exec(frame);
         let r = sc(nr::EXECVE, SELF.get_z().as_ptr() as i64, argv, mem);
+        crate::signals::after_failed_exec(reset);
         sc(nr::MUNMAP, mem, size as i64, 0);
         r
     }

@@ -657,10 +657,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1992](cli.md) | P1 | M | none | cli | partial | Each release publishes its binaries on ghcr.io |
 | [T-1993](machine.md) | P1 | M | none | machine | done | On the incus tier, the init of the image (systemd) runs as PID 1 |
 | [T-1994](machine.md) | P1 | L | none | machine | open | On the machine tier, a root on a disk for each image and the init of the image |
+| [T-1995](enter.md) | P1 | S | none | enter | done | A Go program hangs on the userland rung at its first signal of preemption |
 
 ## Counts
 
-591 entries: 23 open, 32 partial, 3 blocked, 533 done.
+592 entries: 23 open, 32 partial, 3 blocked, 534 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -670,10 +671,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 2 | 15 | 0 | 239 | 256 |
+| P1 | 2 | 15 | 0 | 240 | 257 |
 | P2 | 16 | 13 | 2 | 177 | 208 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
-| **All** | 23 | 32 | 3 | 533 | 591 |
+| **All** | 23 | 32 | 3 | 534 | 592 |
 
 ## Work order
 

@@ -48,6 +48,11 @@ pub mod nr {
     pub const BRK: i64 = 12;
     pub const RT_SIGACTION: i64 = 13;
     pub const RT_SIGPROCMASK: i64 = 14;
+    pub const RT_SIGPENDING: i64 = 127;
+    pub const RT_SIGQUEUEINFO: i64 = 129;
+    pub const GETTID: i64 = 186;
+    pub const TGKILL: i64 = 234;
+    pub const RT_TGSIGQUEUEINFO: i64 = 297;
     pub const RT_SIGRETURN: i64 = 15;
     pub const PREAD64: i64 = 17;
     pub const ACCESS: i64 = 21;

@@ -243,9 +243,89 @@ fn main() {
             let v: Vec<u8> = vec![7; 64 << 20];
             println!("alloc {}", v.iter().map(|&b| b as u64).sum::<u64>());
         }
+        // T-1995 (PodUtils/podrunner#315): a signal that stops a call of
+        // the payload runs its handler on the payload's alternate stack,
+        // as Go's runtime needs, not on a stack of the SIGSYS handler.
+        "sig-in-call" => sig_in_call(),
         _ => {
             eprintln!("podvm-dispatch-probe: no verb {verb:?}");
             std::process::exit(2);
         }
     }
+}
+
+static ALT: [std::sync::atomic::AtomicUsize; 2] =
+    [const { std::sync::atomic::AtomicUsize::new(0) }; 2];
+static ON: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+static OFF: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+extern "C" fn on_urg(_: i32, _: *mut u8, _: *mut u8) {
+    let x = 0u8;
+    let sp = &x as *const u8 as usize;
+    let (lo, n) = (ALT[0].load(Ordering::SeqCst), ALT[1].load(Ordering::SeqCst));
+    let c = if sp >= lo && sp < lo + n { &ON } else { &OFF };
+    c.fetch_add(1, Ordering::SeqCst);
+}
+
+core::arch::global_asm!(
+    ".globl probe_restorer",
+    "probe_restorer:",
+    "mov rax, 15",
+    "syscall"
+);
+unsafe extern "C" {
+    fn probe_restorer();
+}
+
+/// SIGURG by `tgkill`, as Go sends it for preemption, while this thread
+/// makes calls: each handler counts whether it runs on the alternate stack.
+fn sig_in_call() {
+    let size = 64 * 1024;
+    let mem: &'static mut [u8] = Box::leak(vec![0u8; size].into_boxed_slice());
+    ALT[0].store(mem.as_ptr() as usize, Ordering::SeqCst);
+    ALT[1].store(size, Ordering::SeqCst);
+    let st = [mem.as_mut_ptr() as i64, 0, size as i64];
+    // `struct kernel_sigaction`: SA_SIGINFO | SA_ONSTACK | SA_RESTART | SA_RESTORER.
+    let act: [u64; 4] = [
+        on_urg as *const () as usize as u64,
+        0x4 | 0x0800_0000 | 0x1000_0000 | 0x0400_0000,
+        probe_restorer as *const () as usize as u64,
+        0,
+    ];
+    // SAFETY: a leaked stack, and an action whose handler and restorer live.
+    unsafe {
+        if sigaltstack(&st, std::ptr::null_mut()) != 0
+            || syscall(13, 23i64, act.as_ptr(), 0i64, 8i64) != 0
+        {
+            println!("ERR setup");
+            return;
+        }
+    }
+    // SAFETY: plain calls.
+    let (pid, tid) = unsafe { (syscall(39), syscall(186)) };
+    let done = std::sync::Arc::new(AtomicBool::new(false));
+    let d = done.clone();
+    let sender = std::thread::spawn(move || {
+        for _ in 0..3000 {
+            // SAFETY: SIGURG to the first thread of this probe.
+            unsafe { syscall(234, pid, tid, 23i64) };
+            std::thread::yield_now();
+        }
+        d.store(true, Ordering::SeqCst);
+    });
+    let ts = [0i64, 1000];
+    while !done.load(Ordering::SeqCst) {
+        // SAFETY: getppid, and a sleep of 1 us on a timespec that lives.
+        unsafe {
+            syscall(110);
+            syscall(35, ts.as_ptr(), 0i64);
+        }
+    }
+    let _ = sender.join();
+    let on = ON.load(Ordering::SeqCst);
+    println!(
+        "sig {} off {}",
+        if on > 0 { "on-alt" } else { "none" },
+        OFF.load(Ordering::SeqCst)
+    );
 }

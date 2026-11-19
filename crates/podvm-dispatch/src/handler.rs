@@ -416,8 +416,16 @@ fn call(n: i64, a: [i64; 6], g: *mut i64) -> i64 {
         nr::FORK => clone([SIGCHLD, 0, 0, 0, 0, 0], g),
         nr::VFORK => clone([CLONE_VFORK | SIGCHLD, 0, 0, 0, 0, 0], g),
         nr::CLONE3 => -sys::ENOSYS,
-        nr::EXECVE => crate::exec::execveat(sys::AT_FDCWD, a[0], a[1], a[2], 0),
-        nr::EXECVEAT => crate::exec::execveat(a[0], a[1], a[2], a[3], a[4]),
+        // SAFETY: g is the gregs of this frame; its mask lies after them.
+        nr::EXECVE | nr::EXECVEAT => unsafe {
+            let frame = *((g as *mut u8).sub(reg::OFFSET).add(296) as *const u64);
+            let (d, p, v, e, f) = if n == nr::EXECVE {
+                (sys::AT_FDCWD, a[0], a[1], a[2], 0)
+            } else {
+                (a[0], a[1], a[2], a[3], a[4])
+            };
+            crate::exec::execveat(d, p, v, e, f, frame)
+        },
         nr::RT_SIGACTION => sigaction(a[0], a[1], a[2], a[3]),
         nr::RT_SIGPROCMASK => sigprocmask(a[0], a[1], a[2], a[3]),
         nr::RT_SIGRETURN => -sys::ENOSYS,

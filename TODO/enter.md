@@ -5146,3 +5146,36 @@ Reproduce it as uid 1000 under `scripts/dev/nouserns.c` with a Rust image on the
 ## Prove
 
 As uid 1000 under `scripts/dev/nouserns.c`: `cargo doc` of ripgrep at `178cc027` in `--podvm-tier=syscall` ends with exit 0 within the time it takes with no tier, plus a bound.
+
+# T-1995: A Go program hangs on the userland rung at its first signal of preemption
+
+**Source:** PodUtils/podrunner#315 (COORD-105 of podrunner): `npx tsc` of TypeScript 7 (a static Go binary) hung for 30 min in podrunner's `user-gate.yml` run 44438881119
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+On the userland rung, `tsc --strict a.ts` of `typescript@7.0.2` printed nothing and did not end. Its threads waited on futexes. With `GODEBUG=asyncpreemptoff=1`, or with `GOMAXPROCS=1`, it ended at once.
+
+## Premise
+
+Go preempts a goroutine by `tgkill` of SIGURG to its thread. A static program runs under the SIGSYS handler of `podvm-dispatch`, which runs each call on a stack of its pool (T-1976) while the alternate stack of the payload is disarmed (`SS_AUTODISARM`). A SIGURG that stopped the handler ran Go's handler there: Go found a stack that is neither its signal stack nor `g0`, and no alternate stack, took the path of a thread that is not Go's (`needm`), and waited for ever.
+
+## Approach
+
+`signals::wrap`, the wrapper of each handler of the payload, puts off a signal whose saved `rip` lies in podvm's code: it blocks the signal in the frame that it returns to and on the thread, and queues it again with its siginfo (to the thread where `tgkill` sent it, else to the process). The `rt_sigreturn` of the SIGSYS handler restores the payload's mask, and the kernel delivers the signal in the payload's code. A blocking call that it stopped returns EINTR or restarts as `SA_RESTART` says, before the payload's handler runs. `keep_thread_state` computes the mask of a `rt_sigprocmask` from the frame and the call, not from the thread. Before an exec, each held signal that is still pending takes its default action, as the exec gives it, and the thread takes the payload's mask back.
+
+## Decision
+
+-
+
+## Prove
+
+The test `a_signal_that_stops_a_call_runs_on_the_alternate_stack_of_the_payload` (3000 SIGURG by `tgkill` while the thread makes calls; each handler runs on the alternate stack of the payload); as uid 1000 with `PODVM_USERNS=0` (the userland rung): `tsc --strict a.ts` of `typescript@7.0.2` in `node:22-bookworm` ends with exit 0.
+
+## Done
+
+**Done (2026-11-19).** `signals::{in_podvm, defer, before_exec, after_failed_exec, install}`, the exact mask in `keep_thread_state`, and the frame's mask passed to `exec::execveat`. Without the change the test counts 334 handlers off the alternate stack, and with it 0. As uid 1000 with `PODVM_USERNS=0` on the cloud host: `tsc --strict a.ts` and `npx tsc --strict a.ts` of `typescript@7.0.2` end with exit 0 three times in three (before: the bound of 90 s each time); `go build` of a program of 64 goroutines in `golang:1.24-bookworm` and its run end with exit 0. The dispatch tests pass.

@@ -415,3 +415,13 @@ fn the_exec_table_of_the_confine_layer_holds_on_each_exec() {
         assert!(got.starts_with(want), "{table:?} {prog}: {got:?}");
     }
 }
+
+/// PodUtils/podrunner#315 (TODO/enter.md T-1995): `tsc` of TypeScript 7, a
+/// Go program, hung when Go's SIGURG of preemption stopped the SIGSYS
+/// handler and Go's handler ran on the handler's stack. Each handler now
+/// runs in the payload, on its alternate stack.
+#[test]
+fn a_signal_that_stops_a_call_runs_on_the_alternate_stack_of_the_payload() {
+    let Some(r) = root("sigcall") else { return };
+    assert_eq!(probe(&r, &["sig-in-call"]).0, "sig on-alt off 0");
+}

@@ -18,6 +18,11 @@ They describe their recorded revision, not the current build.
   PodUtils/podrunner#313).
 - The image of the incus tier keeps a file or a directory of mode 0000
   (`/etc/shadow` of ubi-init) in place of a failure with EACCES (T-1993).
+- On the userland rung and the syscall tier, a signal that stops a system
+  call of a static program runs its handler in the program, after the
+  call, on the program's own signal stack. A Go program (`tsc` of
+  TypeScript 7) hung at its first signal of preemption (T-1995,
+  PodUtils/podrunner#315).
 
 ## 0.2.0-beta.35 (2026-11-18)
 
