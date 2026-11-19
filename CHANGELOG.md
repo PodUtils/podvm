@@ -8,14 +8,43 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+## 0.2.0-beta.36 (2026-11-19)
+
+### Known gaps: what the checks of 0.2.0-beta.36 prove, and what stays open, 2026-11-19
+
+Record: T-1949, T-1991, T-2001.
+Deployed: version 0.2.0-beta.36.
+
+What the checks of this beta prove: the gate, the integration tests as uid
+1000, `workloads.yml`, `arm.yml`, the nightly trial, experiment 434 of the
+incus tier (clause 19: systemd as PID 1), and an outside pass with the
+binary and `podvm man` only (T-2001), whose one P1 fault is fixed (T-2000).
+
+Each open fault that a user can meet:
+
+- On the syscall tier, a `-v` of one file is refused with "errno 20", and
+  `npm` and `npx` of `node:22-slim` end with SIGSEGV while `node` runs
+  (T-2001, OP-02 and OP-03). Use a `-v` of a directory, or no tier.
+- A SIGUSR1 or SIGHUP to a foreground `podvm run` ends podvm, which
+  forwards only SIGINT and SIGTERM, and leaves a record `Dead` also with
+  `--rm` (T-2001, OP-05); `container prune` removes it.
+- `inspect` of a container names the exit code `.ExitCode`, not
+  `.State.ExitCode` (T-2001, OP-06).
+- On the incus tier the exit code of an instance is read with `inspect`;
+  the tier serves no `wait` (T-1722).
+- The hang of `cargo doc` on the syscall tier that podrunner saw is not
+  reproduced here (T-1991).
+- The faults of `0.2.0-beta.35`'s known gaps stay open where this list
+  does not name them as fixed.
+
+### Fixed: Go on the userland rung, apt-get install, the image of the incus tier, 2026-11-19
+
+Record: T-1990, T-1993, T-1995, T-2000.
+Deployed: version 0.2.0-beta.36.
+
 - On the syscall tier, a path walk that a rename or a mount on the host
   raced is tried again, as openat2(2) asks, in place of "errno 11" at the
   start of a dynamic program (T-1990, PodUtils/podrunner#308).
-- `--podvm-init=image` with `run -d` or `create` on the incus tier boots
-  the init of the image (systemd) as PID 1. The command runs after
-  `systemctl is-system-running` gives running or degraded, with its log and
-  its exit code, and the instance stops when it ends (T-1993,
-  PodUtils/podrunner#313).
 - The image of the incus tier keeps a file or a directory of mode 0000
   (`/etc/shadow` of ubi-init) in place of a failure with EACCES (T-1993).
 - On the userland rung and the syscall tier, a signal that stops a system
@@ -28,6 +57,29 @@ They describe their recorded revision, not the current build.
   each one close-on-exec before it runs dpkg) opens the memo again from
   its path, so dpkg's `tar` can set the owners (T-2000, found by the
   fifth outside pass).
+
+### Added: systemd as PID 1 on the incus tier, the image on ghcr.io, 2026-11-19
+
+Record: T-1992, T-1993.
+Deployed: version 0.2.0-beta.36.
+
+- `--podvm-init=image` with `run -d` or `create` on the incus tier boots
+  the init of the image (systemd) as PID 1. The command runs after
+  `systemctl is-system-running` gives running or degraded, with its log and
+  its exit code, and the instance stops when it ends (T-1993,
+  PodUtils/podrunner#313).
+- Each release publishes `ghcr.io/podutils/podvm:TAG`: one image `FROM
+  scratch` for each architecture with the static binary, under one index
+  that is attested in the registry; the notes name each digest beside the
+  SHA-256 of its asset (T-1992).
+
+### Changed: podcrates v0.74.0, 2026-11-19
+
+Record: T-1955.
+Deployed: version 0.2.0-beta.36.
+
+- podvm takes podcrates `v0.73.0` and `v0.74.0` (PodUtils/podcrates#231,
+  #237).
 
 ## 0.2.0-beta.35 (2026-11-18)
 
