@@ -6351,7 +6351,7 @@ As uid 1000: `podvm system abi --bogus` exits 2 (OT-09); each other finding has 
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -6375,4 +6375,4 @@ The form of call C789 of podcrates (PodUtils/podcrates#236, COORD-142), which po
 
 ## Done
 
-Partial (2026-11-19): `image.yml`, `images/podvm/Dockerfile` and the job `image` of `release.yml` are on `main`. Remaining: the dry run and the push of `v0.2.0-beta.35` by a dispatch of `image.yml`, and the first release with the job.
+**Done (2026-11-19).** `image.yml`, `images/podvm/Dockerfile` and the job `image` of `release.yml` are on `main`. The dry run passed (run 44446041112). Two faults of the push were fixed: the check after the push takes the manifest of each platform from the index (`7d895ec`), and the login to ghcr.io stays for `actions/attest` (`930b37e`). Run 44452103325 pushed `ghcr.io/podutils/podvm:v0.2.0-beta.35` (index `sha256:e11a9a7054c4077c24add7ab9f078fd57b82977965a62c42d02c45894fd2cc3a`), compared each of the 7 platforms with its asset, attested the index in the registry, checked the attestation, and wrote the digests into the notes. From the cloud host with no login: the binary of the layer of `linux/amd64` and of `linux/arm64` is the asset byte for byte (SHA-256 `b39df0b1...` and `41377e93...`), and `podvm pull ghcr.io/podutils/podvm:v0.2.0-beta.35` gives that digest. The job of `release.yml` runs first at the next beta, under its gate.

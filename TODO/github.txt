@@ -484,6 +484,7 @@
 592 issue open
 593 issue open
 594 issue closed
-595 issue open
+595 issue closed
 596 issue open
 597 issue open
+598 issue open
