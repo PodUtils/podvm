@@ -428,7 +428,7 @@ echo "  exec     $(P exec --podvm-tier=incus sd434 systemctl is-system-running 2
 i=0; st=""
 while [ $i -lt 30 ]; do st=$(RI list --format csv -c ns 2>/dev/null | sed -n 's/^sd434,//p'); [ "$st" = STOPPED ] && break; i=$((i+1)); sleep 2; done
 echo "  stopped  ${st:--}"
-echo "  exitcode $(P inspect --format '{{.ExitCode}}' sd434 2>&1)"
+echo "  exitcode $(P inspect --podvm-tier=incus --format '{{.ExitCode}}' sd434 2>&1)"
 echo "  logs     $(P logs --podvm-tier=incus sd434 2>&1 | tr '\n' ' ')"
 echo "  rm       $(P rm -f --podvm-tier=incus sd434 2>&1)"
 out=$(P run --rm --podvm-init=image "$OCI" true </dev/null 2>&1); rc=$?
