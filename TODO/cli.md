@@ -6343,3 +6343,36 @@ Work each by its class with T-1980 and T-1974.
 ## Prove
 
 As uid 1000: `podvm system abi --bogus` exits 2 (OT-09); each other finding has a test of its class.
+
+# T-1992: Each release publishes its binaries on ghcr.io
+
+**Source:** the owner's ruling "ghcr.io" (2026-11-19, `docs/decisions.md`), relayed by PodUtils/podrunner#312
+**Category:** cli
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** blocked
+
+## Problem
+
+podvm publishes its release binaries as GitHub release assets only. podrunner pins each project by an OCI digest beside the SHA-256 of the asset, from one registry (`images/podvm.toml`), and its images are on ghcr.io.
+
+## Premise
+
+`release.yml` builds, signs and publishes the static binaries for x86_64, aarch64 and the other targets of the release, and has `GITHUB_TOKEN`.
+
+## Approach
+
+`release.yml` gets `packages: write` and pushes, for each architecture, one image `FROM scratch` with the static binary at a fixed path, under one multi-arch index `ghcr.io/podutils/podvm:VERSION`, signed or attested as the assets are. The release notes name the digest of the index and of each image beside the SHA-256 of each asset. The GitHub assets stay.
+
+## Decision
+
+-
+
+## Prove
+
+`podvm pull ghcr.io/podutils/podvm:0.2.0-beta.N` and `docker pull --platform linux/arm64` of it give the binary of the asset of that release, byte for byte (`sha256sum` equal), and the notes name the digest.
+
+## Blocker
+
+The form waits for the coordinator (PodUtils/podcrates) to confirm it for all projects, as PodUtils/podrunner#312 asks. Clears when podcrates names the form.

@@ -654,10 +654,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1989](cli.md) | P2 | M | none | cli | open | The faults of the fourth outside pass (2026-11-18, the gate of beta.35) |
 | [T-1990](enter.md) | P1 | S | none | enter | partial | On the syscall tier, a dynamic program sometimes fails to start with "errno 11" |
 | [T-1991](enter.md) | P1 | M | none | enter | open | On the syscall tier, `cargo doc` of ripgrep prints "Compiling ripgrep" and then nothing for 45 min |
+| [T-1992](cli.md) | P1 | M | none | cli | blocked | Each release publishes its binaries on ghcr.io |
 
 ## Counts
 
-588 entries: 22 open, 31 partial, 3 blocked, 532 done.
+589 entries: 22 open, 31 partial, 4 blocked, 532 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -667,10 +668,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 1 | 14 | 0 | 238 | 253 |
+| P1 | 1 | 14 | 1 | 238 | 254 |
 | P2 | 16 | 13 | 2 | 177 | 208 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
-| **All** | 22 | 31 | 3 | 532 | 588 |
+| **All** | 22 | 31 | 4 | 532 | 589 |
 
 ## Work order
 
