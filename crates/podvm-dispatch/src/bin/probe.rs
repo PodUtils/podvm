@@ -254,11 +254,15 @@ fn main() {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 static ALT: [std::sync::atomic::AtomicUsize; 2] =
     [const { std::sync::atomic::AtomicUsize::new(0) }; 2];
+#[cfg(target_arch = "x86_64")]
 static ON: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+#[cfg(target_arch = "x86_64")]
 static OFF: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
+#[cfg(target_arch = "x86_64")]
 extern "C" fn on_urg(_: i32, _: *mut u8, _: *mut u8) {
     let x = 0u8;
     let sp = &x as *const u8 as usize;
@@ -267,18 +271,28 @@ extern "C" fn on_urg(_: i32, _: *mut u8, _: *mut u8) {
     c.fetch_add(1, Ordering::SeqCst);
 }
 
+// The restorer of the kernel's x86_64 frame: Syscall User Dispatch, and so
+// this verb, is of x86_64 (nightly 44458458095 built the probe for aarch64).
+#[cfg(target_arch = "x86_64")]
 core::arch::global_asm!(
     ".globl probe_restorer",
     "probe_restorer:",
     "mov rax, 15",
     "syscall"
 );
+#[cfg(target_arch = "x86_64")]
 unsafe extern "C" {
     fn probe_restorer();
 }
 
+#[cfg(not(target_arch = "x86_64"))]
+fn sig_in_call() {
+    println!("ERR the verb is of x86_64");
+}
+
 /// SIGURG by `tgkill`, as Go sends it for preemption, while this thread
 /// makes calls: each handler counts whether it runs on the alternate stack.
+#[cfg(target_arch = "x86_64")]
 fn sig_in_call() {
     let size = 64 * 1024;
     let mem: &'static mut [u8] = Box::leak(vec![0u8; size].into_boxed_slice());
