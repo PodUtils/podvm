@@ -1,6 +1,6 @@
 # Handoff
 
-The state on 2026-11-19, 07:30 (UTC). `main` is at the commit that
+The state on 2026-11-19, 10:15 (UTC). `main` is at the commit that
 changes this file. `0.2.0-beta.36` is the last release (release run
 44466195422 on `94045a3`; the gate 44461846375, `workloads.yml`
 44457544162, `arm.yml` 44461850154, the nightly trial 44461846698, the
@@ -153,8 +153,12 @@ and `docs/decisions.md`. Remove this file when each step below is done.
 2. podrunner first: watch #593 (T-1990 measured with beta.36; the hang of
    T-1991, which T-1995 may have fixed), #596, #598 and #599. Then the
    hosted snapshot in the order of #599: T-1997 is done (clause 21:
-   the import grows the disk by 2.38 times the tree), then T-1999 (it waits for
-   podcrates@T-957, the xattrs of `pod-extract`), the steps of T-1994, T-1998.
+   the import grows the disk by 2.38 times the tree); T-1999 is partial
+   (podcrates `v0.76.0`; clause 22: a file capability reaches the root of
+   an incus instance; the machine tier remains); then the steps of T-1994
+   and T-1998 on `kvm.yml`. T-1996 waits for podrunner's measure of
+   rootless podman. #598 is closed (podrunner closed #315 on beta.36).
+   The next beta carries T-1996, T-1997, T-1999 and T-2001 (OP-02).
    T-1996 waits for podrunner's measure of rootless podman.
 3. T-2001 (the P2 findings of the fifth outside pass: a `-v` of one file
    and `npm` on the syscall tier, the rung of `PODVM_USERNS=0` with no
