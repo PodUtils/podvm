@@ -1,5 +1,5 @@
 == conditions
-date              2026-11-19T03:14:36Z
+date              2026-11-19T03:20:00Z
 host kernel       Linux 6.18.44-fc-v653
 cgroup            tmpfs
 incus package     6.0.0-1ubuntu0.3
@@ -9,7 +9,7 @@ runs              5
 == 1. a run
   stdout  hello
   exit    0
-  ms      1072 (with the import)
+  ms      1517 (with the import)
   stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-d8fd93b159f9f2f5-v3 imported now (TODO/machine.md T-1718)
 
 == 2. the exit code
@@ -33,7 +33,7 @@ runs              5
   stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-d8fd93b159f9f2f5-v3 from incus (TODO/machine.md T-1718)
 
 == 7. the cached image
-  run true ms  867 (median of 5)
+  run true ms  1029 (median of 5)
   stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-d8fd93b159f9f2f5-v3 from incus (TODO/machine.md T-1718)
 
 == 8. a name that is no instance
@@ -104,12 +104,13 @@ runs              5
   left     0
   native   podvm run: --storage-opt size= sizes the root disk of an instance of the incus tier (--podvm-tier=incus); this tier has no root disk to size (TODO/machine.md T-1964, T-1968)  rc 125
 == 18. the CPU time and the peak memory in inspect
-  usage    1.064 61710336 0
+  usage    1.067 61513728 0
 == 19. --podvm-init=image: systemd as PID 1
   run -d   sd434
   exec     running
   stopped  STOPPED
-  logs     state running pid1 systemd 
+  exitcode 7
+  logs     state running pid1 systemd unit started 
   rm       sd434
   native   rc 125: podvm run: --podvm-init=image needs --podvm-tier=incus with run -d or create (TODO/machine.md T-1993; the machine tier is T-1994)
 

@@ -11,6 +11,13 @@ They describe their recorded revision, not the current build.
 - On the syscall tier, a path walk that a rename or a mount on the host
   raced is tried again, as openat2(2) asks, in place of "errno 11" at the
   start of a dynamic program (T-1990, PodUtils/podrunner#308).
+- `--podvm-init=image` with `run -d` or `create` on the incus tier boots
+  the init of the image (systemd) as PID 1. The command runs after
+  `systemctl is-system-running` gives running or degraded, with its log and
+  its exit code, and the instance stops when it ends (T-1993,
+  PodUtils/podrunner#313).
+- The image of the incus tier keeps a file or a directory of mode 0000
+  (`/etc/shadow` of ubi-init) in place of a failure with EACCES (T-1993).
 
 ## 0.2.0-beta.35 (2026-11-18)
 

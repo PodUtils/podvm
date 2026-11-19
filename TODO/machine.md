@@ -5544,7 +5544,7 @@ Machine tier: a flag that sizes the writable disk of the guest. Namespace rung: 
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -5568,7 +5568,7 @@ Experiment 434 (incus 6.0.0, route A), a new clause: `run -d --podvm-tier=incus 
 
 ## Done
 
-Partial (2026-11-19): `--podvm-init=image|podvm` (`run/parse/opts.rs`; it needs `--podvm-tier=incus` with `run -d` or `create`, else 125), `incus/systemd.rs` (`boot_then_run`: the wait for `systemctl is-system-running --wait` in `BOOT_BOUND`, 180 s, then `guest-hold --run --detach` by the exec API), no `lxc.init.cmd` in `incus/verbs.rs::detached` with the flag, and `guest-hold --detach` (a child in a session of its own; SIGRTMIN+4 to PID 1 when the command ends). The unit test `the_state_of_systemd_gives_the_step` passes. Two faults of clause 19 are fixed: (1) ubi-init has files of mode 0000, and the unified tarball now reads each with the owner's bits and keeps the image's mode (`incus/image.rs`; the test `the_tarball_reads_a_file_and_a_directory_of_mode_0000` fails as uid 1000 without the fix); (2) systemctl gave no state and "Failed to connect to bus" before PID 1 opened its bus, so podvm now asks again each second within the bound, and the error of the bound names PID 1. Remaining: clause 19 of experiment 434 with `registry.access.redhat.com/ubi9/ubi-init`.
+**Done (2026-11-19).** `--podvm-init=image|podvm` (`run/parse/opts.rs`; it needs `--podvm-tier=incus` with `run -d` or `create`, else 125), `incus/systemd.rs` (`boot_then_run`: the wait for `systemctl is-system-running --wait` in `BOOT_BOUND`, 180 s, then `guest-hold --run --detach` by the exec API), no `lxc.init.cmd` in `incus/verbs.rs::detached` with the flag, and `guest-hold --detach` (a child in a session of its own; SIGRTMIN+4 to PID 1 when the command ends). The unit test `the_state_of_systemd_gives_the_step` passes. Two faults of clause 19 are fixed: (1) ubi-init has files of mode 0000, and the unified tarball now reads each with the owner's bits and keeps the image's mode (`incus/image.rs`; the test `the_tarball_reads_a_file_and_a_directory_of_mode_0000` fails as uid 1000 without the fix); (2) systemctl gave no state and "Failed to connect to bus" before PID 1 opened its bus, so podvm now asks again each second within the bound, and the error of the bound names PID 1. Proof: experiment 434 on `7b565c0` (incus 6.0.0, route A) gives "THE INCUS TIER RUNS"; clause 19 with `registry.access.redhat.com/ubi9/ubi-init`: `run -d` starts `sd434`, the log of the command gives `state running pid1 systemd unit started` (`systemctl start systemd-tmpfiles-clean.service`), `exec` gives `running`, the instance stops when the command ends, `inspect` gives the exit code 7, and the flag off the incus tier refuses by name (125). `experiments/results/incus-tier.txt` has the run.
 
 # T-1994: On the machine tier, a root on a disk for each image and the init of the image
 

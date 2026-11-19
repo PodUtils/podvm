@@ -655,12 +655,12 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1990](enter.md) | P1 | S | none | enter | partial | On the syscall tier, a dynamic program sometimes fails to start with "errno 11" |
 | [T-1991](enter.md) | P1 | M | none | enter | open | On the syscall tier, `cargo doc` of ripgrep prints "Compiling ripgrep" and then nothing for 45 min |
 | [T-1992](cli.md) | P1 | M | none | cli | partial | Each release publishes its binaries on ghcr.io |
-| [T-1993](machine.md) | P1 | M | none | machine | partial | On the incus tier, the init of the image (systemd) runs as PID 1 |
+| [T-1993](machine.md) | P1 | M | none | machine | done | On the incus tier, the init of the image (systemd) runs as PID 1 |
 | [T-1994](machine.md) | P1 | L | none | machine | open | On the machine tier, a root on a disk for each image and the init of the image |
 
 ## Counts
 
-591 entries: 23 open, 33 partial, 3 blocked, 532 done.
+591 entries: 23 open, 32 partial, 3 blocked, 533 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -670,10 +670,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 2 | 16 | 0 | 238 | 256 |
+| P1 | 2 | 15 | 0 | 239 | 256 |
 | P2 | 16 | 13 | 2 | 177 | 208 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
-| **All** | 23 | 33 | 3 | 532 | 591 |
+| **All** | 23 | 32 | 3 | 533 | 591 |
 
 ## Work order
 
