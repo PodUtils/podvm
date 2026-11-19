@@ -5536,3 +5536,61 @@ Machine tier: a flag that sizes the writable disk of the guest. Namespace rung: 
 ## Prove
 
 `kvm.yml`: a machine guest with a 1 GiB writable disk gives `No space left on device` to a write of 2 GiB; as uid 1000, `run -d --tmpfs /w:size=64m` gives the same to a write of 100 MiB in `/w`.
+
+# T-1993: On the incus tier, the init of the image (systemd) runs as PID 1
+
+**Source:** PodUtils/podrunner#313 (COORD-103 of podrunner), ask 1; the owner's ruling "GitHub-hosted parity" (2026-11-19)
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+podvm is PID 1 of an incus instance (`raw.lxc lxc.init.cmd = /.podvm/podvm guest-hold`). A job of githome or cfb that runs `systemctl start postgresql.service`, `mysql.service` or `docker.service` finds no systemd.
+
+## Premise
+
+An unprivileged incus instance boots systemd as PID 1 (the images of incus do so); podvm talks to incusd on its socket and runs commands by the exec API.
+
+## Approach
+
+`run -d --podvm-tier=incus --podvm-init=image`: no `lxc.init.cmd`, so the init of the image (`/sbin/init`) is PID 1; podvm starts the relay of `--podvm-channel` by the exec API as its own process; it waits for `systemctl is-system-running --wait` to give `running` or `degraded` within a bound, else it ends the run with 125 and the state; it runs the command by the exec API as the user and the environment of today; `wait` gives its exit code; the instance stops when the command ends.
+
+## Decision
+
+-
+
+## Prove
+
+Experiment 434 (incus 6.0.0, route A), a new clause: `run -d --podvm-tier=incus --podvm-init=image` of an image with systemd; `podvm exec UNIT systemctl is-system-running` prints `running` or `degraded`; `systemctl start` of a unit of the image works; `wait` gives the exit code of the command; the instance stops.
+
+# T-1994: On the machine tier, a root on a disk for each image and the init of the image
+
+**Source:** PodUtils/podrunner#313 (COORD-103 of podrunner), ask 2; the owner's ruling "GitHub-hosted parity" (2026-11-19)
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** L
+**Status:** open
+
+## Problem
+
+The root of a guest is an initramfs that must fit twice in the guest memory, and podvm's init runs the command. The GitHub-hosted image is about 55 GB (a "hosted-core" subset a few GiB), and its scripts need systemd.
+
+## Premise
+
+-
+
+## Approach
+
+In three steps, each released alone: (1) a root on a disk image made once for each image digest, with a copy-on-write overlay for each guest; (2) a switch to the init of the image (systemd), with a guest kernel that systemd accepts; (3) the exit status of the payload back to the host, by a unit of the image that ends the guest (`SuccessAction=exit-force`) and the status through the serial port or a file of the work mount.
+
+## Decision
+
+-
+
+## Prove
+
+`kvm.yml`: `run --podvm-tier=machine --podvm-init=image` of an image with systemd boots from its disk image; `systemctl is-system-running` gives `running` or `degraded`; the exit code of the payload unit is the exit code of the run; a second run of the same digest reuses the disk image.
