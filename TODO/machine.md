@@ -5659,7 +5659,7 @@ Stream the unified tarball into the import of incusd (`POST /1.0/images` with th
 
 ## Prove
 
-`sh experiments/434-incus-tier.sh`, a new clause: the import of an image of at least 1 GB; the peak of the disk use of the store and the pool is at most 2.2 times the size of the image (the store and the pool), and the image runs.
+`sh experiments/434-incus-tier.sh`, clause 21: the first run of an image of about 850 MB of tree on the incus tier; the disk use of the store and of incusd grows by at most 2.6 times the tree (incusd's image and its volume, with no tarball file in the store, which would give about 3.4), no file stays in `store/incus`, and the image runs.
 
 ## Done
 

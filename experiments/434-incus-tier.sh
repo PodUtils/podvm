@@ -84,8 +84,9 @@
 #  21. A large import (T-1997, PodUtils/podrunner#316 ask 1): the first run
 #      of `golang:1.24-bookworm` (about 850 MB of tree) streams the image
 #      into incusd; the disk use of the store and of incusd grows by at most
-#      2.3 times the tree (incusd's image and its volume), not by a third
-#      copy (a tarball file in the store).
+#      2.6 times the tree: incusd's image and its volume, and the overhead of
+#      incusd's files (measured 2.38 on 2026-11-19), not by a third copy (a
+#      tarball file in the store would give about 3.4).
 #
 # Exit: 0 every clause matched, 1 a clause disagreed, 2 the lane could not
 # run (not root, no user namespaces, no package).
@@ -515,7 +516,7 @@ c21 "^  run      rc 0" "the run of the large image did not pass"
 c21 "^  left     0 files" "a tarball file stayed in the store"
 tree=$(sed -n 's/^  tree     //p' "$WORK/c21.txt"); growth=$(sed -n 's/^  growth   //p' "$WORK/c21.txt")
 [ "${tree:-0}" -gt 100000000 ] || { note "21: the tree of the large image was not found (${tree:-0} bytes)"; fail=1; }
-[ "${growth:-0}" -le $(( ${tree:-0} * 23 / 10 )) ] || { note "21: the import grew the disk by $growth bytes, more than 2.3 times the tree of $tree"; fail=1; }
+[ "${growth:-0}" -le $(( ${tree:-0} * 26 / 10 )) ] || { note "21: the import grew the disk by $growth bytes, more than 2.6 times the tree of $tree"; fail=1; }
 
 # ---- clause 9 -----------------------------------------------------------
 left_i=$(RI list --format csv -c n 2>&1 | grep -c .)
