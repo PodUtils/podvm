@@ -146,6 +146,19 @@ and `docs/decisions.md`. Remove this file when each step below is done.
   `v0.75.0` taken (`f3beec1`, COORD-204, #600, closed). The gate on
   `5971b00` passed.
 
+* The table of the owner for systemd as PID 1 (2026-11-19, two research
+  bundles): T-2002 (partial). `run --podvm-init=image` of a foreground run
+  boots the init of the image as PID 1 of a PID namespace: on the
+  namespace rung with the subordinate range and a delegated cgroup2
+  subtree, else in a guest of the machine tier, also from the userland
+  rung (call C26). `sh experiments/465-init-image.sh` passes on the cloud
+  host as uid 1000 (clause 1 with a cgroup2 directory that root made, as
+  the host delegates none). T-2003 (RUNPATH on the userland rung: an ask
+  for pod-enter), T-2004 (a scope of the user manager) and T-2005 (a
+  cgroup2 stand-in, User-Mode Linux) are open. No COORD issue names them
+  yet. T-2006 (done): a SIGKILL of podvm ends each process of a
+  foreground run in the user namespace.
+
 ## Next steps, in order
 
 1. Start the session (`AGENTS.md`, section 8), with the watcher (filter

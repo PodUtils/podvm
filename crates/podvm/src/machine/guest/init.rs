@@ -241,6 +241,23 @@ fn early_exit(nonce: &str, why: &str) -> String {
     )
 }
 
+/// TODO/enter.md T-2002: `--podvm-init=image` in the guest. The command
+/// runs through `podvm guest-init`, which boots the init of the image as
+/// PID 1 of a PID namespace of the guest and runs the command in it.
+/// podvm's own init stays PID 1 of the guest, with the markers, the
+/// volumes and the exit code as before. An internal variable of podvm
+/// does not reach the command (`initns::join`).
+pub fn with_image_init(script: String, init_image: bool) -> String {
+    if !init_image {
+        return script;
+    }
+    let run = format!(
+        "/podvm/podvm {} --cgroup auto --cwd \"$PWD\" -- \"$@\"",
+        crate::initns::VERB
+    );
+    script.replace("\"$@\"", &run)
+}
+
 /// PodUtils/podrunner#296 ask 4 (TODO/machine.md T-1967): `--pids-limit N`
 /// in the guest. Before the ready marker, the init enables the `pids`
 /// controller, makes the cgroup `podvm-payload` with `pids.max`, and moves

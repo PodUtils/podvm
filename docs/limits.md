@@ -300,6 +300,48 @@ The 2026-09-30 KVM runs on the Windows base failed at setup or command
 shutdown. An earlier KVM success does not establish current reliability.
 The operator removed the ReactOS clause from T-1112 on 2026-10-02.
 
+## The init of an image
+
+`run --podvm-init=image IMAGE CMD` boots `/sbin/init` of the image
+(systemd) as PID 1 and runs the command after `systemctl
+is-system-running` gives `running` or `degraded` (180 s at most, else 125
+with the state and the last lines of the console of the init). The end of
+the command ends the init: SIGRTMIN+4, 10 s, then SIGKILL (T-2002, call
+C26). Experiment 465 measures each line below as uid 1000.
+
+- The namespace rung holds it for a foreground `run` of a caller that is
+  not uid 0, where the host gives two things. The first is the
+  subordinate id range of the caller (`newuidmap`, `newgidmap`,
+  `/etc/subuid`, `/etc/subgid`): a unit with `User=mysql` then runs as
+  the uid of mysql, and its files belong to that uid (a subordinate id
+  on the host). The second is a delegated cgroup2 subtree: a directory at
+  or above the cgroup of podvm that the caller can write. systemd as PID 1
+  ends without one ("Failed to create /init.scope control group"). A
+  user manager of systemd gives one to `systemd-run --user --scope -p
+  Delegate=yes podvm run ...` (T-2004 makes podvm ask for it).
+- The init is PID 1 of a PID namespace, not of the host. It has a mount,
+  a cgroup, an IPC and a UTS namespace of its own and the network of the
+  host. `/sys` is read-only, `/dev` is a tmpfs with the nodes `null`,
+  `zero`, `full`, `random`, `urandom` and `tty` of the host and a devpts
+  instance, and the capabilities CAP_NET_ADMIN, CAP_SYS_MODULE,
+  CAP_SYS_RAWIO and CAP_SYS_TIME are out of the bounding set, as they
+  hold nothing in a user namespace.
+- Where the host lacks a part (no range, no delegated cgroup, the
+  userland rung, a caller that is uid 0), the run takes the machine tier
+  and names the part on stderr. The init is then PID 1 of a PID
+  namespace of the guest, with real root and each controller of cgroup2.
+  The guest has the limits of "Guests" above: the root is an initramfs
+  (T-1994 keeps the root on a disk), a volume is a 9p mount, and the
+  network is QEMU's user-mode network. Under TCG on the cloud host a run
+  of `true` takes 24 s with four vCPUs; the namespace rung takes 3 s.
+- The userland rung itself boots no init: its PID 1 is the PID 1 of the
+  host, `setresuid` to another uid gives EPERM (T-0711), and the kernel
+  gives a PID namespace only with a user namespace or CAP_SYS_ADMIN.
+- `run -d`, `create` and `exec` with the init hold on the incus tier only
+  (T-1993). On the namespace rung, the command gets the primary group of
+  `--user` and no supplementary group, and `tty` in a command of `-t`
+  names no device.
+
 ## Network lab
 
 `podvm lab scenarios` lists 27 scenarios of `pod-netlab` (podcrates

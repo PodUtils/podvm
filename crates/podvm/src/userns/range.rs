@@ -77,6 +77,11 @@ pub fn plan(want: Option<&str>) -> Option<Plan> {
     host_plan()
 }
 
+/// True where the host has the tools and the ranges of the caller.
+pub fn available() -> bool {
+    host_plan().is_some()
+}
+
 /// The plan where the host has the tools and the ranges of the caller.
 fn host_plan() -> Option<Plan> {
     // SAFETY: getuid cannot fail.

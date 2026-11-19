@@ -76,7 +76,7 @@ mod sigrelay;
 mod sweep; // PodUtils/podvm#535
 pub use host::{bind_devices, bind_volumes, host_pid};
 pub use join::{joined_pidfd, rejoin};
-pub use range::{again_in_range, cp_in_range};
+pub use range::{again_in_range, available as range_available, cp_in_range};
 pub use sweep::sweep;
 
 static CHILD: AtomicI32 = AtomicI32::new(0);
@@ -207,7 +207,14 @@ fn own_proc() -> bool {
 /// with the subordinate range where the caller asks and the host has it
 /// (T-1911), else the one line of the caller.
 fn open_namespaces(uid: u32, gid: u32) -> bool {
-    if let Some(p) = range::plan(std::env::var(range::VAR).ok().as_deref()) {
+    // TODO/enter.md T-2002: an init of the image takes the range always.
+    let var = std::env::var(range::VAR).ok();
+    let want = if crate::initns::early() {
+        Some("1")
+    } else {
+        var.as_deref()
+    };
+    if let Some(p) = range::plan(want) {
         return with_range(&p, uid, gid, CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWUTS);
     }
     // SAFETY: one thread (the contract of the callers).
@@ -323,7 +330,8 @@ pub fn enter_if(argv: &[String]) {
     {
         UTS.store(true, Ordering::Relaxed);
     }
-    if !wanted(argv, uid, std::env::var(VAR).ok().as_deref()) {
+    // TODO/enter.md T-2002: an init of the image that this rung cannot hold.
+    if crate::initns::decide(argv, uid) || !wanted(argv, uid, std::env::var(VAR).ok().as_deref()) {
         return;
     }
     if !trial(uid, gid) {
@@ -380,7 +388,8 @@ pub fn enter_if(argv: &[String]) {
         }
     }
     // pid 1 of the PID namespace.
-    // SAFETY: the read end of the outer process.
+    sigrelay::die_with_outer(true); // T-2006
+                                    // SAFETY: the read end of the outer process.
     unsafe { close(code_r) };
     // SAFETY: one thread.
     let pid2 = unsafe { fork() };
@@ -430,7 +439,8 @@ pub fn enter_if(argv: &[String]) {
                 128 + (st & 0x7f)
             };
             let b = [code as u8];
-            // SAFETY: one byte of b; the outer process exits on it.
+            sigrelay::die_with_outer(false); // T-2006: the reaper stays
+                                             // SAFETY: one byte of b; the outer process exits on it.
             unsafe { write(code_w, b.as_ptr().cast(), 1) };
             unsafe { close(code_w) };
             told = true;

@@ -208,11 +208,18 @@ pub const RUN_OPTIONS: &str = "\
                    security.nesting and the intercepts of mknod and
                    setxattr (T-1966)
   --podvm-init image|podvm
-                   podvm's own, incus tier with -d or create: image boots
-                   the init of the image (systemd) as PID 1, waits for
-                   systemctl is-system-running (180 s), then runs the
-                   command; the instance stops when it ends. podvm, the
-                   default, keeps podvm's init (TODO/machine.md T-1993)
+                   podvm's own: image boots the init of the image
+                   (/sbin/init, systemd) as PID 1, waits for systemctl
+                   is-system-running (180 s), then runs the command, and
+                   ends the init when the command ends. On the incus tier
+                   with -d or create (TODO/machine.md T-1993). On a
+                   foreground run: in a PID namespace of the namespace
+                   rung, where the host gives the caller a subordinate id
+                   range and a delegated cgroup2 subtree; else, and with
+                   --podvm-tier=machine, in a PID namespace of a guest
+                   (KVM or TCG), with one line that says why
+                   (TODO/enter.md T-2002). podvm, the default, keeps
+                   podvm's init
   --podvm-sealed   podvm's own, machine tier only: the run comes as a tar
                    bundle on stdin (.podvm-run.json with argv, env and
                    workdir, and the files of the guest), and reaches the

@@ -19,7 +19,7 @@ pub const BOOT_BOUND: Duration = Duration::from_secs(180);
 
 /// What podvm does after one `systemctl is-system-running --wait`.
 #[derive(Debug, PartialEq, Eq)]
-enum Step {
+pub(crate) enum Step {
     /// The init is up: start the command.
     Run,
     /// The init is not up yet: ask again. Before PID 1 opens its bus,
@@ -30,11 +30,15 @@ enum Step {
     Fail,
 }
 
-fn step(state: &str, stderr: &str) -> Step {
+/// The step for one answer of `systemctl is-system-running`; the boot of
+/// an init in a PID namespace reads it too (TODO/enter.md T-2002).
+pub(crate) fn step(state: &str, stderr: &str) -> Step {
     match state {
         "running" | "degraded" => Step::Run,
         "initializing" | "starting" => Step::Again,
-        "" if stderr.contains("Failed to connect to bus") => Step::Again,
+        // systemd 262 says "Failed to connect to system scope bus via local
+        // transport" (TODO/enter.md T-2002); older ones "... to bus".
+        "" if stderr.contains("Failed to connect to") => Step::Again,
         _ => Step::Fail,
     }
 }
@@ -123,6 +127,11 @@ mod tests {
             ("starting", "", Step::Again),
             ("initializing", "", Step::Again),
             ("", bus, Step::Again),
+            (
+                "",
+                "Failed to connect to system scope bus via local transport: No such file or directory",
+                Step::Again,
+            ),
             ("", "", Step::Fail),
             ("maintenance", "", Step::Fail),
             ("offline", "", Step::Fail),

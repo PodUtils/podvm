@@ -193,7 +193,13 @@ impl<W: Write> Newc<W> {
             let ft = md.file_type();
             if ft.is_dir() {
                 self.entry(&rel, DIR | perm, &[], (0, 0))?;
-                self.walk(root, &path, prefix)?;
+                // A directory or a file that its owner cannot read (a helper
+                // of mode 4110, `/etc/shadow` of mode 0000) is podvm's own:
+                // read it with the owner's bits, as the tarball of the incus
+                // tier does (T-1993); the entry keeps the mode of the image.
+                podvm_extract::tree::with_owner_bits(&path, 0o500, || {
+                    self.walk(root, &path, prefix)
+                })?;
             } else if ft.is_symlink() {
                 let target = std::fs::read_link(&path)?;
                 self.entry(
@@ -208,22 +214,25 @@ impl<W: Write> Newc<W> {
                     self.raw(&rel, REG | perm, &[], (0, 0), ino, 2)?;
                     continue;
                 }
-                let data = std::fs::read(&path).map_err(|err| {
-                    io::Error::new(err.kind(), format!("{}: {err}", path.display()))
-                })?;
+                let data = read_owned(&path)?;
                 let ino = self.ino;
                 self.ino += 1;
                 self.links.insert(key, ino);
                 self.raw(&rel, REG | perm, &data, (0, 0), ino, 2)?;
             } else if ft.is_file() {
-                let data = std::fs::read(&path).map_err(|err| {
-                    io::Error::new(err.kind(), format!("{}: {err}", path.display()))
-                })?;
+                let data = read_owned(&path)?;
                 self.entry(&rel, REG | perm, &data, (0, 0))?;
             }
         }
         Ok(())
     }
+}
+
+/// The bytes of a file of the tree, read with the owner's read bit where
+/// the mode of the image has none; an error names the path.
+fn read_owned(path: &Path) -> io::Result<Vec<u8>> {
+    podvm_extract::tree::with_owner_bits(path, 0o400, || std::fs::read(path))
+        .map_err(|err| io::Error::new(err.kind(), format!("{}: {err}", path.display())))
 }
 
 /// The data of the first regular member of the `newc` archive `a` whose
@@ -244,4 +253,38 @@ pub fn member<'a>(a: &'a [u8], suffix: &str) -> Option<&'a [u8]> {
         i = (start + size + 3) & !3;
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    /// TODO/enter.md T-2002: the archive of a guest reads a file and a
+    /// directory that their owner cannot read, and keeps their modes on the
+    /// tree and in the entries. As a user that is not root, the read fails
+    /// without the owner's bits ("Permission denied" for the helper of
+    /// mode 4110 of dbus in an Arch Linux image).
+    #[test]
+    fn the_archive_reads_a_file_and_a_directory_that_the_owner_cannot_read() {
+        let dir = std::env::temp_dir().join(format!("podvm-cpio-owner-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("closed")).unwrap();
+        std::fs::write(dir.join("closed/inner"), b"inner-bytes").unwrap();
+        std::fs::write(dir.join("helper"), b"helper-bytes").unwrap();
+        let mode = |p: &str, m: u32| {
+            std::fs::set_permissions(dir.join(p), std::fs::Permissions::from_mode(m)).unwrap()
+        };
+        mode("helper", 0o4110);
+        mode("closed", 0o000);
+        let mut w = Newc::new(Vec::new());
+        w.tree(&dir).unwrap();
+        let a = w.finish().unwrap();
+        assert_eq!(member(&a, "helper"), Some(&b"helper-bytes"[..]));
+        assert_eq!(member(&a, "closed/inner"), Some(&b"inner-bytes"[..]));
+        let now = |p: &str| std::fs::metadata(dir.join(p)).unwrap().permissions().mode() & 0o7777;
+        assert_eq!((now("helper"), now("closed")), (0o4110, 0o000));
+        mode("closed", 0o700);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

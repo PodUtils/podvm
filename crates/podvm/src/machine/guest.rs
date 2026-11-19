@@ -287,6 +287,14 @@ pub fn boot(r: &Request) -> i32 {
                 .to_string(),
         );
     }
+    let init_image = r.env.iter().any(|e| e == crate::initns::MARK);
+    if init_image && tools.is_none() {
+        return fail(
+            "--podvm-init=image needs podvm in the guest, and the kernel of \
+             PODVM_MACHINE_KERNEL brings no module set for it (TODO/enter.md T-2002)"
+                .to_string(),
+        );
+    }
     if r.tty && tools.is_none() {
         return fail(
             "-t needs podvm in the guest, and the kernel of PODVM_MACHINE_KERNEL brings no \
@@ -324,6 +332,7 @@ pub fn boot(r: &Request) -> i32 {
                 }),
             );
             let script = init::with_pids(script, r.pids.as_deref(), &nonce);
+            let script = init::with_image_init(script, init_image); // T-2002
             let script = exec::with_server_if(script, r.keeper.is_some());
             run_archive(&script, tools.as_ref(), &copies, r.stdin.as_deref())
         })

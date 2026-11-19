@@ -226,6 +226,7 @@ pub(super) fn machine_tier(
         }
     };
     env.extend(crate::sandprobe::host_env(store.root()));
+    crate::initns::mark_env(&mut env, o.init_image, o.ask.verbose); // T-2002
     if o.net_none && o.broker {
         eprintln!(
             "podvm {verb}: --podvm-net none leaves no NIC for --network broker: the broker \

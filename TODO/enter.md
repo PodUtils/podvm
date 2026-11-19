@@ -5179,3 +5179,150 @@ The test `a_signal_that_stops_a_call_runs_on_the_alternate_stack_of_the_payload`
 ## Done
 
 **Done (2026-11-19).** `signals::{in_podvm, defer, before_exec, after_failed_exec, install}`, the exact mask in `keep_thread_state`, and the frame's mask passed to `exec::execveat`. Without the change the test counts 334 handlers off the alternate stack, and with it 0. As uid 1000 with `PODVM_USERNS=0` on the cloud host: `tsc --strict a.ts` and `npx tsc --strict a.ts` of `typescript@7.0.2` end with exit 0 three times in three (before: the bound of 90 s each time); `go build` of a program of 64 goroutines in `golang:1.24-bookworm` and its run end with exit 0. The dispatch tests pass.
+
+# T-2002: `--podvm-init=image` holds only on the incus tier: the namespace rung maps one uid, and the userland rung has no PID 1
+
+**Source:** the owner (2026-11-19, the table of the kinds for an image with systemd as PID 1, and two research bundles); PodUtils/podrunner#313, PodUtils/podrunner#316; T-1911, T-1993, T-1994
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** L
+**Status:** partial
+
+## Problem
+
+An image of a hosted runner starts its services with `systemctl start`, and each service runs as its own user (mysql, postgres, www-data). `--podvm-init=image` boots the init of the image only on the incus tier (T-1993). A foreground `run` on the namespace rung is uid 0 of a map with one uid, with podvm as PID 1 of its PID namespace: `systemctl is-system-running` gives `offline`, and `setresuid` to another uid gives EINVAL. The userland rung has the PID 1 of the host and the uid of the caller: `setresuid` gives EPERM (T-0711), and no call there makes a PID namespace.
+
+## Premise
+
+Measured on the cloud host as uid 1000 (kernel 6.18.44, no `/dev/kvm`, `ubuntu:100000:65536` in `/etc/subuid`, cgroup v1 with cgroup2 at `/sys/fs/cgroup/unified`, no delegated directory), with systemd 262 of `mirror.gcr.io/library/archlinux:latest`:
+
+1. In a user namespace with the subordinate range (`newuidmap`, T-1911) and a PID namespace, systemd as PID 1 ends at "Failed to create /init.scope control group: Permission denied": the cgroup2 of its cgroup namespace belongs to host root. With a cgroup2 directory that uid 1000 owns, the same boot reaches `graphical.target`.
+2. systemd wants `/` as a mount point ("Failed to remount root directory as MS_SLAVE: Invalid argument" after a `chroot`), `/dev` as a mount point (it mounts devtmpfs else, which a user namespace refuses), and a console that stays: a pty with no open slave gives EIO, and PID 1 then waits 1 s at each status line (a boot of 54 s, and 2 s with the slave held open).
+3. `/dev/fuse` of the host is mode 0600 of root, and systemd reads the type of `/sys/fs/cgroup` with `statfs`: no file system that a caller with no root can mount answers as cgroup2.
+4. A guest of the machine tier boots under TCG as uid 1000 in 9 s, with a kernel of its own, real root and a cgroup2 with each controller.
+
+## Approach
+
+One supervisor (`podvm guest-init`, `crates/podvm/src/initns/`) for two places:
+
+1. The namespace rung. Where the host gives the caller the subordinate range and a delegated cgroup2 subtree (`pod_hostprobe::cgroup`, with a real write), a foreground `run --podvm-init=image` takes the range with no variable. The supervisor opens a PID namespace; `/sbin/init` of the image is its PID 1, in a mount, a cgroup, an IPC and a UTS namespace, with `/proc`, a read-only `/sys`, a `/dev` on tmpfs with the nodes of the host and a devpts instance, a tmpfs on `/run` and `/tmp`, cgroup2 of its own leaf, `container=podvm`, an empty machine-id, and the tree as `/` by `pivot_root`. The supervisor asks `systemctl is-system-running` until `running` or `degraded` (180 s), then runs the command in the namespaces of the init with the ids of `--user`, forwards the shutdown signals, gives the exit code, and ends the init (SIGRTMIN+4, 10 s, then SIGKILL). The end of PID 1 ends each process of the PID namespace.
+2. A guest of the machine tier. The same supervisor runs the command of `/podvm-init`, as root of the guest; podvm's init stays PID 1 of the guest, with the markers, the 9p volumes and the exit code as before. A `run --podvm-init=image` with no tier takes this route where the host lacks a part of the first (the userland rung, no range, no delegated cgroup), with one line that names the part.
+
+## Decision
+
+Call C26 (2026-11-19): the fallback to the machine tier is automatic and prints one line; a caller that wants no guest names `--podvm-tier`. A guest that boots an init gets the CPUs of the host, at most four, where the caller names no `--podvm-cpus`. A change of this call belongs to the owner.
+
+## Prove
+
+`sh experiments/465-init-image.sh` as a user with no root (or as root with `PODVM_465_USER`), with `ghcr.io/pkgforge-dev/archlinux:latest` at the digest of `scripts/common/distro-matrix.sh`: clause 1 (the namespace rung from a delegated cgroup2 directory), clause 2 (no delegated cgroup: the machine tier) and clause 3 (the userland rung, `PODVM_USERNS=0`: the machine tier) each give exit 7 from the check: `/proc/1/comm` is `systemd`, the state is `running` or `degraded`, the units with `User=` of mysql, postgres, www-data and nobody run as those uids and write files of those uids, and `systemctl stop` ends a unit. Clause 6: no emulator, no systemd and no cgroup `podvm-init-*` stays. On a host with `/dev/kvm` and a delegated subtree: the job `cgroup` of `kvm.yml`.
+
+## Done
+
+Partial (2026-11-19). `crates/podvm/src/initns.rs` and `initns/{boot,mounts,join,cgroup}.rs`; the flag holds on a foreground `run` with no tier and with `--podvm-tier=machine` (`run/parse/opts.rs::init_check`, the table test `where_the_init_of_the_image_holds`); `initns::decide` runs before the user namespace, and `initns::route` takes the machine tier after the parse. The unit tests of `initns` pass, also as uid 1000.
+
+Measured on the cloud host as uid 1000, experiment 465 (`experiments/results/init-image.txt`, "THE INIT OF THE IMAGE RUNS"):
+
+* Clause 1, the namespace rung, with a cgroup2 directory that root gave to uid 1000 as a stand-in of a delegating host: exit 7 in 17 s with the extraction (3 s after it); state `running`; `uid_map` `0 1000 1` and `1 100000 65536`; the four units run as 961, 962, 33 and 65534.
+* Clauses 2 and 3, the host as it is: the run names the missing part and takes the machine tier under TCG; exit 7; state `running`. With four vCPUs the run of `true` takes 24 s (one vCPU: 51 s, of which the boot of systemd is 37 s); a run of the machine tier with podvm's init takes 10 s.
+* Debian 12 with `mariadb-server` and `postgresql` of apt (an image made with `podvm run` and `podvm import` as uid 1000): `mariadb.service` runs as uid 100 and `postgresql@15-main.service` as uid 102, both answer a query, and `/var/lib/mysql` and `/var/lib/postgresql/15/main` belong to them: 3 s on the namespace rung, 28 s through the machine tier from `PODVM_USERNS=0`.
+* `-u http`, `-e`, `-w`, `-i`, `-t` and a `:ro` volume under `/tmp` hold on the namespace rung; a missing program gives 127 and a SIGTERM of the command 143.
+
+Three faults that the runs found are fixed: the base archive of a guest reads a file that its owner cannot read (`dbus-daemon-launch-helper` of mode 4110; `machine/guest/cpio.rs`, as T-1993 did for the tarball of the incus tier; the test fails as uid 1000 without the fix); the wait for the boot reads the bus error of systemd 262 ("Failed to connect to system scope bus") as "not up yet", also on the incus tier (`incus/systemd.rs::step`); a second cgroup2 mount on a cgroup2 mount point gives EBUSY, so the mount goes to a scratch directory and moves.
+
+Remaining:
+
+1. A run on a host with `/dev/kvm` and a real delegated subtree (`kvm.yml`); the stand-in of clause 1 is a directory that root made.
+2. `run -d`, `create` and `exec` with the init on the namespace rung; a caller that is uid 0 of the host takes the machine tier.
+3. The pty of `-t` belongs to the devpts of the host: `tty` in the command gives "No such device".
+4. The command gets the primary group of `--user` only, and no supplementary group of the image.
+5. A volume under `--podvm-volume-base` at or under `/tmp` binds by its path, not by the held descriptor.
+6. An image whose init is not systemd (busybox init, OpenRC): the command starts at once, as no state can be asked; not measured.
+7. T-2003 (a program with a library in a directory of its RUNPATH on the userland rung), T-2004 (a delegated subtree from the user manager of systemd) and T-2005 (the routes with no guest and no delegated cgroup).
+
+# T-2003: On the userland rung, a program with a library in a directory of its RUNPATH does not load (`systemctl`)
+
+**Source:** the measure of T-2002 (2026-11-19); the research bundle of the owner (2026-11-19, `run/libpath.rs` of a branch that is not in this tree)
+**Category:** enter
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+As uid 1000 with `PODVM_USERNS=0` and a volume (the loader family of the userland rung), `systemctl` of `mirror.gcr.io/library/archlinux:latest` ends with "error while loading shared libraries: libsystemd-shared-262.1-1.so: cannot open shared object file" (exit 127), and `/sbin/init` with the same line for `libsystemd-core`. The libraries lie in `/usr/lib/systemd`, which the programs name in `DT_RUNPATH`. The loader of the image runs from its host path, and an absolute directory of a RUNPATH names a path of the host there. `journalctl`, `udevadm`, `loginctl` and each other program of systemd fail the same way.
+
+## Premise
+
+The entry gives the loader the library directories of the image as host paths (`podvm_enter::userland::host_env`, `Userland::lib_dirs`), from the loader configuration of the image; it reads no `DT_RUNPATH` or `DT_RPATH` of the program. pod-enter of podcrates owns that entry.
+
+## Approach
+
+Ask podcrates (a COORD issue) for the directories of `DT_RUNPATH` and `DT_RPATH` of the program, and of each library that it needs, in the library path that pod-enter gives the loader, each resolved in the tree (`$ORIGIN` too). A child that the interposer starts through the loader takes the same path.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 with `PODVM_USERNS=0`: `run --rm -v DIR:/v ghcr.io/pkgforge-dev/archlinux:latest systemctl --version` prints the version of systemd and exits 0.
+
+# T-2004: A delegated cgroup2 subtree from the user manager of systemd, for an init of the image on the namespace rung
+
+**Source:** T-2002 (2026-11-19)
+**Category:** enter
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+On a host with systemd, the shell of a login is in `session-N.scope`, which belongs to root: `run --podvm-init=image` finds no delegated directory and takes the machine tier, while the user manager of the caller (`user@UID.service`) can give a delegated scope. The caller must start podvm with `systemd-run --user --scope -p Delegate=yes` by hand today.
+
+## Premise
+
+rootless podman and crun ask the user manager for a scope with `Delegate=yes` over the user bus (`StartTransientUnit`), and move the container into it. `systemd-run --user --scope -p Delegate=yes -- CMD` does the same for a command and gives its exit code. Not measured here: the cloud host runs no systemd.
+
+## Approach
+
+Where `initns::decide` finds the range and no delegated directory, and the user bus answers (`$XDG_RUNTIME_DIR/bus`): run podvm again in a scope of the user manager with `Delegate=yes` (`systemd-run --user --scope`, else the call of the bus), once, with a variable that stops a second try. Where no user manager answers, the machine tier as today, and the line names the scope.
+
+## Decision
+
+-
+
+## Prove
+
+On a host with systemd and a login of a user with a subordinate range (a hosted runner, a job of `kvm.yml`): `sh experiments/465-init-image.sh` passes clause 1 from the shell of the login, with no directory that root made, and no scope of the run stays.
+
+# T-2005: An init of the image with no guest on a host that delegates no cgroup: a cgroup2 stand-in, or User-Mode Linux
+
+**Source:** T-2002 (2026-11-19); the two research bundles of the owner (2026-11-19)
+**Category:** enter
+**Milestone:** none
+**Priority:** P3
+**Effort:** L
+**Status:** open
+
+## Problem
+
+On a host with no delegated cgroup2 subtree (each container with a cgroup of root, the cloud host), and on the userland rung, the init of the image runs only in a guest of QEMU: 24 s under TCG against 3 s on the namespace rung (T-2002). A host with no QEMU that podvm can fetch or run has no route.
+
+## Premise
+
+Measured for T-2002: systemd ends without a writable cgroup2, reads the type of `/sys/fs/cgroup` with `statfs`, and starts each service with `CLONE_INTO_CGROUP` of a directory descriptor; `/dev/fuse` of the cloud host is closed to a user. The first bundle of the owner booted systemd as PID 1 of a User-Mode Linux kernel 6.13.12 as one process of uid 1000 (48 s with MariaDB and PostgreSQL, a root on ext4); the second bundle got `ptrace: Operation not permitted` from a UML kernel 6.12 on its host, and did not finish a boot of systemd under the interposer with an emulated PID 1 and cgroup tree.
+
+## Approach
+
+Two measures, each with experiment 465 as the check. (1) On the namespace rung, a tmpfs on `/sys/fs/cgroup` with the control files, and the interposer in each process of the image (`/etc/ld.so.preload`): the cgroup2 magic for `statfs`, the files of a new directory at `mkdir`, no `CLONE_INTO_CGROUP`, and `cgroup.procs` from the processes of the PID namespace. Name what stays wrong (the unit of a pid in the journal, the kill of a control group). (2) A User-Mode Linux kernel (static, from the release) as a tier: with `ptrace`, and in the seccomp mode of Linux 6.16 where the host denies `ptrace`; in the user namespace with the range its hostfs root keeps the owners of the image.
+
+## Decision
+
+-
+
+## Prove
+
+`sh experiments/465-init-image.sh` on the cloud host as uid 1000, with a new clause for each route that this entry adds: the check exits 7 with no emulator of QEMU, and the transcript names the time of the run.

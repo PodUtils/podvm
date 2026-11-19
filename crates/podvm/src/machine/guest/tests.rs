@@ -464,3 +464,21 @@ fn pids_limit_goes_into_a_cgroup_of_the_guest_before_the_ready_marker() {
         assert_eq!(init::with_pids(s.clone(), junk, "n"), s, "{junk:?}");
     }
 }
+
+/// TODO/enter.md T-2002: with `--podvm-init=image` the command of the
+/// guest runs through `podvm guest-init`, in the plain form and in the
+/// form of `-t`; the words of the command stay the arguments of `set --`.
+#[test]
+fn the_init_of_the_image_wraps_the_command_of_the_guest() {
+    let argv = ["sh".to_string(), "-c".to_string(), "exit 7".to_string()];
+    let run = "/podvm/podvm guest-init --cgroup auto --cwd \"$PWD\" -- \"$@\"";
+    for tty in [None, Some("24x80")] {
+        let s = init::script("n", &argv, &[], "/", false, &[], tty, None);
+        assert_eq!(init::with_image_init(s.clone(), false), s);
+        let with = init::with_image_init(s.clone(), true);
+        assert_eq!(with.matches(run).count(), 1, "{with}");
+        assert_eq!(with.matches("\"$@\"").count(), 1, "{with}");
+        assert!(with.contains("set -- 'sh' '-c' 'exit 7'"), "{with}");
+        assert!(with.contains("echo PODVM-EXIT-n $rc"), "{with}");
+    }
+}

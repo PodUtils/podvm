@@ -7,7 +7,7 @@ pub(crate) mod image;
 pub(crate) mod inspect;
 pub(crate) mod net;
 pub(crate) mod run;
-mod systemd;
+pub(crate) mod systemd;
 pub(crate) mod verbs;
 mod xattrs; // TODO/machine.md T-1999
 

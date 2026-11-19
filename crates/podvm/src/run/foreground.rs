@@ -1,6 +1,7 @@
 use super::*;
 use podvm_enter::ExitCode as _;
 
+mod init_image; // TODO/enter.md T-2002
 mod tee;
 
 mod record;
@@ -333,6 +334,8 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
                     return outcome.code;
                 }
                 outcome.code
+            } else if crate::initns::takes(&p.env) {
+                init_image::run(&p, &plan, &store, &mut fg, &mut err)
             } else {
                 // ⭐ TODO/enter.md T-1339. The namespace rung where
                 // `prepare` selected it (`p.rung` is the entered word it

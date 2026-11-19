@@ -24,6 +24,21 @@ const SA_RESTART: i32 = 0x1000_0000;
 
 unsafe extern "C" {
     fn sigaction(sig: i32, act: *const SigAction, old: *mut SigAction) -> i32;
+    fn prctl(option: i32, arg2: u64, arg3: u64, arg4: u64, arg5: u64) -> i32;
+}
+
+/// TODO/supervise.md T-2006: pid 1 of the PID namespace gets SIGKILL when
+/// the outer process dies while the run goes on (a SIGKILL of podvm, the
+/// bound of a caller). The end of pid 1 ends each process of the namespace;
+/// before, pid 1, pid 2 and the payload stayed. `on` is false from the
+/// moment pid 2 ended: the outer process then exits first by design, and
+/// pid 1 stays as the reaper of the helpers (T-1781).
+pub(in crate::userns) fn die_with_outer(on: bool) {
+    const PR_SET_PDEATHSIG: i32 = 1;
+    const SIGKILL: u64 = 9;
+    // SAFETY: prctl with integers. The kernel delivers a SIGKILL of an
+    // ancestor PID namespace to the pid 1 of a namespace.
+    unsafe { prctl(PR_SET_PDEATHSIG, if on { SIGKILL } else { 0 }, 0, 0, 0) };
 }
 
 /// The handler: forward a signal that a process sent; leave one of the

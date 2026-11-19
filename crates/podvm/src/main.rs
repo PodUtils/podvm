@@ -21,6 +21,7 @@ mod format;
 mod hosts_tests; // TODO/deps.md T-1679
 mod images;
 mod incus;
+mod initns; // TODO/enter.md T-2002
 mod interpose;
 mod lab; // TODO/net.md T-1662
 mod ladder;
@@ -124,6 +125,7 @@ fn main() -> std::process::ExitCode {
         Some("guest-net") => exit(machine::guest::net::main(rest)), // in a guest, T-1656
         Some("guest-channel") => exit(machine::guest::channel::guest_main(rest)), // T-1751
         Some("guest-hold") => exit(incus::hold(rest)),              // an incus init, T-1718
+        Some(initns::VERB) => exit(initns::main(rest)),             // an init of the image, T-2002
         Some("guest-9p") => exit(machine::guest::vol::main(rest)),  // in a guest, T-1723
         Some("guest-tty") => exit(machine::guest::tty::guest_main(rest)), // in a guest, T-1723
         Some("tree-prefill") => exit(run::spare::main(rest)),       // TODO/image.md T-1781

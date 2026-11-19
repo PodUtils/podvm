@@ -12,10 +12,10 @@ pub(crate) fn prepare(
     store: &podvm_image::Store,
     verb: &str,
 ) -> std::result::Result<crate::lifecycle::Prepared, i32> {
-    let mut o = parse(verb, args)?;
-    // ⭐ TODO/machine.md T-1302. The tier is decided before anything is
-    // fetched: a machine-tier refusal names the legs, and there is nothing
-    // to pull for a tier that cannot run.
+    let mut o = crate::initns::route(verb, parse(verb, args)?); // T-2002
+                                                                // ⭐ TODO/machine.md T-1302. The tier is decided before anything is
+                                                                // fetched: a machine-tier refusal names the legs, and there is nothing
+                                                                // to pull for a tier that cannot run.
     let tier = crate::tier::resolve(o.tier);
     let guest = matches!(
         tier,

@@ -2071,3 +2071,36 @@ A field `oom_kills` of the run report (an added optional field: the schema id st
 
 **Partial (2026-11-18).** The run report has the optional field `oom_kills` (layout 1 stays: `crates/podvm/schemas/run-report.v1.schema.json` lists it, not as required). A foreground run reads `memory.events` of its leaf at the end (`run::cgroup::oom_kills`); the end of `run -d` that the launcher writes into the report reads the leaf of its own process (`podvm_supervise::report::own_leaf`, only a cgroup named `podvm-*`). The unit tests `the_oom_count_comes_from_memory_events` and `the_oom_count_is_an_optional_field_of_the_same_layout` pass. Experiment 459 clause 5 passed in `kvm.yml` run 44285612361 (job `cgroup`, on `098a1bc`, a delegated subtree on a hosted runner): `run --rm --memory 32m` of a payload that holds 200 MB ends with 137 and its report has `oom_kills` 1, and the report of the same payload as `run -d` has `oom_kills` 1; no leaf stays. The incus tier: `inspect` gives `OomKills` (T-1965; podcrates `v0.71.0` reads `incus_memory_OOM_kills_total` of the metrics), 0 in experiment 434 clause 18. A machine guest (2026-11-18): the init reads `oom_kill` of `/proc/vmstat` with shell builtins and writes it after the code of the exit marker (`PODVM-EXIT-NONCE RC N`); the console reader keeps it, and `run::cgroup::oom_kills` gives it where the run has no leaf. The unit test `the_exit_marker_carries_the_oom_kills_of_the_guest` passes. Measured on the cloud host under TCG, `--podvm-mem 256M`, `mirror.gcr.io/library/alpine:3.20`, a payload that holds 600 MB: `run --rm` ends with 137 and its report has `oom_kills` 1; `run -d` (the keeper writes the report) has `exit_code` 137 and `oom_kills` 1; `sh -c 'exit 3'` has `oom_kills` 0; no emulator stays. Remaining: the field `oom_kills` of the run report of the incus tier.
 
+
+# T-2006: A SIGKILL of podvm leaves the processes of a foreground run in its PID namespace
+
+**Source:** the measure of T-2002 (2026-11-19); T-1748, T-1909
+**Category:** supervise
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+A foreground `run` of a caller with no root has three processes of podvm (`userns.rs`): the outer process, pid 1 of the PID namespace, and pid 2, which runs the verb. T-1748 gives the payload a SIGKILL when pid 2 dies. A SIGKILL of the outer process (the bound of a caller, a CI job that ends) ends none of them: as uid 1000 on the cloud host, `run --rm IMAGE sleep 300` and a SIGKILL of the outer process left pid 1, pid 2 and `sleep 300`, with the tree of the run.
+
+## Premise
+
+The kernel delivers a SIGKILL of an ancestor PID namespace to the pid 1 of a namespace, and the end of pid 1 ends each process of the namespace. `PR_SET_PDEATHSIG` sends a signal when the parent dies. The outer process exits first by design after pid 2 ended, and pid 1 then stays as the reaper of the helpers (T-1781).
+
+## Approach
+
+pid 1 sets `PR_SET_PDEATHSIG` to SIGKILL at its start, and clears it when pid 2 ended, before it gives the exit code to the outer process (`userns/sigrelay.rs::die_with_outer`).
+
+## Decision
+
+-
+
+## Prove
+
+`sh experiments/465-init-image.sh`, clause 7, as a user with no root, with `ghcr.io/pkgforge-dev/archlinux:latest`: after a SIGKILL of the outer podvm of `run --rm IMAGE sleep 465465`, and of the same run with `--podvm-init=image` from a delegated cgroup2 directory, no process of the run stays.
+
+## Done
+
+**Done (2026-11-19).** `userns/sigrelay.rs::die_with_outer`, called twice in `userns::enter_if`. Measured as uid 1000 on the cloud host: before the change a SIGKILL of the outer process left three processes of a run with podvm's init, and with `--podvm-init=image` also the supervisor, systemd and its services; after it none stays in both cases (experiment 465, clause 7), a run that ends by itself still removes its `--rm` tree (the reaper stays), and the tree of a killed run stays for `podvm rm`, as after each SIGKILL. The empty cgroups of a killed run with the init of the image go at the next such run, when they are older than 600 s (`initns/cgroup.rs::sweep`).

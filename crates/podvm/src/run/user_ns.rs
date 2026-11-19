@@ -21,6 +21,7 @@ pub(super) fn push(
     env: &mut Vec<String>,
 ) -> Result<(), i32> {
     env.retain(|e| !e.starts_with(&format!("{USERNS_IDS_VAR}=")));
+    crate::initns::mark_env(env, o.init_image, o.ask.verbose); // T-2002
     let rung = podvm_enter::entered_rung(podvm_probe::select::Selection::choose(findings).rung);
     // A detached run (pod-enter's user namespace) and a foreground run in
     // podvm's own (podcrates `v0.63.0` nests one); a host root keeps its ids.

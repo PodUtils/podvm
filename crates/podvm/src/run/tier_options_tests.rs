@@ -84,7 +84,7 @@ fn every_field_of_opts_is_classified(o: Opts) {
         channel: _,           // machine and incus
         sealed: _,            // machine only; incus refuses
         engine: _,            // machine only; incus refuses
-        init_image: _,        // incus run -d and create only (T-1993)
+        init_image: _,        // TABLE below: where_the_init_of_the_image_holds
         volume_base: _,       // a bind of the namespace rung; each guest tier refuses
         volume_given: _,      // the check of --podvm-volume-base at the parse
         volume_base_given: _, // the check of --podvm-volume-base at the parse
@@ -140,4 +140,45 @@ fn hostname_flag_takes_a_host_name() {
         let r = parse::parse("run", &v(&["--hostname", bad, "img", "true"]));
         assert_eq!(r.err(), Some(EXIT_FLAG_ERROR), "{bad:?}");
     }
+}
+
+/// TODO/machine.md T-1993, TODO/enter.md T-2002: `--podvm-init=image`
+/// holds on a foreground `run` (the namespace rung, else the machine
+/// tier) and on the incus tier with `run -d` or `create`; each other
+/// place refuses by name at the parse, and `podvm` holds everywhere.
+#[test]
+fn where_the_init_of_the_image_holds() {
+    for (verb, flags, holds) in [
+        ("run", &[][..], true),
+        ("run", &["--podvm-tier=machine"][..], true),
+        ("run", &["-d"][..], false),
+        ("run", &["-d", "--podvm-tier=machine"][..], false),
+        ("run", &["-d", "--podvm-tier=incus"][..], true),
+        ("run", &["--podvm-tier=incus"][..], false),
+        ("run", &["--podvm-tier=syscall"][..], false),
+        ("run", &["--podvm-tier=emulate"][..], false),
+        ("run", &["--podvm-tier=runsc"][..], false),
+        ("create", &[][..], false),
+        ("create", &["--podvm-tier=incus"][..], true),
+    ] {
+        for init in [&["--podvm-init=image"][..], &["--podvm-init", "image"][..]] {
+            let mut a = flags.to_vec();
+            a.extend_from_slice(init);
+            a.extend_from_slice(&["img", "true"]);
+            let r = parse::parse(verb, &v(&a));
+            match (holds, r) {
+                (true, Ok(o)) => assert!(o.init_image, "{verb} {a:?}"),
+                (false, Err(c)) => assert_eq!(c, EXIT_FLAG_ERROR, "{verb} {a:?}"),
+                (h, r) => panic!("{verb} {a:?}: holds={h}, parse ok={}", r.is_ok()),
+            }
+        }
+        let mut a = flags.to_vec();
+        a.extend_from_slice(&["--podvm-init=podvm", "img", "true"]);
+        let o = parse::parse(verb, &v(&a)).unwrap_or_else(|c| panic!("{verb} {a:?}: {c}"));
+        assert!(!o.init_image);
+    }
+    assert_eq!(
+        parse::parse("run", &v(&["--podvm-init=runit", "img"])).err(),
+        Some(EXIT_FLAG_ERROR)
+    );
 }

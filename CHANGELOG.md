@@ -8,6 +8,21 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- `run --podvm-init=image` holds on a foreground run of a user with no
+  root (T-2002): the init of the image (systemd) is PID 1 of a PID
+  namespace, the command runs after `systemctl is-system-running` gives
+  `running` or `degraded`, and a unit with `User=` runs as its own uid. On
+  the namespace rung where the host gives the caller a subordinate id
+  range and a delegated cgroup2 subtree; else, and from the userland rung,
+  in a guest of the machine tier (KVM or TCG), with one line that names the
+  missing part (call C26).
+- A SIGKILL of podvm during a foreground run of a user with no root ends
+  each process of the run; before, the payload stayed (T-2006).
+- The machine tier boots an image with a file that its owner cannot read
+  (a helper of mode 4110): the archive of the guest reads it with the
+  owner's bits (T-2002).
+- The wait for the boot of `--podvm-init=image` on the incus tier reads the
+  bus error of systemd 262 as "not up yet" (T-2002).
 - On the syscall tier, a `-v` of one file works: the path is the file,
   `:ro` holds, a path under it is ENOTDIR, and `rm` or `mv` of it is
   EBUSY, as for a bound file (T-2001, OP-02 of the fifth outside pass).
