@@ -5564,7 +5564,7 @@ An unprivileged incus instance boots systemd as PID 1 (the images of incus do so
 
 ## Prove
 
-Experiment 434 (incus 6.0.0, route A), a new clause: `run -d --podvm-tier=incus --podvm-init=image` of an image with systemd; `podvm exec UNIT systemctl is-system-running` prints `running` or `degraded`; `systemctl start` of a unit of the image works; `wait` gives the exit code of the command; the instance stops.
+Experiment 434 (incus 6.0.0, route A), a new clause: `run -d --podvm-tier=incus --podvm-init=image` of an image with systemd; `podvm exec UNIT systemctl is-system-running` prints `running` or `degraded`; `systemctl start` of a unit of the image works; the instance stops; `inspect --format '{{.ExitCode}}'` gives the exit code of the command (the incus tier serves no `wait`, T-1722).
 
 ## Done
 
