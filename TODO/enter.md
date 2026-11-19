@@ -5199,7 +5199,7 @@ Measured on the cloud host as uid 1000 (kernel 6.18.44, no `/dev/kvm`, `ubuntu:1
 
 1. In a user namespace with the subordinate range (`newuidmap`, T-1911) and a PID namespace, systemd as PID 1 ends at "Failed to create /init.scope control group: Permission denied": the cgroup2 of its cgroup namespace belongs to host root. With a cgroup2 directory that uid 1000 owns, the same boot reaches `graphical.target`.
 2. systemd wants `/` as a mount point ("Failed to remount root directory as MS_SLAVE: Invalid argument" after a `chroot`), `/dev` as a mount point (it mounts devtmpfs else, which a user namespace refuses), and a console that stays: a pty with no open slave gives EIO, and PID 1 then waits 1 s at each status line (a boot of 54 s, and 2 s with the slave held open).
-3. `/dev/fuse` of the host is mode 0600 of root, and systemd reads the type of `/sys/fs/cgroup` with `statfs`: no file system that a caller with no root can mount answers as cgroup2.
+3. With a tmpfs on `/sys/fs/cgroup` that holds the control files, systemd 262 ends at "Found tmpfs on /sys/fs/cgroup/, assuming legacy hierarchy" and "Detected unsupported legacy cgroup hierarchy, refusing execution": it reads the type of the file system. `/dev/fuse` of the host is mode 0600 of root. So no file system that this caller can mount answers as cgroup2.
 4. A guest of the machine tier boots under TCG as uid 1000 in 9 s, with a kernel of its own, real root and a cgroup2 with each controller.
 
 ## Approach
@@ -5317,7 +5317,7 @@ On a host with no delegated cgroup2 subtree (each container with a cgroup of roo
 
 ## Premise
 
-Measured for T-2002: systemd ends without a writable cgroup2, reads the type of `/sys/fs/cgroup` with `statfs`, and starts each service with `CLONE_INTO_CGROUP` of a directory descriptor; `/dev/fuse` of the cloud host is closed to a user. The first bundle of the owner booted systemd as PID 1 of a User-Mode Linux kernel 6.13.12 as one process of uid 1000 (48 s with MariaDB and PostgreSQL, a root on ext4); the second bundle got `ptrace: Operation not permitted` from a UML kernel 6.12 on its host, and did not finish a boot of systemd under the interposer with an emulated PID 1 and cgroup tree.
+Measured for T-2002: systemd 262 ends without a writable cgroup2 ("Failed to create /init.scope control group: Permission denied"), and with a tmpfs on `/sys/fs/cgroup` ("Detected unsupported legacy cgroup hierarchy, refusing execution"); it starts each service "via CLONE_INTO_CGROUP" (its debug log), which takes a descriptor of a cgroup2 directory; `/dev/fuse` of the cloud host is closed to a user. The machine tier under TCG with four vCPUs runs MariaDB and PostgreSQL of Debian 12 under systemd in 28 s on the cloud host (T-2002). The first bundle of the owner booted systemd as PID 1 of a User-Mode Linux kernel 6.13.12 as one process of uid 1000 (48 s with MariaDB and PostgreSQL, a root on ext4); the second bundle got `ptrace: Operation not permitted` from a UML kernel 6.12 on its host, and did not finish a boot of systemd under the interposer with an emulated PID 1 and cgroup tree.
 
 ## Approach
 
