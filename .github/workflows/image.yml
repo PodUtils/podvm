@@ -118,12 +118,23 @@ jobs:
           digest="$(docker buildx imagetools inspect "$repo:$TAG" --format '{{json .Manifest}}' | jq -r .digest)"
           case "$digest" in sha256:*) ;; *) echo "image: no digest of $repo:$TAG: $digest" >&2; exit 1 ;; esac
           # The check after the push: each binary of the index, pulled by
-          # its platform, is its release asset (SHA-256).
+          # its platform, is its release asset (SHA-256). The digest of each
+          # platform comes from the index itself: a second `docker create`
+          # of the index digest with another platform fails in the store of
+          # the runner ("cannot overwrite digest", run 44448085532).
+          docker buildx imagetools inspect "$repo@$digest" --raw > "$RUNNER_TEMP/index.json"
           while read -r arch platform sum; do
+            os="${platform%%/*}"; rest="${platform#*/}"; cpu="${rest%%/*}"
+            variant=""; case "$rest" in */*) variant="${rest#*/}" ;; esac
+            pd="$(jq -r --arg o "$os" --arg a "$cpu" --arg v "$variant" \
+              '[.manifests[] | select(.platform.os == $o and .platform.architecture == $a and ($v == "" or .platform.variant == $v)) | .digest] | if length == 1 then .[0] else "" end' \
+              "$RUNNER_TEMP/index.json")"
+            case "$pd" in sha256:*) ;; *) echo "image: the index $digest has not one manifest for $platform" >&2; exit 1 ;; esac
             docker rmi -f "$repo:$TAG-$arch" > /dev/null
-            c="$(docker create --platform "$platform" "$repo@$digest")"
+            c="$(docker create --platform "$platform" "$repo@$pd")"
             docker cp "$c:/usr/local/bin/podvm" "$RUNNER_TEMP/pulled-$arch"
             docker rm "$c" > /dev/null
+            docker rmi -f "$repo@$pd" > /dev/null
             pulled="$(sha256sum "$RUNNER_TEMP/pulled-$arch" | cut -d' ' -f1)"
             [ "$pulled" = "$sum" ] || { echo "image: $platform of $repo@$digest is $pulled, the asset is $sum" >&2; exit 1; }
             echo "image: $platform is the asset podvm-$arch ($sum)"
