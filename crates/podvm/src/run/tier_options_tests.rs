@@ -84,6 +84,7 @@ fn every_field_of_opts_is_classified(o: Opts) {
         channel: _,           // machine and incus
         sealed: _,            // machine only; incus refuses
         engine: _,            // machine only; incus refuses
+        init_image: _,        // incus run -d and create only (T-1993)
         volume_base: _,       // a bind of the namespace rung; each guest tier refuses
         volume_given: _,      // the check of --podvm-volume-base at the parse
         volume_base_given: _, // the check of --podvm-volume-base at the parse

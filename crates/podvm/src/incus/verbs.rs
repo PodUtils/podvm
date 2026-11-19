@@ -36,6 +36,8 @@ pub struct Detach {
     pub image: String,
     /// `-i`: the piped stdin goes to the command (TODO/machine.md T-1777).
     pub stdin: bool,
+    /// `--podvm-init=image`: the init of the image is PID 1 (T-1993).
+    pub init_image: bool,
 }
 
 /// The arguments without `--podvm-tier=incus` (or `--podvm-tier incus`),
@@ -124,7 +126,9 @@ pub(super) async fn detached(c: &Client, job: &Job<'_>, image: &str, d: &Detach)
     if let Err(e) = super::run::apply_limits(c, &mut new, &job.limits).await {
         return fail(e); // T-1897, T-1964
     }
-    new.config.insert("raw.lxc".into(), INIT.into());
+    if !d.init_image {
+        new.config.insert("raw.lxc".into(), INIT.into());
+    }
     new.config.insert(LABEL.into(), "1".into());
     new.config.insert(IMAGE_KEY.into(), d.image.clone());
     if let Err(e) = super::net::create(c, &new, job.net_none, job.channel.as_ref()).await {
@@ -169,6 +173,13 @@ pub(super) async fn detached(c: &Client, job: &Job<'_>, image: &str, d: &Detach)
     }
     if d.start
         && let Err(e) = super::run::size_held(c, &name, &job.limits).await
+    {
+        let left = discard(c, &name).await;
+        return fail(format!("{e}{left}"));
+    }
+    if d.start
+        && d.init_image
+        && let Err(e) = super::systemd::boot_then_run(c, &name).await
     {
         let left = discard(c, &name).await;
         return fail(format!("{e}{left}"));

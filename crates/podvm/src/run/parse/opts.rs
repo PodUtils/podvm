@@ -51,6 +51,9 @@ pub(crate) struct Opts {
     /// `--podvm-engine`: the guest loads the modules of a container
     /// engine (T-1780, PodUtils/podrunner#92).
     pub(crate) engine: bool,
+    /// `--podvm-init=image`: the init of the image is PID 1 of an incus
+    /// instance (PodUtils/podrunner#313, TODO/machine.md T-1993).
+    pub(crate) init_image: bool,
     /// `--podvm-volume-base DIR`: each `-v` source under DIR opens under it
     /// with no symbolic link, and the bind takes that descriptor
     /// (PodUtils/podrunner#277, T-1945).
@@ -150,6 +153,7 @@ impl Opts {
             net_none: false,
             sealed: false,
             engine: false,
+            init_image: false,
             volume_base: None,
             volume_given: Vec::new(),
             volume_base_given: None,
@@ -249,4 +253,38 @@ fn a_name_follows_the_rule_of_docker() {
     for bad in ["", "bad/name", "bad name", "-x", ".x", &"n".repeat(65)] {
         assert!(name_arg("run", bad).is_err(), "{bad:?}");
     }
+}
+
+/// `--podvm-init VALUE` (TODO/machine.md T-1993): `image` (the init of the
+/// image is PID 1) or `podvm` (podvm's own init, the default).
+pub(super) fn init_arg(verb: &str, a: &str) -> Result<bool, i32> {
+    match a {
+        "image" => Ok(true),
+        "podvm" => Ok(false),
+        _ => {
+            eprintln!("podvm {verb}: --podvm-init takes image or podvm, not {a:?}");
+            Err(podvm_image::error::EXIT_FLAG_ERROR)
+        }
+    }
+}
+
+/// `--podvm-init=VALUE`, as [`init_arg`].
+pub(super) fn init_eq(verb: &str, a: &str, o: &mut Opts) -> Result<(), i32> {
+    o.init_image = init_arg(verb, a.strip_prefix("--podvm-init=").unwrap_or(a))?;
+    Ok(())
+}
+
+/// `--podvm-init=image` holds on an incus instance that stays (`run -d`
+/// and `create`); elsewhere it is a refusal by name, never a silent
+/// podvm init (TODO/machine.md T-1993; the machine tier is T-1994).
+pub(super) fn init_check(verb: &str, o: &Opts) -> Result<(), i32> {
+    let incus = matches!(o.tier, Some(crate::tier::Want::Incus));
+    if !o.init_image || (incus && (o.detach || verb == "create")) {
+        return Ok(());
+    }
+    eprintln!(
+        "podvm {verb}: --podvm-init=image needs --podvm-tier=incus with run -d or create \
+         (TODO/machine.md T-1993; the machine tier is T-1994)"
+    );
+    Err(podvm_image::error::EXIT_FLAG_ERROR)
 }

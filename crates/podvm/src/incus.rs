@@ -7,6 +7,7 @@ pub(crate) mod image;
 pub(crate) mod inspect;
 pub(crate) mod net;
 pub(crate) mod run;
+mod systemd; // TODO/machine.md T-1993
 pub(crate) mod verbs;
 
 #[cfg(test)]
@@ -139,12 +140,44 @@ pub fn hold(args: &[String]) -> i32 {
         // SAFETY: _exit is async-signal-safe.
         unsafe { _exit(0) }
     }
+    // TODO/machine.md T-1993: `--detach` (with `--podvm-init=image`): the
+    // exec that started this process returns at once, and a child in a
+    // session of its own holds the command; systemd is PID 1.
+    if args.iter().any(|a| a == "--detach") {
+        unsafe extern "C" {
+            fn fork() -> i32;
+            fn setsid() -> i32;
+        }
+        // SAFETY: one thread so far; the child goes on alone.
+        match unsafe { fork() } {
+            0 => {
+                // SAFETY: a plain system call in the child.
+                unsafe { setsid() };
+                if let Ok(null) = std::fs::OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open("/dev/null")
+                {
+                    use std::os::fd::AsRawFd;
+                    unsafe extern "C" {
+                        fn dup2(old: i32, new: i32) -> i32;
+                    }
+                    for fd in 0..3 {
+                        // SAFETY: the standard descriptors of this child.
+                        unsafe { dup2(null.as_raw_fd(), fd) };
+                    }
+                }
+            }
+            pid if pid > 0 => return 0,
+            _ => return 127,
+        }
+    }
     // TODO/machine.md T-1779: an init brings `lo` up. An instance with no
     // NIC (`--podvm-net none`) has nothing else that does. The channel
     // listens on 127.0.0.1 before the command starts.
     let _ = crate::machine::guest::net::lo_up();
     net::listen();
-    if args.first().is_some_and(|a| a == "--run") {
+    if args.iter().any(|a| a == "--run") {
         match start_cmd() {
             Ok(pid) => CHILD.store(pid, std::sync::atomic::Ordering::Relaxed),
             Err(e) => {
@@ -169,6 +202,12 @@ pub fn hold(args: &[String]) -> i32 {
             if pid == CHILD.load(std::sync::atomic::Ordering::Relaxed) {
                 let code = code_of(status);
                 let _ = std::fs::write(EXIT, format!("{code}\n"));
+                // TODO/machine.md T-1993: where the init of the image is
+                // PID 1, the instance stops when its command ends, as with
+                // podvm's own init: SIGRTMIN+4 asks systemd to power off.
+                if std::process::id() != 1 {
+                    kill(1, 34 + 4);
+                }
                 return code;
             }
         }

@@ -433,6 +433,7 @@ pub(super) fn incus_tier(
             start: verb == "run",
             image: o.image.clone().unwrap_or_default(),
             stdin: o.interactive,
+            init_image: o.init_image, // T-1993
         }),
         // TODO/machine.md T-1779: no NIC, and the channel as a proxy device.
         net_none: o.net_none,

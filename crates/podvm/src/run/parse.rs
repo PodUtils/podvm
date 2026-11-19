@@ -91,12 +91,7 @@ fn parse_flags_with(
                 "--env-file" => o.env.extend(read_env_file(verb, a)?),
                 "--env-file0" => o.env.extend(read_env_file0(verb, a)?), // T-1971
                 "--log-driver" => match a.as_str() {
-                    // ⚠ Stub by the table, by value: `json-file` is the one
-                    // driver this runtime's single sink already is, so it is
-                    // accepted and changes nothing. Anything else names a
-                    // driver podvm does not have and is refused naming it.
-                    // TODO/supervise.md T-0605.
-                    "json-file" => {}
+                    "json-file" => {} // the one sink of podvm (T-0605)
                     other => {
                         eprintln!(
                             "podvm {verb}: --log-driver takes json-file, not {other:?}: \
@@ -123,6 +118,7 @@ fn parse_flags_with(
                     }
                 },
                 "--podvm-qemu-arg" => o.qemu_args.push(a.clone()),
+                "--podvm-init" => o.init_image = opts::init_arg(verb, a)?, // T-1993
                 "--podvm-net" if a == "none" => o.net_none = true,
                 "--podvm-net" => {
                     eprintln!(
@@ -259,6 +255,8 @@ fn parse_flags_with(
             "--tls-verify" => o.tls_verify = Some(true),
             "--podvm-sealed" => o.sealed = true,
             "--podvm-engine" => o.engine = true,
+            "--podvm-init" => expecting = Some("--podvm-init"),
+            x if x.starts_with("--podvm-init=") => opts::init_eq(verb, x, &mut o)?,
             "--add-host" => expecting = Some("--add-host"),
             "--podvm-tier" => expecting = Some("--podvm-tier"),
             "--podvm-qemu-arg" => expecting = Some("--podvm-qemu-arg"),
@@ -467,6 +465,7 @@ fn parse_flags_with(
         return Err(EXIT_FLAG_ERROR);
     }
     volume_base::check(verb, &o)?; // PodUtils/podrunner#277
+    opts::init_check(verb, &o)?; // T-1993
     if !matches!(o.pull.as_str(), "never" | "missing" | "always") {
         eprintln!(
             "podvm {verb}: --pull takes never, missing or always, not {:?}",

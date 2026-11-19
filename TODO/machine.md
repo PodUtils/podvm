@@ -5544,7 +5544,7 @@ Machine tier: a flag that sizes the writable disk of the guest. Namespace rung: 
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -5565,6 +5565,10 @@ An unprivileged incus instance boots systemd as PID 1 (the images of incus do so
 ## Prove
 
 Experiment 434 (incus 6.0.0, route A), a new clause: `run -d --podvm-tier=incus --podvm-init=image` of an image with systemd; `podvm exec UNIT systemctl is-system-running` prints `running` or `degraded`; `systemctl start` of a unit of the image works; `wait` gives the exit code of the command; the instance stops.
+
+## Done
+
+Partial (2026-11-19): `--podvm-init=image|podvm` (`run/parse/opts.rs`; it needs `--podvm-tier=incus` with `run -d` or `create`, else 125), `incus/systemd.rs` (`boot_then_run`: the wait for `systemctl is-system-running --wait` in `BOOT_BOUND`, 180 s, then `guest-hold --run --detach` by the exec API), no `lxc.init.cmd` in `incus/verbs.rs::detached` with the flag, and `guest-hold --detach` (a child in a session of its own; SIGRTMIN+4 to PID 1 when the command ends). The unit test `running_and_degraded_let_the_command_run` passes. Remaining: clause 19 of experiment 434 with `registry.access.redhat.com/ubi9/ubi-init`.
 
 # T-1994: On the machine tier, a root on a disk for each image and the init of the image
 

@@ -70,6 +70,11 @@
 #      instance; a native run refuses the flag by name.
 #  18. `inspect` of an instance (T-1965) gives `CpuSeconds` and
 #      `PeakMemoryBytes` as numbers.
+#  19. `--podvm-init=image` (T-1993, PodUtils/podrunner#313 ask 1): `run -d`
+#      of an image with systemd boots it as PID 1; the command runs after
+#      `systemctl is-system-running` gives running or degraded, with its log;
+#      `exec` reaches the same systemd; the instance stops when its command
+#      ends; the flag off the incus tier refuses by name (125).
 #
 # Exit: 0 every clause matched, 1 a clause disagreed, 2 the lane could not
 # run (not root, no user namespaces, no package).
@@ -408,6 +413,31 @@ P rm -f --podvm-tier=incus use434 >/dev/null 2>&1
 } >"$WORK/c18.txt" 2>&1
 cat "$WORK/c18.txt" >>"$REPORT"
 grep -Eq "^  usage    [0-9]+\.[0-9]+ [0-9]+ " "$WORK/c18.txt" || { note "18: inspect gave no CPU time or peak memory"; fail=1; }
+
+# ---- clause 19 ----------------------------------------------------------
+# TODO/machine.md T-1993 (PodUtils/podrunner#313 ask 1): the init of the
+# image (systemd) as PID 1 of an instance that stays.
+INIT_IMG=${PODVM_434_INIT:-registry.access.redhat.com/ubi9/ubi-init:latest}
+echo ""; echo "== 19. --podvm-init=image: systemd as PID 1" >>"$REPORT"
+{
+P pull -q "$INIT_IMG" >/dev/null 2>&1
+echo "  run -d   $(P run -d --name sd434 --podvm-tier=incus --podvm-init=image "$INIT_IMG" sh -c 'echo "state $(systemctl is-system-running)"; echo "pid1 $(cat /proc/1/comm)"; sleep 20; exit 7' </dev/null 2>&1 | tail -1)"
+echo "  exec     $(P exec --podvm-tier=incus sd434 systemctl is-system-running 2>&1 | tail -1)"
+i=0; st=""
+while [ $i -lt 30 ]; do st=$(RI list --format csv -c ns 2>/dev/null | sed -n 's/^sd434,//p'); [ "$st" = STOPPED ] && break; i=$((i+1)); sleep 2; done
+echo "  stopped  ${st:--}"
+echo "  logs     $(P logs --podvm-tier=incus sd434 2>&1 | tr '\n' ' ')"
+echo "  rm       $(P rm -f --podvm-tier=incus sd434 2>&1)"
+out=$(P run --rm --podvm-init=image "$OCI" true </dev/null 2>&1); rc=$?
+echo "  native   rc $rc: $(printf '%s' "$out" | tail -1)"
+} >"$WORK/c19.txt" 2>&1
+cat "$WORK/c19.txt" >>"$REPORT"
+c19() { grep -Eq "$1" "$WORK/c19.txt" || { note "19: $2"; fail=1; }; }
+c19 "^  run -d   sd434$" "run -d --podvm-init=image did not start the instance"
+c19 "^  exec     (running|degraded)$" "exec did not reach a running systemd"
+c19 "^  stopped  STOPPED$" "the instance did not stop when its command ended"
+c19 "^  logs     state (running|degraded) pid1 systemd " "the command did not run after the boot of systemd as PID 1"
+c19 "^  native   rc 125: .*--podvm-init=image needs --podvm-tier=incus" "the flag off the incus tier did not refuse by name"
 
 # ---- clause 9 -----------------------------------------------------------
 left_i=$(RI list --format csv -c n 2>&1 | grep -c .)
