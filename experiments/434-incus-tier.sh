@@ -81,6 +81,11 @@
 #      `--podvm-init=image` an instance maps at least 231,072 ids, has
 #      `/dev/fuse`, and writes a machine-id of its own: two instances of
 #      one image have two.
+#  21. A large import (T-1997, PodUtils/podrunner#316 ask 1): the first run
+#      of `golang:1.24-bookworm` (about 850 MB of tree) streams the image
+#      into incusd; the disk use of the store and of incusd grows by at most
+#      2.3 times the tree (incusd's image and its volume), not by a third
+#      copy (a tarball file in the store).
 #
 # Exit: 0 every clause matched, 1 a clause disagreed, 2 the lane could not
 # run (not root, no user namespaces, no package).
@@ -476,6 +481,41 @@ a=$(sed -n 's/^  logs sna434 .*mid \([0-9a-f]\{32\}\).*/\1/p' "$WORK/c20.txt")
 b=$(sed -n 's/^  logs snb434 .*mid \([0-9a-f]\{32\}\).*/\1/p' "$WORK/c20.txt")
 echo "  machine-ids ${a:--} ${b:--}" >>"$REPORT"
 { [ -n "$a" ] && [ -n "$b" ] && [ "$a" != "$b" ]; } || { note "20: the two instances have no machine-ids of their own"; fail=1; }
+
+# ---- clause 21 ----------------------------------------------------------
+echo ""; echo "== 21. a large import: the growth of the disk use" >>"$REPORT"
+BIG=${PODVM_434_BIG:-mirror.gcr.io/library/golang:1.24-bookworm}
+disk() { du -sb "$B/store" "$B/state/lib" 2>/dev/null | awk '{s+=$1} END {print s+0}'; }
+{
+P pull -q "$BIG" >/dev/null 2>&1; echo "  pull     rc $?"
+# The tree is extracted before the measure, so the growth is the import.
+P run --rm "$BIG" true >/dev/null 2>&1; echo "  extract  rc $?"
+tree=0
+for d in "$B"/store/rootfs/*/rootfs "$B"/store/trees/*/rootfs; do
+  [ -d "$d" ] || continue
+  n=$(du -sb "$d" 2>/dev/null | cut -f1); [ "${n:-0}" -gt "$tree" ] && tree=$n
+done
+base=$(disk)
+: >"$WORK/peak"
+( while :; do disk >>"$WORK/peak"; sleep 1; done ) &
+sampler=$!
+out=$(T "$BIG" true </dev/null 2>&1); rc=$?
+kill "$sampler" 2>/dev/null; wait "$sampler" 2>/dev/null
+peak=$(sort -n "$WORK/peak" | tail -1)
+echo "  run      rc $rc $(printf '%s' "$out" | tail -1)"
+echo "  tree     $tree"
+echo "  base     $base"
+echo "  peak     ${peak:-0}"
+echo "  growth   $(( ${peak:-0} - base ))"
+echo "  left     $(ls "$B/store/incus" 2>/dev/null | wc -l) files in store/incus"
+} >"$WORK/c21.txt" 2>&1
+cat "$WORK/c21.txt" >>"$REPORT"
+c21() { grep -Eq "$1" "$WORK/c21.txt" || { note "21: $2"; fail=1; }; }
+c21 "^  run      rc 0" "the run of the large image did not pass"
+c21 "^  left     0 files" "a tarball file stayed in the store"
+tree=$(sed -n 's/^  tree     //p' "$WORK/c21.txt"); growth=$(sed -n 's/^  growth   //p' "$WORK/c21.txt")
+[ "${tree:-0}" -gt 100000000 ] || { note "21: the tree of the large image was not found (${tree:-0} bytes)"; fail=1; }
+[ "${growth:-0}" -le $(( ${tree:-0} * 23 / 10 )) ] || { note "21: the import grew the disk by $growth bytes, more than 2.3 times the tree of $tree"; fail=1; }
 
 # ---- clause 9 -----------------------------------------------------------
 left_i=$(RI list --format csv -c n 2>&1 | grep -c .)
