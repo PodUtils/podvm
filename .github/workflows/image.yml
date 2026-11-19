@@ -1,0 +1,180 @@
+name: image
+
+# TODO/cli.md T-1992 (the owner's ruling "ghcr.io", 2026-11-19, relayed by
+# PodUtils/podrunner#312; the form is call C789 of podcrates,
+# PodUtils/podcrates#236). The binaries of a release as an OCI image on
+# ghcr.io/podutils/podvm: one image FROM scratch for each architecture
+# (images/podvm/Dockerfile), with the static binary at /usr/local/bin/podvm,
+# under one multi-arch index <tag> (and beta or latest). The images come
+# from the files of the release (no second build). After the push, each
+# binary in the registry is compared with its release asset by SHA-256; the
+# provenance of the index is attested in the registry; the release notes
+# name each digest beside the SHA-256 of the assets.
+#
+# release.yml calls it with push: true after its check of the assets. A
+# dispatch with push: false is the dry run: it builds the images from the
+# assets of TAG, runs the amd64 one, and pushes nothing.
+#
+#   gh workflow run image.yml --ref main -f tag=v0.2.0-beta.35 -f push=false
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      push:
+        required: true
+        type: boolean
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The release tag, with the v (for example v0.2.0-beta.35)"
+        required: true
+        type: string
+      push:
+        description: "Push to ghcr.io (false: a dry run)"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    name: the image of the release on ghcr.io
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: the images, from the assets of the release
+        id: images
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          PUSH: ${{ inputs.push }}
+        run: |
+          set -eu
+          case "$TAG" in v*) ;; *) echo "image: the tag $TAG has no v" >&2; exit 1 ;; esac
+          repo="ghcr.io/$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')/podvm"
+          revision="$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha)"
+          dist="$RUNNER_TEMP/dist"
+          mkdir -p "$dist"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir "$dist" \
+            --pattern 'podvm-*' --skip-existing
+          # The arches come from the matrix of nightly.yml, as release.yml
+          # reads them, so this list cannot drift from the build.
+          arches="$(sed -n 's/^ *- arch: *//p' .github/workflows/nightly.yml)"
+          [ -n "$arches" ] || { echo "image: no arch in nightly.yml" >&2; exit 1; }
+          refs=""
+          for arch in $arches; do
+            case "$arch" in
+              x86_64) platform=linux/amd64 ;;
+              aarch64) platform=linux/arm64 ;;
+              armv7) platform=linux/arm/v7 ;;
+              i686) platform=linux/386 ;;
+              riscv64gc) platform=linux/riscv64 ;;
+              powerpc64le) platform=linux/ppc64le ;;
+              loongarch64) platform=linux/loong64 ;;
+              *) echo "image: no OCI platform for the arch $arch" >&2; exit 1 ;;
+            esac
+            file="$dist/podvm-$arch"
+            [ -f "$file" ] || { echo "image: $TAG has no podvm-$arch" >&2; exit 1; }
+            # The asset is the file that its .sha256 names.
+            want="$(cut -d' ' -f1 "$file.sha256")"
+            got="$(sha256sum "$file" | cut -d' ' -f1)"
+            [ "$want" = "$got" ] || { echo "image: podvm-$arch is $got, its .sha256 says $want" >&2; exit 1; }
+            ctx="$RUNNER_TEMP/ctx-$arch"
+            mkdir -p "$ctx"
+            cp "$file" "$ctx/podvm"
+            docker build --platform "$platform" -f images/podvm/Dockerfile \
+              --label org.opencontainers.image.source="https://github.com/$GITHUB_REPOSITORY" \
+              --label org.opencontainers.image.version="$TAG" \
+              --label org.opencontainers.image.revision="$revision" \
+              --label org.opencontainers.image.licenses=0BSD \
+              -t "$repo:$TAG-$arch" "$ctx"
+            refs="$refs $repo:$TAG-$arch"
+            echo "$arch $platform $got" >> "$RUNNER_TEMP/arches.txt"
+          done
+          docker run --rm "$repo:$TAG-x86_64" --version
+          docker image ls "$repo"
+          if [ "$PUSH" != true ]; then
+            echo "image: a dry run: the images are built, and nothing is pushed"
+            exit 0
+          fi
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          for ref in $refs; do docker push "$ref"; done
+          channel=latest
+          case "$TAG" in *-*) channel=beta ;; esac
+          docker buildx imagetools create -t "$repo:$TAG" -t "$repo:$channel" $refs
+          docker buildx imagetools inspect "$repo:$TAG"
+          digest="$(docker buildx imagetools inspect "$repo:$TAG" --format '{{json .Manifest}}' | jq -r .digest)"
+          case "$digest" in sha256:*) ;; *) echo "image: no digest of $repo:$TAG: $digest" >&2; exit 1 ;; esac
+          # The check after the push: each binary of the index, pulled by
+          # its platform, is its release asset (SHA-256).
+          while read -r arch platform sum; do
+            docker rmi -f "$repo:$TAG-$arch" > /dev/null
+            c="$(docker create --platform "$platform" "$repo@$digest")"
+            docker cp "$c:/usr/local/bin/podvm" "$RUNNER_TEMP/pulled-$arch"
+            docker rm "$c" > /dev/null
+            pulled="$(sha256sum "$RUNNER_TEMP/pulled-$arch" | cut -d' ' -f1)"
+            [ "$pulled" = "$sum" ] || { echo "image: $platform of $repo@$digest is $pulled, the asset is $sum" >&2; exit 1; }
+            echo "image: $platform is the asset podvm-$arch ($sum)"
+          done < "$RUNNER_TEMP/arches.txt"
+          {
+            echo "repo=$repo"
+            echo "digest=$digest"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo ""
+            echo "## The image, by digest"
+            echo ""
+            echo "| Reference | Digest | SHA-256 of the binary (the asset) |"
+            echo "| --- | --- | --- |"
+            echo "| \`$repo:$TAG\` (each architecture) | \`$digest\` | |"
+            while read -r arch platform sum; do
+              d="$(docker buildx imagetools inspect "$repo:$TAG-$arch" --format '{{json .Manifest}}' | jq -r .digest)"
+              case "$d" in sha256:*) ;; *) echo "image: no digest of $repo:$TAG-$arch: $d" >&2; exit 1 ;; esac
+              echo "| \`$repo:$TAG-$arch\` ($platform) | \`$d\` | \`$sum\` |"
+            done < "$RUNNER_TEMP/arches.txt"
+            echo ""
+            echo "Pull by digest: \`docker pull $repo@$digest\`. Check its provenance:"
+            echo "\`gh attestation verify oci://$repo@$digest --repo $GITHUB_REPOSITORY\`."
+          } > "$RUNNER_TEMP/image-digests.md"
+          cat "$RUNNER_TEMP/image-digests.md"
+          docker logout ghcr.io
+
+      - name: the provenance of the index, in the registry
+        if: inputs.push
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.images.outputs.repo }}
+          subject-digest: ${{ steps.images.outputs.digest }}
+          push-to-registry: true
+
+      - name: the provenance, checked; the digests in the notes
+        if: inputs.push
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          REPO: ${{ steps.images.outputs.repo }}
+          DIGEST: ${{ steps.images.outputs.digest }}
+        run: |
+          set -eu
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          gh attestation verify "oci://$REPO@$DIGEST" --repo "$GITHUB_REPOSITORY"
+          docker logout ghcr.io
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > "$RUNNER_TEMP/notes.md"
+          if grep -q '^## The image, by digest$' "$RUNNER_TEMP/notes.md"; then
+            echo "image: the notes name the digest already"
+            exit 0
+          fi
+          cat "$RUNNER_TEMP/image-digests.md" >> "$RUNNER_TEMP/notes.md"
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$RUNNER_TEMP/notes.md"

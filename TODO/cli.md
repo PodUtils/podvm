@@ -6351,7 +6351,7 @@ As uid 1000: `podvm system abi --bogus` exits 2 (OT-09); each other finding has 
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** blocked
+**Status:** partial
 
 ## Problem
 
@@ -6363,7 +6363,7 @@ podvm publishes its release binaries as GitHub release assets only. podrunner pi
 
 ## Approach
 
-`release.yml` gets `packages: write` and pushes, for each architecture, one image `FROM scratch` with the static binary at a fixed path, under one multi-arch index `ghcr.io/podutils/podvm:VERSION`, signed or attested as the assets are. The release notes name the digest of the index and of each image beside the SHA-256 of each asset. The GitHub assets stay.
+The form of call C789 of podcrates (PodUtils/podcrates#236, COORD-142), which podnet took first: `.github/workflows/image.yml` builds one image `FROM scratch` for each arch of the matrix of `nightly.yml` (`images/podvm/Dockerfile`: the static binary at `/usr/local/bin/podvm`, `ENTRYPOINT`, the labels `org.opencontainers.image.source`, `.version` and `.revision`) from the assets of the release (no second build; each asset is checked against its `.sha256`), pushes them with the tags `TAG-ARCH`, and joins them in one index `ghcr.io/podutils/podvm:TAG` (and `beta` or `latest`). After the push it pulls each platform of the index by digest and compares the binary with its asset (SHA-256), attests the provenance of the index in the registry (`actions/attest`, `push-to-registry`), checks it with `gh attestation verify`, and adds the digests to the release notes beside the SHA-256 of each binary. `release.yml` calls it with `push: true` after its check of the assets; a dispatch with `push: false` is the dry run. The GitHub assets stay.
 
 ## Decision
 
@@ -6373,6 +6373,6 @@ podvm publishes its release binaries as GitHub release assets only. podrunner pi
 
 `podvm pull ghcr.io/podutils/podvm:0.2.0-beta.N` and `docker pull --platform linux/arm64` of it give the binary of the asset of that release, byte for byte (`sha256sum` equal), and the notes name the digest.
 
-## Blocker
+## Done
 
-The form waits for the coordinator (PodUtils/podcrates) to confirm it for all projects, as PodUtils/podrunner#312 asks. Clears when podcrates names the form.
+Partial (2026-11-19): `image.yml`, `images/podvm/Dockerfile` and the job `image` of `release.yml` are on `main`. Remaining: the dry run and the push of `v0.2.0-beta.35` by a dispatch of `image.yml`, and the first release with the job.

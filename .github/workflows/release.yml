@@ -17,8 +17,9 @@ name: release
 # podvm-verify requires `nightly.yml@refs/tags/TAG`. The dispatch on the tag
 # keeps that identity, and podvm-publish finds the run by its head branch.
 #
-# This run ends green only when the nightly run ends green and the release
-# has each binary of the matrix with its hash and its signature bundle.
+# This run ends green only when the nightly run ends green, the release
+# has each binary of the matrix with its hash and its signature bundle, and
+# the job `image` pushed and attested the image on ghcr.io (image.yml).
 
 on:
   workflow_dispatch:
@@ -173,3 +174,18 @@ jobs:
           done
           [ "$missing" = 0 ]
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json body --jq .body
+
+  # TODO/cli.md T-1992 (the owner's ruling "ghcr.io"): the binaries of the
+  # release as an OCI image on ghcr.io/podutils/podvm, attested, with each
+  # digest in the release notes (image.yml), after the check of the assets.
+  image:
+    needs: release
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/image.yml
+    with:
+      tag: v${{ inputs.version }}
+      push: true
