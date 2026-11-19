@@ -89,6 +89,8 @@ pub struct Vol {
     pub fd: AtomicI64,
     /// A `:ro` volume of `PODVM_RO` (TODO/enter.md T-1901).
     pub ro: core::sync::atomic::AtomicBool,
+    /// A volume of one file, not a directory (TODO/cli.md T-2001, OP-02).
+    pub file: core::sync::atomic::AtomicBool,
 }
 
 #[allow(clippy::declare_interior_mutable_const)]
@@ -97,6 +99,7 @@ const NO_VOL: Vol = Vol {
     host: Fixed::new(),
     fd: AtomicI64::new(-1),
     ro: core::sync::atomic::AtomicBool::new(false),
+    file: core::sync::atomic::AtomicBool::new(false),
 };
 pub static VOLS: [Vol; MAX_VOLS] = [NO_VOL; MAX_VOLS];
 pub static NVOLS: AtomicUsize = AtomicUsize::new(0);

@@ -92,6 +92,9 @@ fn or_err<T>(r: Result<T, i64>, f: impl FnOnce(T) -> i64) -> i64 {
 
 /// A call on the parent and the name: `n(pfd, name, a, b, c)`.
 fn on_parent(n: i64, dirfd: i64, p: i64, a: i64, b: i64, c: i64) -> i64 {
+    if n == nr::UNLINKAT && arg(p).is_ok_and(|path| path::is_file_volume(dirfd, path)) {
+        return -sys::EBUSY; // TODO/cli.md T-2001: a volume of one file
+    }
     let mut name = [0u8; 256];
     or_err(split(dirfd, p, &mut name), |(par, np)| {
         // SAFETY: the name and the payload's arguments live for the call.
@@ -322,6 +325,12 @@ fn two(n: i64, od: i64, op: i64, nd: i64, np: i64, flags: i64) -> i64 {
             // SAFETY: the names and the proc path live for the call.
             unsafe { sc6(n, AT_FDCWD, pp, b.fd, bn, flags, 0) }
         });
+    }
+    if n == nr::RENAMEAT2
+        && (arg(op).is_ok_and(|path| path::is_file_volume(od, path))
+            || arg(np).is_ok_and(|path| path::is_file_volume(nd, path)))
+    {
+        return -sys::EBUSY; // TODO/cli.md T-2001: a volume of one file
     }
     let a = match split(od, op, &mut name_a) {
         Ok(v) => v,

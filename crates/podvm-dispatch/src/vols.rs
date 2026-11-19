@@ -96,13 +96,8 @@ pub(crate) fn volumes(envp: &[OsString]) -> Result<(), String> {
                     .map_err(|e| format!("the volume {}: {e}", String::from_utf8_lossy(pair)))?;
                 let mut z = host.as_os_str().as_bytes().to_vec();
                 z.push(0);
-                let fd = sys::openat2(
-                    sys::AT_FDCWD,
-                    &z,
-                    sys::O_PATH | sys::O_DIRECTORY | sys::O_CLOEXEC,
-                    0,
-                    0,
-                );
+                // TODO/cli.md T-2001 (OP-02): a volume of one file too.
+                let fd = sys::openat2(sys::AT_FDCWD, &z, sys::O_PATH | sys::O_CLOEXEC, 0, 0);
                 (fd, z)
             }
         };
@@ -110,11 +105,20 @@ pub(crate) fn volumes(envp: &[OsString]) -> Result<(), String> {
         // TODO/image.md T-1774: podvm maps a shimmed device of the tree to
         // the host's device for the loader. This rung serves directory
         // volumes only, so the pair stays out and the tree's node serves.
-        if fd == -20 && guest == &pair[cut + 1..] && guest.starts_with(b"/dev/") {
-            continue;
-        }
         if fd < 0 {
             return Err(format!("the volume {}: errno {}", host.display(), -fd));
+        }
+        let kind = mode_of(fd) & S_IFMT;
+        if kind != S_IFDIR && guest == &pair[cut + 1..] && guest.starts_with(b"/dev/") {
+            sys::close(fd);
+            continue;
+        }
+        if kind != S_IFDIR && kind != S_IFREG {
+            sys::close(fd);
+            return Err(format!(
+                "the volume {}: neither a directory nor a regular file",
+                host.display()
+            ));
         }
         // SAFETY: fcntl and close read no memory.
         let high = unsafe { sc(nr::FCNTL, fd, 1030, 1001) };
@@ -128,6 +132,7 @@ pub(crate) fn volumes(envp: &[OsString]) -> Result<(), String> {
         v.guest.set(guest.strip_suffix(b"/").unwrap_or(guest));
         v.host.set(&z[..z.len() - 1]);
         v.fd.store(fd, Ordering::Relaxed);
+        v.file.store(kind == S_IFREG, Ordering::Relaxed);
         n += 1;
     }
     state::NVOLS.store(n, Ordering::Release);
@@ -147,6 +152,20 @@ pub(crate) fn volumes(envp: &[OsString]) -> Result<(), String> {
         return Err("PODVM_HOSTNAME is empty or longer than 64 bytes".into());
     }
     Ok(())
+}
+
+const S_IFMT: u32 = 0o170000;
+const S_IFDIR: u32 = 0o040000;
+const S_IFREG: u32 = 0o100000;
+
+/// `st_mode` of `fd`, by `fstat`; 0 where it fails.
+fn mode_of(fd: i64) -> u32 {
+    let mut st = [0u8; 144];
+    // SAFETY: fstat writes one `struct stat` of 144 bytes on x86_64.
+    if unsafe { sc(nr::FSTAT, fd, st.as_mut_ptr() as i64, 0) } != 0 {
+        return 0;
+    }
+    u32::from_ne_bytes([st[24], st[25], st[26], st[27]])
 }
 
 #[cfg(test)]

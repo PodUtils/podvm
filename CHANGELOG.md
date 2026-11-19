@@ -8,6 +8,15 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- On the syscall tier, a `-v` of one file works: the path is the file,
+  `:ro` holds, a path under it is ENOTDIR, and `rm` or `mv` of it is
+  EBUSY, as for a bound file (T-2001, OP-02 of the fifth outside pass).
+- On the incus tier, `--podvm-init=image` gives the instance an isolated
+  map of 231,072 ids, `/dev/fuse` and an empty machine-id for the hosted
+  snapshot (T-1996), and the image goes to incusd through a pipe, with no
+  tarball file in the store (T-1997, PodUtils/podrunner#316).
+- podvm takes podcrates `v0.75.0`.
+
 ## 0.2.0-beta.36 (2026-11-19)
 
 ### Known gaps: what the checks of 0.2.0-beta.36 prove, and what stays open, 2026-11-19

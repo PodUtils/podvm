@@ -21,6 +21,7 @@ pub const RESOLVE_IN_ROOT: u64 = 0x10;
 pub const RESOLVE_NO_SYMLINKS: u64 = 0x04;
 pub const RESOLVE_BENEATH: u64 = 0x08;
 
+pub const ENOTDIR: i64 = 20;
 pub const ENOENT: i64 = 2;
 pub const EBADF: i64 = 9;
 pub const EFAULT: i64 = 14;

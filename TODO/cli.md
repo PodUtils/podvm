@@ -6384,7 +6384,7 @@ The form of call C789 of podcrates (PodUtils/podcrates#236, COORD-142), which po
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -6405,3 +6405,8 @@ Work each by its class with T-1989: OP-02 and OP-03 with the volumes and the exe
 ## Prove
 
 As uid 1000: `podvm run --rm --podvm-tier=syscall -v FILE:/f IMAGE cat /f` prints the file or one line that names the limit (OP-02); `podvm run --rm --podvm-tier=syscall node:22-slim npm -v` prints the version (OP-03); each other finding has a test of its class.
+
+## Done
+
+Partial (2026-11-19): OP-02 is fixed. On the syscall tier a `-v` of one file is a volume of one file (`vols.rs` opens it with no `O_DIRECTORY` and marks it `file`): its path reopens the file through `/proc/self/fd/N` (`path::in_file_volume`), a call on its parent reaches the host file in its host directory (`path::parent`), a path under it is ENOTDIR, and an unlink or a rename of it is EBUSY, as of a bound file. The dispatch test `a_volume_of_one_file_is_the_file` passes. As uid 1000 on the tier with `alpine:3.20`: `cat`, `stat`, `chmod`, `touch` and `>>` of the file work, `rm` and `mv` give "Resource busy", `:ro` refuses a write, and a CA bundle of 121 certificates reads through `-v ca.crt:/ca.crt:ro`. Remaining: OP-01, OP-03, OP-05, OP-06, OP-07, and a listing of `/` that does not name a volume whose guest path the image lacks (P3).
+

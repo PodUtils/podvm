@@ -93,6 +93,9 @@ pub fn base_of(guest: &[u8]) -> (i64, usize) {
 /// `openat2` of the guest path `buf[..n]` (a NUL at n) in the root or its
 /// volume, with `RESOLVE_IN_ROOT` at that directory.
 pub fn open_in(buf: &[u8], n: usize, flags: i64, mode: i64, resolve: u64) -> i64 {
+    if let Some(r) = in_file_volume(&buf[..n], flags, mode, resolve) {
+        return r;
+    }
     let (fd, at) = base_of(&buf[..n]);
     let rest = if at >= n { &b".\0"[..] } else { &buf[at..=n] };
     let r = sys::openat2(fd, rest, flags, mode, resolve | RESOLVE_IN_ROOT);
@@ -113,6 +116,34 @@ pub fn open_in(buf: &[u8], n: usize, flags: i64, mode: i64, resolve: u64) -> i64
         }
         _ => r,
     }
+}
+
+/// TODO/cli.md T-2001 (OP-02): a path of a volume of one file. The path
+/// itself reopens the file through `/proc/self/fd/N`: a scoped walk
+/// (`RESOLVE_IN_ROOT`) refuses a magic link, and the host path was made
+/// canonical, so the reopen follows no link of the payload; `O_NOFOLLOW`
+/// goes, or `lstat` would see the magic link. A path under the file is
+/// ENOTDIR, as under a file bound in a mount namespace. None elsewhere.
+fn in_file_volume(guest: &[u8], flags: i64, mode: i64, resolve: u64) -> Option<i64> {
+    let v = state::vols().iter().find(|v| {
+        let g = v.guest.get();
+        v.file.load(core::sync::atomic::Ordering::Relaxed)
+            && (guest == g
+                || (guest.len() > g.len() && guest.starts_with(g) && guest[g.len()] == b'/'))
+    })?;
+    if guest != v.guest.get() {
+        return Some(-sys::ENOTDIR);
+    }
+    let mut link = [0u8; 32];
+    let p = fd_link(v.fd.load(core::sync::atomic::Ordering::Relaxed), &mut link);
+    let scoped = RESOLVE_IN_ROOT | sys::RESOLVE_BENEATH;
+    Some(sys::openat2(
+        AT_FDCWD,
+        p,
+        flags & !sys::O_NOFOLLOW,
+        mode,
+        resolve & !scoped,
+    ))
 }
 
 /// The guest path of a host path into `out`: under a volume's host side
@@ -271,6 +302,41 @@ pub fn parent(t: Target, buf: &mut [u8; PATH_MAX], name: &mut [u8; 256]) -> Resu
     // path names the volume, also where the image has no such name: its
     // parent is the volume itself, as for `.`.
     let whole = &buf[..end];
+    // TODO/cli.md T-2001 (OP-02): a volume of one file is its host file in
+    // its host directory, so a call on the parent and the name (`statx`
+    // with no follow, `fchmodat`, `utimensat`) reaches the file.
+    if in_root
+        && let Some(v) = state::vols()
+            .iter()
+            .find(|v| v.file.load(core::sync::atomic::Ordering::Relaxed) && v.guest.get() == whole)
+    {
+        let host = v.host.get();
+        let cut = host.iter().rposition(|&c| c == b'/').unwrap_or(0);
+        let base = &host[cut + 1..];
+        if base.is_empty() || base.len() >= name.len() {
+            return Err(-sys::ENAMETOOLONG);
+        }
+        name[..base.len()].copy_from_slice(base);
+        name[base.len()] = 0;
+        let mut dir = [0u8; PATH_MAX];
+        let dlen = if cut == 0 { 1 } else { cut };
+        if dlen >= dir.len() {
+            return Err(-sys::ENAMETOOLONG);
+        }
+        dir[..dlen].copy_from_slice(&host[..dlen]);
+        let fd = sys::openat2(
+            AT_FDCWD,
+            &dir[..=dlen],
+            O_PATH | O_CLOEXEC | sys::O_DIRECTORY,
+            0,
+            0,
+        );
+        return if fd < 0 {
+            Err(fd)
+        } else {
+            Ok(Parent { fd, owned: true })
+        };
+    }
     let volume = in_root && state::vols().iter().any(|v| v.guest.get() == whole);
     if last.is_empty() || last == b"." || last == b".." || volume {
         name[0] = b'.';
@@ -300,4 +366,30 @@ pub fn parent(t: Target, buf: &mut [u8; PATH_MAX], name: &mut [u8; 256]) -> Resu
     } else {
         Ok(Parent { fd, owned: true })
     }
+}
+
+/// Whether `(dirfd, path)` names a volume of one file: an unlink or a
+/// rename of it is EBUSY, as of a file bound in a mount namespace
+/// (TODO/cli.md T-2001).
+pub fn is_file_volume(dirfd: i64, path: &[u8]) -> bool {
+    if !state::vols()
+        .iter()
+        .any(|v| v.file.load(core::sync::atomic::Ordering::Relaxed))
+    {
+        return false;
+    }
+    let Some(mut g) = crate::pool::Buf::get() else {
+        return false;
+    };
+    let buf = g.buf();
+    let Ok(Target::Root(n)) = target(dirfd, path, buf) else {
+        return false;
+    };
+    let mut end = n;
+    while end > 1 && buf[end - 1] == b'/' {
+        end -= 1;
+    }
+    state::vols()
+        .iter()
+        .any(|v| v.file.load(core::sync::atomic::Ordering::Relaxed) && v.guest.get() == &buf[..end])
 }

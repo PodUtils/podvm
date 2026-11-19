@@ -425,3 +425,36 @@ fn a_signal_that_stops_a_call_runs_on_the_alternate_stack_of_the_payload() {
     let Some(r) = root("sigcall") else { return };
     assert_eq!(probe(&r, &["sig-in-call"]).0, "sig on-alt off 0");
 }
+
+/// OP-02 of the fifth outside pass (TODO/cli.md T-2001): a volume of one
+/// file. Its path is the file to open(2) and stat(2); a path under it is
+/// ENOTDIR, as under a file bound in a mount namespace.
+#[test]
+fn a_volume_of_one_file_is_the_file() {
+    let Some(r) = root("volfile") else { return };
+    let host = r.0.with_extension("txt");
+    std::fs::write(&host, b"one file").unwrap();
+    for (args, want) in [
+        (&["cat", "/f.txt"][..], "one file"),
+        (&["kind", "/f.txt"][..], "other"),
+        (&["cat", "/f.txt/x"][..], "ERR Not a directory"),
+    ] {
+        let out = Command::new(env!("CARGO_BIN_EXE_podvm-dispatch-run"))
+            .env("PODVM_MAPS", format!("/f.txt:{}", host.display()))
+            .env_remove(podvm_dispatch::TIER_VAR)
+            .arg(&r.0)
+            .arg("/bin/probe")
+            .arg("probe")
+            .args(args)
+            .current_dir(&r.0)
+            .output()
+            .unwrap();
+        let text = String::from_utf8_lossy(&out.stdout).trim_end().to_string();
+        assert!(
+            text.starts_with(want),
+            "{args:?}: {text:?} {:?}",
+            out.status
+        );
+    }
+    let _ = std::fs::remove_file(&host);
+}

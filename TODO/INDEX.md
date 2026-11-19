@@ -663,11 +663,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1998](machine.md) | P1 | L | none | machine | open | On the incus tier, an OCI image with a kernel runs as a virtual machine |
 | [T-1999](machine.md) | P1 | M | none | machine | open | The `security.capability` xattrs of an image stay on the incus tier and the machine tier |
 | [T-2000](interpose.md) | P1 | S | none | interpose | done | `apt-get install` fails on the userland rung: dpkg's `tar` has no ownership memo |
-| [T-2001](cli.md) | P2 | M | none | cli | open | The faults of the fifth outside pass (2026-11-19, the gate of beta.36) |
+| [T-2001](cli.md) | P2 | M | none | cli | partial | The faults of the fifth outside pass (2026-11-19, the gate of beta.36) |
 
 ## Counts
 
-598 entries: 26 open, 32 partial, 3 blocked, 537 done.
+598 entries: 25 open, 33 partial, 3 blocked, 537 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -678,9 +678,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 4 | 15 | 0 | 243 | 262 |
-| P2 | 17 | 13 | 2 | 177 | 209 |
+| P2 | 16 | 14 | 2 | 177 | 209 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
-| **All** | 26 | 32 | 3 | 537 | 598 |
+| **All** | 25 | 33 | 3 | 537 | 598 |
 
 ## Work order
 
