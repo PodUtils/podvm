@@ -1,6 +1,6 @@
 # Handoff
 
-The state on 2026-11-19, 06:15 (UTC). `main` is at the commit that
+The state on 2026-11-19, 07:30 (UTC). `main` is at the commit that
 changes this file. `0.2.0-beta.36` is the last release (release run
 44466195422 on `94045a3`; the gate 44461846375, `workloads.yml`
 44457544162, `arm.yml` 44461850154, the nightly trial 44461846698, the
@@ -138,6 +138,13 @@ and `docs/decisions.md`. Remove this file when each step below is done.
   `PODVM_MEMO_PATH`), fixed; the P2 and P3 findings are in T-2001 and in
   "Known gaps" of beta.36.
 * Released `0.2.0-beta.36`; #593, #596 and #598 name the tag.
+* After beta.36: T-1996 partial (231,072 ids, `/dev/fuse`, an empty
+  machine-id with `--podvm-init=image`; clause 20 of experiment 434
+  passes; rootless podman is podrunner's measure, #599). T-1997 partial
+  (the tarball goes to incusd through a pipe; experiment 434 passes; the
+  peak of the disk use of a large import is not measured yet). podcrates
+  `v0.75.0` taken (`f3beec1`, COORD-204, #600, closed). The gate on
+  `5971b00` passed.
 
 ## Next steps, in order
 
@@ -145,9 +152,12 @@ and `docs/decisions.md`. Remove this file when each step below is done.
    its output to the event lines: a network retry prints a traceback).
 2. podrunner first: watch #593 (T-1990 measured with beta.36; the hang of
    T-1991, which T-1995 may have fixed), #596, #598 and #599. Then the
-   hosted snapshot in the order of #599: T-1996, T-1999 (it waits for the
-   xattrs of `pod-extract`, podrunner's COORD-107 to podcrates), T-1997,
-   the steps of T-1994, T-1998.
+   hosted snapshot in the order of #599: T-1997 (measure the peak of the
+   disk use of an import of an image of 1 GB or more: the store, incusd's
+   `images` and the pool; incusd keeps the image beside the volume, so the
+   bound of its Prove may need that copy), T-1999 (it waits for podcrates
+   T-957, the xattrs of `pod-extract`), the steps of T-1994, T-1998.
+   T-1996 waits for podrunner's measure of rootless podman.
 3. T-2001 (the P2 findings of the fifth outside pass: a `-v` of one file
    and `npm` on the syscall tier, the rung of `PODVM_USERNS=0` with no
    volume).
