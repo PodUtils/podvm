@@ -149,7 +149,8 @@ mount -t tmpfs tmpfs /run && mkdir -p /run/incus
 mount --bind \$base/lib /var/lib/incus
 mount --bind \$base/log /var/log/incus
 mount --bind \$base/cache /var/cache/incus
-printf 'root:1000000:65536\n' >\$base/subid
+# T-1996: room for the isolated maps of 231,072 ids of --podvm-init=image.
+printf 'root:1000000:10000000\n' >\$base/subid
 mount --bind \$base/subid /etc/subuid
 mount --bind \$base/subid /etc/subgid
 export INCUS_DIR=/var/lib/incus

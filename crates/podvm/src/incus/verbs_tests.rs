@@ -121,4 +121,7 @@ fn the_init_of_the_image_gets_the_ids_and_the_fuse_of_the_snapshot() {
     assert_eq!(name, "podvm-fuse");
     assert_eq!(d.get("type").map(String::as_str), Some("unix-char"));
     assert_eq!(d.get("path").map(String::as_str), Some("/dev/fuse"));
+    let e = "Failed initializing instance: Not enough uid/gid available".to_string();
+    assert!(crate::incus::run::ids_hint(e.clone(), true).contains("/etc/subuid"));
+    assert_eq!(crate::incus::run::ids_hint(e.clone(), false), e);
 }

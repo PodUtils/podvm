@@ -150,6 +150,20 @@ pub fn snapshot_keys(init_image: bool) -> Vec<(&'static str, String)> {
     ]
 }
 
+/// An error of incusd that names too few ids, with what `--podvm-init=image`
+/// needs and where the range lives (T-1996).
+pub fn ids_hint(e: String, init_image: bool) -> String {
+    if init_image && e.contains("Not enough uid/gid") {
+        format!(
+            "{e}: --podvm-init=image maps {SNAPSHOT_IDS} ids for the hosted snapshot \
+             (TODO/machine.md T-1996), and incusd has fewer free: give the user of \
+             incusd a larger range in /etc/subuid and /etc/subgid"
+        )
+    } else {
+        e
+    }
+}
+
 /// The device `/dev/fuse` of an instance with `--podvm-init=image`
 /// (T-1996): `fuse-overlayfs` and `sshfs` of the snapshot need it.
 pub fn fuse_device() -> (String, BTreeMap<String, String>) {
