@@ -25,6 +25,13 @@ unsafe extern "C" {
     fn chdir(path: *const std::ffi::c_char) -> i32;
 }
 
+/// Drop each supplementary group of this process; a refusal changes
+/// nothing.
+pub fn drop_groups() {
+    // SAFETY: a count of 0 reads no list.
+    unsafe { setgroups(0, std::ptr::null()) };
+}
+
 /// The namespaces of the init, each as an open descriptor, in join order.
 pub struct Namespaces(Vec<OwnedFd>);
 
@@ -64,10 +71,16 @@ impl Namespaces {
                 for fd in &fds {
                     check(setns(*fd, 0))?;
                 }
-                if let Some((uid, gid)) = ids {
-                    check(setgroups(1, &gid))?;
-                    check(setresgid(gid, gid, gid))?;
-                    check(setresuid(uid, uid, uid))?;
+                match ids {
+                    Some((uid, gid)) => {
+                        check(setgroups(1, &gid))?;
+                        check(setresgid(gid, gid, gid))?;
+                        check(setresuid(uid, uid, uid))?;
+                    }
+                    // Root of the image has no group of the caller: on the
+                    // namespace rung they show as `nobody`. A map that
+                    // denies setgroups keeps them.
+                    None => drop_groups(),
                 }
                 check(chdir(cwd.as_ptr()))
             });

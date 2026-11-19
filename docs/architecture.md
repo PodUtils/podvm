@@ -98,6 +98,17 @@ The init mounts cgroup2 and brings `lo` up. `--podvm-net none`,
 `--podvm-channel`, `--podvm-sealed` and `--podvm-engine` change the guest
 (T-1751, T-1780); [the limits](limits.md#guests) state each one.
 
+`run --podvm-init=image` boots `/sbin/init` of the image as PID 1 of a
+PID namespace and runs the command in its namespaces
+(`crates/podvm/src/initns/`, the internal verb `guest-init`, T-2002). The
+same supervisor runs in the user namespace of a foreground run on the
+namespace rung, and as the command of `/podvm-init` in a guest of the
+machine tier. `initns::decide` selects the place before the user
+namespace opens: the namespace rung needs the subordinate id range and a
+delegated cgroup2 subtree, which the user manager of systemd can give
+(`initns/scope.rs`, T-2004). [The limits](limits.md#the-init-of-an-image)
+state what each place gives.
+
 Three commands boot a guest now:
 
 | Command | Guest |

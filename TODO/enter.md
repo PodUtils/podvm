@@ -5235,9 +5235,9 @@ Remaining:
 1. A run on a host with `/dev/kvm` and a real delegated subtree (`kvm.yml`); the stand-in of clause 1 is a directory that root made.
 2. `run -d`, `create` and `exec` with the init on the namespace rung; a caller that is uid 0 of the host takes the machine tier.
 3. The pty of `-t` belongs to the devpts of the host: `tty` in the command gives "No such device".
-4. The command gets the primary group of `--user` only, and no supplementary group of the image.
+4. The command of `--user NAME` gets the primary group only, and no supplementary group that the image gives the user; the init and a command of root get no group of the caller.
 5. A volume under `--podvm-volume-base` at or under `/tmp` binds by its path, not by the held descriptor.
-6. An image whose init is not systemd (busybox init, OpenRC): the command starts at once, as no state can be asked; not measured.
+6. An image whose init is not systemd: the command starts at once, as no state can be asked. Measured with `public.ecr.aws/docker/library/alpine:3.20` (the digest of the matrix, from `mirror.gcr.io`): busybox `init` is PID 1, and the run gives the exit code 9 of its command. `mirror.gcr.io/library/debian:12` has no `/sbin/init`: exit 125 and "the image has no /sbin/init: it carries no init". OpenRC, runit and s6 are not measured.
 7. T-2003 (a program with a library in a directory of its RUNPATH on the userland rung), T-2004 (a delegated subtree from the user manager of systemd: partial, experiment 466) and T-2005 (the routes with no guest and no delegated cgroup).
 
 # T-2003: On the userland rung, a program with a library in a directory of its RUNPATH does not load (`systemctl`)

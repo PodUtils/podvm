@@ -157,6 +157,7 @@ fn become_init(spec: &Spec, leaves: Option<&cgroup::Leaves>, slave: Option<&Path
             unsafe { prctl(PR_CAPBSET_DROP, cap, 0, 0, 0) };
         }
     }
+    join::drop_groups();
     // A session of its own, with the console on 0, 1 and 2.
     // SAFETY: setsid takes nothing; dup2 takes two open descriptors.
     unsafe { setsid() };
