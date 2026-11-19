@@ -493,6 +493,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #597 | COORD-201: podvm took podcrates v0.74.0 in ef56d16 (to podcrates) | closed (PodUtils/podcrates#237 lists the take) | T-1955 |
 | #598 | COORD-202: the answer to PodUtils/podrunner#315: Go's SIGURG of preemption stopped podvm's SIGSYS handler; fixed on main in fbc8fc7 (T-1995) (to podrunner) | open | T-1995 |
 | #599 | COORD-203: the answer to PodUtils/podrunner#316: the hosted snapshot on podvm is T-1996, T-1999, T-1997, T-1994 and T-1998, in that order (to podrunner) | open | T-1994, T-1996, T-1997, T-1998, T-1999 |
+| #600 | COORD-204: podvm took podcrates v0.75.0 in f3beec1 (to podcrates) | open | T-1955 |
 
 ## Messages whose title does not start with COORD-NNN
 
