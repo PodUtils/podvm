@@ -490,4 +490,4 @@
 598 issue closed
 599 issue open
 600 issue closed
-601 issue open
+601 issue closed
