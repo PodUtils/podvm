@@ -7,7 +7,7 @@ start.
 
 ## State
 
-598 entries: 26 open, 33 partial, 3 blocked, 536 done.
+598 entries: 26 open, 32 partial, 3 blocked, 537 done.
 
 The state on 2026-11-19 (`docs/HANDOFF.md` has the detail):
 
@@ -98,7 +98,7 @@ status with `podvm-count` in the same commit as the work.
    T-1969, in the order the T-1964 remainder (a pool with a quota), the
    T-1969 remainder, then T-1968); #313 and #316 (the hosted snapshot)
    are T-1996, T-1999 (it waits for the xattrs of `pod-extract`,
-   podrunner's COORD-107 to podcrates), T-1997, the steps of T-1994, and
+   podrunner's COORD-107 to podcrates), the steps of T-1994, and
    T-1998; then the asks of
    githome and cfb for their CI, then the items below. A quality item
    that a podrunner unit meets counts as an ask of podrunner.

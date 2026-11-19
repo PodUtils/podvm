@@ -5639,7 +5639,7 @@ Partial (2026-11-19): with `--podvm-init=image` the instance takes `security.idm
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -5663,7 +5663,7 @@ Stream the unified tarball into the import of incusd (`POST /1.0/images` with th
 
 ## Done
 
-Partial (2026-11-19): `incus::run::ensure_image` writes the unified tarball into a pipe in a thread (`image::unified_tarball_to`), and the import of incusd reads it in chunks: no tarball file lies in the store. The incus unit tests pass, among them the run against a stand-in of incusd; experiment 434 on `b7314ce` (incus 6.0.0) gives "THE INCUS TIER RUNS" with each image imported through the pipe. Remaining: the measure of the peak of the disk use (incusd keeps the image in its `images` directory beside the volume of the pool, so the bound of the Prove may need a third copy of incusd's own).
+**Done (2026-11-19).** `incus::run::ensure_image` writes the unified tarball into a pipe in a thread (`image::unified_tarball_to`), and the import of incusd reads it in chunks: no tarball file lies in the store. The incus unit tests pass, among them the run against a stand-in of incusd. Experiment 434 on `18e5738` (incus 6.0.0) gives "THE INCUS TIER RUNS"; clause 21 with `mirror.gcr.io/library/golang:1.24-bookworm` (a tree of 850,228,783 bytes): the first run on the incus tier grows the disk use of the store and of incusd by 2,019,332,672 bytes (2.38 times the tree: incusd's image, its volume and its files), and no file stays in `store/incus`; a tarball file in the store would add the tree once more (about 3.4 times).
 
 # T-1998: On the incus tier, an OCI image with a kernel runs as a virtual machine
 
