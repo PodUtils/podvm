@@ -167,8 +167,10 @@ and `docs/decisions.md`. Remove this file when each step below is done.
   the route of a run with no tier is the namespace rung, then runsc, then
   the machine tier (call C26). The pinned gVisor of experiment 436 is not
   on PATH: set `PODVM_RUNSC`. Open: T-2009 (podvm fetches runsc), T-2005
-  (User-Mode Linux in its seccomp mode for the userland rung: ask
-  podcrates before a kernel build), T-2008 (a saved state of the guest).
+  (User-Mode Linux in its seccomp mode for the userland rung: measured
+  by `sh experiments/467-uml-seccomp.sh`, 15 s for a run with `ptrace`
+  and each namespace denied; ask podcrates before a kernel that podvm
+  carries), T-2008 (a saved state of the guest).
 
 ## Next steps, in order
 

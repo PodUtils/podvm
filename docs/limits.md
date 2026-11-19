@@ -354,8 +354,9 @@ C26). Experiment 465 measures each line below as uid 1000.
 - The userland rung itself boots no init: its PID 1 is the PID 1 of the
   host, `setresuid` to another uid gives EPERM (T-0711), and the kernel
   gives a PID namespace only with a user namespace or CAP_SYS_ADMIN. Its
-  route is the guest; T-2005 plans User-Mode Linux in its seccomp mode
-  as the route with no emulator.
+  route is the guest. Experiment 467 measured User-Mode Linux in its
+  seccomp mode on a host that denies `ptrace` and each namespace: 15 s
+  for a run with systemd as PID 1. T-2005 plans it as a tier.
 - `run -d`, `create` and `exec` with the init hold on the incus tier only
   (T-1993). On the namespace rung, the command gets the primary group of
   `--user` and no supplementary group, and `tty` in a command of `-t`

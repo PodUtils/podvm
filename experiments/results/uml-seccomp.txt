@@ -1,0 +1,21 @@
+date      2026-11-19T16:53:43Z
+user      ubuntu (uid 1000)
+host      Linux 6.18.44-fc-v653, 4 CPUs
+clause 1  the kernel: 7.3.5, 8583024 bytes stripped, built in 207 s
+clause 2  under the launcher: unshare -U gives exit 1; seccomp=off gives "Checking that ptrace can change system call numbers...ptrace: Operation not perm"
+clause 3  the builder in 27 s: BUILD done 25.97 s; mount 0:0 4755; used 580 MiB
+clause 4  the run in 15 s under the launcher (seccomp=on ncpus=4)
+    UMLJOB up at 9.46 s, 4 CPUs, Startup finished in 2.252s (kernel) + 7.138s (userspace) = 9.390s 
+    CHECK pid1 systemd
+    CHECK state degraded
+    CHECK uid_map  0 0 4294967295 
+    CHECK unit-mysql active=active mainpid-uid=961 file-owner=961 want=961
+    CHECK unit-postgres active=active mainpid-uid=962 file-owner=962 want=962
+    CHECK unit-www-data active=active mainpid-uid=33 file-owner=33 want=33
+    CHECK unit-nobody active=active mainpid-uid=65534 file-owner=65534 want=65534
+    CHECK stop inactive
+    CHECK failed-units proc-sys-fs-binfmt_misc.mount 
+    VERDICT pass
+    UMLJOB exit 7
+clause 5  the base: b256a476900058a9 before, b256a476900058a9 after; the copy-on-write file: 19 MiB; processes that stay: none
+UML IN SECCOMP MODE BOOTS THE INIT WITH NO PTRACE AND NO NAMESPACE
