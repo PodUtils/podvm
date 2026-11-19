@@ -335,7 +335,8 @@ C26). Experiment 465 measures each line below as uid 1000.
   The guest has the limits of "Guests" above: the root is an initramfs
   (T-1994 keeps the root on a disk), a volume is a 9p mount, and the
   network is QEMU's user-mode network. Under TCG on the cloud host a run
-  of `true` takes 24 s with four vCPUs; the namespace rung takes 3 s.
+  of `true` takes 24 s to 27 s with four vCPUs, and QEMU holds 2.6 GB of
+  memory for an image of 584 MB; the namespace rung takes 3 s.
 - The userland rung itself boots no init: its PID 1 is the PID 1 of the
   host, `setresuid` to another uid gives EPERM (T-0711), and the kernel
   gives a PID namespace only with a user namespace or CAP_SYS_ADMIN.
