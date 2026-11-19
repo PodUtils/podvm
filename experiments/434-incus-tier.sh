@@ -77,6 +77,10 @@
 #      same systemd; the instance stops when its command ends, and
 #      `inspect` gives its exit code; the flag off the incus tier refuses
 #      by name (125).
+#  20. The hosted snapshot (T-1996, PodUtils/podrunner#316 ask 1): with
+#      `--podvm-init=image` an instance maps at least 231,072 ids, has
+#      `/dev/fuse`, and writes a machine-id of its own: two instances of
+#      one image have two.
 #
 # Exit: 0 every clause matched, 1 a clause disagreed, 2 the lane could not
 # run (not root, no user namespaces, no package).
@@ -443,6 +447,29 @@ c19 "^  logs     state (running|degraded) pid1 systemd " "the command did not ru
 c19 "^  logs     .*unit started " "systemctl start of a unit of the image did not work"
 c19 "^  exitcode 7$" "inspect did not give the exit code of the command"
 c19 "^  native   rc 125: .*--podvm-init=image needs --podvm-tier=incus" "the flag off the incus tier did not refuse by name"
+
+# ---- clause 20 ----------------------------------------------------------
+echo ""; echo "== 20. the hosted snapshot: ids, /dev/fuse, a machine-id of each" >>"$REPORT"
+{
+for n in sna434 snb434; do
+  echo "  run -d   $(P run -d --name $n --podvm-tier=incus --podvm-init=image "$INIT_IMG" sh -c 'echo "ids $(awk "{s+=\$3} END {print s}" /proc/self/uid_map)"; test -c /dev/fuse && exec 3<>/dev/fuse && echo "fuse open"; echo "mid $(cat /etc/machine-id)"; sleep 5' </dev/null 2>&1 | tail -1)"
+done
+for n in sna434 snb434; do
+  i=0; while [ $i -lt 30 ]; do st=$(RI list --format csv -c ns 2>/dev/null | sed -n "s/^$n,//p"); [ "$st" = STOPPED ] && break; i=$((i+1)); sleep 2; done
+  echo "  logs $n $(P logs --podvm-tier=incus $n 2>&1 | tr '\n' ' ')"
+  P rm -f --podvm-tier=incus $n >/dev/null 2>&1
+done
+} >"$WORK/c20.txt" 2>&1
+cat "$WORK/c20.txt" >>"$REPORT"
+c20() { grep -Eq "$1" "$WORK/c20.txt" || { note "20: $2"; fail=1; }; }
+c20 "^  run -d   sna434$" "run -d of the first instance did not start"
+ids=$(sed -n 's/^  logs sna434 ids \([0-9]*\).*/\1/p' "$WORK/c20.txt")
+[ "${ids:-0}" -ge 231072 ] || { note "20: the instance maps ${ids:-no} ids, fewer than 231,072"; fail=1; }
+c20 "^  logs sna434 .*fuse open" "/dev/fuse did not open in the instance"
+a=$(sed -n 's/^  logs sna434 .*mid \([0-9a-f]\{32\}\).*/\1/p' "$WORK/c20.txt")
+b=$(sed -n 's/^  logs snb434 .*mid \([0-9a-f]\{32\}\).*/\1/p' "$WORK/c20.txt")
+echo "  machine-ids ${a:--} ${b:--}" >>"$REPORT"
+{ [ -n "$a" ] && [ -n "$b" ] && [ "$a" != "$b" ]; } || { note "20: the two instances have no machine-ids of their own"; fail=1; }
 
 # ---- clause 9 -----------------------------------------------------------
 left_i=$(RI list --format csv -c n 2>&1 | grep -c .)

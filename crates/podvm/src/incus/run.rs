@@ -131,6 +131,34 @@ pub fn engine_keys(engine: bool) -> Vec<(&'static str, String)> {
     .collect()
 }
 
+/// PodUtils/podrunner#316 ask 1 (TODO/machine.md T-1996): the ids of an
+/// instance with the init of the image. The hosted snapshot gives `runner`
+/// the subordinate ids `165536:65536`, so rootless podman needs ids up to
+/// 231071: an isolated map of this size, from the range of incusd.
+pub const SNAPSHOT_IDS: u32 = 231_072;
+// runner's subordinate ids `165536:65536` fit in the map.
+const _: () = assert!(SNAPSHOT_IDS >= 165_536 + 65_536);
+
+/// The keys of an instance with `--podvm-init=image` (T-1996).
+pub fn snapshot_keys(init_image: bool) -> Vec<(&'static str, String)> {
+    if !init_image {
+        return Vec::new();
+    }
+    vec![
+        ("security.idmap.isolated", "true".to_string()),
+        ("security.idmap.size", SNAPSHOT_IDS.to_string()),
+    ]
+}
+
+/// The device `/dev/fuse` of an instance with `--podvm-init=image`
+/// (T-1996): `fuse-overlayfs` and `sshfs` of the snapshot need it.
+pub fn fuse_device() -> (String, BTreeMap<String, String>) {
+    let mut d = BTreeMap::new();
+    d.insert("type".to_string(), "unix-char".to_string());
+    d.insert("path".to_string(), "/dev/fuse".to_string());
+    ("podvm-fuse".to_string(), d)
+}
+
 /// The devices of an instance of `job`: the volumes, the mask of the NIC
 /// and the channel.
 pub fn job_devices(job: &Job<'_>) -> pod_incus::Devices {

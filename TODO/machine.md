@@ -5606,7 +5606,7 @@ In three steps, each released alone: (1) a root on a disk image made once for ea
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -5627,6 +5627,10 @@ With `--podvm-init=image` on the incus tier: `security.idmap.size` of at least 2
 ## Prove
 
 Experiment 434, a new clause with `--podvm-init=image --podvm-engine` of an image with systemd, podman and fuse-overlayfs: `cat /proc/self/uid_map` in the instance gives a range of at least 231,072; as a user with the subordinate ids `165536:65536`, `podman run --rm` of a small image passes; `fuse-overlayfs` mounts; two instances of the same image have two machine-ids.
+
+## Done
+
+Partial (2026-11-19): with `--podvm-init=image` the instance takes `security.idmap.isolated` and `security.idmap.size` 231072 (`incus::run::snapshot_keys`), the device `podvm-fuse` (`unix-char` `/dev/fuse`), and an empty `/etc/machine-id` before its start (`incus::verbs::detached`). The unit test `the_init_of_the_image_gets_the_ids_and_the_fuse_of_the_snapshot` passes. Remaining: clause 20 of experiment 434 (the ids, `/dev/fuse`, two machine-ids), and rootless `podman run` and `fuse-overlayfs` of a user with `165536:65536`, which ubi-init does not carry: podrunner's snapshot measures them.
 
 # T-1997: On the incus tier, the import of a large image keeps no third copy
 

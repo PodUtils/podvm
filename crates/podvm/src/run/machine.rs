@@ -426,6 +426,7 @@ pub(super) fn incus_tier(
             .iter()
             .map(|(_, k, v)| (*k, v.clone()))
             .chain(crate::incus::run::engine_keys(o.engine))
+            .chain(crate::incus::run::snapshot_keys(o.init_image)) // T-1996
             .collect(),
         // TODO/machine.md T-1722: create and run -d keep the instance.
         detach: (verb == "create" || o.detach).then(|| crate::incus::verbs::Detach {

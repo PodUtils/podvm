@@ -106,3 +106,19 @@ fn incus_verbs_discard_and_rm_name_what_stays() {
     assert_eq!(rows[0][4], "Up");
     let _ = std::fs::remove_dir_all(&d);
 }
+
+/// PodUtils/podrunner#316 ask 1 (TODO/machine.md T-1996): the init of the
+/// image gets an isolated map of 231,072 ids and `/dev/fuse`; podvm's own
+/// init gets neither.
+#[test]
+fn the_init_of_the_image_gets_the_ids_and_the_fuse_of_the_snapshot() {
+    use crate::incus::run::{fuse_device, snapshot_keys, SNAPSHOT_IDS};
+    assert!(snapshot_keys(false).is_empty());
+    let k = snapshot_keys(true);
+    assert!(k.contains(&("security.idmap.isolated", "true".to_string())));
+    assert!(k.contains(&("security.idmap.size", SNAPSHOT_IDS.to_string())));
+    let (name, d) = fuse_device();
+    assert_eq!(name, "podvm-fuse");
+    assert_eq!(d.get("type").map(String::as_str), Some("unix-char"));
+    assert_eq!(d.get("path").map(String::as_str), Some("/dev/fuse"));
+}

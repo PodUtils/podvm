@@ -128,6 +128,9 @@ pub(super) async fn detached(c: &Client, job: &Job<'_>, image: &str, d: &Detach)
     }
     if !d.init_image {
         new.config.insert("raw.lxc".into(), INIT.into());
+    } else {
+        let (k, v) = super::run::fuse_device(); // T-1996
+        new.devices.insert(k, v);
     }
     new.config.insert(LABEL.into(), "1".into());
     new.config.insert(IMAGE_KEY.into(), d.image.clone());
@@ -158,6 +161,16 @@ pub(super) async fn detached(c: &Client, job: &Job<'_>, image: &str, d: &Detach)
         if let Err(e) = c.put_file(&name, super::STDIN, w).await {
             let _ = c.delete_instance(&name).await;
             return fail(e.to_string());
+        }
+    }
+    // T-1996: an empty machine-id, so that systemd writes a new one in
+    // each instance of the same image (the snapshot ships it empty).
+    if d.init_image {
+        let mut w = FileWrite::file(Payload::bytes(Vec::new()));
+        (w.uid, w.gid, w.mode) = (Some(0), Some(0), Some(0o444));
+        if let Err(e) = c.put_file(&name, "/etc/machine-id", w).await {
+            let _ = c.delete_instance(&name).await;
+            return fail(format!("/etc/machine-id: {e}"));
         }
     }
     if let Err(e) = super::net::push_port(c, &name, job.channel.as_ref()).await {
