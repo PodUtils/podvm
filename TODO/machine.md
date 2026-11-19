@@ -5572,7 +5572,7 @@ Experiment 434 (incus 6.0.0, route A), a new clause: `run -d --podvm-tier=incus 
 
 # T-1994: On the machine tier, a root on a disk for each image and the init of the image
 
-**Source:** PodUtils/podrunner#313 (COORD-103 of podrunner), ask 2; the owner's ruling "GitHub-hosted parity" (2026-11-19)
+**Source:** PodUtils/podrunner#313 (COORD-103 of podrunner), ask 2; PodUtils/podrunner#316 (COORD-106), ask 2; the owner's ruling "GitHub-hosted parity" (2026-11-19)
 **Category:** machine
 **Milestone:** none
 **Priority:** P1
@@ -5589,7 +5589,7 @@ The root of a guest is an initramfs that must fit twice in the guest memory, and
 
 ## Approach
 
-In three steps, each released alone: (1) a root on a disk image made once for each image digest, with a copy-on-write overlay for each guest; (2) a switch to the init of the image (systemd), with a guest kernel that systemd accepts; (3) the exit status of the payload back to the host, by a unit of the image that ends the guest (`SuccessAction=exit-force`) and the status through the serial port or a file of the work mount.
+In three steps, each released alone: (1) a root on a disk image made once for each image digest, with a copy-on-write overlay for each guest; (2) a switch to the init of the image (systemd), with a guest kernel that systemd accepts; (3) the exit status of the payload back to the host, by a unit of the image that ends the guest (`SuccessAction=exit-force`) and the status through the serial port or a file of the work mount. A choice boots the kernel and the initrd of the image (`/boot/vmlinuz-KVER`, `/boot/initrd.img-KVER`, `root=LABEL=cloudimg-rootfs`) beside the Alpine kernel, with the 9p and vsock modules from `/usr/lib/modules` of the image, and passes nested KVM where the host has it (PodUtils/podrunner#316 ask 2).
 
 ## Decision
 
@@ -5598,3 +5598,119 @@ In three steps, each released alone: (1) a root on a disk image made once for ea
 ## Prove
 
 `kvm.yml`: `run --podvm-tier=machine --podvm-init=image` of an image with systemd boots from its disk image; `systemctl is-system-running` gives `running` or `degraded`; the exit code of the payload unit is the exit code of the run; a second run of the same digest reuses the disk image.
+
+# T-1996: On the incus tier, an instance of the hosted snapshot has 231,072 ids, `/dev/fuse` and a machine-id of its own
+
+**Source:** PodUtils/podrunner#316 (COORD-106 of podrunner, the owner's ruling "The hosted snapshot" of podrunner)
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+The snapshot of a GitHub-hosted runner gives the user `runner` the subordinate ids `165536:65536`, so rootless podman needs ids up to 231071; `fuse-overlayfs` and `sshfs` need `/dev/fuse`; the snapshot ships `/etc/machine-id` empty. An instance of the incus tier has the default id map of incusd (65,536 ids), no `/dev/fuse`, and the machine-id of the image.
+
+## Premise
+
+incus sizes the id map of an unprivileged instance with `security.idmap.size` (and `security.idmap.isolated`) from the range that incusd has; a `unix-char` device `/dev/fuse` is allowed in an unprivileged instance; systemd writes a new machine-id at boot where the file is empty. `--podvm-engine` gives `security.nesting` and the intercepts (T-1966).
+
+## Approach
+
+With `--podvm-init=image` on the incus tier: `security.idmap.size` of at least 231,072 (refused by name with 125 where incusd has a smaller range), a `unix-char` device `/dev/fuse`, and an empty `/etc/machine-id` in the root of the instance, so that systemd writes a new one at each instance. `--podvm-engine` stays the choice of nesting.
+
+## Decision
+
+-
+
+## Prove
+
+Experiment 434, a new clause with `--podvm-init=image --podvm-engine` of an image with systemd, podman and fuse-overlayfs: `cat /proc/self/uid_map` in the instance gives a range of at least 231,072; as a user with the subordinate ids `165536:65536`, `podman run --rm` of a small image passes; `fuse-overlayfs` mounts; two instances of the same image have two machine-ids.
+
+# T-1997: On the incus tier, the import of a large image keeps no third copy
+
+**Source:** PodUtils/podrunner#316 (COORD-106 of podrunner, the owner's ruling "The hosted snapshot" of podrunner)
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+An image of 55 to 60 GB (the hosted snapshot) is held four times on the incus tier: the layers in the store, the extracted tree, the unified tarball, and the pool of incusd.
+
+## Premise
+
+incusd imports a unified tarball by a stream of the API, and the store keeps the layers by digest. podvm can write the tarball into the stream from the extracted tree, or from the layers, with no file between.
+
+## Approach
+
+Stream the unified tarball into the import of incusd (`POST /1.0/images` with the body as a stream), from the extracted tree; no tarball file. Measure the peak disk use of the import against the size of the image, and remove the extracted tree after the import where the store can make it again.
+
+## Decision
+
+-
+
+## Prove
+
+`sh experiments/434-incus-tier.sh`, a new clause: the import of an image of at least 1 GB; the peak of the disk use of the store and the pool is at most 2.2 times the size of the image (the store and the pool), and the image runs.
+
+# T-1998: On the incus tier, an OCI image with a kernel runs as a virtual machine
+
+**Source:** PodUtils/podrunner#316 (COORD-106 of podrunner, the owner's ruling "The hosted snapshot" of podrunner)
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** L
+**Status:** open
+
+## Problem
+
+incus runs an OCI image only as a container (lxc/incus#1360). The hosted snapshot has its kernel and initrd in `/boot`, and podrunner's checks of the snapshot need `losetup -f` and a kernel of the image, which a container does not give.
+
+## Premise
+
+incusd runs a VM image (a qcow2 root with a GPT and an ESP, or a direct boot of a kernel) where `/dev/kvm` exists. The snapshot has `/boot/vmlinuz-KVER`, `/boot/initrd.img-KVER`, `/boot/efi`, and the root label `cloudimg-rootfs`.
+
+## Approach
+
+`--podvm-tier=incus --podvm-vm`: turn the image into a VM image of incus once for each digest (a qcow2 root with the label of the image, the ESP from `/boot/efi`, else a direct boot of the kernel and the initrd of the image), import it, and run it with `--podvm-init=image` as T-1993 runs a container. Refuse by name with 125 where incusd has no VM support.
+
+## Decision
+
+-
+
+## Prove
+
+`kvm.yml`, a new step with incus: `run -d --podvm-tier=incus --podvm-vm --podvm-init=image` of an image with a kernel boots it; `systemctl is-system-running` gives running or degraded; `losetup -f` prints a device; the exit code of the command is the exit code of the run; a second run of the same digest reuses the VM image.
+
+# T-1999: The `security.capability` xattrs of an image stay on the incus tier and the machine tier
+
+**Source:** PodUtils/podrunner#316 (COORD-106 of podrunner, the owner's ruling "The hosted snapshot" of podrunner)
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+Files of the hosted snapshot carry `security.capability` (`ping`, `mtr-packet`). The extract of podvm drops the PAX records `SCHILY.xattr.*`, so the sidecar, the unified tarball of the incus tier and the root of the machine tier have none, and `ping` as a user fails.
+
+## Premise
+
+An unprivileged incus instance keeps `security.capability` of its root (a v3 capability with the root id of the instance). The extract of podcrates (`pod-extract`) has the same gap: podrunner's COORD-107 asks podcrates for it.
+
+## Approach
+
+Take the xattrs from `pod-extract` when podcrates has them (a COORD issue to podcrates names the need); keep them in `.meta.jsonl`, write them as PAX records into the unified tarball, and set them in the root of the machine tier. A file system that refuses an xattr gives one line that names the file.
+
+## Decision
+
+-
+
+## Prove
+
+Experiment 434, a new clause: an image whose `/bin/ping` has `cap_net_raw+ep`; `getcap /bin/ping` in the instance prints it, and `ping -c1 127.0.0.1` as a user passes; `kvm.yml`: the same on the machine tier.

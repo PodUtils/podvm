@@ -658,10 +658,14 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1993](machine.md) | P1 | M | none | machine | done | On the incus tier, the init of the image (systemd) runs as PID 1 |
 | [T-1994](machine.md) | P1 | L | none | machine | open | On the machine tier, a root on a disk for each image and the init of the image |
 | [T-1995](enter.md) | P1 | S | none | enter | done | A Go program hangs on the userland rung at its first signal of preemption |
+| [T-1996](machine.md) | P1 | M | none | machine | open | On the incus tier, an instance of the hosted snapshot has 231,072 ids, `/dev/fuse` and a machine-id of its own |
+| [T-1997](machine.md) | P1 | M | none | machine | open | On the incus tier, the import of a large image keeps no third copy |
+| [T-1998](machine.md) | P1 | L | none | machine | open | On the incus tier, an OCI image with a kernel runs as a virtual machine |
+| [T-1999](machine.md) | P1 | M | none | machine | open | The `security.capability` xattrs of an image stay on the incus tier and the machine tier |
 
 ## Counts
 
-592 entries: 23 open, 31 partial, 3 blocked, 535 done.
+596 entries: 27 open, 31 partial, 3 blocked, 535 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -671,10 +675,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 2 | 14 | 0 | 241 | 257 |
+| P1 | 6 | 14 | 0 | 241 | 261 |
 | P2 | 16 | 13 | 2 | 177 | 208 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
-| **All** | 23 | 31 | 3 | 535 | 592 |
+| **All** | 27 | 31 | 3 | 535 | 596 |
 
 ## Work order
 
