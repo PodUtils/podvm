@@ -160,7 +160,9 @@ jobs:
             echo "\`gh attestation verify oci://$repo@$digest --repo $GITHUB_REPOSITORY\`."
           } > "$RUNNER_TEMP/image-digests.md"
           cat "$RUNNER_TEMP/image-digests.md"
-          docker logout ghcr.io
+          # The login stays: actions/attest pushes the attestation with it
+          # (run 44450054587 failed with "No credentials found for registry
+          # ghcr.io"). The last step logs out.
 
       - name: the provenance of the index, in the registry
         if: inputs.push
