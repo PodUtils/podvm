@@ -458,3 +458,12 @@ fn a_volume_of_one_file_is_the_file() {
     }
     let _ = std::fs::remove_file(&host);
 }
+
+/// OP-03 of the fifth outside pass (TODO/cli.md T-2001): `npm -v` died
+/// with SIGSEGV where `process.title` wrote over argv. The strings of argv
+/// lie in one block in rising order, just below those of the environment.
+#[test]
+fn the_strings_of_argv_lie_in_rising_order_below_the_environment() {
+    let Some(r) = root("layout") else { return };
+    assert_eq!(probe(&r, &["layout", "a", "bb", "ccc"]).0, "layout ok");
+}

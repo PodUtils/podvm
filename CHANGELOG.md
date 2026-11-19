@@ -11,6 +11,9 @@ They describe their recorded revision, not the current build.
 - On the syscall tier, a `-v` of one file works: the path is the file,
   `:ro` holds, a path under it is ENOTDIR, and `rm` or `mv` of it is
   EBUSY, as for a bound file (T-2001, OP-02 of the fifth outside pass).
+- On the syscall tier, `npm` and `npx` run: a program that sets its process
+  title (Node's `process.title`) no longer writes past its stack (T-2001,
+  OP-03 of the fifth outside pass).
 - On the incus tier, `--podvm-init=image` gives the instance an isolated
   map of 231,072 ids, `/dev/fuse` and an empty machine-id for the hosted
   snapshot (T-1996), and the image goes to incusd through a pipe, with no

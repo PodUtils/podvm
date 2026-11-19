@@ -168,10 +168,30 @@ fn stack(img: &Image, argv: &[Vec<u8>], envp: &[Vec<u8>], execfn: &[u8]) -> Resu
         }
         at
     };
-    let argp: Vec<u64> = argv.iter().map(|a| put(a)).collect();
-    let envp_p: Vec<u64> = envp.iter().map(|e| put(e)).collect();
     let execfn_p = put(execfn);
     let platform = put(b"x86_64");
+    // TODO/cli.md T-2001 (OP-03): the strings of argv, then of the
+    // environment, in one block in rising order, as the kernel lays them.
+    // libuv takes `argv[0]` to the end of the last argument as the room of
+    // the process title: with the strings in falling order that room was
+    // negative, and `process.title = "npm"` wrote past the stack (SIGSEGV
+    // of `npm -v` on the syscall tier).
+    let block: u64 = argv.iter().chain(envp).map(|s| s.len() as u64 + 1).sum();
+    at -= block;
+    let mut next = at;
+    let mut lay = |bytes: &[u8]| -> u64 {
+        let here = next;
+        // SAFETY: the block of `block` bytes lies in the new stack, below
+        // the strings above it.
+        unsafe {
+            core::ptr::copy_nonoverlapping(bytes.as_ptr(), here as *mut u8, bytes.len());
+            *((here + bytes.len() as u64) as *mut u8) = 0;
+        }
+        next += bytes.len() as u64 + 1;
+        here
+    };
+    let argp: Vec<u64> = argv.iter().map(|a| lay(a)).collect();
+    let envp_p: Vec<u64> = envp.iter().map(|e| lay(e)).collect();
     let mut random = [0u8; 16];
     // SAFETY: random lives for the call.
     unsafe { sc(318, random.as_mut_ptr() as i64, 16, 0) };

@@ -247,6 +247,31 @@ fn main() {
         // the payload runs its handler on the payload's alternate stack,
         // as Go's runtime needs, not on a stack of the SIGSYS handler.
         "sig-in-call" => sig_in_call(),
+        // T-2001 (OP-03): the strings of argv lie in one block in rising
+        // order, just below those of the environment, as libuv reads them.
+        "layout" => {
+            unsafe extern "C" {
+                static environ: *const *const u8;
+            }
+            let want: Vec<u8> = std::env::args_os()
+                .flat_map(|a| {
+                    let mut v = std::os::unix::ffi::OsStringExt::into_vec(a);
+                    v.push(0);
+                    v
+                })
+                .collect();
+            // SAFETY: environ[0] is the first string of the environment; the
+            // `want.len()` bytes below it are on the stack of this process
+            // where the layout holds, and the test passes an environment.
+            let got = unsafe {
+                let e0 = *environ;
+                std::slice::from_raw_parts(e0.sub(want.len()), want.len())
+            };
+            println!(
+                "layout {}",
+                if got == want.as_slice() { "ok" } else { "bad" }
+            );
+        }
         _ => {
             eprintln!("podvm-dispatch-probe: no verb {verb:?}");
             std::process::exit(2);
