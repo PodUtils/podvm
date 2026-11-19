@@ -128,8 +128,9 @@ pub(super) async fn detached(c: &Client, job: &Job<'_>, image: &str, d: &Detach)
     }
     if !d.init_image {
         new.config.insert("raw.lxc".into(), INIT.into());
-    } else {
-        let (k, v) = super::run::fuse_device(); // T-1996
+    } else if std::path::Path::new("/dev/fuse").exists() {
+        // T-1996: a host with no FUSE starts the instance with no device.
+        let (k, v) = super::run::fuse_device();
         new.devices.insert(k, v);
     }
     new.config.insert(LABEL.into(), "1".into());

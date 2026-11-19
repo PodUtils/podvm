@@ -126,9 +126,14 @@ cleanup() {
 	done
 	rm -rf "$B"
 	for c in /sys/fs/cgroup/*/"$U"; do rmdir "$c" 2>/dev/null; done
+	case "${FUSE_MODE:--}" in -) ;; *) chmod "$FUSE_MODE" /dev/fuse ;; esac
 }
 cleanup
 id "$U" >/dev/null 2>&1 || useradd -m -s /bin/sh "$U" || exit 2
+# T-1996: a host gives /dev/fuse mode 0666; this cloud host gives 0600, which
+# the instances of an incusd that is not root cannot open. Restored at the end.
+FUSE_MODE=$(stat -c %a /dev/fuse 2>/dev/null || echo -)
+[ "$FUSE_MODE" = - ] || chmod 0666 /dev/fuse
 for f in /etc/subuid /etc/subgid; do sed -i "/^$U:/d" "$f"; echo "$U:2000000000:100000000" >>"$f"; done
 for c in /sys/fs/cgroup/*/; do
 	n=$(basename "$c"); [ "$n" = unified ] && continue
@@ -453,7 +458,7 @@ c19 "^  native   rc 125: .*--podvm-init=image needs --podvm-tier=incus" "the fla
 echo ""; echo "== 20. the hosted snapshot: ids, /dev/fuse, a machine-id of each" >>"$REPORT"
 {
 for n in sna434 snb434; do
-  echo "  run -d   $(P run -d --name $n --podvm-tier=incus --podvm-init=image "$INIT_IMG" sh -c 'echo "ids $(awk "{s+=\$3} END {print s}" /proc/self/uid_map)"; test -c /dev/fuse && exec 3<>/dev/fuse && echo "fuse open"; echo "mid $(cat /etc/machine-id)"; sleep 5' </dev/null 2>&1 | tail -1)"
+  echo "  run -d   $(P run -d --name $n --podvm-tier=incus --podvm-init=image "$INIT_IMG" sh -c 'echo "ids $(awk "{s+=\$3} END {print s}" /proc/self/uid_map)"; test -c /dev/fuse && (exec 3<>/dev/fuse) 2>/dev/null && echo "fuse open"; echo "mid $(cat /etc/machine-id)"; sleep 5' </dev/null 2>&1 | tail -1)"
 done
 for n in sna434 snb434; do
   i=0; while [ $i -lt 30 ]; do st=$(RI list --format csv -c ns 2>/dev/null | sed -n "s/^$n,//p"); [ "$st" = STOPPED ] && break; i=$((i+1)); sleep 2; done
