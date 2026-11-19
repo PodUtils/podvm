@@ -74,7 +74,9 @@ pub fn unified_tarball_to<W: std::io::Write>(
     podvm: &[u8],
 ) -> Result<(), String> {
     let sidecar = rootfs.with_file_name(".meta.jsonl");
-    let meant = intended(&std::fs::read_to_string(&sidecar).unwrap_or_default());
+    let text = std::fs::read_to_string(&sidecar).unwrap_or_default();
+    let meant = intended(&text);
+    let unset = super::xattrs::unset_of(&text); // T-1999
     let mut b = tar::Builder::new(std::io::BufWriter::new(w));
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -94,7 +96,7 @@ pub fn unified_tarball_to<W: std::io::Write>(
     let err = |e: std::io::Error| format!("the unified tarball of {}: {e}", rootfs.display());
     b.append_data(&mut h, "metadata.yaml", meta.as_bytes())
         .map_err(err)?;
-    walk(&mut b, rootfs, "", &meant).map_err(err)?;
+    walk(&mut b, rootfs, "", &meant, &unset).map_err(err)?;
     for (path, mode, data) in [
         ("rootfs/.podvm", 0o755, None),
         ("rootfs/.podvm/podvm", 0o755, Some(podvm)),
@@ -124,6 +126,7 @@ fn walk<W: std::io::Write>(
     dir: &Path,
     rel: &str,
     meant: &HashMap<String, (u64, u64, u32)>,
+    unset: &HashMap<String, Vec<super::xattrs::Attr>>,
 ) -> std::io::Result<()> {
     let mut names: Vec<_> = std::fs::read_dir(dir)
         .and_then(|d| d.collect::<Result<_, _>>())
@@ -150,6 +153,18 @@ fn walk<W: std::io::Write>(
         h.set_mode(mode & 0o7777);
         let at = format!("rootfs/{r}");
         let ft = md.file_type();
+        // T-1999: the attributes of the image, as PAX records before it.
+        let attrs = super::xattrs::merge(super::xattrs::on_disk(&p), unset.get(&r));
+        if !attrs.is_empty() {
+            let data = super::xattrs::pax_records(&attrs);
+            let mut x = tar::Header::new_ustar();
+            x.set_entry_type(tar::EntryType::XHeader);
+            x.set_path("PaxHeaders/x")?;
+            x.set_size(data.len() as u64);
+            x.set_mode(0o644);
+            x.set_cksum();
+            b.append(&x, &data[..])?;
+        }
         if ft.is_symlink() {
             let target = std::fs::read_link(&p)?;
             b.append_link(&mut h, &at, target)?;
@@ -160,7 +175,7 @@ fn walk<W: std::io::Write>(
             // (`/etc/shadow` of mode 0000 in ubi-init, experiment 434 clause
             // 19) is podvm's own: read it with the owner's bits, then restore
             // the image's mode. The header keeps the image's mode.
-            podvm_extract::tree::with_owner_bits(&p, 0o500, || walk(b, &p, &r, meant))?;
+            podvm_extract::tree::with_owner_bits(&p, 0o500, || walk(b, &p, &r, meant, unset))?;
         } else if ft.is_file() {
             let f = owned(&p, 0o400, || std::fs::File::open(&p))?;
             b.append_data(&mut h, &at, f)?;

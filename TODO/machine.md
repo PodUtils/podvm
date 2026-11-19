@@ -5701,7 +5701,7 @@ incusd runs a VM image (a qcow2 root with a GPT and an ESP, or a direct boot of 
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -5722,3 +5722,8 @@ Take the xattrs from `pod-extract` when podcrates has them (a COORD issue to pod
 ## Prove
 
 Experiment 434, a new clause: an image whose `/bin/ping` has `cap_net_raw+ep`; `getcap /bin/ping` in the instance prints it, and `ping -c1 127.0.0.1` as a user passes; `kvm.yml`: the same on the machine tier.
+
+## Done
+
+Partial (2026-11-19): podcrates `v0.76.0` (podcrates@T-957) is taken (`16f2395`): `pod-extract` sets each `SCHILY.xattr.*` record that the kernel lets it set, and names each other one in the sidecar row with its value. The unified tarball of the incus tier carries the attributes of the image as PAX records (`incus/xattrs.rs`): `security.capability` and `user.*` of the tree, and each attribute of the sidecar with a value; a v3 capability of the tree (the root id of the extracting user's namespace) goes as v2, so that the kernel of the instance sets its own root id. The unit test `the_sidecar_and_the_records_carry_each_attribute` passes. Remaining: clause 22 of experiment 434 (a file with `cap_net_raw+ep` in the root of an instance), and the root of the machine tier on `kvm.yml`.
+

@@ -661,13 +661,13 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1996](machine.md) | P1 | M | none | machine | partial | On the incus tier, an instance of the hosted snapshot has 231,072 ids, `/dev/fuse` and a machine-id of its own |
 | [T-1997](machine.md) | P1 | M | none | machine | done | On the incus tier, the import of a large image keeps no third copy |
 | [T-1998](machine.md) | P1 | L | none | machine | open | On the incus tier, an OCI image with a kernel runs as a virtual machine |
-| [T-1999](machine.md) | P1 | M | none | machine | open | The `security.capability` xattrs of an image stay on the incus tier and the machine tier |
+| [T-1999](machine.md) | P1 | M | none | machine | partial | The `security.capability` xattrs of an image stay on the incus tier and the machine tier |
 | [T-2000](interpose.md) | P1 | S | none | interpose | done | `apt-get install` fails on the userland rung: dpkg's `tar` has no ownership memo |
 | [T-2001](cli.md) | P2 | M | none | cli | partial | The faults of the fifth outside pass (2026-11-19, the gate of beta.36) |
 
 ## Counts
 
-598 entries: 25 open, 33 partial, 3 blocked, 537 done.
+598 entries: 24 open, 34 partial, 3 blocked, 537 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -677,10 +677,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 4 | 15 | 0 | 243 | 262 |
+| P1 | 3 | 16 | 0 | 243 | 262 |
 | P2 | 16 | 14 | 2 | 177 | 209 |
 | P3 | 5 | 4 | 1 | 42 | 52 |
-| **All** | 25 | 33 | 3 | 537 | 598 |
+| **All** | 24 | 34 | 3 | 537 | 598 |
 
 ## Work order
 

@@ -87,6 +87,11 @@
 #      2.6 times the tree: incusd's image and its volume, and the overhead of
 #      incusd's files (measured 2.38 on 2026-11-19), not by a third copy (a
 #      tarball file in the store would give about 3.4).
+#  22. The capabilities of a file (T-1999, PodUtils/podrunner#316 ask 4):
+#      alpine with a layer whose /usr/bin/capfile carries
+#      security.capability (cap_net_raw+ep) as a PAX record; a user that is
+#      not root cannot set it on the tree, the sidecar names it, and the
+#      root of an instance of the incus tier has it.
 #
 # Exit: 0 every clause matched, 1 a clause disagreed, 2 the lane could not
 # run (not root, no user namespaces, no package).
@@ -517,6 +522,65 @@ c21 "^  left     0 files" "a tarball file stayed in the store"
 tree=$(sed -n 's/^  tree     //p' "$WORK/c21.txt"); growth=$(sed -n 's/^  growth   //p' "$WORK/c21.txt")
 [ "${tree:-0}" -gt 100000000 ] || { note "21: the tree of the large image was not found (${tree:-0} bytes)"; fail=1; }
 [ "${growth:-0}" -le $(( ${tree:-0} * 26 / 10 )) ] || { note "21: the import grew the disk by $growth bytes, more than 2.6 times the tree of $tree"; fail=1; }
+
+# ---- clause 22 ----------------------------------------------------------
+echo ""; echo "== 22. the capabilities of a file in the root of an instance" >>"$REPORT"
+cat >"$B/mkcap.py" <<'PYEOF'
+import hashlib, io, json, sys, tarfile
+src, dst = sys.argv[1], sys.argv[2]
+blobs, meta = {}, {}
+with tarfile.open(src) as t:
+    for m in t.getmembers():
+        if m.isfile():
+            blobs[m.name] = t.extractfile(m).read()
+idx = json.loads(blobs["index.json"])
+mdesc = idx["manifests"][0]
+man = json.loads(blobs["blobs/" + mdesc["digest"].replace(":", "/")])
+cfg = json.loads(blobs["blobs/" + man["config"]["digest"].replace(":", "/")])
+# vfs_cap_data v2: magic with the effective flag, then cap_net_raw (13) permitted.
+cap = (0x02000001).to_bytes(4, "little") + (1 << 13).to_bytes(4, "little") + bytes(12)
+lay = io.BytesIO()
+with tarfile.open(fileobj=lay, mode="w", format=tarfile.PAX_FORMAT) as t:
+    for d in ("usr", "usr/bin"):
+        i = tarfile.TarInfo(d); i.type = tarfile.DIRTYPE; i.mode = 0o755; t.addfile(i)
+    data = b"cap434\n"
+    i = tarfile.TarInfo("usr/bin/capfile"); i.size = len(data); i.mode = 0o755
+    i.pax_headers = {"SCHILY.xattr.security.capability": cap.decode("utf-8", "surrogateescape")}
+    t.addfile(i, io.BytesIO(data))
+layer = lay.getvalue()
+def put(b):
+    d = "sha256:" + hashlib.sha256(b).hexdigest()
+    blobs["blobs/" + d.replace(":", "/")] = b
+    return d
+blobs.pop("blobs/" + mdesc["digest"].replace(":", "/"))
+blobs.pop("blobs/" + man["config"]["digest"].replace(":", "/"))
+ld = put(layer)
+man["layers"].append({"mediaType": "application/vnd.oci.image.layer.v1.tar", "digest": ld, "size": len(layer)})
+cfg["rootfs"]["diff_ids"].append(ld)
+cb = json.dumps(cfg).encode(); man["config"]["digest"] = put(cb); man["config"]["size"] = len(cb)
+mb = json.dumps(man).encode(); mdesc["digest"] = put(mb); mdesc["size"] = len(mb)
+mdesc.setdefault("annotations", {})["org.opencontainers.image.ref.name"] = "localhost/cap434:1"
+blobs["index.json"] = json.dumps(idx).encode()
+with tarfile.open(dst, "w") as t:
+    for name, b in blobs.items():
+        i = tarfile.TarInfo(name); i.size = len(b); t.addfile(i, io.BytesIO(b))
+print(ld)
+PYEOF
+{
+P save -o "$B/alp.tar" "$OCI" >/dev/null 2>&1; echo "  save     rc $?"
+python3 -I "$B/mkcap.py" "$B/alp.tar" "$B/cap.tar" >"$WORK/c22.layer" 2>&1; echo "  build    rc $?"
+chown "$U:$U" "$B/cap.tar" 2>/dev/null
+echo "  load     $(P load -i "$B/cap.tar" 2>&1 | tail -1)"
+echo "  run -d   $(P run -d --name cap434 --podvm-tier=incus localhost/cap434:1 sleep 30 </dev/null 2>&1 | tail -1)"
+f="$B/state/lib/storage-pools/default/containers/cap434/rootfs/usr/bin/capfile"
+echo "  cap      $(python3 -I -c 'import os,sys; print(os.getxattr(sys.argv[1], "security.capability").hex())' "$f" 2>&1 | tail -1)"
+echo "  sidecar  $(grep -rh '"usr/bin/capfile"' "$B"/store/rootfs/*/.meta.jsonl "$B"/store/trees/*/.meta.jsonl 2>/dev/null | grep -o '"xattrs":[^]]*]' | head -1)"
+P rm -f --podvm-tier=incus cap434 >/dev/null 2>&1
+} >"$WORK/c22.txt" 2>&1
+cat "$WORK/c22.txt" >>"$REPORT"
+c22() { grep -Eq "$1" "$WORK/c22.txt" || { note "22: $2"; fail=1; }; }
+c22 "^  run -d   cap434$" "run -d of the image with a capability did not start"
+c22 "^  cap      0100000[23]00200000" "the root of the instance has no cap_net_raw on /usr/bin/capfile"
 
 # ---- clause 9 -----------------------------------------------------------
 left_i=$(RI list --format csv -c n 2>&1 | grep -c .)
