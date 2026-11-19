@@ -186,8 +186,7 @@ pub const TABLE: &[FailureRow] = &[
 ///
 /// The map legs share one line after the mechanism, so the quoted map always
 /// reads within two lines of the example the entry's Prove greps for.
-/// Returns `None` where the extraction recorded no example, in which case the
-/// caller prints the counts line alone.
+/// `None` where the extraction recorded no example: the counts line alone.
 pub fn ownership_note(
     done: &podvm_extract::Extracted,
     id: &podvm_probe::identity::Identity,
@@ -382,6 +381,7 @@ mod tests {
             first_dropped: first,
             dir_modes: 0,
             dirs_opened: 0,
+            xattrs: Default::default(),
         }
     }
 
