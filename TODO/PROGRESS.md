@@ -9,9 +9,14 @@ start.
 
 598 entries: 28 open, 31 partial, 3 blocked, 536 done.
 
-The state on 2026-11-18 (`docs/HANDOFF.md` has the detail):
+The state on 2026-11-19 (`docs/HANDOFF.md` has the detail):
 
-* The newest release is `v0.2.0-beta.35` (2026-11-18, release run
+* The newest release is `v0.2.0-beta.36` (2026-11-19, release run
+  44466195422 on `94045a3`): systemd as PID 1 on the incus tier (T-1993),
+  Go on the userland rung (T-1995), `apt-get install -u 0` on the userland
+  rung (T-2000), the retry of `openat2` (T-1990), the image on ghcr.io
+  (T-1992), podcrates `v0.74.0`. Before it:
+* `v0.2.0-beta.35` (2026-11-18, release run
   44406181198 on `9e1e2e7`): the confine layer on the syscall tier
   (T-1982, T-1983), Fedora 42 (T-1981, T-1986), AlmaLinux 9's `ls -l`
   (T-1987), `stat` of a volume on the tier (T-1988), podcrates `v0.72.0`;

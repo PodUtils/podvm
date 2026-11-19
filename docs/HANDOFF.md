@@ -1,10 +1,10 @@
 # Handoff
 
-The state on 2026-11-18, 22:45 (UTC), at the end of a session. `main` is
-at the commit that adds this file. `0.2.0-beta.35` is the last release
-(release run 44406181198 on `9e1e2e7`; the gate 44400983081, `workloads.yml`
-44400995816, `arm.yml` 44400989122, the nightly trial 44400982967, the
-uid-1000 tests and the fourth outside pass passed first). A fresh session
+The state on 2026-11-19, 06:15 (UTC). `main` is at the commit that
+changes this file. `0.2.0-beta.36` is the last release (release run
+44466195422 on `94045a3`; the gate 44461846375, `workloads.yml`
+44457544162, `arm.yml` 44461850154, the nightly trial 44461846698, the
+uid-1000 tests and the fifth outside pass passed first). A fresh session
 with no memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md`
 and `docs/decisions.md`. Remove this file when each step below is done.
 
@@ -22,10 +22,16 @@ and `docs/decisions.md`. Remove this file when each step below is done.
 
 ## Where things are
 
-* podcrates is taken at `v0.71.0` (`c213375`; `v0.70.0` in `6b5a6cb`).
-  The takes are recorded in
-  COORD-184 (#571): a podvm session can not write on PodUtils/podcrates
-  issues (its GitHub access reaches podvm only).
+* podcrates is taken at `v0.74.0` (`ef56d16`, COORD-201, #597, closed;
+  `v0.73.0` in `20313a0`). A podvm session can not write on
+  PodUtils/podcrates issues (its GitHub access reaches podvm only): each
+  take is a COORD issue of this repository.
+* Each release publishes `ghcr.io/podutils/podvm:TAG` by the job `image`
+  of `release.yml` (`image.yml`, T-1992); `image.yml` can be dispatched
+  alone for a tag (`push: false` is the dry run).
+* The issue-sync bot of a push reopens or closes an issue as the record of
+  THAT commit says: a sync of an older commit can reopen an issue that a
+  newer record closed; the sync of the newer commit closes it again.
 * The pkgforge mirrors answer for podvm and podcrates reads, with some
   403s; retry. Release assets of another repository: the GitHub MCP tool.
 * The cloud host runs incus (route A): `PODVM_434_MIRROR=1 sh
@@ -119,17 +125,33 @@ and `docs/decisions.md`. Remove this file when each step below is done.
   #593 asks podrunner for its processes. podrunner keeps the tier off
   until both are fixed.
 
+* This session (2026-11-19): experiment 434 clause 19 passes, T-1993
+  done (systemd as PID 1 on the incus tier; the tarball reads files of mode
+  0000; the wait for the bus of systemd). T-1992 done (beta.35 on ghcr.io,
+  #595 closed). podcrates `v0.73.0` and `v0.74.0` taken. podrunner's
+  #315 (COORD-105): `tsc` of TypeScript 7 hung on the userland rung at
+  Go's SIGURG of preemption; T-1995 holds a signal that stops the SIGSYS
+  handler until the call ends (COORD-202, #598). podrunner's #316
+  (COORD-106, the hosted snapshot): T-1996 to T-1999 and T-1994 amended
+  (COORD-203, #599). The fifth outside pass (T-2001): one P1, T-2000
+  (`apt-get install -u 0` on the userland rung: the memo reopens from
+  `PODVM_MEMO_PATH`), fixed; the P2 and P3 findings are in T-2001 and in
+  "Known gaps" of beta.36.
+* Released `0.2.0-beta.36`; #593, #596 and #598 name the tag.
+
 ## Next steps, in order
 
 1. Start the session (`AGENTS.md`, section 8), with the watcher (filter
    its output to the event lines: a network retry prints a traceback).
-2. podrunner first: watch #593 (its data of the hang of T-1991, and the
-   measure of T-1990 with the next beta), #590 and #592. The next beta
-   carries T-1990; its gate needs a new outside pass.
-3. T-1972 remainder (the loader family), T-1969 remainder (the run report
-   of an incus unit), then T-1968; the T-1964 remainder waits for a
-   measure on a host with a quota pool (podrunner).
-4. T-1984 and T-1985 (P2): enforce them where podvm sees the call.
+2. podrunner first: watch #593 (T-1990 measured with beta.36; the hang of
+   T-1991, which T-1995 may have fixed), #596, #598 and #599. Then the
+   hosted snapshot in the order of #599: T-1996, T-1999 (it waits for the
+   xattrs of `pod-extract`, podrunner's COORD-107 to podcrates), T-1997,
+   the steps of T-1994, T-1998.
+3. T-2001 (the P2 findings of the fifth outside pass: a `-v` of one file
+   and `npm` on the syscall tier, the rung of `PODVM_USERNS=0` with no
+   volume).
+4. T-1972 remainder, T-1969 remainder, T-1968; T-1984 and T-1985 (P2).
 5. When podcrates answers COORD-188 (#584): set the controlling terminal
    for `-t` and remove `run::pty::send`.
 6. T-1989, T-1980, T-1974 remainders, T-1970 remainder, T-1935, T-1955
@@ -159,3 +181,10 @@ and `docs/decisions.md`. Remove this file when each step below is done.
 * A `cargo` in a payload cannot pass the proxy of the cloud host (a
   self-signed certificate): fetch the crates on the host into a
   `CARGO_HOME` in the volume, then `cargo ... --offline` in the payload.
+* `PODVM_USERNS=0` gives the userland rung only with a volume (`-v`);
+  with no volume the run takes the namespace rung (a chroot), where a
+  host path is not there. Check the rung with `run --verbose` (`mode=`).
+* A probe verb or a test helper in `global_asm!` must carry
+  `#[cfg(target_arch = "x86_64")]`: the nightly builds each arch.
+* An issue body that the sync tool rewrote has lost its footer: an amend
+  puts it back before the block `pod-todo:state`.
