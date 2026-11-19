@@ -1,5 +1,5 @@
 == conditions
-date              2026-11-19T08:25:27Z
+date              2026-11-19T09:51:06Z
 host kernel       Linux 6.18.44-fc-v653
 cgroup            tmpfs
 incus package     6.0.0-1ubuntu0.3
@@ -9,15 +9,15 @@ runs              5
 == 1. a run
   stdout  hello
   exit    0
-  ms      1503 (with the import)
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-715bb496ff74f2bd-v3 imported now (TODO/machine.md T-1718)
+  ms      1017 (with the import)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-f5bfbcfccbe1e784-v3 imported now (TODO/machine.md T-1718)
 
 == 2. the exit code
   exit    7
 
 == 3. stdout and stderr
   stdout  out
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-715bb496ff74f2bd-v3 from incus (TODO/machine.md T-1718)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-f5bfbcfccbe1e784-v3 from incus (TODO/machine.md T-1718)
   stderr  err
 
 == 4. stdin
@@ -30,11 +30,11 @@ runs              5
   PID 1                 /.podvm/podvm guest-hold 
   owner of /etc/passwd  0:0
   owner of /etc/shadow  0:42
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-715bb496ff74f2bd-v3 from incus (TODO/machine.md T-1718)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-f5bfbcfccbe1e784-v3 from incus (TODO/machine.md T-1718)
 
 == 7. the cached image
-  run true ms  1006 (median of 5)
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-715bb496ff74f2bd-v3 from incus (TODO/machine.md T-1718)
+  run true ms  829 (median of 5)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-f5bfbcfccbe1e784-v3 from incus (TODO/machine.md T-1718)
 
 == 8. a name that is no instance
   exec exit    125
@@ -104,7 +104,7 @@ runs              5
   left     0
   native   podvm run: --storage-opt size= sizes the root disk of an instance of the incus tier (--podvm-tier=incus); this tier has no root disk to size (TODO/machine.md T-1964, T-1968)  rc 125
 == 18. the CPU time and the peak memory in inspect
-  usage    1.043 61689856 0
+  usage    1.101 61739008 0
 == 19. --podvm-init=image: systemd as PID 1
   run -d   sd434
   exec     running
@@ -116,18 +116,25 @@ runs              5
 == 20. the hosted snapshot: ids, /dev/fuse, a machine-id of each
   run -d   sna434
   run -d   snb434
-  logs sna434 ids 231072 fuse open mid cf444711fbcb41f98de640acfa0ff934 
-  logs snb434 ids 231072 fuse open mid 8e18a084ed0b4e26ac3b4aeb0484cfc7 
-  machine-ids cf444711fbcb41f98de640acfa0ff934 8e18a084ed0b4e26ac3b4aeb0484cfc7
+  logs sna434 ids 231072 fuse open mid 60bbe6fc5ec64e708a704bd55875c0b0 
+  logs snb434 ids 231072 fuse open mid a716a765252d4eb7a9193cb0dc77d590 
+  machine-ids 60bbe6fc5ec64e708a704bd55875c0b0 a716a765252d4eb7a9193cb0dc77d590
 == 21. a large import: the growth of the disk use
   pull     rc 0
   extract  rc 0
-  run      rc 0 podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-98d673f18a1aac43-715bb496ff74f2bd-v3 imported now (TODO/machine.md T-1718)
+  run      rc 0 podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-98d673f18a1aac43-f5bfbcfccbe1e784-v3 imported now (TODO/machine.md T-1718)
   tree     850228783
-  base     3115074382
-  peak     5134407054
-  growth   2019332672
+  base     3117039445
+  peak     5134473078
+  growth   2017433633
   left     0 files in store/incus
+== 22. the capabilities of a file in the root of an instance
+  save     rc 0
+  build    rc 0
+  load     Loaded image: localhost/cap434:1
+  run -d   cap434
+  cap      01000003002000000000000000000000000000003fd64477
+  sidecar  "xattrs":[{"name":"security.capability","value":"0x0100000200200000000000000000000000000000","reason":"EPERM"}]
 
 == 9. nothing stays
   instances in incus              0
