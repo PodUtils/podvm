@@ -456,3 +456,45 @@ fn engine_gives_the_instance_nesting_and_the_two_intercepts() {
         .iter()
         .all(|(_, v)| v == "true"));
 }
+
+/// T-1993, experiment 434 clause 19: ubi-init has files of mode 0000.
+#[test]
+fn the_tarball_reads_a_file_and_a_directory_of_mode_0000() {
+    use std::os::unix::fs::PermissionsExt;
+    let d = scratch("tar0");
+    let r = d.join("img/rootfs");
+    std::fs::create_dir_all(r.join("etc/locked")).unwrap();
+    std::fs::write(r.join("etc/gshadow"), b"root:::").unwrap();
+    std::fs::write(r.join("etc/locked/key"), b"k").unwrap();
+    for p in ["etc/gshadow", "etc/locked"] {
+        std::fs::set_permissions(r.join(p), std::fs::Permissions::from_mode(0o0)).unwrap();
+    }
+    let out = d.join("img.tar");
+    unified_tarball(&r, &out, b"podvm").unwrap();
+    let mut a = tar::Archive::new(std::fs::File::open(&out).unwrap());
+    let mut seen = Vec::new();
+    for e in a.entries().unwrap() {
+        let mut e = e.unwrap();
+        let p = e.path().unwrap().to_string_lossy().into_owned();
+        let mode = e.header().mode().unwrap();
+        let mut b = Vec::new();
+        e.read_to_end(&mut b).unwrap();
+        match p.as_str() {
+            "rootfs/etc/gshadow" => assert_eq!((mode, &b[..]), (0, &b"root:::"[..])),
+            "rootfs/etc/locked" => assert_eq!(mode, 0, "the image's mode"),
+            "rootfs/etc/locked/key" => assert_eq!(b, b"k"),
+            _ => {}
+        }
+        seen.push(p);
+    }
+    assert!(
+        seen.iter().any(|s| s == "rootfs/etc/locked/key"),
+        "{seen:?}"
+    );
+    for p in ["etc/gshadow", "etc/locked"] {
+        let m = std::fs::metadata(r.join(p)).unwrap().permissions().mode();
+        assert_eq!(m & 0o7777, 0, "{p}: the store keeps the image's mode");
+        std::fs::set_permissions(r.join(p), std::fs::Permissions::from_mode(0o700)).unwrap();
+    }
+    let _ = std::fs::remove_dir_all(&d);
+}

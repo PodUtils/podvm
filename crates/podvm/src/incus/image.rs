@@ -114,7 +114,9 @@ fn walk<W: std::io::Write>(
     rel: &str,
     meant: &HashMap<String, (u64, u64, u32)>,
 ) -> std::io::Result<()> {
-    let mut names: Vec<_> = std::fs::read_dir(dir)?.collect::<Result<_, _>>()?;
+    let mut names: Vec<_> = std::fs::read_dir(dir)
+        .and_then(|d| d.collect::<Result<_, _>>())
+        .map_err(|e| std::io::Error::new(e.kind(), format!("{}: {e}", dir.display())))?;
     names.sort_by_key(|e| e.file_name());
     for e in names {
         let name = e.file_name().to_string_lossy().into_owned();
@@ -143,11 +145,22 @@ fn walk<W: std::io::Write>(
         } else if ft.is_dir() {
             h.set_size(0);
             b.append_data(&mut h, &at, std::io::empty())?;
-            walk(b, &p, &r, meant)?;
+            // A directory or a file of the image that its owner cannot read
+            // (`/etc/shadow` of mode 0000 in ubi-init, experiment 434 clause
+            // 19) is podvm's own: read it with the owner's bits, then restore
+            // the image's mode. The header keeps the image's mode.
+            podvm_extract::tree::with_owner_bits(&p, 0o500, || walk(b, &p, &r, meant))?;
         } else if ft.is_file() {
-            b.append_data(&mut h, &at, std::fs::File::open(&p)?)?;
+            let f = owned(&p, 0o400, || std::fs::File::open(&p))?;
+            b.append_data(&mut h, &at, f)?;
         }
         // A socket, a fifo or a device: an extracted rootfs holds none.
     }
     Ok(())
+}
+
+/// [`podvm_extract::tree::with_owner_bits`], with the path in its error.
+fn owned<T>(p: &Path, bits: u32, f: impl FnOnce() -> std::io::Result<T>) -> std::io::Result<T> {
+    podvm_extract::tree::with_owner_bits(p, bits, f)
+        .map_err(|e| std::io::Error::new(e.kind(), format!("{}: {e}", p.display())))
 }

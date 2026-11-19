@@ -251,7 +251,11 @@ pub(crate) fn open_dirs(dir: &Path) -> io::Result<()> {
 /// the files to the user that runs podvm, with the image's modes: a file of
 /// mode 0000 (`/etc/shadow` of some images) is podvm's own and still
 /// cannot be opened by a user that is not root.
-fn with_owner_bits<T>(path: &Path, bits: u32, f: impl FnOnce() -> io::Result<T>) -> io::Result<T> {
+pub fn with_owner_bits<T>(
+    path: &Path,
+    bits: u32,
+    f: impl FnOnce() -> io::Result<T>,
+) -> io::Result<T> {
     let mode = fs::symlink_metadata(path)?.permissions().mode() & 0o7777;
     if mode & bits == bits {
         return f();
