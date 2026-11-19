@@ -5304,24 +5304,35 @@ Partial (2026-11-19). `crates/podvm/src/initns/scope.rs` (`ask`, called by `init
 
 # T-2005: An init of the image with no guest on a host that delegates no cgroup: a cgroup2 stand-in, or User-Mode Linux
 
-**Source:** T-2002 (2026-11-19); the two research bundles of the owner (2026-11-19)
+**Source:** T-2002 (2026-11-19); the two research bundles of the owner (2026-11-19); the owner's direction of 2026-11-19 ("look for a near-native route first; TCG is the last fallback") and the hints of the scout of that day
 **Category:** enter
 **Milestone:** none
-**Priority:** P3
+**Priority:** P2
 **Effort:** L
 **Status:** open
 
 ## Problem
 
-On a host with no delegated cgroup2 subtree (each container with a cgroup of root, the cloud host), and on the userland rung, the init of the image runs only in a guest of QEMU: 24 s under TCG against 3 s on the namespace rung (T-2002). A host with no QEMU that podvm can fetch or run has no route.
+The userland rung (a host that denies user namespaces), and a host that denies `ptrace`, boot the init of the image only in a guest of QEMU: under TCG on the cloud host a run with MariaDB and PostgreSQL takes 46 s, a start of a small unit 250 ms, and the guest holds 2.6 GB (T-2002). The namespace rung (3 s to 10 s) and the runsc tier (7 s to 10 s, T-2007) need a user namespace. A host with no QEMU that podvm can fetch or run has no route.
 
 ## Premise
 
-Measured for T-2002: systemd 262 ends without a writable cgroup2 ("Failed to create /init.scope control group: Permission denied"), and with a tmpfs on `/sys/fs/cgroup` ("Detected unsupported legacy cgroup hierarchy, refusing execution"); it starts each service "via CLONE_INTO_CGROUP" (its debug log), which takes a descriptor of a cgroup2 directory; `/dev/fuse` of the cloud host is closed to a user. The machine tier under TCG with four vCPUs runs MariaDB and PostgreSQL of Debian 12 under systemd in 28 s on the cloud host (T-2002). The first bundle of the owner booted systemd as PID 1 of a User-Mode Linux kernel 6.13.12 as one process of uid 1000 (48 s with MariaDB and PostgreSQL, a root on ext4); the second bundle got `ptrace: Operation not permitted` from a UML kernel 6.12 on its host, and did not finish a boot of systemd under the interposer with an emulated PID 1 and cgroup tree.
+Not measured in this tree; each line is a claim of its source until a run here reads it.
+
+1. User-Mode Linux in its seccomp mode (`seccomp=on`, Linux 6.16) needs no `ptrace`, namespace, KVM or QEMU: `os_early_checks()` of `arch/um/os-Linux/start_up.c` at v6.18 returns before `check_ptrace()` when `init_seccomp()` passes. The code of the guest runs on the CPU of the host, and the guest kernel gives a PID 1, a cgroup2 and each uid. The cost is the creation of a process.
+2. UML SMP came in 6.19 (`ncpus=N`, only with `seccomp=on`); 7.0 fixed SIGCHLD in the seccomp mode; 7.1 added musl and an SMP fix of the TLB. pocket_vm (Apache-2.0 or MIT, github.com/flyinghorse0510/pocket_vm) runs each guest with `seccomp=on`, carries 8 patches on 7.2 (an SMP fix in `chan_kern.c`, a deadlock of the vector driver), makes `ptrace` give EPERM in its CI, and runs `docker:dind` with cgroup2 as a user.
+3. The first bundle of the owner booted systemd as PID 1 of a UML kernel 6.13.12 in the ptrace mode on one CPU: 48 s with MariaDB and PostgreSQL, against 38 s under KVM on that host. The second bundle got `ptrace: Operation not permitted` from a UML 6.12 on its host.
+4. UML takes a root with copy-on-write (`ubd0=run.cow,base.ext4`): the base of T-1994 for each digest keeps the owners of the image with no `chown` on the host. pocket_vm writes the layers in a "builder UML".
+5. The second bundle of the owner tried a PID 1 and a cgroup tree in the interposer on the userland rung (`pid1.rs`, `cgroupfs.rs`, `fsmagic.rs`, `spawn.rs`, `rlimit_calls.rs`, `kmsg.rs`): about 45 runs, none with a boot ("Can't run system mode unless PID 1", then RLIMIT_CORE). Measured for T-2002: systemd 262 refuses a tmpfs in place of cgroup2, and starts each service "via CLONE_INTO_CGROUP".
+6. For a namespace route with no gVisor: a seccomp filter that gives ENOSYS for `clone3` makes systemd attach through `cgroup.procs` (`posix_spawn_wrapper` of `src/basic/process-util.c`), and only `statfs` and `fstatfs` of `/sys/fs/cgroup` need a false answer. What stays wrong: `/proc/PID/cgroup` reads `/`, `cgroup.procs` keeps the last pid only, and `cgroup.events` never reads `populated 0`.
 
 ## Approach
 
-Two measures, each with experiment 465 as the check. (1) On the namespace rung, a tmpfs on `/sys/fs/cgroup` with the control files, and the interposer in each process of the image (`/etc/ld.so.preload`): the cgroup2 magic for `statfs`, the files of a new directory at `mkdir`, no `CLONE_INTO_CGROUP`, and `cgroup.procs` from the processes of the PID namespace. Name what stays wrong (the unit of a pid in the journal, the kill of a control group). (2) A User-Mode Linux kernel (static, from the release) as a tier: with `ptrace`, and in the seccomp mode of Linux 6.16 where the host denies `ptrace`; in the user namespace with the range its hostfs root keeps the owners of the image.
+In this order, each with experiment 465 as the check and its time for a run and for a unit start against the three routes of T-2002 and T-2007:
+
+1. A UML tier for the userland rung: a static UML kernel of 7.1 or later with `seccomp=on ncpus=N`, the root from the ext4 base of T-1994 with a copy-on-write file, the exit code and the volumes as on the machine tier. ⛔ A kernel build is shared code (rule 2a): ask podcrates first (`pod-guest`, a `pod-microvm`), with pocket_vm as the donor.
+2. Only where a namespace route with no gVisor is wanted: the seccomp filter and the `statfs` answer of premise 6, with its three faults named in the limits.
+3. Not routes: proot (the target filters `ptrace`), LKL (no bridge to processes), `systemd --user` (it needs a delegated cgroup and has no `User=`), cgroup v1 (the same `statfs` check), and a PID 1 in the interposer (premise 5).
 
 ## Decision
 
@@ -5329,4 +5340,74 @@ Two measures, each with experiment 465 as the check. (1) On the namespace rung, 
 
 ## Prove
 
-`sh experiments/465-init-image.sh` on the cloud host as uid 1000, with a new clause for each route that this entry adds: the check exits 7 with no emulator of QEMU, and the transcript names the time of the run.
+`sh experiments/465-init-image.sh` on the cloud host as uid 1000, with a new clause for each route that this entry adds: with `PODVM_USERNS=0` and a launcher that makes `ptrace` and `unshare` give EPERM, the check exits 7 with no emulator of QEMU, and the transcript names the time of the run.
+
+# T-2007: The init of the image as PID 1 of a gVisor sandbox: the runsc tier, for a host with a user namespace and no delegated cgroup
+
+**Source:** the owner's direction of 2026-11-19 ("look for a near-native route first; TCG is the last fallback"), hint 1 of the scout; T-1729, T-2002
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+A host with user namespaces and no delegated cgroup2 subtree (the cloud host, each container whose cgroup belongs to root) booted the init of the image only in a guest: 24 s to 51 s under TCG, with 2.6 GB of memory (T-2002). The runsc tier (T-1729) ran a command with no capability: `setresuid` and `chown` gave EPERM in it.
+
+## Premise
+
+gVisor runs systemd as PID 1 since 2026-09 (gvisor.dev/blog/2026/09/17/systemd-in-gvisor), with `--in-sandbox-cgroup=v2` and `--allow-suid`; both flags are in `release-20261102.0`, which experiment 436 pins. The Sentry gives a cgroup2 tree and each uid in its own kernel. Measured here as uid 1000 with that release, rootless on `systrap`: (1) with `/sbin/init` as the process of a bundle, systemd 262 ends at the mount of cgroup2 with `memory_hugetlb_accounting` (EINVAL) and of `/dev/shm` with `usrquota`; with those mount points in the bundle it boots in 2.5 s to 5 s; (2) `runsc kill` takes no real-time signal, and after SIGRTMIN+4 systemd stops each unit and stays as `systemd-shutdown`; (3) `systemd-sysctl.service` ends with exit 1, and the Sentry does not apply `readonlyPaths`; (4) with `--overlay2=root:self` a `chown` to mysql holds.
+
+## Approach
+
+`run --podvm-tier=runsc --podvm-init=image` (`crates/podvm/src/runsc/init.rs`). The bundle starts `podvm guest-init --pid1` (`initns/sandbox.rs`; podvm and the sidecar of the image are bind mounts): it gives the files of the tree the owners of the sidecar, masks `systemd-sysctl.service` in `/run`, writes an empty machine-id, and becomes `/sbin/init`. The bundle has the capabilities of a container without CAP_NET_ADMIN, CAP_SYS_MODULE, CAP_SYS_RAWIO and CAP_SYS_TIME, and the mount points `/dev/shm`, `/dev/pts`, `/sys/fs/cgroup`, `/run` and `/tmp`. podvm asks `systemctl is-system-running` by `runsc exec` (180 s), runs the command by `runsc exec` with `--user`, the environment and the working directory, then sends SIGRTMIN+4 from inside, waits until PID 1 is no longer the manager (10 s), and kills the sandbox. `runsc run` ends with podvm (`PR_SET_PDEATHSIG`), and its sandbox with it. A `run --podvm-init=image` with no tier takes this tier before the machine tier, where `runsc` is there (`PODVM_RUNSC`, else PATH), the host gives a user namespace, and the run has no flag that the tier does not serve (`-t`, `--timeout`, `--tmpfs`); call C26 has the order.
+
+## Decision
+
+Call C26, amended 2026-11-19: the namespace rung, then the runsc tier, then the machine tier.
+
+## Prove
+
+`sh experiments/465-init-image.sh` as a user with no root, with `ghcr.io/pkgforge-dev/archlinux:latest` at the digest of `scripts/common/distro-matrix.sh`, clause 8: on a host with no delegated cgroup, with the pinned runsc, the run names the runsc tier and the check exits 7 (systemd is PID 1, the state is `running` or `degraded`, the units of mysql, postgres, www-data and nobody run as those uids and own their files), also with `PODVM_USERNS=0`; after a SIGKILL of podvm no process of gVisor stays.
+
+## Done
+
+Partial (2026-11-19). `runsc/init.rs`, `initns/sandbox.rs`, `userns/owners.rs::apply_text`, `run/runsc.rs::unserved`, the route in `initns::route`; the unit tests of `runsc::init` and `initns::sandbox` pass. Measured on the cloud host as uid 1000 (no delegated cgroup, no `/dev/kvm`, gVisor `release-20261102.0`):
+
+| Debian 12 with MariaDB 10.11 and PostgreSQL 15 under systemd 252 | the whole run | the boot of systemd | a start of a unit of `/bin/true` | a restart of MariaDB | a restart of PostgreSQL |
+| --- | --- | --- | --- | --- | --- |
+| the namespace rung (a cgroup2 directory that root gave) | 9.8 s | 2.4 s | 7 ms to 21 ms | 0.17 s to 0.19 s | 2.4 s |
+| the runsc tier (the host as it is) | 10.2 s | 3.6 s | 42 ms to 45 ms | 0.54 s to 0.59 s | 2.9 s |
+| the machine tier under TCG, four vCPUs | 45.6 s | 8.8 s | 244 ms to 252 ms | 3.2 s to 3.4 s | 6.7 s |
+
+`mariadb.service` runs as uid 100 and `postgresql@15-main.service` as uid 102, both answer a query, and their data directories belong to them (the owners of the sidecar, applied in the sandbox). The check of experiment 465 with systemd 262 of `mirror.gcr.io/library/archlinux:latest` gives exit 7 in 7 s, state `running`. A missing program gives 127 before the boot; a SIGTERM of podvm gives 143; after a SIGTERM and a SIGKILL of podvm no process of gVisor stays. Remaining: (1) podvm fetches no runsc: the tier is there only where the host has one (T-2009); (2) `-t`, `--timeout` and `--tmpfs` go to the machine tier; (3) each write of the root ends with the run (the overlay), and a file whose owner changes is copied into the overlay; (4) after a SIGKILL of podvm the bundle and the tree of the run stay in the store; (5) the tier needs a user namespace and `ptrace` for the threads of `systrap`, so it does not serve the userland rung (T-2005); (6) a run on `kvm.yml` and on arm64.
+
+# T-2009: podvm fetches no runsc: the gVisor route of an init is there only where the host has one
+
+**Source:** T-2007 (2026-11-19); the owner's rule of 2026-11-05 ("users download and use")
+**Category:** enter
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+The runsc tier takes `runsc` of `PODVM_RUNSC` or of PATH. A host with a user namespace and no gVisor takes the machine tier for an init of the image (45 s against 10 s on the cloud host, T-2007), and the user must install gVisor by hand, with its sidecars of `gvisor-bin/`.
+
+## Premise
+
+podvm fetches a pinned static QEMU into the store where the host has none, and checks it by its digest (T-1875). gVisor publishes `gvisor.tar.bz2` for each release with a SHA-512; experiment 436 pins `20261102` and its sum. `runsc` and its sidecars are static.
+
+## Approach
+
+Where no `runsc` is found, fetch the pinned release for the architecture of the host into the store (as T-1875 does: the pin and its sum in the binary, a partial file, a resume, the proxy and the CA of the host), unpack `runsc` and `gvisor-bin/`, and use it. `podvm doctor` names it. Ask podcrates first for the fetch of a pinned tool (rule 2a): `pod-guest` holds the one of QEMU.
+
+## Decision
+
+-
+
+## Prove
+
+On a host with a user namespace and no `runsc` on PATH, as a user with no root: `run --rm --podvm-init=image ghcr.io/pkgforge-dev/archlinux:latest systemctl is-system-running` fetches gVisor once, names the runsc tier, and prints `running` or `degraded`; a second run fetches nothing.

@@ -332,7 +332,7 @@ fn tmp_bind(stage: &Path, b: &Bind) -> std::io::Result<()> {
 /// An empty machine-id, so that each run gets an id of its own from
 /// systemd, with no first-boot pass (as T-1996 does for an incus instance).
 /// A link or another kind of file is left alone.
-fn machine_id(path: &Path) {
+pub fn machine_id(path: &Path) {
     match std::fs::symlink_metadata(path) {
         Ok(m) if m.is_file() => {
             let _ = std::fs::write(path, "");

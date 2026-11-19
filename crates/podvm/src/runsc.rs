@@ -21,6 +21,8 @@ use std::process::{Command, Stdio};
 
 use podvm_image::error::EXIT_RUNTIME_ERROR;
 
+pub mod init; // TODO/enter.md T-2007
+
 /// The variable that names the `runsc` program; else `runsc` on `PATH`.
 pub const VAR: &str = "PODVM_RUNSC";
 
@@ -44,6 +46,9 @@ pub struct Job<'a> {
     pub read_only: bool,
     /// `--user UID[:GID]`, numeric only.
     pub user: (u32, u32),
+    /// `--podvm-init=image`: the sidecar of the image; the init of the
+    /// image is then PID 1 of the sandbox (TODO/enter.md T-2007).
+    pub init: Option<PathBuf>,
 }
 
 /// The `runsc` program: [`VAR`], else `runsc` on `PATH`.
@@ -185,7 +190,14 @@ pub fn run(job: &Job) -> i32 {
         std::fs::create_dir_all(&state).map_err(|e| format!("{}: {e}", state.display()))?;
         std::fs::create_dir_all(&bundle).map_err(|e| format!("{}: {e}", bundle.display()))?;
         let cfg = bundle.join("config.json");
-        let text = serde_json::to_vec_pretty(&spec(job)).map_err(|e| e.to_string())?;
+        let value = match &job.init {
+            Some(sidecar) => {
+                let me = std::env::current_exe().map_err(|e| format!("the path of podvm: {e}"))?;
+                init::spec(job, &me, sidecar)
+            }
+            None => spec(job),
+        };
+        let text = serde_json::to_vec_pretty(&value).map_err(|e| e.to_string())?;
         std::fs::write(&cfg, text).map_err(|e| format!("{}: {e}", cfg.display()))?;
         eprintln!(
             "podvm {}: entering on the runsc tier: {} ({}) answers each system call of the \
@@ -195,6 +207,16 @@ pub fn run(job: &Job) -> i32 {
             version(&runsc),
             runsc.display()
         );
+        if job.init.is_some() {
+            eprintln!(
+                "podvm {}: --podvm-init=image: {} of the image is PID 1 of the sandbox, with \
+                 the cgroup2 tree and each uid of gVisor's kernel; the writes of the root go \
+                 to an overlay that ends with the run (TODO/enter.md T-2007)",
+                job.verb,
+                crate::initns::INIT
+            );
+            return init::drive(job, &runsc, &state, &bundle, &id);
+        }
         let mut cmd = Command::new(&runsc);
         cmd.args(args(&state, &bundle, &id));
         if job.stdin.is_some() {

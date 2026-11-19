@@ -213,13 +213,14 @@ pub const RUN_OPTIONS: &str = "\
                    is-system-running (180 s), then runs the command, and
                    ends the init when the command ends. On the incus tier
                    with -d or create (TODO/machine.md T-1993). On a
-                   foreground run: in a PID namespace of the namespace
-                   rung, where the host gives the caller a subordinate id
-                   range and a delegated cgroup2 subtree; else, and with
-                   --podvm-tier=machine, in a PID namespace of a guest
-                   (KVM or TCG), with one line that says why
-                   (TODO/enter.md T-2002). podvm, the default, keeps
-                   podvm's init
+                   foreground run, the first place that the host gives,
+                   with one line that says why: a PID namespace of the
+                   namespace rung (a subordinate id range and a delegated
+                   cgroup2 subtree); a gVisor sandbox of the runsc tier
+                   (runsc and a user namespace); a guest of the machine
+                   tier (KVM or TCG). --podvm-tier=runsc or machine names
+                   one (TODO/enter.md T-2002, T-2007). podvm, the
+                   default, keeps podvm's init
   --podvm-sealed   podvm's own, machine tier only: the run comes as a tar
                    bundle on stdin (.podvm-run.json with argv, env and
                    workdir, and the files of the guest), and reaches the
@@ -328,6 +329,7 @@ mod foreign;
 mod machine;
 // TODO/enter.md T-1729: gVisor's runsc.
 mod runsc;
+pub(crate) use runsc::unserved as runsc_unserved; // T-2007
 
 // TODO/cli.md T-1706: the reason of a SIGXFSZ death.
 mod exit_note;

@@ -328,8 +328,22 @@ C26). Experiment 465 measures each line below as uid 1000.
   instance, and the capabilities CAP_NET_ADMIN, CAP_SYS_MODULE,
   CAP_SYS_RAWIO and CAP_SYS_TIME are out of the bounding set, as they
   hold nothing in a user namespace.
-- Where the host lacks a part (no range, no delegated cgroup, the
-  userland rung, a caller that is uid 0), the run takes the machine tier
+- Where the host lacks a part (no range, no delegated cgroup, a caller
+  that is uid 0) and has gVisor's `runsc` (`PODVM_RUNSC`, else PATH) and
+  user namespaces, the run takes the runsc tier and names the part on
+  stderr (T-2007). The init is PID 1 of a sandbox: gVisor's kernel gives
+  it a cgroup2 tree and each uid, and the code of the image runs on the
+  CPU of the host. The owners of the image go onto the files in the
+  sandbox. Each write of the root goes to an overlay that ends with the
+  run; a volume is a bind mount. `systemd-sysctl.service` is masked, as
+  the sandbox takes no sysctl. `uname -r` names gVisor, and a program
+  that needs a call that gVisor lacks fails there. The tier takes no
+  `-t`, `--timeout` or `--tmpfs`: such a run goes to the guest. podvm
+  fetches no runsc (T-2009). On the cloud host a run with MariaDB and
+  PostgreSQL takes 10 s on this tier, as on the namespace rung, and 46 s
+  in the guest under TCG.
+- Where the host has no runsc or no user namespace (the userland rung),
+  the run takes the machine tier
   and names the part on stderr. The init is then PID 1 of a PID
   namespace of the guest, with real root and each controller of cgroup2.
   The guest has the limits of "Guests" above: the root is an initramfs
@@ -339,7 +353,9 @@ C26). Experiment 465 measures each line below as uid 1000.
   memory for an image of 584 MB; the namespace rung takes 3 s.
 - The userland rung itself boots no init: its PID 1 is the PID 1 of the
   host, `setresuid` to another uid gives EPERM (T-0711), and the kernel
-  gives a PID namespace only with a user namespace or CAP_SYS_ADMIN.
+  gives a PID namespace only with a user namespace or CAP_SYS_ADMIN. Its
+  route is the guest; T-2005 plans User-Mode Linux in its seccomp mode
+  as the route with no emulator.
 - `run -d`, `create` and `exec` with the init hold on the incus tier only
   (T-1993). On the namespace rung, the command gets the primary group of
   `--user` and no supplementary group, and `tty` in a command of `-t`

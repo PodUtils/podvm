@@ -157,7 +157,8 @@ fn where_the_init_of_the_image_holds() {
         ("run", &["--podvm-tier=incus"][..], false),
         ("run", &["--podvm-tier=syscall"][..], false),
         ("run", &["--podvm-tier=emulate"][..], false),
-        ("run", &["--podvm-tier=runsc"][..], false),
+        ("run", &["--podvm-tier=runsc"][..], true),
+        ("run", &["-d", "--podvm-tier=runsc"][..], false),
         ("create", &[][..], false),
         ("create", &["--podvm-tier=incus"][..], true),
     ] {

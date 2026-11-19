@@ -5,17 +5,20 @@
 #
 # TODO/enter.md T-2002. The table of the owner (2026-11-19) said "not
 # possible" for the userland rung and "limited: one uid" for the namespace
-# rung. Two routes answer it: the namespace rung with the subordinate id
-# range and a delegated cgroup2 subtree (the init is PID 1 of a PID
-# namespace of the host), and a guest of the machine tier under KVM or TCG
-# (the init is PID 1 of a PID namespace of the guest), which a run takes by
-# itself where the host lacks a part of the first.
+# rung. Three routes answer it, and a run takes the first that the host
+# gives: the namespace rung with the subordinate id range and a delegated
+# cgroup2 subtree (the init is PID 1 of a PID namespace of the host); the
+# runsc tier (T-2007: PID 1 of a gVisor sandbox, which needs a user
+# namespace and no more); a guest of the machine tier under KVM or TCG
+# (PID 1 of a PID namespace of the guest).
 #
 # Run it as a user that is not root, or as root with PODVM_465_USER (the
 # user that runs podvm, default `ubuntu`; root then makes the store, and a
 # stand-in of a delegated cgroup2 directory for clause 1). The user needs
 # `newuidmap`, `newgidmap` and a range in /etc/subuid and /etc/subgid for
-# clause 1, and qemu-system-x86_64 for clauses 2 and 3.
+# clause 1, qemu-system-x86_64 for clauses 2 and 3, and for clause 8
+# gVisor's runsc (PODVM_465_RUNSC, else the pinned release of experiment
+# 436, which the script fetches and checks by its SHA-512).
 #
 # Pinned inputs:
 #   podvm   PODVM_465_BIN (default the release build of the workspace)
@@ -48,7 +51,12 @@
 #      cgroup `podvm-init-*` stays in the delegated directory;
 #   7. a SIGKILL of podvm during a run (TODO/supervise.md T-2006): no
 #      process of the run stays, for a run with podvm's init and, from the
-#      delegated directory, for a run with the init of the image.
+#      delegated directory, for a run with the init of the image;
+#   8. with runsc and no delegated cgroup (TODO/enter.md T-2007): the run
+#      names the runsc tier, and the check exits 7, from the namespace rung
+#      and with `PODVM_USERNS=0`; a SIGKILL of podvm leaves no process.
+#      Clauses 2 and 3 run with `PODVM_RUNSC` on a path with no file, so
+#      that they measure the guest. Skipped with no runsc.
 
 set -u
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -219,14 +227,14 @@ fi
 if delegated "$OWN"; then
 	say "clause 2  skipped: the cgroup of this shell is delegated"
 else
-	run_check 2 as
+	run_check 2 as env PODVM_RUNSC=/nonexistent/runsc
 	rc=$?
 	[ "$rc" -eq 7 ] || { bad "clause 2: the check gave $rc, not 7"; keep "$T.2.err"; }
 	grep -q 'takes the machine tier' "$T.2.err" || bad "clause 2: the run names no machine tier"
 fi
 
 # Clause 3: the userland rung: the machine tier.
-run_check 3 as env PODVM_USERNS=0
+run_check 3 as env PODVM_USERNS=0 PODVM_RUNSC=/nonexistent/runsc
 rc=$?
 [ "$rc" -eq 7 ] || { bad "clause 3: the check gave $rc, not 7"; keep "$T.3.err"; }
 grep -q 'takes the machine tier' "$T.3.err" || bad "clause 3: the run names no machine tier"
@@ -277,8 +285,8 @@ killed() { # the name of the case, then the command
 	wait
 	sleep 2
 	left=$(ps -u "$WHO" -o pid=,stat=,args= 2>/dev/null | grep -E 'sleep 465465|systemd|guest-init' | grep -v ' Z' || true)
-	say "clause 7  $what: podvm was pid ${outer:-none}; processes that stay: ${left:-none}"
-	{ [ -n "$outer" ] && [ -z "$left" ]; } || bad "clause 7: $what"
+	say "clause ${KC:-7}  $what: podvm was pid ${outer:-none}; processes that stay: ${left:-none}"
+	{ [ -n "$outer" ] && [ -z "$left" ]; } || bad "clause ${KC:-7}: $what"
 }
 killed "a run with podvm's init" as timeout 120 "$P" run --rm "$IMG" sleep 465465
 if [ -n "$DELEG" ]; then
@@ -290,6 +298,40 @@ if [ -n "$DELEG" ]; then
 			env HOME="$WORK/home" PODVM_STORE="$WORK/store" timeout 120 "$P" run --rm --podvm-init=image "$IMG" sleep 465465
 	fi
 fi
+
+# Clause 8: the runsc tier, on the host as it is.
+REL=20261102
+SUM=2e6671bb2d033b871c5811ab57e16ac570988b0e0054c525f911cfaf191bab3ca4efb08e0a98daa4b9e7d248f9e5776ef2ef2f8a6b82d829646a42924c98bb05
+RUNSC="${PODVM_465_RUNSC:-}"
+if [ -z "$RUNSC" ] && [ "$(uname -m)" = x86_64 ]; then
+	mkdir -p "$WORK/gvisor"
+	if curl -qfsSL -o "$WORK/gvisor.tar.bz2" "https://storage.googleapis.com/gvisor/releases/release/$REL/x86_64/gvisor.tar.bz2" &&
+		echo "$SUM  $WORK/gvisor.tar.bz2" | sha512sum -c - >/dev/null 2>&1 &&
+		tar -xjf "$WORK/gvisor.tar.bz2" -C "$WORK/gvisor" runsc gvisor-bin; then
+		RUNSC="$WORK/gvisor/runsc"
+		chmod -R a+rX "$WORK/gvisor"
+	fi
+	rm -f "$WORK/gvisor.tar.bz2"
+fi
+if [ -n "$RUNSC" ] && [ -x "$RUNSC" ] && ! delegated "$OWN"; then
+	say "runsc     $("$RUNSC" --version 2>/dev/null | head -1)"
+	run_check 8 as env PODVM_RUNSC="$RUNSC"
+	rc=$?
+	[ "$rc" -eq 7 ] || { bad "clause 8: the check gave $rc, not 7"; keep "$T.8.err"; }
+	grep -q 'takes the runsc tier' "$T.8.err" || bad "clause 8: the run names no runsc tier"
+	cp "$T.8.err" "$T.8a.err"
+	run_check 8 as env PODVM_USERNS=0 PODVM_RUNSC="$RUNSC"
+	rc=$?
+	[ "$rc" -eq 7 ] || { bad "clause 8 (PODVM_USERNS=0): the check gave $rc, not 7"; keep "$T.8.err"; }
+	KC=8
+	killed "a SIGKILL of podvm on the runsc tier" as env PODVM_RUNSC="$RUNSC" timeout 120 "$P" run --rm --podvm-init=image "$IMG" sleep 465465
+	left=$(ps -u "$WHO" -o pid=,stat=,args= 2>/dev/null | grep -E 'runsc|gvisor' | grep -v ' Z' || true)
+	say "clause 8  processes of gVisor that stay: ${left:-none}"
+	[ -z "$left" ] || bad "clause 8: a process of gVisor stays"
+else
+	say "clause 8  skipped: no runsc, or the cgroup of this shell is delegated"
+fi
+
 # The base of the killed run is empty; the next run removes it when it is
 # older than each boot (`initns::cgroup::sweep`). Here the script does.
 if [ -n "$STANDIN" ]; then

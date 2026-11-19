@@ -283,7 +283,7 @@ pub(super) fn init_check(verb: &str, o: &Opts) -> Result<(), i32> {
     let stays = o.detach || verb == "create";
     let holds = match o.tier {
         Some(Want::Incus) => stays,
-        Some(Want::Machine) | None => verb == "run" && !stays,
+        Some(Want::Machine) | Some(Want::Runsc) | None => verb == "run" && !stays,
         Some(_) => false,
     };
     if !o.init_image || holds {
@@ -291,8 +291,8 @@ pub(super) fn init_check(verb: &str, o: &Opts) -> Result<(), i32> {
     }
     eprintln!(
         "podvm {verb}: --podvm-init=image holds on a foreground run (the namespace rung, \
-         else the machine tier) and on --podvm-tier=incus with run -d or create \
-         (TODO/machine.md T-1993, TODO/enter.md T-2002)"
+         else the runsc tier, else the machine tier) and on --podvm-tier=incus with run -d \
+         or create (TODO/machine.md T-1993, TODO/enter.md T-2002, T-2007)"
     );
     Err(podvm_image::error::EXIT_FLAG_ERROR)
 }

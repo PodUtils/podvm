@@ -106,7 +106,12 @@ namespace rung, and as the command of `/podvm-init` in a guest of the
 machine tier. `initns::decide` selects the place before the user
 namespace opens: the namespace rung needs the subordinate id range and a
 delegated cgroup2 subtree, which the user manager of systemd can give
-(`initns/scope.rs`, T-2004). [The limits](limits.md#the-init-of-an-image)
+(`initns/scope.rs`, T-2004). On the runsc tier the init is PID 1 of a
+gVisor sandbox (`crates/podvm/src/runsc/init.rs`, T-2007): the bundle
+starts `guest-init --pid1`, which gives the files their owners and
+becomes the init, and the command runs by `runsc exec`. `initns::route`
+takes the namespace rung, then the runsc tier, then the machine tier
+(call C26). [The limits](limits.md#the-init-of-an-image)
 state what each place gives.
 
 Three commands boot a guest now:

@@ -5727,3 +5727,31 @@ Experiment 434, a new clause: an image whose `/bin/ping` has `cap_net_raw+ep`; `
 
 Partial (2026-11-19): podcrates `v0.76.0` (podcrates@T-957) is taken (`16f2395`): `pod-extract` sets each `SCHILY.xattr.*` record that the kernel lets it set, and names each other one in the sidecar row with its value. The unified tarball of the incus tier carries the attributes of the image as PAX records (`incus/xattrs.rs`): `security.capability` and `user.*` of the tree, and each attribute of the sidecar with a value; a v3 capability of the tree (the root id of the extracting user's namespace) goes as v2, so that the kernel of the instance sets its own root id. The unit test `the_sidecar_and_the_records_carry_each_attribute` passes. Experiment 434 on `1bbc6cd` gives "THE INCUS TIER RUNS" (the result is in `5d40e15`); clause 22: alpine with a layer whose `/usr/bin/capfile` carries `cap_net_raw+ep` in a PAX record; the sidecar names it (`EPERM`, the v2 value of the layer), and in the root of the instance of the incus tier the file has `security.capability` `01000003...0020...3fd64477`: `cap_net_raw` effective and permitted, v3 with the instance's own root id. Remaining: the root of the machine tier, on `kvm.yml`.
 
+# T-2008: The machine tier boots systemd at each run: a saved state of the guest for each digest
+
+**Source:** the owner's direction of 2026-11-19, hint 7 of the scout (the backlog of #580, TH-35 and FE-02); T-2002
+**Category:** machine
+**Milestone:** none
+**Priority:** P3
+**Effort:** L
+**Status:** open
+
+## Problem
+
+A run of `--podvm-init=image` on the machine tier boots the kernel and systemd each time: under TCG with one vCPU the boot of systemd is 37 s of 51 s, and with four vCPUs 12 s of 24 s (T-2002). The machine tier is the last route of an init, for a host with no user namespace.
+
+## Premise
+
+QEMU saves and loads the state of a guest (`savevm`, `migrate` to a file, `-incoming`), with the disks on a copy-on-write overlay. Not measured here.
+
+## Approach
+
+Boot the init of the image once for each digest and each guest shape, save the state of the guest after `systemctl is-system-running`, and start each run from that state on a new overlay; the command, the volumes and the environment of the run go in after the load. It needs the root on a disk (T-1994). A state of another QEMU version or shape is made again.
+
+## Decision
+
+-
+
+## Prove
+
+`sh experiments/465-init-image.sh`, clause 3, on the cloud host as uid 1000 with `ghcr.io/pkgforge-dev/archlinux:latest`: the second run of the same digest gives exit 7, and its time is under 15 s under TCG.

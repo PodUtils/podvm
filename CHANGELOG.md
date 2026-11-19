@@ -8,6 +8,12 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- `run --podvm-init=image` holds on the runsc tier (T-2007): the init of
+  the image is PID 1 of a gVisor sandbox, with a cgroup2 tree and each uid
+  from gVisor's kernel, so the host needs no delegated cgroup and no id
+  range. A run with no tier takes it before a guest of the machine tier
+  where `runsc` is there (call C26): 10 s against 46 s under TCG on the
+  cloud host for MariaDB and PostgreSQL under systemd.
 - `run --podvm-init=image` holds on a foreground run of a user with no
   root (T-2002): the init of the image (systemd) is PID 1 of a PID
   namespace, the command runs after `systemctl is-system-running` gives

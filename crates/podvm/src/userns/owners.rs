@@ -71,6 +71,13 @@ pub fn apply(rootfs: &Path) -> usize {
     else {
         return 0;
     };
+    apply_text(rootfs, &text, top)
+}
+
+/// Give the owners of the sidecar `text` to the tree `rootfs`, for the ids
+/// up to `top`. The count changed. A kernel of a sandbox that holds each
+/// id (gVisor, TODO/enter.md T-2007) takes the same records.
+pub fn apply_text(rootfs: &Path, text: &str, top: u64) -> usize {
     let Some(root) = rootfs.to_str().and_then(k::CBuf::new) else {
         return 0;
     };
@@ -78,7 +85,7 @@ pub fn apply(rootfs: &Path) -> usize {
         return 0;
     };
     let mut n = 0;
-    for c in changes(&text, top) {
+    for c in changes(text, top) {
         let (dir, name) = c.path.rsplit_once('/').unwrap_or(("", c.path.as_str()));
         let dfd = if dir.is_empty() {
             Some(rfd)

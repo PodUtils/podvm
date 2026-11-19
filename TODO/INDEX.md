@@ -667,12 +667,15 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2002](enter.md) | P1 | L | none | enter | partial | `--podvm-init=image` holds only on the incus tier: the namespace rung maps one uid, and the userland rung has no PID 1 |
 | [T-2003](enter.md) | P2 | M | none | enter | open | On the userland rung, a program with a library in a directory of its RUNPATH does not load (`systemctl`) |
 | [T-2004](enter.md) | P2 | M | none | enter | partial | A delegated cgroup2 subtree from the user manager of systemd, for an init of the image on the namespace rung |
-| [T-2005](enter.md) | P3 | L | none | enter | open | An init of the image with no guest on a host that delegates no cgroup: a cgroup2 stand-in, or User-Mode Linux |
+| [T-2005](enter.md) | P2 | L | none | enter | open | An init of the image with no guest on a host that delegates no cgroup: a cgroup2 stand-in, or User-Mode Linux |
 | [T-2006](supervise.md) | P1 | S | none | supervise | done | A SIGKILL of podvm leaves the processes of a foreground run in its PID namespace |
+| [T-2007](enter.md) | P1 | M | none | enter | partial | The init of the image as PID 1 of a gVisor sandbox: the runsc tier, for a host with a user namespace and no delegated cgroup |
+| [T-2008](machine.md) | P3 | L | none | machine | open | The machine tier boots systemd at each run: a saved state of the guest for each digest |
+| [T-2009](enter.md) | P2 | M | none | enter | open | podvm fetches no runsc: the gVisor route of an init is there only where the host has one |
 
 ## Counts
 
-603 entries: 26 open, 36 partial, 3 blocked, 538 done.
+606 entries: 28 open, 37 partial, 3 blocked, 538 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -682,10 +685,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 17 | 0 | 244 | 264 |
-| P2 | 17 | 15 | 2 | 177 | 211 |
+| P1 | 3 | 18 | 0 | 244 | 265 |
+| P2 | 19 | 15 | 2 | 177 | 213 |
 | P3 | 6 | 4 | 1 | 42 | 53 |
-| **All** | 26 | 36 | 3 | 538 | 603 |
+| **All** | 28 | 37 | 3 | 538 | 606 |
 
 ## Work order
 

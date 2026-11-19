@@ -5,24 +5,15 @@
 
 use super::*;
 
-/// The runsc tier: `run` only; each flag that the tier does not serve
-/// refuses by name.
-pub(super) fn runsc_tier(
-    verb: &str,
-    store: &podvm_image::Store,
-    o: &Opts,
-    platform: &Platform,
-    policy: &Policy,
-) -> i32 {
-    let refuse = |what: &str| {
-        eprintln!("podvm {verb}: --podvm-tier=runsc {what} (TODO/enter.md T-1729)");
-        EXIT_FLAG_ERROR
-    };
+/// What the tier does not serve of `o`, or `None`: the refusal of the
+/// tier, and the reason for which a run that selects its tier by itself
+/// (`--podvm-init=image`, TODO/enter.md T-2007) goes past it.
+pub(crate) fn unserved(verb: &str, o: &Opts) -> Option<&'static str> {
     if verb != "run" || o.detach {
-        return refuse("serves a foreground run only: the bundle goes at its end");
+        return Some("serves a foreground run only: the bundle goes at its end");
     }
     if o.tty {
-        return refuse("takes no -t: the bundle has no terminal");
+        return Some("takes no -t: the bundle has no terminal");
     }
     if o.mem.is_some()
         || o.cpus.is_some()
@@ -36,10 +27,29 @@ pub(super) fn runsc_tier(
         || o.sealed
         || o.engine
     {
-        return refuse(
+        return Some(
             "takes no --podvm-mem, --podvm-cpus, --podvm-qemu-arg, --podvm-net, \
              --podvm-channel, --podvm-sealed, --podvm-engine, --network broker, --podvm-confine, --timeout or --tmpfs yet",
         );
+    }
+    None
+}
+
+/// The runsc tier: `run` only; each flag that the tier does not serve
+/// refuses by name.
+pub(super) fn runsc_tier(
+    verb: &str,
+    store: &podvm_image::Store,
+    o: &Opts,
+    platform: &Platform,
+    policy: &Policy,
+) -> i32 {
+    let refuse = |what: &str| {
+        eprintln!("podvm {verb}: --podvm-tier=runsc {what} (TODO/enter.md T-1729)");
+        EXIT_FLAG_ERROR
+    };
+    if let Some(what) = unserved(verb, o) {
+        return refuse(what);
     }
     let user = match crate::runsc::numeric_user(o.user.as_deref()) {
         Ok(u) => u,
@@ -55,6 +65,18 @@ pub(super) fn runsc_tier(
         Ok(p) => p,
         Err(c) => return c,
     };
+    // TODO/enter.md T-2007: the command of an init starts after the boot,
+    // by `runsc exec`, whose error for a missing program has no code of
+    // its own: a program that the image lacks refuses here with 127.
+    if o.init_image {
+        let maps = podvm_enter::userland::Maps::of_root(&p.rootfs.to_string_lossy());
+        let program = p.argv.first().cloned().unwrap_or_default();
+        let dirs = Plan::path_from(&p.env);
+        if podvm_enter::ladder::guest_exe(&maps, &program, &dirs).is_none() {
+            eprintln!("podvm {verb}: runsc tier: exec: {program:?}: no such program in the image");
+            return 127;
+        }
+    }
     let tree = match super::tree::Tree::fill(verb, store, &p.digest) {
         Ok(t) => t,
         Err(c) => return c,
@@ -72,5 +94,8 @@ pub(super) fn runsc_tier(
         ro: &o.ro_volumes,
         read_only: o.read_only,
         user,
+        init: o
+            .init_image
+            .then(|| podvm_extract::paths(store, &p.digest).1), // T-2007
     })
 }

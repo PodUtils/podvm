@@ -161,6 +161,15 @@ and `docs/decisions.md`. Remove this file when each step below is done.
   yet. T-2006 (done): a SIGKILL of podvm ends each process of a
   foreground run in the user namespace.
 
+* The owner's direction of 2026-11-19: a near-native route before TCG.
+  T-2007 (partial): `--podvm-init=image` on the runsc tier (gVisor): the
+  cloud host as it is boots systemd as PID 1 in 7 s to 10 s as uid 1000;
+  the route of a run with no tier is the namespace rung, then runsc, then
+  the machine tier (call C26). The pinned gVisor of experiment 436 is not
+  on PATH: set `PODVM_RUNSC`. Open: T-2009 (podvm fetches runsc), T-2005
+  (User-Mode Linux in its seccomp mode for the userland rung: ask
+  podcrates before a kernel build), T-2008 (a saved state of the guest).
+
 ## Next steps, in order
 
 1. Start the session (`AGENTS.md`, section 8), with the watcher (filter

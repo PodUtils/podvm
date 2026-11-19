@@ -26,6 +26,7 @@ pub mod boot;
 pub mod cgroup;
 pub mod join;
 pub mod mounts;
+pub mod sandbox;
 pub mod scope;
 
 /// The init of an image, as incus and each container manager start it.
@@ -159,11 +160,32 @@ pub fn route(verb: &str, mut o: crate::run::Opts) -> crate::run::Opts {
         let why = WHY.get().cloned().unwrap_or_else(|| {
             "the host refuses the user namespace of the run or its id range".to_string()
         });
-        eprintln!(
-            "podvm run: --podvm-init=image: {why}; the run takes the machine tier, where the \
-             init of the image is PID 1 of a PID namespace of the guest (TODO/enter.md T-2002)"
-        );
-        o.tier = Some(crate::tier::Want::Machine);
+        // TODO/enter.md T-2007: gVisor before a guest. Its kernel gives the
+        // init a cgroup2 tree and each uid with no help of the host, and
+        // the code of the image runs on the CPU of the host.
+        let sandbox = match crate::run::runsc_unserved(verb, &o) {
+            Some(what) => Err(format!("the runsc tier {what}")),
+            None => crate::runsc::binary()
+                .and_then(|_| crate::runsc::user_namespaces())
+                .map_err(|e| format!("no runsc tier: {e}")),
+        };
+        match sandbox {
+            Ok(()) => {
+                eprintln!(
+                    "podvm run: --podvm-init=image: {why}; the run takes the runsc tier, where \
+                     the init of the image is PID 1 of a gVisor sandbox (TODO/enter.md T-2007)"
+                );
+                o.tier = Some(crate::tier::Want::Runsc);
+            }
+            Err(no) => {
+                eprintln!(
+                    "podvm run: --podvm-init=image: {why}; {no}; the run takes the machine \
+                     tier, where the init of the image is PID 1 of a PID namespace of the \
+                     guest (TODO/enter.md T-2002)"
+                );
+                o.tier = Some(crate::tier::Want::Machine);
+            }
+        }
     }
     if o.tier == Some(crate::tier::Want::Machine) && o.cpus.is_none() {
         let host = std::thread::available_parallelism().map_or(1, |n| n.get());
@@ -274,6 +296,9 @@ pub fn parse(args: &[String]) -> Result<boot::Spec, String> {
 /// `podvm guest-init ...`: internal, in the user namespace of a run or in
 /// a guest.
 pub fn main(args: &[String]) -> i32 {
+    if args.first().map(String::as_str) == Some(sandbox::FLAG) {
+        return sandbox::main(&args[1..]);
+    }
     match parse(args) {
         Ok(mut spec) => {
             spec.verbose |= std::env::var(LOG_VAR).is_ok_and(|v| v == "1");
