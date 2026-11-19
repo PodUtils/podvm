@@ -316,9 +316,11 @@ C26). Experiment 465 measures each line below as uid 1000.
   the uid of mysql, and its files belong to that uid (a subordinate id
   on the host). The second is a delegated cgroup2 subtree: a directory at
   or above the cgroup of podvm that the caller can write. systemd as PID 1
-  ends without one ("Failed to create /init.scope control group"). A
-  user manager of systemd gives one to `systemd-run --user --scope -p
-  Delegate=yes podvm run ...` (T-2004 makes podvm ask for it).
+  ends without one ("Failed to create /init.scope control group"). Where
+  the caller has none and a user manager of systemd answers on the user
+  bus, podvm asks it for a scope with `Delegate=yes` (`busctl` of the
+  host, T-2004, experiment 466); the init of the image then gets no
+  controller of cgroup2.
 - The init is PID 1 of a PID namespace, not of the host. It has a mount,
   a cgroup, an IPC and a UTS namespace of its own and the network of the
   host. `/sys` is read-only, `/dev` is a tmpfs with the nodes `null`,

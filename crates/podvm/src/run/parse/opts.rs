@@ -290,7 +290,9 @@ pub(super) fn init_check(verb: &str, o: &Opts) -> Result<(), i32> {
         return Ok(());
     }
     eprintln!(
-        "podvm {verb}: --podvm-init=image holds on a foreground run (the namespace rung,          else the machine tier) and on --podvm-tier=incus with run -d or create          (TODO/machine.md T-1993, TODO/enter.md T-2002)"
+        "podvm {verb}: --podvm-init=image holds on a foreground run (the namespace rung, \
+         else the machine tier) and on --podvm-tier=incus with run -d or create \
+         (TODO/machine.md T-1993, TODO/enter.md T-2002)"
     );
     Err(podvm_image::error::EXIT_FLAG_ERROR)
 }

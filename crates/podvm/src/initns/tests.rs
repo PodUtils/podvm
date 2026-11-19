@@ -142,3 +142,37 @@ fn a_base_is_stale_with_no_process_and_an_age() {
         assert_eq!(cgroup::stale(events, age), want, "{events:?} {age:?}");
     }
 }
+
+/// TODO/enter.md T-2004: the call of the user manager, and the read of the
+/// move from `/proc/self/cgroup`.
+#[test]
+fn the_scope_of_the_user_manager_is_asked_for_and_read() {
+    let a = scope::call_args("podvm-init-ab.scope", 4242);
+    let line = a.join(" ");
+    assert!(
+        line.starts_with("--user --no-pager call org.freedesktop.systemd1 "),
+        "{line}"
+    );
+    assert!(
+        line.ends_with(
+            "StartTransientUnit ssa(sv)a(sa(sv)) podvm-init-ab.scope fail 2 \
+             PIDs au 1 4242 Delegate b true 0"
+        ),
+        "{line}"
+    );
+    let own = "0::/user.slice/user-1000.slice/user@1000.service/app.slice/podvm-init-ab.scope\n";
+    for (text, want) in [
+        (own, true),
+        (
+            "1:cpu:/x\n0::/user.slice/user-1000.slice/session-3.scope\n",
+            false,
+        ),
+        ("0::/a/podvm-init-ab.scope/child\n", false),
+        ("0::/a/xpodvm-init-ab.scope\n", false),
+        ("", false),
+    ] {
+        assert_eq!(scope::moved(text, "podvm-init-ab.scope"), want, "{text:?}");
+    }
+    assert_eq!(scope::user_bus(Some("/nonexistent-podvm-dir"), 1000), None);
+    assert_eq!(scope::user_bus(Some("relative"), 4_000_000_000), None);
+}

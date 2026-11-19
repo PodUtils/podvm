@@ -1,0 +1,26 @@
+date      2026-11-19T15:25:57Z
+podvm     podvm 0.2.0-beta.36
+user      ubuntu (uid 1000)
+kvm       no (the guest runs under TCG)
+guest     rc 0 in 273 s
+    NEST systemd systemd 261 (261.2-1-arch)
+    NEST user-manager active bus=yes
+    NEST cgroup-before /system.slice/run-p138-i945.service
+    NEST load 0
+    CHECK pid1 systemd
+    CHECK state running
+    CHECK uid_map  0 1000 1 1 100000 65536 
+    CHECK unit-mysql active=active mainpid-uid=961 file-owner=961 want=961
+    CHECK unit-postgres active=active mainpid-uid=962 file-owner=962 want=962
+    CHECK unit-www-data active=active mainpid-uid=33 file-owner=33 want=33
+    CHECK unit-nobody active=active mainpid-uid=65534 file-owner=65534 want=65534
+    CHECK stop inactive
+    CHECK failed-units 
+    VERDICT pass
+    NEST inner-rc 7
+    NEST machine-tier-lines 0
+    NEST scope-at-the-end:   podvm-init-5041780c9fe8ff4ac809153791c041e6.scope loaded active running podvm-init-5041780c9fe8ff4ac809153791c041e6.scope
+    NEST scopes-after 0 (waited 24 s)
+    NEST systemd-run 0
+emulators that stay: none
+THE USER MANAGER GIVES THE SUBTREE

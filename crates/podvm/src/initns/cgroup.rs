@@ -109,7 +109,17 @@ pub fn make(base: &Path) -> std::io::Result<Leaves> {
     Ok(leaves)
 }
 
+/// ⛔ Not in a directory with a process of its own, except the root of the
+/// hierarchy: the kernel lets a threaded controller (`pids`, `cpu`) go on
+/// there, and each child is then "domain invalid", so that no process can
+/// move into it (EOPNOTSUPP; measured in a scope of a user manager).
 fn enable(dir: &Path) {
+    let root = !dir.join("cgroup.events").exists();
+    let busy =
+        std::fs::read_to_string(dir.join("cgroup.procs")).is_ok_and(|p| !p.trim().is_empty());
+    if busy && !root {
+        return;
+    }
     let offered = std::fs::read_to_string(dir.join("cgroup.controllers")).unwrap_or_default();
     for c in offered.split_whitespace() {
         let _ = std::fs::write(dir.join("cgroup.subtree_control"), format!("+{c}"));

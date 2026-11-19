@@ -15,7 +15,8 @@ They describe their recorded revision, not the current build.
   the namespace rung where the host gives the caller a subordinate id
   range and a delegated cgroup2 subtree; else, and from the userland rung,
   in a guest of the machine tier (KVM or TCG), with one line that names the
-  missing part (call C26).
+  missing part (call C26). Where a user manager of systemd answers, podvm
+  asks it for the delegated subtree (a scope with `Delegate=yes`, T-2004).
 - A SIGKILL of podvm during a foreground run of a user with no root ends
   each process of the run; before, the payload stayed (T-2006).
 - The machine tier boots an image with a file that its owner cannot read

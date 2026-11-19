@@ -26,6 +26,7 @@ pub mod boot;
 pub mod cgroup;
 pub mod join;
 pub mod mounts;
+pub mod scope;
 
 /// The init of an image, as incus and each container manager start it.
 pub const INIT: &str = "/sbin/init";
@@ -96,10 +97,21 @@ pub fn decide(argv: &[String], uid: u32) -> bool {
         return false;
     }
     let var = std::env::var(crate::userns::VAR).ok();
+    let userns = crate::userns::wanted(argv, uid, var.as_deref());
+    let range = crate::userns::range_available();
+    let mut cgroup = cgroup::delegated();
+    // TODO/enter.md T-2004: where the rest holds, the user manager of
+    // systemd can give the missing subtree.
+    if let (true, true, Err(first)) = (userns, range, &cgroup) {
+        cgroup = match scope::ask() {
+            Ok(()) => cgroup::delegated(),
+            Err(why) => Err(format!("{first}; {why}")),
+        };
+    }
     let host = Host {
-        userns: crate::userns::wanted(argv, uid, var.as_deref()),
-        range: crate::userns::range_available(),
-        cgroup: cgroup::delegated(),
+        userns,
+        range,
+        cgroup,
     };
     match refusal(&host) {
         Some(why) => {

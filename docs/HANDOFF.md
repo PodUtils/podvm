@@ -153,9 +153,11 @@ and `docs/decisions.md`. Remove this file when each step below is done.
   subtree, else in a guest of the machine tier, also from the userland
   rung (call C26). `sh experiments/465-init-image.sh` passes on the cloud
   host as uid 1000 (clause 1 with a cgroup2 directory that root made, as
-  the host delegates none). T-2003 (RUNPATH on the userland rung: an ask
-  for pod-enter), T-2004 (a scope of the user manager) and T-2005 (a
-  cgroup2 stand-in, User-Mode Linux) are open. No COORD issue names them
+  the host delegates none). T-2004 (partial): podvm asks the user manager
+  of systemd for the delegated scope; `sh experiments/466-init-image-scope.sh`
+  passes (the host of that measure is a guest with systemd, 5 minutes
+  under TCG). T-2003 (RUNPATH on the userland rung: an ask for pod-enter)
+  and T-2005 (a cgroup2 stand-in, User-Mode Linux) are open. No COORD issue names them
   yet. T-2006 (done): a SIGKILL of podvm ends each process of a
   foreground run in the user namespace.
 

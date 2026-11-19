@@ -666,13 +666,13 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2001](cli.md) | P2 | M | none | cli | partial | The faults of the fifth outside pass (2026-11-19, the gate of beta.36) |
 | [T-2002](enter.md) | P1 | L | none | enter | partial | `--podvm-init=image` holds only on the incus tier: the namespace rung maps one uid, and the userland rung has no PID 1 |
 | [T-2003](enter.md) | P2 | M | none | enter | open | On the userland rung, a program with a library in a directory of its RUNPATH does not load (`systemctl`) |
-| [T-2004](enter.md) | P2 | M | none | enter | open | A delegated cgroup2 subtree from the user manager of systemd, for an init of the image on the namespace rung |
+| [T-2004](enter.md) | P2 | M | none | enter | partial | A delegated cgroup2 subtree from the user manager of systemd, for an init of the image on the namespace rung |
 | [T-2005](enter.md) | P3 | L | none | enter | open | An init of the image with no guest on a host that delegates no cgroup: a cgroup2 stand-in, or User-Mode Linux |
 | [T-2006](supervise.md) | P1 | S | none | supervise | done | A SIGKILL of podvm leaves the processes of a foreground run in its PID namespace |
 
 ## Counts
 
-603 entries: 27 open, 35 partial, 3 blocked, 538 done.
+603 entries: 26 open, 36 partial, 3 blocked, 538 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -683,9 +683,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 17 | 0 | 244 | 264 |
-| P2 | 18 | 14 | 2 | 177 | 211 |
+| P2 | 17 | 15 | 2 | 177 | 211 |
 | P3 | 6 | 4 | 1 | 42 | 53 |
-| **All** | 27 | 35 | 3 | 538 | 603 |
+| **All** | 26 | 36 | 3 | 538 | 603 |
 
 ## Work order
 

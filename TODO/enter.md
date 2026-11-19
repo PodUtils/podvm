@@ -5238,7 +5238,7 @@ Remaining:
 4. The command gets the primary group of `--user` only, and no supplementary group of the image.
 5. A volume under `--podvm-volume-base` at or under `/tmp` binds by its path, not by the held descriptor.
 6. An image whose init is not systemd (busybox init, OpenRC): the command starts at once, as no state can be asked; not measured.
-7. T-2003 (a program with a library in a directory of its RUNPATH on the userland rung), T-2004 (a delegated subtree from the user manager of systemd) and T-2005 (the routes with no guest and no delegated cgroup).
+7. T-2003 (a program with a library in a directory of its RUNPATH on the userland rung), T-2004 (a delegated subtree from the user manager of systemd: partial, experiment 466) and T-2005 (the routes with no guest and no delegated cgroup).
 
 # T-2003: On the userland rung, a program with a library in a directory of its RUNPATH does not load (`systemctl`)
 
@@ -5276,7 +5276,7 @@ As uid 1000 with `PODVM_USERNS=0`: `run --rm -v DIR:/v ghcr.io/pkgforge-dev/arch
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -5288,7 +5288,7 @@ rootless podman and crun ask the user manager for a scope with `Delegate=yes` ov
 
 ## Approach
 
-Where `initns::decide` finds the range and no delegated directory, and the user bus answers (`$XDG_RUNTIME_DIR/bus`): run podvm again in a scope of the user manager with `Delegate=yes` (`systemd-run --user --scope`, else the call of the bus), once, with a variable that stops a second try. Where no user manager answers, the machine tier as today, and the line names the scope.
+Where `initns::decide` finds the range and no delegated directory, and the user bus answers (`$XDG_RUNTIME_DIR/bus`, else `/run/user/UID/bus`): ask the user manager for a scope `podvm-init-NONCE.scope` with `Delegate=yes` that holds the pid of podvm (`StartTransientUnit` with `PIDs=`, by `busctl --user` of the host, 5 s at most), and read `/proc/self/cgroup` until it names the scope. podvm runs no second time, and its descriptors stay. The scope ends with its last process. Where a step fails, the machine tier as before, and the line names the step.
 
 ## Decision
 
@@ -5296,7 +5296,11 @@ Where `initns::decide` finds the range and no delegated directory, and the user 
 
 ## Prove
 
-On a host with systemd and a login of a user with a subordinate range (a hosted runner, a job of `kvm.yml`): `sh experiments/465-init-image.sh` passes clause 1 from the shell of the login, with no directory that root made, and no scope of the run stays.
+`sh experiments/466-init-image-scope.sh` as a user with no root, with `ghcr.io/pkgforge-dev/archlinux:latest` at the digest of `scripts/common/distro-matrix.sh`: in a guest with systemd, a user with a user manager runs podvm from a cgroup of root; the check of experiment 465 exits 7 with the range in the `uid_map`, the run names no machine tier, and no scope `podvm-init-*` stays 90 s after it. On a host with systemd and a login of a user (a hosted runner, a job of `kvm.yml`): `sh experiments/465-init-image.sh` passes clause 1 from the shell of the login, with no directory that root made.
+
+## Done
+
+Partial (2026-11-19). `crates/podvm/src/initns/scope.rs` (`ask`, called by `initns::decide` before the user namespace); the unit test `the_scope_of_the_user_manager_is_asked_for_and_read` passes. Experiment 466 on the cloud host as uid 1000 gives "THE USER MANAGER GIVES THE SUBTREE" (`experiments/results/init-image-scope.txt`): the host of the measure is a guest of the machine tier under TCG with systemd 261 as its init (T-2002), as the cloud host runs no systemd. In it, uid 1000 starts podvm from `/system.slice/run-*.service` (a transient service of the system manager, as the scope of a login); the user manager moves podvm into `app.slice/podvm-init-*.scope`; the init of the image boots on the namespace rung (state `running`, `uid_map` `0 1000 1` and `1 100000 65536`, the four units as their users, exit 7); the scope ends 24 s after the run, with the helpers of podvm. A fault that the run found is fixed: podvm enabled the controllers of the scope for its children while podvm was a process of the scope; the kernel accepts that for a threaded controller (`pids`), each child cgroup is then "domain invalid", and the move of the supervisor gave EOPNOTSUPP. podvm now enables no controller in a directory with a process (`initns/cgroup.rs::enable`). Remaining: (1) the same from the shell of a real login on a host with systemd (`kvm.yml`); the setup of the guest made the user, started `user@1000.service` by `systemctl`, and gave `newuidmap` its set-user-ID bit; (2) the init of the image in a scope gets no controller of cgroup2 (memory, pids), as podvm is a process of the scope: move podvm into a leaf of the scope first; (3) a host with a user manager and no `busctl`.
 
 # T-2005: An init of the image with no guest on a host that delegates no cgroup: a cgroup2 stand-in, or User-Mode Linux
 
