@@ -280,7 +280,6 @@ fn a_run_imports_creates_pushes_starts_execs_and_deletes() {
     unsafe { std::env::set_var("PODVM_INCUS_SOCKET", &sock) };
     let code = super::run::run(&Job {
         verb: "run",
-        store_root: &d,
         rootfs: &d.join("root"),
         digest: "sha256:00112233445566778899",
         argv: vec!["echo".into(), "hello".into()],

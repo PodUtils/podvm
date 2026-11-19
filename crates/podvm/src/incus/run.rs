@@ -28,11 +28,10 @@ use pod_incus::{
 };
 use podvm_image::error::EXIT_RUNTIME_ERROR;
 
-use super::image::{alias, unified_tarball};
+use super::image::{alias, unified_tarball_to};
 
 pub struct Job<'a> {
     pub verb: &'a str,
-    pub store_root: &'a Path,
     pub rootfs: &'a Path,
     pub digest: &'a str,
     pub argv: Vec<String>,
@@ -222,19 +221,23 @@ async fn ensure_image(c: &Client, job: &Job<'_>) -> Result<(String, bool), Strin
     if c.alias(&name).await.map_err(|e| e.to_string())?.is_some() {
         return Ok((name, true));
     }
-    let dir = job.store_root.join("incus");
-    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    let tarball: PathBuf = dir.join(format!("{name}.tar"));
-    unified_tarball(job.rootfs, &tarball, &me)?;
-    let file = tokio::fs::File::open(&tarball)
-        .await
-        .map_err(|e| format!("{}: {e}", tarball.display()))?;
-    let length = file.metadata().await.map(|m| m.len()).ok();
-    let mut import = ImageImport::new(ImageData::Unified(Payload::new(file, length)));
+    // TODO/machine.md T-1997 (PodUtils/podrunner#316): the tarball goes to
+    // incusd through a pipe, in chunks, as a thread writes it: no tarball
+    // file in the store beside the tree and the image of incusd.
+    let (r, w) = std::io::pipe().map_err(|e| format!("a pipe for the import: {e}"))?;
+    let rootfs = job.rootfs.to_path_buf();
+    let writer = std::thread::spawn(move || unified_tarball_to(&rootfs, w, &me));
+    let reader = tokio::fs::File::from_std(std::fs::File::from(std::os::fd::OwnedFd::from(r)));
+    let mut import = ImageImport::new(ImageData::Unified(Payload::new(reader, None)));
     import.aliases = vec![name.clone()];
     let done = c.import_image(import).await;
-    let _ = std::fs::remove_file(&tarball);
+    // The writer ends at the end of the tree, or with EPIPE where incusd
+    // stopped reading; incusd's own error is the one that names the cause.
+    let wrote = writer
+        .join()
+        .unwrap_or_else(|_| Err("the writer of the tarball ended with a panic".into()));
     done.map_err(|e| e.to_string())?;
+    wrote?;
     Ok((name, false))
 }
 

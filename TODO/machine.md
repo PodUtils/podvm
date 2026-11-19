@@ -5639,7 +5639,7 @@ Partial (2026-11-19): with `--podvm-init=image` the instance takes `security.idm
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -5660,6 +5660,10 @@ Stream the unified tarball into the import of incusd (`POST /1.0/images` with th
 ## Prove
 
 `sh experiments/434-incus-tier.sh`, a new clause: the import of an image of at least 1 GB; the peak of the disk use of the store and the pool is at most 2.2 times the size of the image (the store and the pool), and the image runs.
+
+## Done
+
+Partial (2026-11-19): `incus::run::ensure_image` writes the unified tarball into a pipe in a thread (`image::unified_tarball_to`), and the import of incusd reads it in chunks: no tarball file lies in the store. The incus unit tests pass, among them the run against a stand-in of incusd. Remaining: experiment 434 with incusd, and the measure of the peak of the disk use (incusd keeps the image in its `images` directory beside the volume of the pool, so the bound of the Prove may need a third copy of incusd's own).
 
 # T-1998: On the incus tier, an OCI image with a kernel runs as a virtual machine
 

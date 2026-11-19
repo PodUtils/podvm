@@ -60,11 +60,22 @@ pub fn intended(sidecar: &str) -> HashMap<String, (u64, u64, u32)> {
 /// The unified tarball of `rootfs` at `out`: `metadata.yaml` and
 /// `rootfs/`, with the owners and modes of `.meta.jsonl` beside `rootfs`,
 /// and `podvm` at `rootfs/.podvm/podvm` (owner 0, mode 0755).
+#[cfg(test)]
 pub fn unified_tarball(rootfs: &Path, out: &Path, podvm: &[u8]) -> Result<(), String> {
+    let f = std::fs::File::create(out).map_err(|e| format!("{}: {e}", out.display()))?;
+    unified_tarball_to(rootfs, f, podvm)
+}
+
+/// [`unified_tarball`] into `w`: a pipe to the import of incusd, so that
+/// no tarball file lies in the store (TODO/machine.md T-1997).
+pub fn unified_tarball_to<W: std::io::Write>(
+    rootfs: &Path,
+    w: W,
+    podvm: &[u8],
+) -> Result<(), String> {
     let sidecar = rootfs.with_file_name(".meta.jsonl");
     let meant = intended(&std::fs::read_to_string(&sidecar).unwrap_or_default());
-    let f = std::fs::File::create(out).map_err(|e| format!("{}: {e}", out.display()))?;
-    let mut b = tar::Builder::new(std::io::BufWriter::new(f));
+    let mut b = tar::Builder::new(std::io::BufWriter::new(w));
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())

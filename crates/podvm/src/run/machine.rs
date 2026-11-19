@@ -414,7 +414,6 @@ pub(super) fn incus_tier(
     note_guest_run("incus", o, &p);
     crate::incus::run::run(&crate::incus::run::Job {
         verb,
-        store_root: store.root(),
         rootfs: &p.rootfs,
         digest: &p.digest,
         argv: p.argv,
