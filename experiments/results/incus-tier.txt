@@ -1,5 +1,5 @@
 == conditions
-date              2026-11-19T06:23:37Z
+date              2026-11-19T06:42:03Z
 host kernel       Linux 6.18.44-fc-v653
 cgroup            tmpfs
 incus package     6.0.0-1ubuntu0.3
@@ -9,15 +9,15 @@ runs              5
 == 1. a run
   stdout  hello
   exit    0
-  ms      1194 (with the import)
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-4e1b76ee4e94b8cb-v3 imported now (TODO/machine.md T-1718)
+  ms      1072 (with the import)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-715bb496ff74f2bd-v3 imported now (TODO/machine.md T-1718)
 
 == 2. the exit code
   exit    7
 
 == 3. stdout and stderr
   stdout  out
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-4e1b76ee4e94b8cb-v3 from incus (TODO/machine.md T-1718)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-715bb496ff74f2bd-v3 from incus (TODO/machine.md T-1718)
   stderr  err
 
 == 4. stdin
@@ -30,11 +30,11 @@ runs              5
   PID 1                 /.podvm/podvm guest-hold 
   owner of /etc/passwd  0:0
   owner of /etc/shadow  0:42
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-4e1b76ee4e94b8cb-v3 from incus (TODO/machine.md T-1718)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-715bb496ff74f2bd-v3 from incus (TODO/machine.md T-1718)
 
 == 7. the cached image
-  run true ms  1053 (median of 5)
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-4e1b76ee4e94b8cb-v3 from incus (TODO/machine.md T-1718)
+  run true ms  887 (median of 5)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-715bb496ff74f2bd-v3 from incus (TODO/machine.md T-1718)
 
 == 8. a name that is no instance
   exec exit    125
@@ -104,7 +104,7 @@ runs              5
   left     0
   native   podvm run: --storage-opt size= sizes the root disk of an instance of the incus tier (--podvm-tier=incus); this tier has no root disk to size (TODO/machine.md T-1964, T-1968)  rc 125
 == 18. the CPU time and the peak memory in inspect
-  usage    1.015 61706240 0
+  usage    1.083 61792256 0
 == 19. --podvm-init=image: systemd as PID 1
   run -d   sd434
   exec     running
@@ -116,9 +116,9 @@ runs              5
 == 20. the hosted snapshot: ids, /dev/fuse, a machine-id of each
   run -d   sna434
   run -d   snb434
-  logs sna434 ids 231072 fuse open mid 8c6d1642f1e344fb8c2b3655a5fa6377 
-  logs snb434 ids 231072 fuse open mid 87bf538c95614795b8bbef069705f797 
-  machine-ids 8c6d1642f1e344fb8c2b3655a5fa6377 87bf538c95614795b8bbef069705f797
+  logs sna434 ids 231072 fuse open mid bbbd5052885f4979bafca93c4f0f313f 
+  logs snb434 ids 231072 fuse open mid 1911bac080664039b08165a6ba07fd1c 
+  machine-ids bbbd5052885f4979bafca93c4f0f313f 1911bac080664039b08165a6ba07fd1c
 
 == 9. nothing stays
   instances in incus              0

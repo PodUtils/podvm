@@ -5663,7 +5663,7 @@ Stream the unified tarball into the import of incusd (`POST /1.0/images` with th
 
 ## Done
 
-Partial (2026-11-19): `incus::run::ensure_image` writes the unified tarball into a pipe in a thread (`image::unified_tarball_to`), and the import of incusd reads it in chunks: no tarball file lies in the store. The incus unit tests pass, among them the run against a stand-in of incusd. Remaining: experiment 434 with incusd, and the measure of the peak of the disk use (incusd keeps the image in its `images` directory beside the volume of the pool, so the bound of the Prove may need a third copy of incusd's own).
+Partial (2026-11-19): `incus::run::ensure_image` writes the unified tarball into a pipe in a thread (`image::unified_tarball_to`), and the import of incusd reads it in chunks: no tarball file lies in the store. The incus unit tests pass, among them the run against a stand-in of incusd; experiment 434 on `b7314ce` (incus 6.0.0) gives "THE INCUS TIER RUNS" with each image imported through the pipe. Remaining: the measure of the peak of the disk use (incusd keeps the image in its `images` directory beside the volume of the pool, so the bound of the Prove may need a third copy of incusd's own).
 
 # T-1998: On the incus tier, an OCI image with a kernel runs as a virtual machine
 
