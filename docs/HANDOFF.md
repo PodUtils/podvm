@@ -158,10 +158,10 @@ and `docs/decisions.md`. Remove this file when each step below is done.
    an incus instance; the machine tier remains); then the steps of T-1994
    and T-1998 on `kvm.yml`. T-1996 waits for podrunner's measure of
    rootless podman. #598 is closed (podrunner closed #315 on beta.36).
-   The next beta carries T-1996, T-1997, T-1999 and T-2001 (OP-02).
-3. T-2001 (the P2 findings of the fifth outside pass; OP-02, a `-v` of
-   one file on the syscall tier, is fixed): `npm` on the syscall tier
-   (OP-03), the rung of `PODVM_USERNS=0` with no volume (OP-01).
+   The next beta carries T-1996, T-1997, T-1999 and T-2001 (OP-02, OP-03).
+3. T-2001 (the findings of the fifth outside pass; OP-02, a `-v` of one
+   file, and OP-03, `npm` on the syscall tier, are fixed): the rung of
+   `PODVM_USERNS=0` with no volume (OP-01), then the P3 findings.
 4. T-1972 remainder, T-1969 remainder, T-1968; T-1984 and T-1985 (P2).
 5. When podcrates answers COORD-188 (#584): set the controlling terminal
    for `-t` and remove `run::pty::send`.
