@@ -158,7 +158,8 @@ pub const USER: &[Group] = &[
                  (--podvm-init=image, T-2008). With no value or 1, the first run of an image \
                  saves the state of its guest in the store, and each later run starts from it. \
                  0 boots each guest. pipe saves and loads through a pipe of cat. Another value \
-                 exits 125.",
+                 exits 125. Each run of one state shares the machine-id, the boot id and what \
+                 a service made at its start (call C27).",
             ),
             v(
                 "PODVM_MACHINE_KERNEL",
