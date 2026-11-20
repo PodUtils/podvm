@@ -168,7 +168,8 @@ fn the_emulator_line_names_the_accelerator_and_the_init() {
         &["-x".into()],
     );
     let line = v.join(" ");
-    assert!(line.contains("-accel tcg,thread=multi"));
+    // TODO/enter.md T-2010: the translation cache of TCG.
+    assert!(line.contains("-accel tcg,thread=multi,tb-size=512 "));
     assert!(line.contains("-m 512M"));
     assert!(line.contains("rdinit=/podvm-init"));
     assert!(line.contains("-no-reboot"));

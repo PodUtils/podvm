@@ -8,6 +8,10 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- A guest under TCG takes a translation cache of 512 MiB in place of
+  QEMU's 1 GiB (T-2010): the peak memory of a run with MariaDB and
+  PostgreSQL under systemd goes from 3,670 MiB to about 3,300 MiB on the
+  cloud host, and its time does not change.
 - `exec` into a `run -d` container of the namespace rung enters by the
   join of its namespaces, where its volumes are, also where the probe of
   the host denies chroot to the user; before, it took the entry with no

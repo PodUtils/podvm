@@ -197,7 +197,11 @@ pub fn qemu_argv(
     v.push("-accel".to_string());
     v.push(match accel {
         Accel::Kvm => "kvm".to_string(),
-        Accel::Tcg => "tcg,thread=multi".to_string(),
+        // TODO/enter.md T-2010: a translation cache of 512 MiB, where QEMU
+        // takes 1 GiB. Measured with experiment 468 under TCG: the peak
+        // memory of a run goes from 3,670 MiB to 3,300 MiB, and its time
+        // stays in the difference between two runs.
+        Accel::Tcg => "tcg,thread=multi,tb-size=512".to_string(),
     });
     v.push("-cpu".to_string());
     v.push(accel.cpu().to_string());
