@@ -512,7 +512,8 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #616 | COORD-216: podvm took podcrates v0.79.0 in e864b31; a waiter with threads needs the set blocked in each thread (to podcrates) | closed (PodUtils/podcrates#245 lists the take; the finding on threads is podcrates@T-996) | T-1955, T-2001, T-2003 |
 | #617 | [gh action] requested | closed (on ec55ca9: gate 44706254361, arm 44706259556, secrets 44706265525, issue-sync 44706272331 passed; kvm 44706277889 init failed in the build of experiment 468, again in #619) | the gate, arm, secrets, issue-sync and kvm.yml init runs of ec55ca9 (T-2001, T-2003, T-2008, T-2013, T-2016) |
 | #618 | COORD-217: a saved guest state of pod_guest::warm with no UEFI Plan; a pinned static QEMU with the use-after-free fix of 10.0.4 (to podcrates) | open | T-2008, T-2016 |
-| #619 | [gh action] requested | open | kvm.yml job init of 06f0d29, after run 44706277889 failed in the build of experiment 468 (T-2008, T-2016) |
+| #619 | [gh action] requested | closed (kvm 44707550400 on 2f3b155 failed: the build of experiment 468 on the userland rung; 4e022de lifts the AppArmor restriction; again in #620) | kvm.yml job init of 06f0d29, after run 44706277889 failed in the build of experiment 468 (T-2008, T-2016) |
+| #620 | [gh action] requested | open | kvm.yml job init of 4e022de (T-2008, T-2016) |
 
 ## Messages whose title does not start with COORD-NNN
 
