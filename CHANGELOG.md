@@ -40,7 +40,12 @@ They describe their recorded revision, not the current build.
   map of 231,072 ids, `/dev/fuse` and an empty machine-id for the hosted
   snapshot (T-1996), and the image goes to incusd through a pipe, with no
   tarball file in the store (T-1997, PodUtils/podrunner#316).
-- podvm takes podcrates `v0.75.0`.
+- On the incus tier, the tarball of the image carries `security.capability`
+  and `user.*` as PAX records, so a file capability reaches the root of the
+  instance (T-1999).
+- podvm takes podcrates `v0.75.0` (PodUtils/podcrates#238) and `v0.76.0`
+  (PodUtils/podcrates#239: `pod-extract` sets the extended attributes of a
+  layer and names each one that it cannot set).
 
 ## 0.2.0-beta.36 (2026-11-19)
 

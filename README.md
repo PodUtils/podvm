@@ -24,8 +24,12 @@ file of the run (`--podvm-sealed`, T-1751), and a container engine
 T-1718; `tier = incus` in `$store/config` selects it with no flag,
 T-1722), `runsc` (gVisor, rootless, T-1729), `emulate` (a static
 qemu-user, T-1651) and `syscall` (each system call through podvm's
-handler, T-1657, T-1731). `podvm lab` plans a network lab in one guest
-(T-1662), and the crate `podvm-api` runs podvm from Rust (T-1745).
+handler, T-1657, T-1731). `run --podvm-init=image` boots the init of the
+image (systemd) as PID 1 on the namespace rung, the runsc tier, the
+machine tier or the incus tier (T-1993, T-2002, T-2007; [the
+limits](docs/limits.md#the-init-of-an-image) state each). `podvm lab` plans
+a network lab in one guest (T-1662), and the crate `podvm-api` runs podvm
+from Rust (T-1745).
 
 Read [the architecture](docs/architecture.md) for the execution paths.
 Read [the limits](docs/limits.md) before you select a path.
@@ -69,6 +73,18 @@ curl -fLO https://github.com/PodUtils/podvm/releases/download/TAG/podvm-x86_64.s
 sha256sum -c podvm-x86_64.sha256
 install -m 0755 podvm-x86_64 ~/.local/bin/podvm
 podvm version --verbose
+```
+
+Each release also publishes its binaries as an OCI index on ghcr.io
+(T-1992). The image is `FROM scratch` with the binary at
+`/usr/local/bin/podvm` as its entry point, one image for each
+architecture under one index. The tag has the `v` of the release; `beta` or
+`latest` names the newest. The notes of the release name the digest of the
+index and the SHA-256 of each binary.
+
+```sh
+podvm pull ghcr.io/podutils/podvm:vTAG
+docker run --rm ghcr.io/podutils/podvm:vTAG --version
 ```
 
 Each binary is static: it needs no library of the host. The release has

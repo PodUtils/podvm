@@ -86,13 +86,24 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   The tier sees each raw `syscall` instruction of a dynamic program (Rust's
   `rustix`, Go), which the loader family does not. The handler shares the payload's address space, so
   the tier is a compatibility layer, not a boundary.
+  A `-v` of one file is a volume of one file (T-2001): the file opens with
+  no `O_DIRECTORY`, and a call on its parent reaches the host file in its
+  host directory. A path under it is `ENOTDIR`, and `unlink` or `rename`
+  of it is `EBUSY`, as of a bound file; `:ro` refuses a write. The entry
+  of the tier lays the strings of `argv` and of the environment in one
+  block in rising order, as the kernel does, so that libuv can take
+  `argv[0]` to the end of the last argument as the room of the process
+  title: `npm` and `npx` of `node:22-slim` run on the tier. A listing of
+  `/` does not name a volume whose guest path the image lacks.
 - `--podvm-tier=runsc` (T-1729) needs a `runsc` (`PODVM_RUNSC` or
   `PATH`, with its `gvisor-bin/` sidecars) and a host that grants user
   namespaces; otherwise it refuses by name. It serves a foreground `run`
   only, with no terminal, a numeric `--user`, and no `--timeout`,
   `--tmpfs`, `--network broker` or `--podvm-confine`. The network is the
   host's. Where podvm runs as root, `runsc` keeps a mounted `null-netns`
-  in `<store>/runsc/state`; unmount it before you remove the store.
+  in `<store>/runsc/state`; unmount it before you remove the store. With
+  `--podvm-init=image` the tier runs the init of the image as PID 1 of the
+  sandbox (T-2007; [the init of an image](#the-init-of-an-image)).
 - Each container has its own rootfs (T-1709): `run` and `create` copy
   the extracted image into `<store>/trees/<id>/`, and completion and the
   payload write only in that copy. A write in one container is not read
@@ -266,7 +277,7 @@ instance of an incusd that answers on its socket (`PODVM_INCUS_SOCKET`, or
 `INCUS_DIR/unix.socket`), and gives its stdout, stderr and exit code
 (T-1718, [incus](incus.md)). podvm imports its extracted image with the
 owners that the image intended, and is the init of the instance. The
-command is not PID 1. `run -d` and `create` keep the instance, and `ps`,
+command is not PID 1, except with `--podvm-init=image`. `run -d` and `create` keep the instance, and `ps`,
 `start`, `stop`, `rm`, `logs` and `exec` with the tier act on it; incusd
 keeps its state, and podvm keeps no record of it (T-1722). `logs -f`
 follows the log, `inspect` gives the state, and `tier = incus` in
@@ -279,7 +290,14 @@ instance, where podvm's init relays each connection to the loopback port
 to that socket; it is not an incus `proxy` device (T-1779, [incus](incus.md)).
 A run where no incusd answers exits 125 and names the
 socket. The image carries podvm as the init of the instance (T-1722).
-The instance does not honour `--podvm-confine`, `--user`, `--hostname`, `--add-host`,
+`run -d` and `create` with `--podvm-init=image` start the init of the
+image (systemd) as PID 1 of the instance, and the command runs by the exec
+API after `systemctl is-system-running` gives `running` or `degraded`
+(T-1993, [incus](incus.md)). That instance takes 231,072 ids with its own
+id map, `/dev/fuse` and an empty machine-id (T-1996), and the import of an
+image streams the unified tarball into incusd with no file between
+(T-1997). The tarball carries `security.capability` and `user.*` records
+of the image (T-1999). The instance does not honour `--podvm-confine`, `--user`, `--hostname`, `--add-host`,
 `--read-only`, `--tmpfs`, `--ulimit`, `--security-opt`, `--cap-drop`,
 `--label`, `--timeout`, `-t`, `--device` or `--ports`, so the incus tier
 refuses each by name with exit 125 (T-1854).
@@ -339,7 +357,8 @@ C26). Experiment 465 measures each line below as uid 1000.
   the sandbox takes no sysctl. `uname -r` names gVisor, and a program
   that needs a call that gVisor lacks fails there. The tier takes no
   `-t`, `--timeout` or `--tmpfs`: such a run goes to the guest. podvm
-  fetches no runsc (T-2009). On the cloud host a run with MariaDB and
+  fetches no runsc (T-2009 waits for a fetch module of podcrates,
+  podcrates@T-977). On the cloud host a run with MariaDB and
   PostgreSQL takes 10 s on this tier, as on the namespace rung, and 46 s
   in the guest under TCG.
 - Where the host has no runsc or no user namespace (the userland rung),
@@ -356,7 +375,9 @@ C26). Experiment 465 measures each line below as uid 1000.
   gives a PID namespace only with a user namespace or CAP_SYS_ADMIN. Its
   route is the guest. Experiment 467 measured User-Mode Linux in its
   seccomp mode on a host that denies `ptrace` and each namespace: 15 s
-  for a run with systemd as PID 1. T-2005 plans it as a tier.
+  for a run with systemd as PID 1. T-2005 plans it as a tier; it waits
+  for the UML kernel and its launcher in a crate of podcrates
+  (podcrates@T-975), as podvm carries no kernel.
 - `run -d`, `create` and `exec` with the init hold on the incus tier only
   (T-1993). On the namespace rung, the command gets the primary group of
   `--user` and no supplementary group, and `tty` in a command of `-t`
