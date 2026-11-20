@@ -13,8 +13,10 @@
 //! side is not `/`) is read as its guest path before each rule: the
 //! read-only table, the walk of links in guest names (T-1725) and the
 //! volume base (T-1972). The rewrite then gives the same host path again.
-//! The rootfs (the pair of `/`) keeps T-1705: its host path passes, and
-//! only the read-only table reads it by its guest path ([`ro_denied`]).
+//! The rootfs (the pair of `/`) keeps T-1705: its host path keeps its
+//! name, the read-only table reads it by its guest path ([`ro_denied`]),
+//! and the walk resolves its links from the rootfs (T-2045,
+//! `exec::walk::resolve`).
 //!
 //! ⛔ No allocation: each buffer is on the caller's stack.
 

@@ -343,3 +343,6 @@ mod meta;
 
 // TODO/enter.md T-2040: a host path of a volume takes its rules.
 mod ro_hostpath;
+
+// TODO/enter.md T-2045: a host path of the rootfs walks from the rootfs.
+mod rootfs_hostpath;

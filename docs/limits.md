@@ -57,7 +57,8 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   `EROFS`, and `/dev` stays writable. The layer reads a host path of a
   volume or of the rootfs (`PODVM_MAPS` names them) by its guest path, and
   the path that a link reaches, so such a write fails the same way
-  (T-2040). A raw `syscall` instruction passes
+  (T-2040). A host path of the rootfs resolves its links from the
+  rootfs, and `..` stops there (T-2045). A raw `syscall` instruction passes
   the layer. Each entry with no interposer table refuses both by name.
 - `--podvm-volume-base DIR` on the loader family (T-1972): at the start,
   each volume under DIR must open under it as a directory with no

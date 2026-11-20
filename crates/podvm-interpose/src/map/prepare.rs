@@ -104,6 +104,20 @@ pub(super) unsafe fn prepare_inner(
     }
     let mut guest = [0u8; OUT];
     match unsafe { rewrite(&t, abs.as_ptr(), abs_n, out) } {
+        // ⭐ TODO/enter.md T-2045: a host path of the rootfs (T-1705) walks
+        // its links from the rootfs, so a link in it names no host file.
+        -1 if unsafe { under_host_side(&t, abs.as_ptr(), abs_n) } => {
+            let walked =
+                unsafe { walk_links(&t, what, &abs[..abs_n], follow, writes, &mut guest, out) };
+            walked.unwrap_or_else(|| {
+                out[..abs_n].copy_from_slice(&abs[..abs_n]);
+                out[abs_n] = 0;
+                match unsafe { super::base::held(&t, what, follow, writes, out, abs_n) } {
+                    Ok(_) => out.as_ptr() as *const c_char,
+                    Err(()) => core::ptr::null(),
+                }
+            })
+        }
         // ⭐ Unmatched resolves back to the caller's own pointer, never the
         // absolutized copy: the bytes the kernel sees stay exactly the
         // payload's, including any symlinks in the working directory prefix.
@@ -122,38 +136,62 @@ pub(super) unsafe fn prepare_inner(
             crate::set_errno(ENAMETOOLONG);
             core::ptr::null()
         }
-        // ⭐ T-1725: a path in the table resolves its links in guest
-        // names, so an absolute link target stays in the rootfs. Where the
-        // walk cannot run (no real `readlink`), the rewrite stands.
-        // The NUL ends the name here: a buffer used again (the per-thread
-        // buffer of `dlopen`, T-1645) holds the tail of a longer name.
-        // T-2040: the read-only table holds for the path that the walk
-        // reached (a link to a `:ro` volume, by its guest or host path).
-        n => match unsafe { resolve_links(&t, &abs[..abs_n], follow, &mut guest, out) } {
-            Ok((gn, _)) if writes && unsafe { ro_denied(&t, &guest[..gn]) } => {
-                crate::set_errno(EROFS);
-                core::ptr::null()
-            }
-            Ok((_, m)) => {
-                out[m] = 0;
-                match unsafe { super::base::held(&t, what, follow, writes, out, m) } {
-                    Ok(_) => out.as_ptr() as *const c_char,
-                    Err(()) => core::ptr::null(),
-                }
-            }
-            Err(EINVAL) => {
+        // Where the walk cannot run (no real `readlink`), the rewrite
+        // stands.
+        n => {
+            let walked =
+                unsafe { walk_links(&t, what, &abs[..abs_n], follow, writes, &mut guest, out) };
+            walked.unwrap_or_else(|| {
                 let n = unsafe { rewrite(&t, abs.as_ptr(), abs_n, out) }.max(n);
                 out[n as usize] = 0;
                 match unsafe { super::base::held(&t, what, follow, writes, out, n as usize) } {
                     Ok(_) => out.as_ptr() as *const c_char,
                     Err(()) => core::ptr::null(),
                 }
-            }
-            Err(e) => {
-                crate::say::line(&[what, b": a link of the path does not resolve inside the rootfs, so the call fails (TODO/interpose.md T-1725)"]);
-                crate::set_errno(e);
-                core::ptr::null()
-            }
-        },
+            })
+        }
+    }
+}
+
+/// ⭐ T-1725: the path `abs` resolves its links in guest names into `out`,
+/// so an absolute link target stays in the rootfs; then the base holds it
+/// (T-1972). T-2040: the read-only table holds for the path that the walk
+/// reached (a link to a `:ro` volume, by its guest or host path). The
+/// pointer to call with (null with `errno` set), or `None` where the walk
+/// cannot run (no real `readlink`). The NUL ends the name here: a buffer
+/// used again (the per-thread buffer of `dlopen`, T-1645) holds the tail
+/// of a longer name.
+///
+/// # Safety
+/// As [`prepare`].
+unsafe fn walk_links(
+    t: &Table,
+    what: &[u8],
+    abs: &[u8],
+    follow: bool,
+    writes: bool,
+    guest: &mut [u8; OUT],
+    out: &mut [u8; OUT],
+) -> Option<*const c_char> {
+    match unsafe { resolve_links(t, abs, follow, guest, out) } {
+        Ok((gn, _)) if writes && unsafe { ro_denied(t, &guest[..gn]) } => {
+            crate::set_errno(EROFS);
+            Some(core::ptr::null())
+        }
+        Ok((_, m)) => {
+            out[m] = 0;
+            Some(
+                match unsafe { super::base::held(t, what, follow, writes, out, m) } {
+                    Ok(_) => out.as_ptr() as *const c_char,
+                    Err(()) => core::ptr::null(),
+                },
+            )
+        }
+        Err(EINVAL) => None,
+        Err(e) => {
+            crate::say::line(&[what, b": a link of the path does not resolve inside the rootfs, so the call fails (TODO/interpose.md T-1725)"]);
+            crate::set_errno(e);
+            Some(core::ptr::null())
+        }
     }
 }

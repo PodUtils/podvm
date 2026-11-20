@@ -34,6 +34,16 @@ fn host_of(t: &Table, guest: &[u8], host: &mut [u8; OUT]) -> Result<Option<usize
     }
 }
 
+/// TODO/enter.md T-2045: the length of the host side of the rootfs (the
+/// pair of `/`) where `p` starts with it at a component boundary.
+fn rootfs_side(t: &Table, p: &[u8]) -> Option<usize> {
+    let (idx, to_n) = unsafe { crate::map::longest_to(t, p.as_ptr(), p.len()) }?;
+    let pair = &t.pairs[idx];
+    // SAFETY: a pair borrows environ memory of its lengths.
+    let root = pair.from_n == 1 && unsafe { *pair.from_p } == b'/';
+    (root && to_n > 1).then_some(to_n)
+}
+
 /// Resolve the absolute guest path `g` inside the rootfs.
 ///
 /// Writes the resolved guest path to `guest` and its host path to `host`,
@@ -44,6 +54,14 @@ fn host_of(t: &Table, guest: &[u8], host: &mut [u8; OUT]) -> Result<Option<usize
 /// is: the exec answers for it, as the kernel would. Under a path outside
 /// the table (`/proc`) the walk follows no link: those links are the
 /// kernel's own, and their text names host objects.
+///
+/// ⛔ TODO/enter.md T-2040, T-2045: a path that names a host side of the
+/// table (T-1705: a path that the loader gave) is not outside it. The host
+/// path of a volume goes on as its guest path. The host path of the rootfs
+/// is walked from the rootfs: each link of it resolves as a link of the
+/// guest, and `..` stops at the rootfs, as it stops at the guest root, so
+/// `ROOTFS/../../etc` names no host file. Its names stay host names, so
+/// `ROOTFS/.podvm/` and the paths of the loader pass as before.
 ///
 /// # Safety
 /// Calls the real `readlink`.
@@ -68,7 +86,20 @@ pub unsafe fn resolve(
     let mut dn = 1usize;
     let mut links = 0usize;
     let mut literal = false;
-    while pos < pn {
+    // The length of the root that `..` does not leave: `/`, or the host
+    // side of the rootfs where the path starts with it.
+    let mut floor = 1usize;
+    let mut enter = true;
+    while pos < pn || enter {
+        if core::mem::take(&mut enter) {
+            if let Some(m) = unsafe { crate::map::to_volume_guest(t, &mut pend, pn) } {
+                pn = m;
+            } else if let Some(r) = rootfs_side(t, &pend[..pn]) {
+                guest[..r].copy_from_slice(&pend[..r]);
+                (dn, pos, floor) = (r, r, r);
+            }
+            continue;
+        }
         while pos < pn && pend[pos] == b'/' {
             pos += 1;
         }
@@ -84,10 +115,10 @@ pub unsafe fn resolve(
             continue;
         }
         if len == 2 && pend[start] == b'.' && pend[start + 1] == b'.' {
-            while dn > 1 && guest[dn - 1] != b'/' {
+            while dn > floor && guest[dn - 1] != b'/' {
                 dn -= 1;
             }
-            if dn > 1 {
+            if dn > floor {
                 dn -= 1;
             }
             continue;
@@ -108,8 +139,20 @@ pub unsafe fn resolve(
         if mapped.is_none()
             && let Some(m) = unsafe { crate::map::to_volume_guest(t, guest, dn) }
         {
-            dn = m;
+            (dn, floor) = (m, 1);
             mapped = host_of(t, &guest[..dn], host)?;
+        }
+        // T-2045: a name under the host side of the rootfs is its own host
+        // path, and the walk goes on through it.
+        if mapped.is_none()
+            && let Some(r) = rootfs_side(t, &guest[..dn])
+        {
+            if dn == r {
+                floor = dn;
+            }
+            host[..dn].copy_from_slice(&guest[..dn]);
+            host[dn] = 0;
+            mapped = Some(dn);
         }
         if mapped.is_none() {
             // Outside the table: the rest goes as it is written.
@@ -140,7 +183,11 @@ pub unsafe fn resolve(
         pend[..ln + rest].copy_from_slice(&link[..ln + rest]);
         pn = ln + rest;
         pos = 0;
-        dn = if pend[0] == b'/' { 1 } else { parent };
+        if pend[0] == b'/' {
+            (dn, floor, enter) = (1, 1, true);
+        } else {
+            dn = parent;
+        }
     }
     if literal && pos < pn {
         if dn + (pn - pos) >= OUT {

@@ -8,6 +8,13 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- On the userland rung (the loader family), a path that names the host
+  path of the rootfs (`PODVM_MAPS` gives it) resolves its links from the
+  rootfs, and `..` stops there. Before, a link to `ROOTFS/../../etc`, or
+  `ROOTFS/tmp/l/f` with a relative link `l` that climbs out, read a host
+  file (T-2045). An absolute link of the image under such a path resolves
+  in the image now, not on the host.
+
 - On the userland rung (the loader family), a write through the host path
   of a `:ro` volume (`echo X > HOST/f`, also `chmod`, `touch`, `mv`, `rm`,
   `ln`, `mkstemp`, or a link to the volume by its host or its guest path)

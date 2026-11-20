@@ -5728,7 +5728,7 @@ Partial (2026-11-20). `initns::stays::check` refuses `--podvm-confine`, `--ulimi
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -5744,8 +5744,12 @@ The walk reads a host path of the rootfs by its guest path, as T-2040 does for a
 
 ## Decision
 
--
+2026-11-20, the session's call. The walk of links (`exec::walk::resolve`) walks a path that starts with the host side of the rootfs from the rootfs: its names stay host names (so `ROOTFS/.podvm/` and the paths of the loader of T-1705 keep their pass-through), each link of it resolves as a link of the guest (an absolute target from the guest root, a relative one from its directory), and `..` stops at the rootfs. A link target that names the host path of the rootfs starts again there. The funnel (`map::prepare`) gives a host path of the rootfs to this walk, where it passed it to the kernel before; only where the walk cannot run (no real `readlink`) does the path pass as before. The same hole had a second form, also closed: a host path of the rootfs as given, with a link in it (`ROOTFS/tmp/rel/hostname`, `rel -> ../../etc`), which the kernel followed on the host.
 
 ## Prove
 
 As uid 1000 under `scripts/dev/nouserns.c` with `mirror.gcr.io/library/alpine:3.20`: `ln -s ROOTFS/../../../../../../../etc /tmp/esc; cat /tmp/esc/hostname` gives the image's name or ENOENT, never the host's; a table test of the interposer holds the class (a host path of the rootfs with `..`, through a link and as given; the loader paths of T-1705 still open).
+
+## Done
+
+**Done (2026-11-20).** `crates/podvm-interpose/src/exec/walk.rs` and `map/prepare.rs` apply the Decision. Measured as uid 1000 under `scripts/dev/nouserns.c` (`mode=userland`, the loader family) with `mirror.gcr.io/library/alpine:3.20`; the host's name is `vm`, the image's `localhost`. Before (the interposer of `main` at `0490555`): `cat ROOTFS/../../../../../../../etc/hostname` gave `localhost`, and `vm` for a link to `ROOTFS/../../../../../../../etc`, for `ROOTFS/tmp/rel/hostname` with `rel -> ../../../../../../../../../etc`, and for a link to `ROOTFS/.podvm/../../../../../../../../etc`. After: each gives `localhost`; `ls ROOTFS/.podvm/`, a read of `ROOTFS/lib/ld-musl-x86_64.so.1` and of the link `ROOTFS/lib/libc.musl-x86_64.so.1`, and a write to `ROOTFS/tmp/made` exit 0. With `mirror.gcr.io/library/python:3.13-slim`, the path that `dladdr` gives for `libz.so.1` (a host path under the rootfs, a link) opens, before and after (T-1705); `import ssl, json, sqlite3` works. The measure of T-2040 gives the same lines as its Done. `a_host_path_of_the_rootfs_reads_no_file_out_of_the_rootfs` (13 reads and a create: a link to `ROOTFS/..`, to `ROOTFS/.podvm/..` and to `ROOTFS/tmp/../..`; as given, a relative link, a link to `ROOTFS/..`, `ROOTFS/..`, an absolute link of the image, a link to a host directory; a relative link in the rootfs, a path of the loader, `ROOTFS/.podvm/obj`) pins the class: on the code before, 7 of its cases read the file out of the rootfs or did not open.
