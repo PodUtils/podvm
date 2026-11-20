@@ -5263,7 +5263,7 @@ Partial (2026-11-20, the second part). The command of `--user NAME` on the names
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** blocked
+**Status:** done
 
 ## Problem
 
@@ -5285,9 +5285,13 @@ Ask podcrates (a COORD issue) for the directories of `DT_RUNPATH` and `DT_RPATH`
 
 As uid 1000 with `PODVM_USERNS=0`: `run --rm -v DIR:/v ghcr.io/pkgforge-dev/archlinux:latest systemctl --version` prints the version of systemd and exits 0.
 
-## Blocker
+## Correction
 
-Blocked (2026-11-20) on `podcrates@T-976` (PodUtils/podcrates#243, COORD-148, the answer to COORD-207, #603): pod-enter adds the directories of `DT_RUNPATH` and `DT_RPATH`, with `$ORIGIN`, in the order of `ld.so`. The condition that clears it: the tag of podcrates that carries it; podvm takes the tag and runs the Prove.
+Blocked (2026-11-20) on `podcrates@T-976` (PodUtils/podcrates#243, COORD-148, the answer to COORD-207, #603): pod-enter adds the directories of `DT_RUNPATH` and `DT_RPATH`, with `$ORIGIN`, in the order of `ld.so`. The condition that clears it: the tag of podcrates that carries it; podvm takes the tag and runs the Prove. Unblocked (2026-11-20): `v0.79.0` carries it.
+
+## Done
+
+**Done (2026-11-20).** podcrates `v0.79.0` (PodUtils/podcrates#245, podcrates@T-976) puts the `DT_RUNPATH` (else `DT_RPATH`) directories of the program and of each library in the library path of the loader family, resolved in the image, with `$ORIGIN`, `$LIB` and `$PLATFORM`; podvm took it in `e864b31` with no change of its code. The Prove holds as uid 1000 with `PODVM_USERNS=0` on the cloud host: `run --rm --verbose -v DIR:/v ghcr.io/pkgforge-dev/archlinux:latest systemctl --version` enters the loader family (`mode=userland`), prints `systemd 262 (262.2-1-arch)` and exits 0. A dynamic child that the interposer starts gets the library path of its caller, with no `RUNPATH` of the child (podcrates' note): the interposer's part, not measured here.
 
 # T-2004: A delegated cgroup2 subtree from the user manager of systemd, for an init of the image on the namespace rung
 

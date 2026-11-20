@@ -496,19 +496,20 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #600 | COORD-204: podvm took podcrates v0.75.0 in f3beec1 (to podcrates) | closed (PodUtils/podcrates#238 lists the take) | T-1955 |
 | #601 | COORD-205: podvm took podcrates v0.76.0 in 16f2395; the form of the sidecar's xattrs fits (to podcrates) | closed (PodUtils/podcrates#239 lists the take and the answer on the form) | T-1955, T-1999 |
 | #602 | COORD-206: a User-Mode Linux kernel in seccomp mode for a guest with no KVM, no ptrace and no namespace (to podcrates) | open | T-2005 |
-| #603 | COORD-207: pod-enter adds the RUNPATH directories of a program to the library path of the loader family (to podcrates) | open | T-2003 |
+| #603 | COORD-207: pod-enter adds the RUNPATH directories of a program to the library path of the loader family (to podcrates) | closed (podcrates v0.79.0 carries podcrates@T-976; taken in e864b31, T-2003 done) | T-2003 |
 | #604 | COORD-208: a pinned fetch of a static tool (gVisor's runsc) for a project that needs it at run time (to podcrates) | open | T-2009 |
 | #605 | COORD-209: --podvm-init=image now holds on a foreground run with no tier, on --podvm-tier=runsc and on --podvm-tier=machine (to podrunner) | open | T-2002, T-2007 |
 | #606 | COORD-210: podvm took podcrates v0.78.1 (and v0.77.0) in 3272e3d (to podcrates) | closed (PodUtils/podcrates#240 and #241 list the take) | T-1955 |
 | #607 | [gh action] requested | closed (gate 44661449164, secrets 44661453546, issue-sync 44661458479: success) | the gate, secrets and issue-sync runs of 163c231, the take of podcrates v0.78.1 (T-1955) |
-| #608 | COORD-211: pod-enter's wait_forwarding forwards SIGHUP, SIGINT and SIGTERM only: a SIGUSR1 or SIGQUIT kills the waiter and the payload stays (to podcrates) | open | T-2001 |
+| #608 | COORD-211: pod-enter's wait_forwarding forwards SIGHUP, SIGINT and SIGTERM only: a SIGUSR1 or SIGQUIT kills the waiter and the payload stays (to podcrates) | closed (podcrates v0.79.0 carries podcrates@T-995; taken in e864b31, T-2001 done) | T-2001 |
 | #609 | COORD-212: the answer to PodUtils/podrunner#325: the Entrypoint /sbin/init of the snapshot ran as a prefix of the command; fixed on main (T-2011) (to podrunner) | open | T-2011 |
 | #610 | [gh action] requested | closed (gate 44668370887, arm 44668375205, secrets 44668379276, issue-sync 44668383916: success) | the gate, arm, secrets and issue-sync runs of eb93a34 (T-1969, T-1972, T-2001, T-2011) |
 | #611 | COORD-213: one beneath-open of a volume under a base, with no allocation, for the four copies in podvm and pod-enter (to podcrates) | open | T-1955, T-1972 |
 | #612 | COORD-214: the answer to PodUtils/podrunner#326: exec into a run -d container of the namespace rung joins its namespaces and sees its volumes; fixed on main (T-2012) (to podrunner) | open | T-2012 |
 | #613 | COORD-215: pod-enter's check_exec and the program of a dynamic loader; a write table of pod-confine beside its exec table (to podcrates) | open | T-1955, T-1984, T-1985, T-2013 |
 | #614 | [gh action] requested | closed (on 9609466: issue-sync 44699870545 and secrets 44699865218 passed, arm 44699859975 failed and 46b9079 fixes it, gate 44699855095 cancelled; superseded by #615) | the gate, arm, secrets and issue-sync runs of cdbcaa6 (T-1984, T-1985, T-2012, T-2013) |
-| #615 | [gh action] requested | open | arm and gate of 46b9079, after arm.yml 44699859975 failed on the aarch64 build of podvm-dispatch (T-1985) |
+| #615 | [gh action] requested | closed (arm 44701679612 and gate 44701684514 on 369f2d6: success) | arm and gate of 46b9079, after arm.yml 44699859975 failed on the aarch64 build of podvm-dispatch (T-1985) |
+| #616 | COORD-216: podvm took podcrates v0.79.0 in e864b31; a waiter with threads needs the set blocked in each thread (to podcrates) | open | T-1955, T-2001, T-2003 |
 
 ## Messages whose title does not start with COORD-NNN
 
