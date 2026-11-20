@@ -30,6 +30,12 @@ const MS_REC: u64 = 0x4000;
 const MS_PRIVATE: u64 = 0x4_0000;
 const CLONE_NEWUSER: i32 = 0x1000_0000;
 const CLONE_NEWPID: i32 = 0x2000_0000;
+/// `O_DIRECTORY`: on aarch64 `0o200000` is `O_DIRECT` (podcrates' COORD-149).
+#[cfg(target_arch = "aarch64")]
+pub(crate) const O_DIRECTORY: i32 = 0o40000;
+#[cfg(not(target_arch = "aarch64"))]
+pub(crate) const O_DIRECTORY: i32 = 0o200000;
+
 const SIGHUP: i32 = 1;
 const SIGINT: i32 = 2;
 const SIGQUIT: i32 = 3;
@@ -399,7 +405,7 @@ pub fn enter_if(argv: &[String]) {
     if pid2 == 0 {
         // SAFETY: the write end of pid 1.
         unsafe { close(code_w) };
-        const O_PATH_DIR_CLOEXEC: i32 = 0o10000000 | 0o200000 | 0o2000000;
+        const O_PATH_DIR_CLOEXEC: i32 = 0o10000000 | O_DIRECTORY | 0o2000000;
         // SAFETY: a NUL-ended literal.
         let host = unsafe { open(c"/proc".as_ptr(), O_PATH_DIR_CLOEXEC) };
         host::HOST_PROC.store(host, Ordering::Relaxed);

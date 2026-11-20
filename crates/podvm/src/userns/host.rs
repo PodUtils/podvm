@@ -358,7 +358,7 @@ fn beneath(base: &str, host: &str) -> Result<Option<Held>, String> {
         }
     };
     const O_PATH: i32 = 0o10000000;
-    const O_DIRECTORY: i32 = 0o200000;
+    use super::O_DIRECTORY;
     const O_CLOEXEC: i32 = 0o2000000;
     const RESOLVE_NO_SYMLINKS: u64 = 0x04;
     const RESOLVE_BENEATH: u64 = 0x08;

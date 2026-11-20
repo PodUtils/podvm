@@ -19,6 +19,9 @@ struct SigAction {
 
 use super::{forward, signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM, SIGUSR1, SIGUSR2, SIG_IGN};
 
+const SIGALRM: i32 = 14;
+const SIGPWR: i32 = 30;
+
 const SA_SIGINFO: i32 = 4;
 const SA_RESTART: i32 = 0x1000_0000;
 
@@ -73,7 +76,8 @@ pub(in crate::userns) fn relay_signals() {
     // SAFETY: forward is async-signal-safe; the handlers stay for the life
     // of the process.
     unsafe {
-        for s in [SIGHUP, SIGTERM, SIGUSR1, SIGUSR2] {
+        // podcrates `v0.79.0` (T-995): the set of `pod_enter::WAIT_FORWARDED`.
+        for s in [SIGHUP, SIGTERM, SIGUSR1, SIGUSR2, SIGALRM, SIGPWR] {
             signal(s, forward as *const () as usize);
         }
         for s in [SIGINT, SIGQUIT] {
@@ -81,5 +85,36 @@ pub(in crate::userns) fn relay_signals() {
                 signal(s, SIG_IGN); // #535: the old rule as the fallback
             }
         }
+    }
+}
+
+/// TODO/cli.md T-2001 OP-05: the outer process relays each signal that
+/// the waiter of pod-enter forwards to the payload, so that none ends the
+/// outer process first; the parity row of `run` names each one.
+#[cfg(test)]
+#[test]
+fn the_outer_process_relays_each_signal_that_the_waiter_forwards() {
+    let names = [
+        (SIGHUP, "SIGHUP"),
+        (SIGINT, "SIGINT"),
+        (SIGQUIT, "SIGQUIT"),
+        (SIGUSR1, "SIGUSR1"),
+        (SIGUSR2, "SIGUSR2"),
+        (SIGTERM, "SIGTERM"),
+        (SIGALRM, "SIGALRM"),
+        (SIGPWR, "SIGPWR"),
+    ];
+    let mask: u64 = names.iter().map(|(n, _)| 1u64 << (n - 1)).sum();
+    assert_eq!(
+        mask,
+        podvm_enter::WAIT_FORWARDED,
+        "the set of pod-enter changed"
+    );
+    let row = crate::parity::TABLE
+        .iter()
+        .find(|r| r.verb == "run" && r.flag.is_none())
+        .expect("the row of run");
+    for (_, name) in names {
+        assert!(row.note.contains(name), "{name}: {}", row.note);
     }
 }

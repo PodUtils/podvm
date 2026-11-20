@@ -16,7 +16,7 @@ pub use pod_enter::{
     fuse, ns_setup_step, ns_tmp_target, plan, run, run_ladder, run_namespace, run_selected,
     run_userland, spawn, spawn_joined, spawn_ladder, spawn_namespace, spawn_selected,
     spawn_userland, status, Bounded, Child, Error, Fds, Names, NsMount, Plan, Program, Result,
-    RootDir, VolumeBind, DEVPTS_FLAGS, DEVPTS_OPTIONS, ENTERED_RUNG,
+    RootDir, VolumeBind, DEVPTS_FLAGS, DEVPTS_OPTIONS, ENTERED_RUNG, WAIT_FORWARDED,
 };
 
 // docker's codes, from the one file that holds them (TODO/cli.md T-0802).

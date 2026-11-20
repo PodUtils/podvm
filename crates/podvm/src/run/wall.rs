@@ -21,7 +21,8 @@ pub fn arm_wall(wall_ms: u64) -> Wall {
     let flag = fired.clone();
     let handle = std::thread::spawn(move || {
         let mut old = 0u64;
-        let _ = podvm_probe::sys::sigblock_shutdown(&mut old);
+        // T-2001 OP-05: each signal that the waiter forwards (podcrates `v0.79.0`).
+        let _ = podvm_probe::sys::sigblock(podvm_enter::WAIT_FORWARDED, &mut old);
         if rx.recv_timeout(Duration::from_millis(wall_ms))
             != Err(std::sync::mpsc::RecvTimeoutError::Timeout)
         {

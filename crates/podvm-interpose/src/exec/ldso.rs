@@ -17,10 +17,15 @@
 /// of an older glibc), `ld-musl-x86_64.so.1`, `ld64.so.2`, `ld.so.1`. The
 /// caller resolves each link first, so another name of the same file (a
 /// link, `/lib64/...` or `/usr/lib/...`) gives the name of the file.
+///
+/// musl's install makes `ld-musl-ARCH.so.1` a link to its libc
+/// (`libc.musl-ARCH.so.1`, `libc.so`), so a resolved name of a libc counts
+/// too; glibc's `libc.so.6` runs no program, so it only adds a check.
 pub fn is_loader(path: &[u8]) -> bool {
     let base = path.rsplit(|&b| b == b'/').next().unwrap_or(path);
     let named = base.starts_with(b"ld-") || base.starts_with(b"ld.") || base.starts_with(b"ld64.");
-    named && base.windows(3).any(|w| w == b".so")
+    let libc = base.starts_with(b"libc.so") || base.starts_with(b"libc.musl-");
+    (named && base.windows(3).any(|w| w == b".so")) || libc
 }
 
 /// The options of glibc's and musl's loaders that take the next argument

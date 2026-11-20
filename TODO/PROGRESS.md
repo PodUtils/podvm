@@ -7,7 +7,7 @@ start.
 
 ## State
 
-613 entries: 25 open, 37 partial, 6 blocked, 545 done.
+613 entries: 25 open, 36 partial, 6 blocked, 546 done.
 
 The state on 2026-11-19 (`docs/HANDOFF.md` has the detail):
 
@@ -51,8 +51,10 @@ The state on 2026-11-19 (`docs/HANDOFF.md` has the detail):
   dispatches each workflow. A newer push cancels the gate of an older
   commit. The issue `[gh action] requested` is the fallback only
   (`docs/decisions.md`, 2026-11-13, "Workflow fallback").
-* podvm takes the crates of PodUtils/podcrates at `v0.78.1`
-  (PodUtils/podcrates#241, COORD-146 of podcrates, which holds `v0.77.0`
+* podvm takes the crates of PodUtils/podcrates at `v0.79.0`
+  (PodUtils/podcrates#245, COORD-149 of podcrates: the signals and the
+  RUNPATH of pod-enter; before it `v0.78.1`,
+  PodUtils/podcrates#241, COORD-146 of podcrates, which holds `v0.77.0`
   and `v0.78.0`, PodUtils/podcrates#240; before it `v0.76.0`,
   PodUtils/podcrates#239, COORD-205; `v0.75.0`,
   PodUtils/podcrates#238, COORD-204; `v0.74.0`,

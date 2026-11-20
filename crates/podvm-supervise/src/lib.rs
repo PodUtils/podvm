@@ -172,7 +172,8 @@ pub type Hold = pod_supervise::Foreground<table::Detail>;
 /// back after.
 pub fn foreground(store: &Store, want: &str, payload_pid: i64) -> Result<Hold> {
     let mut old = 0u64;
-    let blocked = podvm_probe::sys::sigblock_shutdown(&mut old).is_ok();
+    // T-2001 OP-05: each signal that the waiter forwards (podcrates `v0.79.0`).
+    let blocked = podvm_probe::sys::sigblock(podvm_enter::WAIT_FORWARDED, &mut old).is_ok();
     let hold = pod_supervise::foreground(&settings(store), want, payload_pid);
     if blocked {
         let _ = podvm_probe::sys::sigrestore(old);

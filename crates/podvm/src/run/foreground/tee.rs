@@ -77,7 +77,8 @@ pub(super) fn tee_fd_to(fd: i64, log_path: &std::path::Path) -> Result<Tee, Stri
     // the signal with the default action: podvm ended 143, and the tree ran on.
     let handle = std::thread::spawn(move || {
         let mut old = 0u64;
-        let _ = podvm_probe::sys::sigblock_shutdown(&mut old);
+        // T-2001 OP-05: each signal that the waiter forwards (podcrates `v0.79.0`).
+        let _ = podvm_probe::sys::sigblock(podvm_enter::WAIT_FORWARDED, &mut old);
         // PodUtils/podvm#534: a reader that closed stdout (`| head -1`) sent
         // SIGPIPE to this thread, and its default action ended podvm before
         // the record and `--rm`. Blocked here only (an ignored signal would

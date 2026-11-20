@@ -8,6 +8,13 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- A SIGQUIT, SIGUSR1, SIGUSR2, SIGALRM or SIGPWR to a foreground `run` is
+  forwarded to the payload, as SIGHUP, SIGINT and SIGTERM were; before, it
+  ended podvm and left the payload and a record `Dead` (T-2001, OP-05;
+  podcrates `v0.79.0`).
+- `ld-musl-ARCH.so.1`, a link to musl's libc, counts as a dynamic loader
+  for `--podvm-confine exec=` (T-1984).
+- podcrates `v0.79.0`.
 - `--podvm-confine exec=` holds for the first program of a run on the
   userland rung and the syscall tier, also through the dynamic loader and
   for the interpreter of a `#!` script: a program out of `exec=` exits 126

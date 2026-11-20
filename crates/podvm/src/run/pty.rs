@@ -26,13 +26,13 @@ unsafe extern "C" {
 }
 
 /// Block in this thread each signal that the waiter of a foreground run
-/// forwards (SIGHUP, SIGINT, SIGQUIT, SIGTERM): a process-directed signal
+/// forwards (`podvm_enter::WAIT_FORWARDED`): a process-directed signal
 /// then goes to the waiter, not to a relay thread whose default action
 /// ends podvm (OR-03 of the outside pass of 2026-11-18).
 fn block_forwarded() {
     const SIG_BLOCK: i64 = 0;
     const RT_SIGPROCMASK: i64 = 14;
-    let mask: u64 = [1u64, 2, 3, 15].iter().fold(0, |m, s| m | 1 << (s - 1));
+    let mask: u64 = podvm_enter::WAIT_FORWARDED;
     // SAFETY: rt_sigprocmask reads one 8-byte mask of this thread.
     unsafe {
         syscall(

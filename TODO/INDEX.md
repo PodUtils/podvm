@@ -663,7 +663,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1998](machine.md) | P1 | L | none | machine | open | On the incus tier, an OCI image with a kernel runs as a virtual machine |
 | [T-1999](machine.md) | P1 | M | none | machine | partial | The `security.capability` xattrs of an image stay on the incus tier and the machine tier |
 | [T-2000](interpose.md) | P1 | S | none | interpose | done | `apt-get install` fails on the userland rung: dpkg's `tar` has no ownership memo |
-| [T-2001](cli.md) | P2 | M | none | cli | partial | The faults of the fifth outside pass (2026-11-19, the gate of beta.36) |
+| [T-2001](cli.md) | P2 | M | none | cli | done | The faults of the fifth outside pass (2026-11-19, the gate of beta.36) |
 | [T-2002](enter.md) | P1 | L | none | enter | partial | `--podvm-init=image` holds only on the incus tier: the namespace rung maps one uid, and the userland rung has no PID 1 |
 | [T-2003](enter.md) | P2 | M | none | enter | blocked | On the userland rung, a program with a library in a directory of its RUNPATH does not load (`systemctl`) |
 | [T-2004](enter.md) | P2 | M | none | enter | partial | A delegated cgroup2 subtree from the user manager of systemd, for an init of the image on the namespace rung |
@@ -682,7 +682,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-613 entries: 25 open, 37 partial, 6 blocked, 545 done.
+613 entries: 25 open, 36 partial, 6 blocked, 546 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -693,9 +693,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 17 | 0 | 249 | 269 |
-| P2 | 17 | 15 | 5 | 179 | 216 |
+| P2 | 17 | 14 | 5 | 180 | 216 |
 | P3 | 5 | 5 | 1 | 42 | 53 |
-| **All** | 25 | 37 | 6 | 545 | 613 |
+| **All** | 25 | 36 | 6 | 546 | 613 |
 
 ## Work order
 

@@ -11,7 +11,7 @@ use std::os::unix::fs::symlink;
 /// the loaders' options: one table, one rule (`ldso::each_program`).
 #[test]
 fn the_program_of_the_loader_is_each_argument_that_a_loader_can_run() {
-    let names: [(&[u8], bool); 9] = [
+    let names: [(&[u8], bool); 12] = [
         (b"/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2", true),
         (b"/lib/ld-linux-aarch64.so.1", true),
         (b"/lib/x86_64-linux-gnu/ld-2.28.so", true),
@@ -20,7 +20,14 @@ fn the_program_of_the_loader_is_each_argument_that_a_loader_can_run() {
         (b"/usr/lib/ld.so.1", true),
         (b"/usr/bin/ld", false),
         (b"/usr/bin/ldd", false),
-        (b"/lib/x86_64-linux-gnu/libc.so.6", false),
+        // musl's install makes `ld-musl-ARCH.so.1` a link to its libc,
+        // so the resolved file of the loader is the libc (podcrates'
+        // COORD-149); glibc's libc.so.6 runs no program, so its rule only
+        // adds a check.
+        (b"/lib/libc.musl-x86_64.so.1", true),
+        (b"/usr/lib/musl/lib/libc.so", true),
+        (b"/lib/x86_64-linux-gnu/libc.so.6", true),
+        (b"/lib/x86_64-linux-gnu/libcrypt.so.1", false),
     ];
     for (n, want) in names {
         assert_eq!(is_loader(n), want, "{}", String::from_utf8_lossy(n));
