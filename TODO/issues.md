@@ -498,7 +498,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #602 | COORD-206: a User-Mode Linux kernel in seccomp mode for a guest with no KVM, no ptrace and no namespace (to podcrates) | open | T-2005 |
 | #603 | COORD-207: pod-enter adds the RUNPATH directories of a program to the library path of the loader family (to podcrates) | closed (podcrates v0.79.0 carries podcrates@T-976; taken in e864b31, T-2003 done) | T-2003 |
 | #604 | COORD-208: a pinned fetch of a static tool (gVisor's runsc) for a project that needs it at run time (to podcrates) | open | T-2009 |
-| #605 | COORD-209: --podvm-init=image now holds on a foreground run with no tier, on --podvm-tier=runsc and on --podvm-tier=machine (to podrunner) | open | T-2002, T-2007 |
+| #605 | COORD-209: --podvm-init=image now holds on a foreground run with no tier, on --podvm-tier=runsc and on --podvm-tier=machine (to podrunner) | open | T-2002, T-2007, T-2008, T-2011 |
 | #606 | COORD-210: podvm took podcrates v0.78.1 (and v0.77.0) in 3272e3d (to podcrates) | closed (PodUtils/podcrates#240 and #241 list the take) | T-1955 |
 | #607 | [gh action] requested | closed (gate 44661449164, secrets 44661453546, issue-sync 44661458479: success) | the gate, secrets and issue-sync runs of 163c231, the take of podcrates v0.78.1 (T-1955) |
 | #608 | COORD-211: pod-enter's wait_forwarding forwards SIGHUP, SIGINT and SIGTERM only: a SIGUSR1 or SIGQUIT kills the waiter and the payload stays (to podcrates) | closed (podcrates v0.79.0 carries podcrates@T-995; taken in e864b31, T-2001 done) | T-2001 |
@@ -510,6 +510,8 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #614 | [gh action] requested | closed (on 9609466: issue-sync 44699870545 and secrets 44699865218 passed, arm 44699859975 failed and 46b9079 fixes it, gate 44699855095 cancelled; superseded by #615) | the gate, arm, secrets and issue-sync runs of cdbcaa6 (T-1984, T-1985, T-2012, T-2013) |
 | #615 | [gh action] requested | closed (arm 44701679612 and gate 44701684514 on 369f2d6: success) | arm and gate of 46b9079, after arm.yml 44699859975 failed on the aarch64 build of podvm-dispatch (T-1985) |
 | #616 | COORD-216: podvm took podcrates v0.79.0 in e864b31; a waiter with threads needs the set blocked in each thread (to podcrates) | open | T-1955, T-2001, T-2003 |
+| #617 | [gh action] requested | open | the gate, arm, secrets, issue-sync and kvm.yml init runs of ec55ca9 (T-2001, T-2003, T-2008, T-2013, T-2016) |
+| #618 | COORD-217: a saved guest state of pod_guest::warm with no UEFI Plan; a pinned static QEMU with the use-after-free fix of 10.0.4 (to podcrates) | open | T-2008, T-2016 |
 
 ## Messages whose title does not start with COORD-NNN
 
