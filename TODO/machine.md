@@ -5787,6 +5787,8 @@ What the code reading found, for the paths that differ under KVM: (1) `-cpu host
 
 Remaining (added): (7) the cause under KVM: `kvm.yml`, job `init`, until one run fails and names it; (8) where the line is the missing answer of the monitor: a bound of the caller for one answer and a read that goes on after it in `pod_guest::qmp::Monitor` (an ask for podcrates, with COORD-217), then a `query-migrate` that waits for the late answer.
 
+The cause under KVM (2026-11-20, `kvm.yml` run 44749207855 on `55a3dce`, experiment 468 with the lines of podvm on the state): "the monitor of the emulator gave no answer to query-migrate within its bound (qmp read: Resource temporarily unavailable)". The emulator answers nothing while it writes the last part of the state, for longer than the read bound of 5 s of `pod_guest::qmp::Monitor`, which the caller cannot set (ask 3 of COORD-217, #618). Fixed in podvm: where one `query-migrate` gets no answer, `state::save::migrate` drops that connection, connects again (`reconnect`, tried until the bound of the save) and asks again; the late answer goes to the closed connection. The unit test `a_save_leaves_a_whole_state_or_nothing` has the case `Peer::Late` (a first `query-migrate` with no answer for 5.6 s, then a second connection that answers): the save holds. Remaining (added): a run of `kvm.yml` job `init` with the fix.
+
 # T-2011: `run -d --podvm-init=image` of an image whose Entrypoint is its init runs `/sbin/init CMD` and not the command
 
 **Source:** PodUtils/podrunner#325 (COORD-112 of podrunner, podrunner@T-556): `hosted-boot.yml` run 44663656956 on `0.2.0-beta.36`

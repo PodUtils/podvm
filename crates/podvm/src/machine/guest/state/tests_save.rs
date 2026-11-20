@@ -120,6 +120,10 @@ enum Peer {
     Leaves,
     /// The guest does not go on after the save.
     NoCont,
+    /// The first `query-migrate` gets no answer within the read bound of
+    /// the monitor, and its connection ends (the lock of the emulator,
+    /// T-2008); a second connection answers.
+    Late,
 }
 
 /// A monitor on `sock` that answers one connection as `peer` says, and
@@ -127,54 +131,64 @@ enum Peer {
 fn monitor(sock: &Path, peer: Peer) -> std::thread::JoinHandle<Vec<String>> {
     let l = UnixListener::bind(sock).unwrap();
     std::thread::spawn(move || {
-        let (s, _) = l.accept().unwrap();
-        let mut w = s.try_clone().unwrap();
         let mut seen = Vec::new();
-        w.write_all(b"{\"QMP\": {\"version\": {}}}\n").unwrap();
         let mut status = "none".to_string();
-        for line in BufReader::new(s).lines().map_while(Result::ok) {
-            let v: serde_json::Value = serde_json::from_str(&line).unwrap();
-            let verb = v["execute"].as_str().unwrap().to_string();
-            seen.push(verb.clone());
-            let mut answer = serde_json::json!({"return": {}});
-            match verb.as_str() {
-                "migrate" => {
-                    let uri = v["arguments"]["uri"].as_str().unwrap();
-                    if peer == Peer::Leaves {
-                        return seen;
-                    }
-                    let path = uri
-                        .strip_prefix("file:")
-                        .map(str::to_string)
-                        .or_else(|| {
-                            let quoted = uri.strip_prefix("exec:cat > '")?;
-                            Some(quoted.trim_end_matches('\'').to_string())
-                        })
-                        .unwrap();
-                    if peer == Peer::NoFile && uri.starts_with("file:") {
-                        answer = serde_json::json!({"error": {"class": "GenericError",
+        let mut late = peer == Peer::Late;
+        'conn: loop {
+            let (s, _) = l.accept().unwrap();
+            let mut w = s.try_clone().unwrap();
+            w.write_all(b"{\"QMP\": {\"version\": {}}}\n").unwrap();
+            for line in BufReader::new(s).lines().map_while(Result::ok) {
+                let v: serde_json::Value = serde_json::from_str(&line).unwrap();
+                let verb = v["execute"].as_str().unwrap().to_string();
+                seen.push(verb.clone());
+                let mut answer = serde_json::json!({"return": {}});
+                match verb.as_str() {
+                    "migrate" => {
+                        let uri = v["arguments"]["uri"].as_str().unwrap();
+                        if peer == Peer::Leaves {
+                            return seen;
+                        }
+                        let path = uri
+                            .strip_prefix("file:")
+                            .map(str::to_string)
+                            .or_else(|| {
+                                let quoted = uri.strip_prefix("exec:cat > '")?;
+                                Some(quoted.trim_end_matches('\'').to_string())
+                            })
+                            .unwrap();
+                        if peer == Peer::NoFile && uri.starts_with("file:") {
+                            answer = serde_json::json!({"error": {"class": "GenericError",
                             "desc": "unknown migration protocol"}});
-                    } else if peer == Peer::Fails {
-                        std::fs::write(&path, b"half").unwrap();
-                        status = "failed".to_string();
-                    } else {
-                        let bytes: &[u8] = if peer == Peer::Empty { b"" } else { b"STATE" };
-                        std::fs::write(&path, bytes).unwrap();
-                        status = "completed".to_string();
+                        } else if peer == Peer::Fails {
+                            std::fs::write(&path, b"half").unwrap();
+                            status = "failed".to_string();
+                        } else {
+                            let bytes: &[u8] = if peer == Peer::Empty { b"" } else { b"STATE" };
+                            std::fs::write(&path, bytes).unwrap();
+                            status = "completed".to_string();
+                        }
                     }
-                }
-                "query-migrate" => {
-                    answer = serde_json::json!({"return": {"status": status,
+                    "query-migrate" if late => {
+                        late = false;
+                        std::thread::sleep(std::time::Duration::from_millis(5600));
+                        continue 'conn;
+                    }
+                    "query-migrate" => {
+                        answer = serde_json::json!({"return": {"status": status,
                         "error-desc": "the disk is full"}});
+                    }
+                    "cont" if peer == Peer::NoCont => {
+                        answer =
+                            serde_json::json!({"error": {"class": "GenericError", "desc": "no"}});
+                    }
+                    _ => {}
                 }
-                "cont" if peer == Peer::NoCont => {
-                    answer = serde_json::json!({"error": {"class": "GenericError", "desc": "no"}});
+                if w.write_all(format!("{answer}\n").as_bytes()).is_err() {
+                    break;
                 }
-                _ => {}
             }
-            if w.write_all(format!("{answer}\n").as_bytes()).is_err() {
-                break;
-            }
+            break;
         }
         seen
     })
@@ -242,6 +256,7 @@ fn a_save_leaves_a_whole_state_or_nothing() {
             Transport::File,
             "",
         ),
+        (Peer::Late, Transport::File, true, true, Transport::File, ""),
     ] {
         let d = scratch("save");
         let f = files(&d, "sha256:aa", "print");
