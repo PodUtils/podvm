@@ -496,5 +496,5 @@
 604 issue open
 605 issue open
 606 issue closed
-607 issue open
+607 issue closed
 608 issue open
