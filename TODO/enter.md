@@ -5247,7 +5247,7 @@ Remaining:
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** open
+**Status:** blocked
 
 ## Problem
 
@@ -5268,6 +5268,10 @@ Ask podcrates (a COORD issue) for the directories of `DT_RUNPATH` and `DT_RPATH`
 ## Prove
 
 As uid 1000 with `PODVM_USERNS=0`: `run --rm -v DIR:/v ghcr.io/pkgforge-dev/archlinux:latest systemctl --version` prints the version of systemd and exits 0.
+
+## Blocker
+
+Blocked (2026-11-20) on `podcrates@T-976` (PodUtils/podcrates#243, COORD-148, the answer to COORD-207, #603): pod-enter adds the directories of `DT_RUNPATH` and `DT_RPATH`, with `$ORIGIN`, in the order of `ld.so`. The condition that clears it: the tag of podcrates that carries it; podvm takes the tag and runs the Prove.
 
 # T-2004: A delegated cgroup2 subtree from the user manager of systemd, for an init of the image on the namespace rung
 
@@ -5309,7 +5313,7 @@ Partial (2026-11-19). `crates/podvm/src/initns/scope.rs` (`ask`, called by `init
 **Milestone:** none
 **Priority:** P2
 **Effort:** L
-**Status:** partial
+**Status:** blocked
 
 ## Problem
 
@@ -5342,9 +5346,11 @@ In this order, each with experiment 465 as the check and its time for a run and 
 
 `sh experiments/465-init-image.sh` on the cloud host as uid 1000, with a new clause for each route that this entry adds: with `PODVM_USERNS=0` and a launcher that makes `ptrace` and `unshare` give EPERM, the check exits 7 with no emulator of QEMU, and the transcript names the time of the run.
 
-## Done
+## Blocker
 
-Partial (2026-11-19): the measure, with no code of a tier. `sh experiments/467-uml-seccomp.sh` on the cloud host as uid 1000 gives "UML IN SECCOMP MODE BOOTS THE INIT WITH NO PTRACE AND NO NAMESPACE" (`experiments/results/uml-seccomp.txt`). A stock Linux 7.3.5 for `ARCH=um` (by the SHA-256 of kernel.org, built in 207 s, 8.6 MB stripped, linked to glibc) runs under a launcher whose seccomp filter gives EPERM for `ptrace`, `unshare`, `setns`, `chroot` and `mount`. Under it the same kernel with `seccomp=off` ends at "ptrace: Operation not permitted". With `seccomp=on ncpus=4`: a builder guest, with the tree of `ghcr.io/pkgforge-dev/archlinux` as its hostfs root, writes an ext4 base of 580 MiB in 27 s, with the owners of the sidecar (`/usr/bin/mount` is 0:0 with its set-user-ID bit; on hostfs each file belongs to the user of the host, and a set-user-ID program loses root); the run boots systemd 261 as PID 1 from the base behind a copy-on-write file (19 MiB) and gives exit 7 from the check of experiment 465 in 15 s; the base keeps its SHA-256, and no process stays.
+Blocked (2026-11-20) on `podcrates@T-975` (PodUtils/podcrates#242, COORD-147, the answer to COORD-206, #602): podcrates takes the UML kernel in its seccomp mode and its launcher into `pod-microvm`, and podvm carries no kernel and no kernel build (rule 2a). The answers that podcrates got: x86_64 only; the stock 7.3.5 needed no patch of pocket_vm for the measure; the channel is the exit code, stdout and stderr. podvm's side, for the launcher of the crate: the ext4 base for each digest with a copy-on-write file (with T-1994), the check of the init, and the exit code and the two streams in the mailbox form of `pod-guest`; out of the route of call C26 until the crate is there. The condition that clears it: the tag of podcrates with `pod-microvm`. A measure stays in experiment 467.
+
+The measure of 2026-11-19, with no code of a tier. `sh experiments/467-uml-seccomp.sh` on the cloud host as uid 1000 gives "UML IN SECCOMP MODE BOOTS THE INIT WITH NO PTRACE AND NO NAMESPACE" (`experiments/results/uml-seccomp.txt`). A stock Linux 7.3.5 for `ARCH=um` (by the SHA-256 of kernel.org, built in 207 s, 8.6 MB stripped, linked to glibc) runs under a launcher whose seccomp filter gives EPERM for `ptrace`, `unshare`, `setns`, `chroot` and `mount`. Under it the same kernel with `seccomp=off` ends at "ptrace: Operation not permitted". With `seccomp=on ncpus=4`: a builder guest, with the tree of `ghcr.io/pkgforge-dev/archlinux` as its hostfs root, writes an ext4 base of 580 MiB in 27 s, with the owners of the sidecar (`/usr/bin/mount` is 0:0 with its set-user-ID bit; on hostfs each file belongs to the user of the host, and a set-user-ID program loses root); the run boots systemd 261 as PID 1 from the base behind a copy-on-write file (19 MiB) and gives exit 7 from the check of experiment 465 in 15 s; the base keeps its SHA-256, and no process stays.
 
 A manual run of the same harness with Debian 12, MariaDB 10.11 and PostgreSQL 15 (the image and the bench of T-2007; not in the transcript), under the launcher:
 
@@ -5355,7 +5361,6 @@ A manual run of the same harness with Debian 12, MariaDB 10.11 and PostgreSQL 15
 | the machine tier under TCG, four vCPUs (T-2007) | 45.6 s | 8.8 s | 244 ms to 252 ms | 3.2 s to 3.4 s | 6.7 s |
 
 The builder wrote the base of that image (834 MiB) in 32 s. Remaining: each part of the Approach. The kernel of the measure is dynamic and has no network device, no volume and no exit code to the host; COORD-206 (#602) asks podcrates for a kernel that podvm carries.
-
 
 # T-2007: The init of the image as PID 1 of a gVisor sandbox: the runsc tier, for a host with a user namespace and no delegated cgroup
 
@@ -5405,7 +5410,7 @@ Partial (2026-11-19). `runsc/init.rs`, `initns/sandbox.rs`, `userns/owners.rs::a
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** open
+**Status:** blocked
 
 ## Problem
 
@@ -5426,3 +5431,7 @@ Where no `runsc` is found, fetch the pinned release for the architecture of the 
 ## Prove
 
 On a host with a user namespace and no `runsc` on PATH, as a user with no root: `run --rm --podvm-init=image ghcr.io/pkgforge-dev/archlinux:latest systemctl is-system-running` fetches gVisor once, names the runsc tier, and prints `running` or `degraded`; a second run fetches nothing.
+
+## Blocker
+
+Blocked (2026-11-20) on `podcrates@T-977` (PodUtils/podcrates#243, COORD-148, the answer to COORD-208, #604): a `fetch` module of `pod-release` (a pinned URL for each architecture with its SHA-256, a cache under a lock, the hash checked before the first exec). podvm writes no fetch; `PODVM_RUNSC` and PATH stay. podvm keeps the pin and the order of its tiers. The pin for x86_64, read from the file that experiment 436 checks by its SHA-512: `https://storage.googleapis.com/gvisor/releases/release/20261102/x86_64/gvisor.tar.bz2`, 75,332,313 bytes, SHA-256 `6f6b1a8f0f4665a403238135167d0d990bfaeaff5544abf68f5e0d822b35484a`; the tier needs its members `runsc` and `gvisor-bin/` (the release has no `runsc` as a file of its own: that URL gives 404). The call site is `runsc::binary` (`crates/podvm/src/runsc.rs`) and the check of `initns::route`. The condition that clears it: the tag of podcrates with the module.

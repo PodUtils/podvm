@@ -176,6 +176,11 @@ and `docs/decisions.md`. Remove this file when each step below is done.
   runsc (T-2009); to podrunner the routes of `--podvm-init=image`
   (T-2002, T-2007). The owner's round 2 (2026-11-20): make each route as
   fast as possible, with a measured baseline first.
+* podcrates answered (2026-11-20): T-2005 waits for `podcrates@T-975`
+  (`pod-microvm`: the UML kernel and its launcher, PodUtils/podcrates#242),
+  T-2003 for `podcrates@T-976` (RUNPATH in pod-enter) and T-2009 for
+  `podcrates@T-977` (the `fetch` module of `pod-release`),
+  PodUtils/podcrates#243. podvm carries no kernel and writes no fetch.
 
 ## Next steps, in order
 

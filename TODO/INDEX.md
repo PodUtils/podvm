@@ -665,17 +665,17 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2000](interpose.md) | P1 | S | none | interpose | done | `apt-get install` fails on the userland rung: dpkg's `tar` has no ownership memo |
 | [T-2001](cli.md) | P2 | M | none | cli | partial | The faults of the fifth outside pass (2026-11-19, the gate of beta.36) |
 | [T-2002](enter.md) | P1 | L | none | enter | partial | `--podvm-init=image` holds only on the incus tier: the namespace rung maps one uid, and the userland rung has no PID 1 |
-| [T-2003](enter.md) | P2 | M | none | enter | open | On the userland rung, a program with a library in a directory of its RUNPATH does not load (`systemctl`) |
+| [T-2003](enter.md) | P2 | M | none | enter | blocked | On the userland rung, a program with a library in a directory of its RUNPATH does not load (`systemctl`) |
 | [T-2004](enter.md) | P2 | M | none | enter | partial | A delegated cgroup2 subtree from the user manager of systemd, for an init of the image on the namespace rung |
-| [T-2005](enter.md) | P2 | L | none | enter | partial | An init of the image with no guest on a host that delegates no cgroup: a cgroup2 stand-in, or User-Mode Linux |
+| [T-2005](enter.md) | P2 | L | none | enter | blocked | An init of the image with no guest on a host that delegates no cgroup: a cgroup2 stand-in, or User-Mode Linux |
 | [T-2006](supervise.md) | P1 | S | none | supervise | done | A SIGKILL of podvm leaves the processes of a foreground run in its PID namespace |
 | [T-2007](enter.md) | P1 | M | none | enter | partial | The init of the image as PID 1 of a gVisor sandbox: the runsc tier, for a host with a user namespace and no delegated cgroup |
 | [T-2008](machine.md) | P3 | L | none | machine | open | The machine tier boots systemd at each run: a saved state of the guest for each digest |
-| [T-2009](enter.md) | P2 | M | none | enter | open | podvm fetches no runsc: the gVisor route of an init is there only where the host has one |
+| [T-2009](enter.md) | P2 | M | none | enter | blocked | podvm fetches no runsc: the gVisor route of an init is there only where the host has one |
 
 ## Counts
 
-606 entries: 27 open, 38 partial, 3 blocked, 538 done.
+606 entries: 25 open, 37 partial, 6 blocked, 538 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -686,9 +686,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 18 | 0 | 244 | 265 |
-| P2 | 18 | 16 | 2 | 177 | 213 |
+| P2 | 16 | 15 | 5 | 177 | 213 |
 | P3 | 6 | 4 | 1 | 42 | 53 |
-| **All** | 27 | 38 | 3 | 538 | 606 |
+| **All** | 25 | 37 | 6 | 538 | 606 |
 
 ## Work order
 
