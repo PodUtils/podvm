@@ -425,3 +425,22 @@ fn an_unmeasured_leg_is_never_attributed() {
     assert!(note.contains("clone flags"), "{note}");
     assert!(!note.contains("Setgroups is clear"), "{note}");
 }
+
+#[test]
+fn the_probe_rows_say_that_they_are_of_the_host_outside_a_user_namespace() {
+    // TODO/cli.md T-2001 OP-01: `mode=namespace` beside `clone(NEWNS)=EPERM`
+    // is no contradiction, because the rows are of the host before pod-enter
+    // opens a user namespace. The second line of rows lines up under the first.
+    let f = Findings::empty();
+    let sel = Selection::choose(&f);
+    let b = entry_banner(&f, &sel, Rung::Namespace);
+    let lines: Vec<&str> = b.lines().collect();
+    let at = lines
+        .iter()
+        .position(|l| l.starts_with(PROBES_LABEL))
+        .expect(&b);
+    assert!(PROBES_LABEL.contains("outside any user namespace"), "{b}");
+    if let Some(next) = lines.get(at + 1).filter(|l| l.starts_with(' ')) {
+        assert!(next.starts_with(&" ".repeat(PROBES_LABEL.len())), "{b}");
+    }
+}

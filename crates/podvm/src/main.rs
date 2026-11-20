@@ -15,6 +15,7 @@ mod broker;
 mod complete;
 mod diagnose;
 mod doctor;
+mod environ; // TODO/cli.md T-2001 OP-01
 mod exec;
 mod format;
 #[cfg(test)]
