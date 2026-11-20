@@ -340,3 +340,6 @@ mod volume_base;
 
 // TODO/enter.md T-1985: mode, owner and times under the confine layer.
 mod meta;
+
+// TODO/enter.md T-2040: a host path of a volume takes its rules.
+mod ro_hostpath;
