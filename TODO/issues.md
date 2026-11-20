@@ -516,7 +516,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #620 | [gh action] requested | closed (kvm 44708331241 on 15c1208: experiment 468 ran, but its machine routes took the namespace rung; fc1aad9 names the tier; again in #621) | kvm.yml job init of 4e022de (T-2008, T-2016) |
 | #621 | [gh action] requested | closed (kvm 44709519610 on 2a23242: success; 468 under KVM: the save failed; 469 on QEMU 10.2.1: 0 of 200 early ends) | kvm.yml job init of fc1aad9 (T-2008, T-2016) |
 | #622 | [gh action] requested | closed (kvm 44713826631 on afe8257: success; the save under KVM held: first output 0.8 s from the state against 12.0 s; 469: 0 of 200) | kvm.yml job init of 919f373, for the cause of the failed save under KVM (T-2008) |
-| #623 | [gh action] requested | open | the gate, arm, secrets and issue-sync runs of ccdeade (T-2014, T-2015) |
+| #623 | [gh action] requested | closed (gate 44739866889, arm 44739871860, secrets 44739876549, issue-sync 44739881849 on 5c1a58d: success) | the gate, arm, secrets and issue-sync runs of ccdeade (T-2014, T-2015) |
 
 ## Messages whose title does not start with COORD-NNN
 
