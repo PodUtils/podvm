@@ -5640,7 +5640,7 @@ As uid 1000 under `scripts/dev/nouserns.c` on the syscall tier with `exec=/usr/b
 
 # T-2040: On the userland rung, a payload writes a `:ro` volume through its host path
 
-**Source:** the sixth outside pass (2026-11-20, the gate of the next beta; `docs/history/outside-pass-2026-11-20.md`): an agent with the binary of `2fc28af` and `podvm man` only, as uid 1000, OQ-01 (P0 by the pass) and OQ-11
+**Source:** the sixth outside pass ([T-2044](cli.md)), OQ-01 (P0 by the pass) and OQ-11
 **Category:** enter
 **Milestone:** none
 **Priority:** P1

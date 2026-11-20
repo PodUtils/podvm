@@ -6414,7 +6414,7 @@ Partial (2026-11-19): OP-02 is fixed. On the syscall tier a `-v` of one file is 
 
 # T-2043: `exec -t` gives the command no terminal and does not refuse
 
-**Source:** the sixth outside pass (2026-11-20, the gate of the next beta; `docs/history/outside-pass-2026-11-20.md`): an agent with the binary of `2fc28af` and `podvm man` only, as uid 1000, OQ-04 (P1)
+**Source:** the sixth outside pass (T-2044), OQ-04 (P1)
 **Category:** cli
 **Milestone:** none
 **Priority:** P1
@@ -6443,7 +6443,7 @@ As uid 1000: `exec -t NAME tty` prints a `/dev/pts/N` path and exits 0 on the na
 
 # T-2044: The faults of the sixth outside pass (2026-11-20, the gate of the next beta)
 
-**Source:** the sixth outside pass (2026-11-20, the gate of the next beta; `docs/history/outside-pass-2026-11-20.md`): an agent with the binary of `2fc28af` and `podvm man` only, as uid 1000
+**Source:** the sixth outside pass (2026-11-20, the gate of the next beta; [the report](../docs/history/outside-pass-2026-11-20.md)): an agent with the binary of `2fc28af` and `podvm man` only, as uid 1000
 **Category:** cli
 **Milestone:** none
 **Priority:** P2

@@ -5849,7 +5849,7 @@ Partial (2026-11-20). Step (3) of the Approach: `drive` ends with `Driven::Again
 
 # T-2041: On the machine tier, a SIGTERM, SIGINT or SIGHUP to a foreground run ends podvm and does not reach the payload
 
-**Source:** the sixth outside pass (2026-11-20, the gate of the next beta; `docs/history/outside-pass-2026-11-20.md`): an agent with the binary of `2fc28af` and `podvm man` only, as uid 1000, OQ-02 (P1)
+**Source:** the sixth outside pass ([T-2044](cli.md)), OQ-02 (P1)
 **Category:** machine
 **Milestone:** none
 **Priority:** P1
@@ -5878,7 +5878,7 @@ As uid 1000 under TCG: a `kill -TERM` of podvm of `run --rm --podvm-tier=machine
 
 # T-2042: After `run -d --podvm-tier=machine`, `inspect`, `kill`, `wait` and the filters of `ps` do not find the container
 
-**Source:** the sixth outside pass (2026-11-20, the gate of the next beta; `docs/history/outside-pass-2026-11-20.md`): an agent with the binary of `2fc28af` and `podvm man` only, as uid 1000, OQ-03 (P1)
+**Source:** the sixth outside pass ([T-2044](cli.md)), OQ-03 (P1)
 **Category:** machine
 **Milestone:** none
 **Priority:** P1
