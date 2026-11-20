@@ -5662,7 +5662,7 @@ As uid 1000 under `scripts/dev/nouserns.c` on the syscall tier with `exec=/usr/b
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -5678,11 +5678,15 @@ A host path under the host side of a volume takes the rules of that volume: its 
 
 ## Decision
 
--
+2026-11-20, the session's call. (1) A host path under the host side of a volume (a pair whose guest side is not `/`) goes on as its guest path before each rule (`map::hostside::to_volume_guest`): the read-only table, the walk of links in guest names (T-1725) and the base (T-1972). The rewrite then gives the same host path again. The rootfs keeps T-1705: its host path passes, and only the read-only table reads it by its guest path (`ro_denied`). (2) The read-only table also reads the path that the walk reached, so a link to a `:ro` volume (by its guest path or its host path) is a refusal; before, the table read only the spelled path. (3) OQ-11 is not a fault of the code: the walk of T-1725 resolves each link of a volume in guest names, also a link that the host makes after the start, so an absolute target names a place of the image (`/etc` of alpine, OQ-11) and never a host file out of DIR, as on the namespace rung, where the kernel follows the link in the mount namespace. A refusal of each link under DIR would break the links of a tree of the payload (`node_modules/.bin`, the case "a link in the volume" of T-1972). `ELOOP` stays the answer for a link that the host makes between the walk and the call. The manual (`run --help`, `parity.rs`, `docs/limits.md`) said "a link under DIR is a refusal"; it now gives this rule. The clause "experiment of OQ-11: ELOOP" of Prove reads: the experiment of OQ-11 reaches no host file.
 
 ## Prove
 
 As uid 1000 under `scripts/dev/nouserns.c` with `mirror.gcr.io/library/alpine:3.20` and `-v H:/cfg:ro`: `sh -c 'echo X > H/f'` fails with EROFS and `H/f` is unchanged, on the loader family; a table test of the interposer holds the class (a host path of a `:ro` volume: open, create, unlink, rename, chmod, utimes; a host path of the rootfs and of a library directory still passes); experiment of OQ-11: ELOOP.
+
+## Done
+
+**Done (2026-11-20).** `crates/podvm-interpose/src/map/hostside.rs` (new) and `map/prepare.rs` (the funnel, moved out of `map/rewrite.rs`) apply the Decision; `exec/walk.rs` goes on in guest names where a walked path reaches the host side of a volume; `mkstemp` and its family read the template with `ro_denied`; `link`, `rename` and their `*at` forms keep the errno of their first path (before, the walk of the second path replaced `EROFS` with `EINVAL`). Measured as uid 1000 under `scripts/dev/nouserns.c` (`mode=userland`, the loader family) with `mirror.gcr.io/library/alpine:3.20`, `-v H:/cfg:ro -v W:/w`, H a directory of uid 1000 with a file of mode 666. Before (the binary of `main` at `d9b152f`): `echo > H/f`, `>>`, `chmod`, `touch -d`, `truncate`, `ln`, `touch H/new`, `mkdir`, `mv` exit 0, a link `/tmp/l -> H/f` and a link `/tmp/g -> /cfg/f` take a write, and the host file holds the last write with mode 600. After: each of them gives `Read-only file system` (exit 1), the host file holds `orig` with mode 666 and the volume holds no new name; a read of `H/f` and a write to the host path of `W` pass. The same with `--podvm-volume-base`: before `host=0 chmod=0`, after `host=1 chmod=1`, the file unchanged. OQ-11 after: the link that the host swaps in at `DIR/real/sub` reads the image's `/etc/hostname` (`localhost`), no host file. `a_host_path_of_a_volume_takes_the_rules_of_the_volume` (28 calls and 3 under `--read-only`: open, append, create, `fopen`, `mkstemp`, `mkdir`, `unlink`, `rename` both ways, `chmod`, `utimes`, `truncate`, `link` both ways, `symlink` in the volume, a link to the host path, to the guest path and to the directory, a relative name after `chdir`; the guest path; a read; the host path of a rw volume; a host path of the rootfs and of a library directory with one prefix) and `a_host_path_of_a_volume_reads_as_its_guest_path` pin the class.
 
 # T-2017: A run with the init of the image on the namespace rung dropped `--podvm-confine`, `--ulimit`, no-new-privileges and `--device` with no line
 
@@ -5716,3 +5720,36 @@ Experiment 465, clause 12: `run --podvm-confine read=/usr --podvm-init=image` an
 ## Done
 
 Partial (2026-11-20). `initns::stays::check` refuses `--podvm-confine`, `--ulimit`, `--security-opt no-new-privileges` and `--device` with 125 and the name of the flag, for each run with `--podvm-init=image` and no tier (the namespace rung, in the foreground and with `-d` or `create`); the unit test `a_limit_that_the_init_route_drops_is_named` is the table. Experiment 465, clause 12, passes on the cloud host as uid 1000. Remaining: (1) apply each of the four flags in the supervisor; (2) `--memory`, `--cpus` and `--pids-limit` with the init on a host with cgroup2 at `/sys/fs/cgroup` are not measured; (3) the runsc tier and the machine tier are not measured for these flags; (4) the table test of each flag of `run` against each route.
+
+# T-2045: On the userland rung, a link to the host path of the rootfs with `..` reads host files
+
+**Source:** the work of T-2040 (2026-11-20), also in `0.2.0-beta.36`
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** done
+
+## Problem
+
+On the loader family, `ln -s ROOTFS/../../../../../../../etc /tmp/esc; cat /tmp/esc/hostname` prints the host's name, where `cat /etc/hostname` gives the image's: a link whose target names the host path of the rootfs and then `..` leaves the rootfs. The manual says that host pass-through happens only under `--unsafe-host-paths`.
+
+## Premise
+
+T-1705 lets a host path under the host side of a pair pass with no rewrite (`map::rewrite::under_host_side`); T-2040 reads the host path of a volume by its guest path, but a host path of the rootfs stays literal, and the walk of links (T-1725) gives the rest of the path, `..` included, to the kernel with no normalisation.
+
+## Approach
+
+The walk reads a host path of the rootfs by its guest path, as T-2040 does for a volume, so that `..` stops at the guest root; the paths of `/.podvm/` and the paths of the loader of T-1705 keep their pass-through where they name no `..`.
+
+## Decision
+
+2026-11-20, the session's call. The walk of links (`exec::walk::resolve`) walks a path that starts with the host side of the rootfs from the rootfs: its names stay host names (so `ROOTFS/.podvm/` and the paths of the loader of T-1705 keep their pass-through), each link of it resolves as a link of the guest (an absolute target from the guest root, a relative one from its directory), and `..` stops at the rootfs. A link target that names the host path of the rootfs starts again there. The funnel (`map::prepare`) gives a host path of the rootfs to this walk, where it passed it to the kernel before; only where the walk cannot run (no real `readlink`) does the path pass as before. The same hole had a second form, also closed: a host path of the rootfs as given, with a link in it (`ROOTFS/tmp/rel/hostname`, `rel -> ../../etc`), which the kernel followed on the host.
+
+## Prove
+
+As uid 1000 under `scripts/dev/nouserns.c` with `mirror.gcr.io/library/alpine:3.20`: `ln -s ROOTFS/../../../../../../../etc /tmp/esc; cat /tmp/esc/hostname` gives the image's name or ENOENT, never the host's; a table test of the interposer holds the class (a host path of the rootfs with `..`, through a link and as given; the loader paths of T-1705 still open).
+
+## Done
+
+**Done (2026-11-20).** `crates/podvm-interpose/src/exec/walk.rs` and `map/prepare.rs` apply the Decision. Measured as uid 1000 under `scripts/dev/nouserns.c` (`mode=userland`, the loader family) with `mirror.gcr.io/library/alpine:3.20`; the host's name is `vm`, the image's `localhost`. Before (the interposer of `main` at `0490555`): `cat ROOTFS/../../../../../../../etc/hostname` gave `localhost`, and `vm` for a link to `ROOTFS/../../../../../../../etc`, for `ROOTFS/tmp/rel/hostname` with `rel -> ../../../../../../../../../etc`, and for a link to `ROOTFS/.podvm/../../../../../../../../etc`. After: each gives `localhost`; `ls ROOTFS/.podvm/`, a read of `ROOTFS/lib/ld-musl-x86_64.so.1` and of the link `ROOTFS/lib/libc.musl-x86_64.so.1`, and a write to `ROOTFS/tmp/made` exit 0. With `mirror.gcr.io/library/python:3.13-slim`, the path that `dladdr` gives for `libz.so.1` (a host path under the rootfs, a link) opens, before and after (T-1705); `import ssl, json, sqlite3` works. The measure of T-2040 gives the same lines as its Done. `a_host_path_of_the_rootfs_reads_no_file_out_of_the_rootfs` (13 reads and a create: a link to `ROOTFS/..`, to `ROOTFS/.podvm/..` and to `ROOTFS/tmp/../..`; as given, a relative link, a link to `ROOTFS/..`, `ROOTFS/..`, an absolute link of the image, a link to a host directory; a relative link in the rootfs, a path of the loader, `ROOTFS/.podvm/obj`) pins the class: on the code before, 7 of its cases read the file out of the rootfs or did not open.

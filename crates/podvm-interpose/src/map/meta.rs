@@ -194,7 +194,7 @@ pub unsafe fn prepare_follow(
     follow: bool,
     out: &mut [u8; OUT],
 ) -> *const c_char {
-    let p = unsafe { super::rewrite::prepare_inner(what, dirfd, path, writes, follow, out) };
+    let p = unsafe { super::prepare::prepare_inner(what, dirfd, path, writes, follow, out) };
     // TODO/enter.md T-1985: the confine layer on a change of mode, owner
     // or times, on the path that the call passes on.
     let at = if p == path { dirfd } else { AT_FDCWD };

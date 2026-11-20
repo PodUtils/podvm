@@ -85,6 +85,7 @@ fn disk(part: &str) -> String {
 /// that failed, the status before it, the time, and the disk.
 pub(super) fn migrate(
     m: &mut Monitor,
+    qmp: &Path,
     transport: Transport,
     part: &str,
 ) -> Result<Duration, String> {
@@ -97,17 +98,40 @@ pub(super) fn migrate(
     let end = started + SAVE_BOUND;
     let mut longest = Duration::ZERO;
     let mut before = "none".to_string();
+    let mut quiet = 0u32;
     loop {
         let at = Instant::now();
-        let line = m.ask("{\"execute\":\"query-migrate\"}").map_err(|e| {
-            format!(
-                "through {via}: {} {:.1} s after the start of the migration (status {before:?} \
-                 before; {})",
-                asked("query-migrate", &e),
-                started.elapsed().as_secs_f64(),
-                disk(part)
-            )
-        })?;
+        let line = match m.ask("{\"execute\":\"query-migrate\"}") {
+            Ok(line) => line,
+            // T-2008 (`kvm.yml` run 44749207855): under KVM the emulator
+            // answered nothing for longer than the read bound of the
+            // monitor while it wrote the last part of the state. The late
+            // answer goes to this connection, which no read can follow: a
+            // new connection asks again, until the bound of the save.
+            Err(e) if no_answer(&e) && Instant::now() < end => {
+                quiet += 1;
+                longest = longest.max(at.elapsed());
+                *m = reconnect(qmp, end).map_err(|again| {
+                    format!(
+                        "through {via}: {}; a new connection to the monitor: {again} ({:.1} s \
+                         after the start of the migration; {})",
+                        asked("query-migrate", &e),
+                        started.elapsed().as_secs_f64(),
+                        disk(part)
+                    )
+                })?;
+                continue;
+            }
+            Err(e) => {
+                return Err(format!(
+                    "through {via}: {} {:.1} s after the start of the migration (status \
+                     {before:?} before; {quiet} answers late before; {})",
+                    asked("query-migrate", &e),
+                    started.elapsed().as_secs_f64(),
+                    disk(part)
+                ))
+            }
+        };
         longest = longest.max(at.elapsed());
         let (status, why) = migration(&line);
         match status.as_str() {
@@ -130,6 +154,18 @@ pub(super) fn migrate(
             _ => std::thread::sleep(Duration::from_millis(25)),
         }
         before = status;
+    }
+}
+
+/// A new connection to the monitor at `qmp`, tried again until `end`: the
+/// emulator greets a new client only when it lets go of its lock.
+fn reconnect(qmp: &Path, end: Instant) -> Result<Monitor, String> {
+    loop {
+        match Monitor::connect(qmp, Duration::from_secs(5)) {
+            Ok(m) => return Ok(m),
+            Err(e) if Instant::now() >= end => return Err(e.to_string()),
+            Err(_) => std::thread::sleep(Duration::from_millis(200)),
+        }
     }
 }
 
@@ -175,12 +211,12 @@ pub fn save(
         return (Err(asked("stop", &e)), cont(&mut m));
     }
     let mut transport = first;
-    let mut done = migrate(&mut m, transport, &path);
+    let mut done = migrate(&mut m, qmp, transport, &path);
     // A QEMU before 8.2 has no `file:` transport: the pipe is the second path.
     if done.is_err() && transport == Transport::File {
         let _ = std::fs::remove_file(&part);
         transport = Transport::Pipe;
-        let second = migrate(&mut m, transport, &path);
+        let second = migrate(&mut m, qmp, transport, &path);
         done = match (second, done) {
             (Ok(t), _) => Ok(t),
             (Err(pipe), Err(file)) => Err(format!("{file}; then {pipe}")),

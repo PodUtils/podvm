@@ -424,7 +424,9 @@ jobs:
       - name: experiment 465, the routes of an init (run -d, exec, the pty; clauses 10 to 12)
         run: |
           rc=0
-          timeout 45m sh experiments/465-init-image.sh || rc=$?
+          # As root for the user of the runner: root makes the stand-in of a
+          # delegated directory, and clauses 1 and 10 to 12 run from it.
+          sudo env PODVM_465_USER="$USER" timeout 45m sh experiments/465-init-image.sh || rc=$?
           if pgrep -a qemu-system; then
             echo "an emulator stayed after the run"
             sudo pkill -9 qemu-system || true

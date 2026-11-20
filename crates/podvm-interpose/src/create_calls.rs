@@ -233,10 +233,15 @@ macro_rules! path_dual {
             let pa = unsafe {
                 crate::map::prepare(stringify!($name).as_bytes(), $dirfd_a, $path_a, &mut bufa)
             };
+            // The errno of the first path stands: the second path's walk
+            // would overwrite it (`readlink` of a plain file, EINVAL).
+            if pa.is_null() {
+                return -1;
+            }
             let pb = unsafe {
                 crate::map::prepare(stringify!($name).as_bytes(), $dirfd_b, $path_b, &mut bufb)
             };
-            if pa.is_null() || pb.is_null() {
+            if pb.is_null() {
                 return -1;
             }
             let $path_a = pa;
@@ -261,6 +266,10 @@ macro_rules! path_dual {
                     &mut bufa,
                 )
             };
+            // The errno of the first path stands, as above.
+            if pa.is_null() {
+                return -1;
+            }
             let pb = unsafe {
                 crate::map::prepare(
                     stringify!($name).as_bytes(),
@@ -269,7 +278,7 @@ macro_rules! path_dual {
                     &mut bufb,
                 )
             };
-            if pa.is_null() || pb.is_null() {
+            if pb.is_null() {
                 return -1;
             }
             let $path_a = pa;
@@ -403,8 +412,9 @@ pub(super) unsafe fn on_template<R: Copy>(
         return fail;
     }
     let abs_n = crate::map::strnlen(abs.as_ptr() as *const c_char, crate::map::OUT);
-    // TODO/cli.md T-1655: a template under a read-only prefix makes no file.
-    if unsafe { crate::map::denied(abs.as_ptr(), abs_n) } {
+    // TODO/cli.md T-1655: a template under a read-only prefix makes no file,
+    // also by the host path of a `:ro` volume (TODO/enter.md T-2040).
+    if unsafe { crate::map::ro_denied(&t, &abs[..abs_n]) } {
         set_errno(crate::map::EROFS);
         return fail;
     }

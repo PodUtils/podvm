@@ -54,7 +54,11 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   through the same table, to the file of the volume.
 - `:ro` and `--read-only` are a read-only layer of the same interposer
   (T-1655): a write through libc under a read-only guest path fails with
-  `EROFS`, and `/dev` stays writable. A raw `syscall` instruction passes
+  `EROFS`, and `/dev` stays writable. The layer reads a host path of a
+  volume or of the rootfs (`PODVM_MAPS` names them) by its guest path, and
+  the path that a link reaches, so such a write fails the same way
+  (T-2040). A host path of the rootfs resolves its links from the
+  rootfs, and `..` stops there (T-2045). A raw `syscall` instruction passes
   the layer. Each entry with no interposer table refuses both by name.
 - `--podvm-volume-base DIR` on the loader family (T-1972): at the start,
   each volume under DIR must open under it as a directory with no
@@ -62,9 +66,12 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   in such a volume, the interposer opens the volume and the rest of the
   path under DIR again with `openat2(RESOLVE_BENEATH |
   RESOLVE_NO_SYMLINKS)`, and the call takes that descriptor
-  (`/proc/self/fd/N`) until it returns. So a link that the host makes
-  under DIR after the start gives the call `ELOOP` and one line, not a
-  file out of DIR. No descriptor stays open between two calls. An exec
+  (`/proc/self/fd/N`) until it returns. Before that, the walk of T-1725
+  resolves each link of the path in guest names, also a link that the
+  host makes in the volume after the start: an absolute target names a
+  place of the image or of a volume, not of the host (T-2040). So a link
+  that the host makes between the walk and the call gives the call
+  `ELOOP` and one line, and no link gives a file out of DIR. No descriptor stays open between two calls. An exec
   route, `dlopen`, `glob`, the `ftw` family, `openat2` and `mount` of the
   payload, and a socket address get the check only: the same opens, then
   the host path, so a link that the host makes in the short time between

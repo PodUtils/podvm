@@ -195,6 +195,11 @@ UID_OF=$(id -u "$WHO")
 CGROOT=$(awk '$9 == "cgroup2" || $10 == "cgroup2" {print $5; exit}' /proc/self/mountinfo)
 OWN="$CGROOT$(sed -n 's/^0:://p' /proc/self/cgroup)"
 delegated() { [ -n "$CGROOT" ] && as sh -c "mkdir '$1/podvm-465-probe' 2>/dev/null && rmdir '$1/podvm-465-probe'"; }
+# A user manager of systemd gives a run a delegated scope (TODO/enter.md
+# T-2004), as on a GitHub-hosted runner. A clause that needs a host with no
+# delegation hides the user bus: podvm reads it only in XDG_RUNTIME_DIR.
+NOBUS="$WORK/no-user-bus"
+mkdir -p "$NOBUS" && chmod 777 "$NOBUS"
 STANDIN=""
 if delegated "$OWN"; then
 	DELEG="$OWN"
@@ -256,7 +261,7 @@ fi
 if delegated "$OWN"; then
 	say "clause 2  skipped: the cgroup of this shell is delegated"
 else
-	run_check 2 as env PODVM_RUNSC=/nonexistent/runsc
+	run_check 2 as env XDG_RUNTIME_DIR="$NOBUS" PODVM_RUNSC=/nonexistent/runsc
 	rc=$?
 	first=$took
 	[ "$rc" -eq 7 ] || { bad "clause 2: the check gave $rc, not 7"; keep "$T.2.err"; }
@@ -269,7 +274,7 @@ fi
 first=${first:-0}
 states() { find "$WORK/store/machine" -maxdepth 1 -name "state-*.$1" 2>/dev/null | wc -l; }
 before=$(states vm)
-run_check 3 as env PODVM_USERNS=0 PODVM_RUNSC=/nonexistent/runsc
+run_check 3 as env XDG_RUNTIME_DIR="$NOBUS" PODVM_USERNS=0 PODVM_RUNSC=/nonexistent/runsc
 rc=$?
 [ "$rc" -eq 7 ] || { bad "clause 3: the check gave $rc, not 7"; keep "$T.3.err"; }
 grep -q 'takes the machine tier' "$T.3.err" || bad "clause 3: the run names no machine tier"
@@ -291,7 +296,10 @@ say "clause 4  rc $? (the userland rung with no init: $(grep -o 'mode=[a-z-]*' "
 keep "$T.4.out"
 grep -a 'setresuid' "$T.4.err" | cut -c1-200 | sed 's/^/    stderr: /' | tee -a "$OUT"
 grep -q 'mode=userland' "$T.4.err" || bad "clause 4: the run did not enter the userland rung"
-grep -q 'pid1=systemd' "$T.4.out" && bad "clause 4: the userland rung has systemd as PID 1"
+# The userland rung shows the PID 1 of the host: a host whose own init is
+# systemd (a hosted runner) says nothing of the payload.
+[ "$(cat /proc/1/comm 2>/dev/null)" = systemd ] ||
+	{ grep -q 'pid1=systemd' "$T.4.out" && bad "clause 4: the userland rung has systemd as PID 1"; }
 
 # Clause 5: the refusals by name.
 for flags in "run --podvm-tier=syscall" "create --podvm-tier=machine"; do
@@ -307,7 +315,7 @@ done
 if delegated "$OWN"; then
 	say "clause 5  run -d from a cgroup with no delegation: skipped, the cgroup of this shell is delegated"
 else
-	as timeout 60 "$P" run -d --podvm-init=image "$IMG" true >/dev/null 2>"$T.5.err"
+	as env XDG_RUNTIME_DIR="$NOBUS" timeout 60 "$P" run -d --podvm-init=image "$IMG" true >/dev/null 2>"$T.5.err"
 	rc=$?
 	say "clause 5  rc $rc (run -d --podvm-init=image from a cgroup that is not delegated)"
 	cut -c1-200 "$T.5.err" | sed 's/^/    stderr: /' | tee -a "$OUT"
@@ -318,7 +326,7 @@ fi
 
 # Clause 6: nothing stays.
 sleep 2
-left=$(ps -u "$WHO" -o pid=,stat=,args= 2>/dev/null | grep -E 'qemu-system|systemd|guest-init' | grep -v ' Z' || true)
+left=$(ps -u "$WHO" -o pid=,stat=,args= 2>/dev/null | grep -E 'qemu-system|systemd|guest-init' | grep -v -e ' Z' -e 'systemd --user' -e 'dbus-daemon' -e 'grep -E' || true)
 say "clause 6  processes that stay: ${left:-none}"
 [ -z "$left" ] || bad "clause 6: a process of the runs stays"
 if [ -n "$DELEG" ]; then
@@ -339,7 +347,7 @@ killed() { # the name of the case, then the command
 	[ -n "$outer" ] && kill -KILL "$outer"
 	wait
 	sleep 2
-	left=$(ps -u "$WHO" -o pid=,stat=,args= 2>/dev/null | grep -E 'sleep 465465|systemd|guest-init' | grep -v ' Z' || true)
+	left=$(ps -u "$WHO" -o pid=,stat=,args= 2>/dev/null | grep -E 'sleep 465465|systemd|guest-init' | grep -v -e ' Z' -e 'systemd --user' -e 'dbus-daemon' -e 'grep -E' || true)
 	say "clause ${KC:-7}  $what: podvm was pid ${outer:-none}; processes that stay: ${left:-none}"
 	{ [ -n "$outer" ] && [ -z "$left" ]; } || bad "clause ${KC:-7}: $what"
 }
@@ -370,7 +378,7 @@ if [ -z "$RUNSC" ] && [ "$(uname -m)" = x86_64 ]; then
 fi
 if [ -n "$RUNSC" ] && [ -x "$RUNSC" ] && ! delegated "$OWN"; then
 	say "runsc     $("$RUNSC" --version 2>/dev/null | head -1)"
-	run_check 8 as env PODVM_RUNSC="$RUNSC"
+	run_check 8 as env XDG_RUNTIME_DIR="$NOBUS" PODVM_RUNSC="$RUNSC"
 	rc=$?
 	[ "$rc" -eq 7 ] || { bad "clause 8: the check gave $rc, not 7"; keep "$T.8.err"; }
 	grep -q 'takes the runsc tier' "$T.8.err" || bad "clause 8: the run names no runsc tier"
@@ -380,7 +388,7 @@ if [ -n "$RUNSC" ] && [ -x "$RUNSC" ] && ! delegated "$OWN"; then
 	[ "$rc" -eq 7 ] || { bad "clause 8 (PODVM_USERNS=0): the check gave $rc, not 7"; keep "$T.8.err"; }
 	KC=8
 	killed "a SIGKILL of podvm on the runsc tier" as env PODVM_RUNSC="$RUNSC" timeout 120 "$P" run --rm --podvm-init=image "$IMG" sleep 465465
-	left=$(ps -u "$WHO" -o pid=,stat=,args= 2>/dev/null | grep -E 'runsc|gvisor' | grep -v ' Z' || true)
+	left=$(ps -u "$WHO" -o pid=,stat=,args= 2>/dev/null | grep -E 'runsc|gvisor' | grep -v -e ' Z' -e 'systemd --user' -e 'dbus-daemon' -e 'grep -E' || true)
 	say "clause 8  processes of gVisor that stay: ${left:-none}"
 	[ -z "$left" ] || bad "clause 8: a process of gVisor stays"
 else
@@ -396,7 +404,7 @@ ST=$(find "$WORK/store/machine" -maxdepth 1 -name 'state-*.vm' 2>/dev/null | hea
 if [ -n "$ST" ]; then
 	KC=9
 	killed "a SIGKILL of podvm with a guest from a state" as env PODVM_RUNSC=/nonexistent/runsc timeout 120 "$P" run --rm --podvm-init=image "$IMG" sleep 465465
-	left=$(ps -u "$WHO" -o pid=,stat=,args= 2>/dev/null | grep -E 'qemu-system' | grep -v ' Z' || true)
+	left=$(ps -u "$WHO" -o pid=,stat=,args= 2>/dev/null | grep -E 'qemu-system' | grep -v -e ' Z' -e 'systemd --user' -e 'dbus-daemon' -e 'grep -E' || true)
 	say "clause 9  emulators that stay: ${left:-none}"
 	[ -z "$left" ] || bad "clause 9: an emulator stays"
 	size=$(stat -c %s "$ST")
@@ -445,7 +453,7 @@ ind() {
 }
 stays() { # the processes and the cgroups of the runs that stay
 	sleep 1
-	left=$(ps -u "$WHO" -o pid=,stat=,args= 2>/dev/null | grep -E 'systemd|guest-init|/sbin/init' | grep -v ' Z' || true)
+	left=$(ps -u "$WHO" -o pid=,stat=,args= 2>/dev/null | grep -E 'systemd|guest-init|/sbin/init' | grep -v -e ' Z' -e 'systemd --user' -e 'dbus-daemon' -e 'grep -E' || true)
 	# The base of a run that a SIGKILL of podvm ended (clause 7) is empty
 	# and stays for the sweep: only a base with a process counts here.
 	cg=$(for d in "$DELEG"/podvm-init-*; do [ -s "$d/cgroup.procs" ] || grep -qs 'populated 1' "$d/cgroup.events" && echo "$d"; done 2>/dev/null)

@@ -8,6 +8,24 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- On the userland rung (the loader family), a path that names the host
+  path of the rootfs (`PODVM_MAPS` gives it) resolves its links from the
+  rootfs, and `..` stops there. Before, a link to `ROOTFS/../../etc`, or
+  `ROOTFS/tmp/l/f` with a relative link `l` that climbs out, read a host
+  file (T-2045). An absolute link of the image under such a path resolves
+  in the image now, not on the host.
+
+- On the userland rung (the loader family), a write through the host path
+  of a `:ro` volume (`echo X > HOST/f`, also `chmod`, `touch`, `mv`, `rm`,
+  `ln`, `mkstemp`, or a link to the volume by its host or its guest path)
+  fails with `EROFS`, as a write through the guest path did. Before, it
+  changed the host file (T-2040, OQ-01 of the sixth outside pass). A host
+  path of a volume now resolves its links in guest names, and a host path
+  of the rootfs takes `--read-only` by its guest path.
+- `link`, `rename` and their `*at` forms give the errno of their first
+  path when it fails; before, the second path could replace it (`EINVAL`
+  for `EROFS`).
+
 - On the machine tier, a guest whose emulator crashes (SIGSEGV, SIGBUS,
   SIGABRT) before the command runs boots once more, with one line that
   names the signal (T-2016: QEMU 8.2 under TCG with more than one vCPU).

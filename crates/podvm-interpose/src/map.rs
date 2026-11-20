@@ -277,6 +277,10 @@ use absolute::{fd_base, guest_base};
 pub use absolute::{fd_guest, normalise};
 mod rewrite;
 pub use rewrite::*;
+mod prepare;
+pub use prepare::{prepare, prepare_mode};
+mod hostside; // TODO/enter.md T-2040
+pub use hostside::{ro_denied, to_volume_guest};
 mod readonly;
 pub use readonly::*;
 mod meta; // TODO/enter.md T-1985
