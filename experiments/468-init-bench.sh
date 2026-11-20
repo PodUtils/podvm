@@ -170,7 +170,7 @@ one() { # the route, then the prefix of the command
 	) &
 	watcher=$!
 	# shellcheck disable=SC2086
-	"$@" timeout 900 "$P" run --rm --podvm-init=image $EXTRA -v "$WORK/fx:/fx${PODVM_468_VOLMODE:-}" "$IMG" sh /fx/bench.sh \
+	"$@" timeout 900 "$P" run --rm --podvm-init=image $TIER $EXTRA -v "$WORK/fx:/fx${PODVM_468_VOLMODE:-}" "$IMG" sh /fx/bench.sh \
 		>"$WORK/out" 2>"$WORK/err" </dev/null
 	end=$(date +%s%N)
 	: >"$WORK/stop"
@@ -185,6 +185,9 @@ one() { # the route, then the prefix of the command
 
 say "# $(date -u +%Y-%m-%dT%H:%M:%SZ) podvm $("$P" version 2>/dev/null | cut -d' ' -f2), host $(uname -r), $(nproc) CPUs, kvm $([ -w /dev/kvm ] && echo yes || echo no), label $LABEL${EXTRA:+, flags $EXTRA}"
 for r in $ROUTES; do
+	# Each route names its tier: a host whose user manager gives a delegated
+	# cgroup (a hosted runner) takes the namespace rung with no tier (call C26).
+	TIER=
 	case $r in
 	ns)
 		[ -n "$CGROOT" ] || { say "$LABEL ns: no cgroup2 mount"; continue; }
@@ -200,13 +203,15 @@ EOF
 		find "$STANDIN" -mindepth 1 -depth -type d -exec rmdir {} \; 2>/dev/null
 		rmdir "$STANDIN" 2>/dev/null
 		;;
-	runsc) one runsc as env PODVM_RUNSC="$RUNSC" ${PODVM_468_ENV:-} ;;
-	machine) one machine as env PODVM_RUNSC=/nonexistent/runsc PODVM_MACHINE_STATE=0 ${PODVM_468_ENV:-} ;;
+	runsc) TIER=--podvm-tier=runsc; one runsc as env PODVM_RUNSC="$RUNSC" ${PODVM_468_ENV:-} ;;
+	machine) TIER=--podvm-tier=machine; one machine as env PODVM_RUNSC=/nonexistent/runsc PODVM_MACHINE_STATE=0 ${PODVM_468_ENV:-} ;;
 	machine-save)
 		find "$WORK/store/machine" -maxdepth 1 -name 'state-*' -exec rm -f {} + 2>/dev/null
+		TIER=--podvm-tier=machine
 		one mach-sav as env PODVM_RUNSC=/nonexistent/runsc ${PODVM_468_ENV:-}
 		;;
 	machine-load)
+		TIER=--podvm-tier=machine
 		one mach-lod as env PODVM_RUNSC=/nonexistent/runsc ${PODVM_468_ENV:-}
 		st=$(find "$WORK/store/machine" -maxdepth 1 -name 'state-*.vm' -exec stat -c %s {} + 2>/dev/null | awk '{s+=$1} END{print int(s/1048576)}')
 		bad=$(find "$WORK/store/machine" -maxdepth 1 -name 'state-*.bad' 2>/dev/null | wc -l)
@@ -215,6 +220,8 @@ EOF
 	esac
 done
 sleep 2
-left=$(ps -u "$WHO" -o pid=,stat=,args= 2>/dev/null | grep -E 'qemu-system|runsc|systemd|guest-init' | grep -v ' Z' || true)
+# The user manager of the host and its session bus are not of a run.
+left=$(ps -u "$WHO" -o pid=,stat=,args= 2>/dev/null | grep -E 'qemu-system|runsc|systemd|guest-init' |
+	grep -v -e ' Z' -e 'systemd --user' -e 'dbus-daemon --session' || true)
 [ -z "$left" ] || say "A PROCESS STAYS: $left"
 exit 0
