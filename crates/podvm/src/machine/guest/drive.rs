@@ -155,11 +155,11 @@ pub(super) fn drive(
                                     unique,
                                 );
                                 w.saved = Some(saved);
-                                if !runs {
-                                    cold = Some(
-                                        "the guest did not go on after the save of its state"
-                                            .to_string(),
-                                    );
+                                if let Err(why) = runs {
+                                    cold = Some(format!(
+                                        "the guest did not go on after the save of its state: \
+                                         {why}"
+                                    ));
                                     break;
                                 }
                             }
@@ -289,8 +289,17 @@ pub(super) fn drive(
     // TODO/machine.md T-2016: a crash of the emulator before the command
     // ran: the caller boots once more, as nothing of the command ran.
     if let Some(sig) = crashed_early(code.is_some(), ready, timed_out, status) {
+        // The last line of the emulator and of the console: the cause.
+        let log = std::fs::read_to_string(dir.join("qemu.err")).unwrap_or_default();
+        let said = log
+            .lines()
+            .rfind(|l| !l.contains("info: QEMU waiting for connection"));
         return Driven::Again(format!(
-            "the emulator ended on signal {sig} before the guest reached the command"
+            "the emulator ended on signal {sig} {:.1} s after its start, before the guest \
+             reached the command; qemu: {}; console: {}",
+            started.elapsed().as_secs_f64(),
+            said.unwrap_or("no line"),
+            boot.back().map_or("no line", String::as_str)
         ));
     }
     Driven::Code(match code {

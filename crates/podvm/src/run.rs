@@ -223,7 +223,11 @@ pub const RUN_OPTIONS: &str = "\
                    cgroup2 subtree); a gVisor sandbox of the runsc tier
                    (runsc and a user namespace); a guest of the machine
                    tier (KVM or TCG). --podvm-tier=runsc or machine names
-                   one (TODO/enter.md T-2002, T-2007). podvm, the
+                   one (TODO/enter.md T-2002, T-2007). With -d or create
+                   and no tier, the namespace rung only: exec joins the
+                   init, and stop ends the command, then the init; a
+                   host with a missing part refuses by name (125). -t
+                   gives the command a pty of the init. podvm, the
                    default, keeps podvm's init
   --podvm-sealed   podvm's own, machine tier only: the run comes as a tar
                    bundle on stdin (.podvm-run.json with argv, env and

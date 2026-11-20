@@ -97,6 +97,10 @@ pub fn exec(args: &[String]) -> i32 {
         {
             return c;
         }
+        // TODO/enter.md T-2002: a running init of the image is joined.
+        if let Some(code) = super::init::exec_if(&image, &rootfs, state, &o, &store) {
+            return code;
+        }
         return enter(&image, &rootfs, state, &o, &store);
     }
 

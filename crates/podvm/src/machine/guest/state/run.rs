@@ -333,9 +333,11 @@ pub fn run(r: &Request, c: &Ctx) -> Outcome {
     let loaded = matches!(plan, Plan::Load(_));
     match (&warm.saved, loaded) {
         (Some(Ok(s)), _) => say(&format!(
-            "the state of the guest is saved: {} MiB in {:.1} s, {}",
+            "the state of the guest is saved: {} MiB in {:.1} s (the longest answer of the \
+             monitor: {} ms), {}",
             s.bytes.div_ceil(1 << 20),
             s.took.as_secs_f64(),
+            s.longest.as_millis(),
             files.state.display()
         )),
         // A save that failed is a fault of the store or of the emulator:

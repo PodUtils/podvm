@@ -191,6 +191,9 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
     if p.tty {
         match super::pty::Pty::open().and_then(|t| Ok((t.slaves()?, t))) {
             Ok((slaves, t)) => {
+                if crate::initns::takes(&p.env) {
+                    t.carry_only(); // T-2002: the init has the pty of the command
+                }
                 let fd = |i: usize| super::pty::raw(&slaves[i]);
                 pass.extend([(0, fd(0)), (1, fd(1)), (2, fd(2))]);
                 pty = Some((t, slaves));

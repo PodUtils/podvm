@@ -48,8 +48,11 @@
 #      than half of the time of clause 2, which booted;
 #   4. the userland rung with no init, for the record of why it has none:
 #      PID 1 is a process of the host, and `setresuid` to another uid fails;
-#   5. `run -d --podvm-init=image` and `--podvm-tier=syscall
-#      --podvm-init=image` refuse by name with 125;
+#   5. `run --podvm-tier=syscall --podvm-init=image` and `create
+#      --podvm-tier=machine --podvm-init=image` refuse by name with 125,
+#      and so does `run -d --podvm-init=image` from a cgroup that is not
+#      delegated: it names the missing part, and no other route keeps an
+#      init for a container that stays;
 #   6. after the runs: no emulator and no systemd of the user stays, and no
 #      cgroup `podvm-init-*` stays in the delegated directory;
 #   7. a SIGKILL of podvm during a run (TODO/supervise.md T-2006): no
@@ -66,7 +69,22 @@
 #      the emulator refuses gives a boot with the same result, one line,
 #      and a marker with the count 1 in place of the state;
 #      `PODVM_MACHINE_STATE=0` writes
-#      no state, and another value is refused with 125.
+#      no state, and another value is refused with 125;
+#  10. a container that stays, on the namespace rung from the delegated
+#      directory (TODO/enter.md T-2002): `run -d --podvm-init=image`
+#      returns after the boot; `exec` of `systemctl is-system-running`
+#      gives `running` or `degraded`, the check exits 7 through `exec`,
+#      `exec -u` gives the uid, and `exec -t` gives `tty` a name;
+#      `stop` gives the command SIGTERM (its trap writes a file, and the
+#      record has its exit code 5) and the init its power off (the
+#      ExecStop of a unit writes a file); nothing stays; `start`, `exec`
+#      and `rm -f` hold, and nothing stays;
+#  11. the pty of `-t` on the namespace rung (TODO/enter.md T-2002): `tty`
+#      names a pty of the init, and a shell that reads two lines from the
+#      pipe of `-it` runs them and gives its exit code;
+#  12. a limit that the supervisor of the init does not apply
+#      (`--podvm-confine`, `--ulimit`) is refused by name with 125
+#      (TODO/enter.md T-2017).
 
 set -u
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -85,7 +103,7 @@ cleanup() {
 }
 trap cleanup EXIT
 chmod 0755 "$WORK"
-mkdir -p "$WORK/home" "$WORK/fx" "$(dirname "$OUT")"
+mkdir -p "$WORK/home" "$WORK/fx" "$WORK/vol" "$(dirname "$OUT")"
 cp "$BIN" "$WORK/podvm"
 : >"$OUT"
 fail=0
@@ -276,16 +294,27 @@ grep -q 'mode=userland' "$T.4.err" || bad "clause 4: the run did not enter the u
 grep -q 'pid1=systemd' "$T.4.out" && bad "clause 4: the userland rung has systemd as PID 1"
 
 # Clause 5: the refusals by name.
-for flags in "-d" "--podvm-tier=syscall"; do
+for flags in "run --podvm-tier=syscall" "create --podvm-tier=machine"; do
 	# shellcheck disable=SC2086
-	as timeout 60 "$P" run $flags --podvm-init=image "$IMG" true >/dev/null 2>"$T.5.err"
+	as timeout 60 "$P" $flags --podvm-init=image "$IMG" true >/dev/null 2>"$T.5.err"
 	rc=$?
-	say "clause 5  rc $rc (run $flags --podvm-init=image)"
+	say "clause 5  rc $rc ($flags --podvm-init=image)"
 	{ [ "$rc" -eq 125 ] && grep -q 'podvm-init=image holds on' "$T.5.err"; } || {
-		bad "clause 5: run $flags"
+		bad "clause 5: $flags"
 		keep "$T.5.err"
 	}
 done
+if delegated "$OWN"; then
+	say "clause 5  run -d from a cgroup with no delegation: skipped, the cgroup of this shell is delegated"
+else
+	as timeout 60 "$P" run -d --podvm-init=image "$IMG" true >/dev/null 2>"$T.5.err"
+	rc=$?
+	say "clause 5  rc $rc (run -d --podvm-init=image from a cgroup that is not delegated)"
+	cut -c1-200 "$T.5.err" | sed 's/^/    stderr: /' | tee -a "$OUT"
+	{ [ "$rc" -eq 125 ] && grep -q 'delegates no cgroup2 subtree' "$T.5.err" && grep -q 'a container that stays' "$T.5.err"; } ||
+		bad "clause 5: run -d with no delegated cgroup"
+	[ "$(as "$P" ps -a 2>/dev/null | grep -c ' true ')" -eq 0 ] || bad "clause 5: the refused run left a record"
+fi
 
 # Clause 6: nothing stays.
 sleep 2
@@ -404,6 +433,123 @@ if [ -n "$ST" ]; then
 	{ [ "$rc" -eq 125 ] && grep -q 'the values are 0, 1 and pipe' "$T.9v.err"; } || { bad "clause 9: a wrong value of the variable"; keep "$T.9v.err"; }
 else
 	say "clause 9  skipped: the runs of the machine tier saved no state"
+fi
+
+# A command from the delegated directory, as the user.
+ind() {
+	if [ "$(id -u)" -eq 0 ]; then
+		from_deleg runuser -u "$WHO" -- env HOME="$WORK/home" PODVM_STORE="$WORK/store" "$@"
+	else
+		from_deleg env HOME="$WORK/home" PODVM_STORE="$WORK/store" "$@"
+	fi
+}
+stays() { # the processes and the cgroups of the runs that stay
+	sleep 1
+	left=$(ps -u "$WHO" -o pid=,stat=,args= 2>/dev/null | grep -E 'systemd|guest-init|/sbin/init' | grep -v ' Z' || true)
+	# The base of a run that a SIGKILL of podvm ended (clause 7) is empty
+	# and stays for the sweep: only a base with a process counts here.
+	cg=$(for d in "$DELEG"/podvm-init-*; do [ -s "$d/cgroup.procs" ] || grep -qs 'populated 1' "$d/cgroup.events" && echo "$d"; done 2>/dev/null)
+	say "clause $1  processes that stay: ${left:-none}; cgroups with a process: ${cg:-none}"
+	[ -z "$left$cg" ] || bad "clause $1: a process or a cgroup of the container stays"
+}
+
+# Clause 10: a container that stays: run -d, exec, stop, start, rm.
+if [ -n "$DELEG" ]; then
+	C=c465
+	before=$(find "$DELEG" -maxdepth 1 -name 'podvm-init-*' 2>/dev/null | wc -l)
+	start=$(date +%s)
+	ind timeout 300 "$P" run -d --name $C -v "$WORK/fx:/fx" -v "$WORK/vol:/vol" --podvm-init=image "$IMG" \
+		sh -c 'trap "echo term > /vol/term; exit 5" TERM; while :; do sleep 1; done' >"$T.10.out" 2>"$T.10.err"
+	rc=$?
+	say "clause 10  rc $rc in $(($(date +%s) - start)) s (run -d --podvm-init=image)"
+	[ "$rc" -eq 0 ] || { bad "clause 10: run -d gave $rc"; keep "$T.10.err"; }
+	state=$(as timeout 60 "$P" exec $C systemctl is-system-running 2>&1)
+	say "clause 10  exec systemctl is-system-running: $state"
+	case "$state" in running | degraded) ;; *) bad "clause 10: the state through exec is $state" ;; esac
+	as timeout 300 "$P" exec $C sh /fx/check.sh >"$T.10c.out" 2>"$T.10c.err"
+	rc=$?
+	say "clause 10  rc $rc (the check through exec)"
+	keep "$T.10c.out"
+	[ "$rc" -eq 7 ] || { bad "clause 10: the check through exec gave $rc, not 7"; keep "$T.10c.err"; }
+	u=$(as timeout 60 "$P" exec -u 65534 -e A=b -w /etc $C sh -c 'echo "$(id -u) $A $PWD"' 2>&1)
+	say "clause 10  exec -u 65534 -e A=b -w /etc: $u"
+	[ "$u" = "65534 b /etc" ] || bad "clause 10: exec -u, -e and -w"
+	t=$(as timeout 60 "$P" exec -t $C tty </dev/null 2>&1 | tr -d '\r\000')
+	say "clause 10  exec -t tty: $t"
+	case "$t" in /dev/pts/*) ;; *) bad "clause 10: exec -t gives tty no name" ;; esac
+	as timeout 60 "$P" exec $C sh -c 'exit 9' 2>/dev/null
+	[ $? -eq 9 ] || bad "clause 10: exec does not give the exit code of its command"
+	as timeout 60 "$P" exec $C sh -c 'printf "[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/bin/true\nExecStop=/bin/sh -c \"echo stopped > /vol/unit\"\n" > /etc/systemd/system/podvm-stop.service; systemctl daemon-reload; systemctl start podvm-stop.service' ||
+		bad "clause 10: the unit of the stop check did not start"
+	start=$(date +%s)
+	as timeout 60 "$P" stop $C >/dev/null 2>"$T.10s.err"
+	rc=$?
+	code=$(as "$P" inspect --format '{{.State.ExitCode}}' $C 2>/dev/null)
+	say "clause 10  rc $rc in $(($(date +%s) - start)) s (stop); the exit code of the record: $code; the command wrote: $(cat "$WORK/vol/term" 2>/dev/null); the unit wrote: $(cat "$WORK/vol/unit" 2>/dev/null)"
+	[ "$rc" -eq 0 ] && [ "$code" = 5 ] || bad "clause 10: stop, or the exit code of the command"
+	[ "$(cat "$WORK/vol/term" 2>/dev/null)" = term ] || bad "clause 10: the command did not get SIGTERM"
+	[ "$(cat "$WORK/vol/unit" 2>/dev/null)" = stopped ] || bad "clause 10: the init did not stop its units"
+	stays 10
+	ind timeout 300 "$P" start $C >/dev/null 2>"$T.10.err" || { bad "clause 10: start"; keep "$T.10.err"; }
+	state=$(as timeout 60 "$P" exec $C sh -c 'cat /proc/1/comm; systemctl is-system-running' 2>&1 | tr '\n' ' ')
+	say "clause 10  after start: $state"
+	case "$state" in "systemd running "* | "systemd degraded "*) ;; *) bad "clause 10: the init after start" ;; esac
+	start=$(date +%s)
+	as timeout 60 "$P" rm -f $C >/dev/null 2>"$T.10r.err"
+	rc=$?
+	say "clause 10  rc $rc in $(($(date +%s) - start)) s (rm -f of the running container)"
+	[ "$rc" -eq 0 ] || { bad "clause 10: rm -f"; keep "$T.10r.err"; }
+	stays 10
+	after=$(find "$DELEG" -maxdepth 1 -name 'podvm-init-*' 2>/dev/null | wc -l)
+	[ "$after" -le "$before" ] || bad "clause 10: a cgroup base of the container stays ($before before, $after after)"
+	trees=$(find "$WORK/store/trees" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l)
+	# The end by SIGKILL, five times: the launcher must wait for no process
+	# of the run (the init of a PID namespace ends when each process of
+	# its namespace is reaped; before the supervisor was PID 1 of a
+	# namespace of its own, rm -f took 5 s and kept the record in some runs).
+	slow=0
+	for i in 1 2 3 4 5; do
+		ind timeout 300 "$P" run -d --name $C --podvm-init=image "$IMG" sh -c 'while :; do sleep 1; done' >/dev/null 2>"$T.10.err" ||
+			{ bad "clause 10: run -d number $i"; keep "$T.10.err"; }
+		start=$(date +%s)
+		as timeout 60 "$P" rm -f $C >/dev/null 2>"$T.10r.err" || { bad "clause 10: rm -f number $i"; keep "$T.10r.err"; }
+		[ $(($(date +%s) - start)) -lt 4 ] || slow=$((slow + 1))
+	done
+	say "clause 10  five times run -d and rm -f: $slow of them took 4 s or more"
+	[ "$slow" -eq 0 ] || bad "clause 10: rm -f waited for a process of the run"
+	stays 10
+	recs=$(as "$P" ps -a 2>/dev/null | grep -c " $C\$")
+	say "clause 10  records of $C: $recs; trees in the store: $trees (a run that a SIGKILL ended keeps its tree and its record)"
+	[ "$recs" -eq 0 ] || bad "clause 10: the record of $C stays"
+else
+	say "clause 10  skipped: no delegated cgroup2 directory"
+fi
+
+# Clause 11: the pty of -t with the init of the image.
+if [ -n "$DELEG" ]; then
+	t=$(ind timeout 300 "$P" run --rm -t --podvm-init=image "$IMG" sh -c 'tty; ps -o tty= -p $$' </dev/null 2>"$T.11.err" | tr -d '\r\000' | tr '\n' ' ')
+	say "clause 11  run -t: tty and the terminal of the process: $t"
+	case "$t" in "/dev/pts/"*" pts/"*) ;; *) bad "clause 11: -t gives the command no pty of the init"; keep "$T.11.err" ;; esac
+	printf 'echo typed-$((40+2))\nexit 4\n' | ind timeout 300 "$P" run --rm -it --podvm-init=image "$IMG" sh >"$T.11.out" 2>"$T.11.err"
+	rc=$?
+	say "clause 11  rc $rc (a shell that reads two lines from the pipe of -it); typed-42: $(tr -d '\r' <"$T.11.out" | grep -c '^typed-42$')"
+	{ [ "$rc" -eq 4 ] && tr -d '\r' <"$T.11.out" | grep -q '^typed-42$'; } || { bad "clause 11: the input of -it"; keep "$T.11.err"; }
+	stays 11
+else
+	say "clause 11  skipped: no delegated cgroup2 directory"
+fi
+
+# Clause 12: a limit that the init route does not apply is refused.
+if [ -n "$DELEG" ]; then
+	for flags in "--podvm-confine read=/usr" "--ulimit nofile=64"; do
+		# shellcheck disable=SC2086
+		ind timeout 60 "$P" run --rm $flags --podvm-init=image "$IMG" true >/dev/null 2>"$T.12.err"
+		rc=$?
+		say "clause 12  rc $rc (run $flags --podvm-init=image)"
+		{ [ "$rc" -eq 125 ] && grep -q 'does not apply' "$T.12.err"; } || { bad "clause 12: run $flags"; keep "$T.12.err"; }
+	done
+else
+	say "clause 12  skipped: no delegated cgroup2 directory"
 fi
 
 # The base of the killed run is empty; the next run removes it when it is

@@ -1,4 +1,4 @@
-date      2026-11-20T08:18:06Z
+date      2026-11-20T13:37:12Z
 podvm     podvm 0.2.0-beta.36
 user      ubuntu (uid 1000)
 kernel    6.18.44-fc-v726
@@ -16,7 +16,7 @@ clause 1  rc 7 in 13 s
     CHECK stop inactive
     CHECK failed-units 
     VERDICT pass
-clause 2  rc 7 in 42 s
+clause 2  rc 7 in 39 s
     CHECK pid1 systemd
     CHECK state running
     CHECK uid_map  0 0 4294967295 
@@ -28,7 +28,7 @@ clause 2  rc 7 in 42 s
     CHECK failed-units 
     VERDICT pass
     stderr: podvm run: --podvm-init=image: the host delegates no cgroup2 subtree to the caller (none: /sys/fs/cgroup is not cgroup2 (f_type 0x1021994; cgroup v1 or a hybrid); no user bus of systemd answers), and systemd as PID 1 needs one; no runsc tier: PODVM_RUNSC=/none
-clause 3  rc 7 in 13 s
+clause 3  rc 7 in 12 s
     CHECK pid1 systemd
     CHECK state running
     CHECK uid_map  0 0 4294967295 
@@ -39,18 +39,20 @@ clause 3  rc 7 in 13 s
     CHECK stop inactive
     CHECK failed-units 
     VERDICT pass
-    stderr: podvm run: --podvm-init=image: the namespace rung boots an init of the image for a foreground run of a caller that is not uid 0, with PODVM_USERNS not 0; no runsc tier: PODVM_RUNSC=/nonexistent/runsc names no file; the run takes the machine tier, where the ini
-clause 3  the guest came from a saved state: 1 state file, 13 s
+    stderr: podvm run: --podvm-init=image: the namespace rung boots an init of the image for a caller that is not uid 0, with PODVM_USERNS not 0; no runsc tier: PODVM_RUNSC=/nonexistent/runsc names no file; the run takes the machine tier, where the init of the image is PI
+clause 3  the guest came from a saved state: 1 state file, 12 s
 clause 4  rc 127 (the userland rung with no init: mode=userland)
-    pid1=process_api self=16516 uid=1000
+    pid1=process_api self=12882 uid=1000
     stderr: podvm: interpose: setresuid failed with errno 1 (EPERM); the payload keeps uid 1000, and podvm does not change it (TODO/interpose.md T-0711)
     stderr: setpriv: setresuid failed: Operation not permitted
-clause 5  rc 125 (run -d --podvm-init=image)
 clause 5  rc 125 (run --podvm-tier=syscall --podvm-init=image)
+clause 5  rc 125 (create --podvm-tier=machine --podvm-init=image)
+clause 5  rc 125 (run -d --podvm-init=image from a cgroup that is not delegated)
+    stderr: podvm run: --podvm-init=image: the host delegates no cgroup2 subtree to the caller (none: /sys/fs/cgroup is not cgroup2 (f_type 0x1021994; cgroup v1 or a hybrid); no user bus of systemd answers), and 
 clause 6  processes that stay: none
 clause 6  cgroups that stay: none
-clause 7  a run with podvm's init: podvm was pid 16562; processes that stay: none
-clause 7  a run with the init of the image: podvm was pid 16692; processes that stay: none
+clause 7  a run with podvm's init: podvm was pid 12949; processes that stay: none
+clause 7  a run with the init of the image: podvm was pid 13079; processes that stay: none
 runsc     runsc version release-20261102.0
 clause 8  rc 7 in 6 s
     CHECK pid1 systemd
@@ -76,13 +78,13 @@ clause 8  rc 7 in 6 s
     CHECK stop inactive
     CHECK failed-units 
     VERDICT pass
-    stderr: podvm run: --podvm-init=image: the namespace rung boots an init of the image for a foreground run of a caller that is not uid 0, with PODVM_USERNS not 0; the run takes the runsc tier, where the init of the image is PID 1 of a gVisor sandbox (TODO/enter.md T-20
+    stderr: podvm run: --podvm-init=image: the namespace rung boots an init of the image for a caller that is not uid 0, with PODVM_USERNS not 0; the run takes the runsc tier, where the init of the image is PID 1 of a gVisor sandbox (TODO/enter.md T-2007)
     stderr: podvm run: --podvm-init=image: /sbin/init of the image is PID 1 of the sandbox, with the cgroup2 tree and each uid of gVisor's kernel; the writes of the root go to an overlay that ends with the run (TODO/enter.md T-2007)
-clause 8  a SIGKILL of podvm on the runsc tier: podvm was pid 17372; processes that stay: none
+clause 8  a SIGKILL of podvm on the runsc tier: podvm was pid 13922; processes that stay: none
 clause 8  processes of gVisor that stay: none
-clause 9  a SIGKILL of podvm with a guest from a state: podvm was pid 17575; processes that stay: none
+clause 9  a SIGKILL of podvm with a guest from a state: podvm was pid 14154; processes that stay: none
 clause 9  emulators that stay: none
-clause 9  rc 7 in 39 s
+clause 9  rc 7 in 38 s
     CHECK pid1 systemd
     CHECK state running
     CHECK uid_map  0 0 4294967295 
@@ -94,7 +96,7 @@ clause 9  rc 7 in 39 s
     CHECK failed-units 
     VERDICT pass
     stderr: podvm run: --podvm-init=image: the host delegates no cgroup2 subtree to the caller (none: /sys/fs/cgroup is not cgroup2 (f_type 0x1021994; cgroup v1 or a hybrid); no user bus of systemd answers), and systemd as PID 1 needs one; no runsc tier: PODVM_RUNSC=/none
-clause 9  rc 7 in 37 s
+clause 9  rc 7 in 34 s
     CHECK pid1 systemd
     CHECK state running
     CHECK uid_map  0 0 4294967295 
@@ -106,9 +108,9 @@ clause 9  rc 7 in 37 s
     CHECK failed-units 
     VERDICT pass
     stderr: podvm run: --podvm-init=image: the host delegates no cgroup2 subtree to the caller (none: /sys/fs/cgroup is not cgroup2 (f_type 0x1021994; cgroup v1 or a hybrid); no user bus of systemd answers), and systemd as PID 1 needs one; no runsc tier: PODVM_RUNSC=/none
-    stderr: podvm run: machine tier: the guest that podvm started from a saved state did not reach the command after 0.3 s (the emulator exited with code 1, before the guest reached the command; qemu: qemu-system-x86_64: load of migration failed: Input/output error; conso
+    stderr: podvm run: machine tier: the guest that podvm started from a saved state did not reach the command after 0.4 s (the emulator exited with code 1, before the guest reached the command; qemu: qemu-system-x86_64: load of migration failed: Input/output error; conso
 clause 9  markers of a failed state: 1; state files: 0
-clause 9  rc 7 in 37 s
+clause 9  rc 7 in 36 s
     CHECK pid1 systemd
     CHECK state running
     CHECK uid_map  0 0 4294967295 
@@ -121,4 +123,32 @@ clause 9  rc 7 in 37 s
     VERDICT pass
     stderr: podvm run: --podvm-init=image: the host delegates no cgroup2 subtree to the caller (none: /sys/fs/cgroup is not cgroup2 (f_type 0x1021994; cgroup v1 or a hybrid); no user bus of systemd answers), and systemd as PID 1 needs one; no runsc tier: PODVM_RUNSC=/none
 clause 9  PODVM_MACHINE_STATE=maybe: rc 125
+clause 10  rc 0 in 5 s (run -d --podvm-init=image)
+clause 10  exec systemctl is-system-running: running
+clause 10  rc 7 (the check through exec)
+    CHECK pid1 systemd
+    CHECK state running
+    CHECK uid_map  0 1000 1 1 100000 65536 
+    CHECK unit-mysql active=active mainpid-uid=961 file-owner=961 want=961
+    CHECK unit-postgres active=active mainpid-uid=962 file-owner=962 want=962
+    CHECK unit-www-data active=active mainpid-uid=33 file-owner=33 want=33
+    CHECK unit-nobody active=active mainpid-uid=65534 file-owner=65534 want=65534
+    CHECK stop inactive
+    CHECK failed-units 
+    VERDICT pass
+clause 10  exec -u 65534 -e A=b -w /etc: 65534 b /etc
+clause 10  exec -t tty: /dev/pts/0
+clause 10  rc 0 in 1 s (stop); the exit code of the record: 5; the command wrote: term; the unit wrote: stopped
+clause 10  processes that stay: none; cgroups with a process: none
+clause 10  after start: systemd running 
+clause 10  rc 0 in 0 s (rm -f of the running container)
+clause 10  processes that stay: none; cgroups with a process: none
+clause 10  five times run -d and rm -f: 0 of them took 4 s or more
+clause 10  processes that stay: none; cgroups with a process: none
+clause 10  records of c465: 0; trees in the store: 3 (a run that a SIGKILL ended keeps its tree and its record)
+clause 11  run -t: tty and the terminal of the process: /dev/pts/0 pts/0 
+clause 11  rc 4 (a shell that reads two lines from the pipe of -it); typed-42: 1
+clause 11  processes that stay: none; cgroups with a process: none
+clause 12  rc 125 (run --podvm-confine read=/usr --podvm-init=image)
+clause 12  rc 125 (run --ulimit nofile=64 --podvm-init=image)
 THE INIT OF THE IMAGE RUNS

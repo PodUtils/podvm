@@ -65,13 +65,17 @@ impl Namespaces {
 
     /// A command that joins before its `execve`, then takes `ids` with the
     /// supplementary `groups`, and the working directory `cwd` of the image.
+    /// With `tty` (a path of the image), the command is the leader of a
+    /// session of its own with that terminal on 0, 1 and 2.
     fn command(
         &self,
         program: &str,
         ids: Option<(u32, u32)>,
         groups: &[u32],
         cwd: &str,
+        tty: Option<&str>,
     ) -> Command {
+        let tty = tty.and_then(|t| std::ffi::CString::new(t).ok());
         // The list of setgroups: the primary group first, as login does.
         let list: Vec<u32> = ids
             .iter()
@@ -95,6 +99,9 @@ impl Namespaces {
                 };
                 for fd in &fds {
                     check(setns(*fd, 0))?;
+                }
+                if let Some(t) = &tty {
+                    super::pty::take(t)?;
                 }
                 match ids {
                     Some((uid, gid)) => {
@@ -158,7 +165,7 @@ pub fn wait_boot(ns: &Namespaces, ended: &mut dyn FnMut() -> Option<i32>) -> Res
                 "the init of the image ended during its boot with status {code}"
             ));
         }
-        let mut c = ns.command("systemctl", None, &[], "/");
+        let mut c = ns.command("systemctl", None, &[], "/", None);
         c.arg("is-system-running");
         if wait {
             c.arg("--wait");
@@ -203,27 +210,66 @@ fn internal(name: &str) -> bool {
     name == "LD_PRELOAD" || (name.starts_with("PODVM_") && name != "PODVM_INIT")
 }
 
-/// Run the command of the run in the namespaces, and wait for it with the
-/// forward of each shutdown signal. Its exit code; 127 or 126 where the
-/// image has no such program or refuses it, as docker.
-pub fn run_command(ns: &Namespaces, spec: &super::boot::Spec) -> i32 {
+/// Run the command of the run in the namespaces of the init `init` (a pid
+/// of this `/proc`), and wait for it with the forward of each shutdown
+/// signal. Its exit code; 127 or 126 where the image has no such program
+/// or refuses it, as docker. The environment is `env` (`KEY=VALUE`), else
+/// the one of this process; a variable of podvm's own entry is left out.
+pub fn run_command(
+    ns: &Namespaces,
+    spec: &super::boot::Spec,
+    init: i32,
+    env: Option<&[String]>,
+) -> i32 {
     let Some(program) = spec.argv.first() else {
         eprintln!("podvm: --podvm-init=image: no command");
         return 125;
     };
-    let mut c = ns.command(program, spec.ids, &spec.groups, &spec.cwd);
+    // TODO/enter.md T-2002: with `-t`, a pty of the devpts of the init. The
+    // terminal that this process has belongs to another devpts, and has no
+    // name in the image (`tty` gave "No such device").
+    let inner = match spec.tty.then(|| super::pty::for_init(init)) {
+        None => None,
+        Some(Ok(p)) => Some(p),
+        Some(Err(e)) => {
+            eprintln!("podvm: --podvm-init=image: -t: a pty of the devpts of the init: {e}");
+            return 125;
+        }
+    };
+    let slave = inner.as_ref().map(|p| p.slave.as_str());
+    let mut c = ns.command(program, spec.ids, &spec.groups, &spec.cwd, slave);
     c.args(&spec.argv[1..]).env_clear();
+    // The bytes of a value stay as they are, also where they are no text.
+    use std::ffi::OsString;
+    let vars: Vec<(OsString, OsString)> = match env {
+        Some(e) => e
+            .iter()
+            .filter_map(|e| e.split_once('='))
+            .map(|(k, v)| (k.into(), v.into()))
+            .collect(),
+        None => std::env::vars_os().collect(),
+    };
     let mut has_path = false;
-    for (k, v) in std::env::vars_os() {
+    for (k, v) in vars {
         let name = k.to_string_lossy();
         if !internal(&name) {
             has_path |= name == "PATH";
-            c.env(k, v);
+            c.env(&k, v);
         }
     }
     if !has_path {
         c.env("PATH", PATH);
     }
+    // The relay starts before the command: it is a process, as this one
+    // makes no thread after it took the PID namespace of the init.
+    let relay = match inner.map(super::pty::Inner::relay) {
+        None => None,
+        Some(Ok(r)) => Some(r),
+        Some(Err(e)) => {
+            eprintln!("podvm: --podvm-init=image: -t: the relay of the pty: {e}");
+            return 125;
+        }
+    };
     let child = match c.spawn() {
         Ok(c) => c,
         Err(e) => {
@@ -232,6 +278,7 @@ pub fn run_command(ns: &Namespaces, spec: &super::boot::Spec) -> i32 {
                 std::io::ErrorKind::PermissionDenied => 126,
                 _ => 125,
             };
+            drop(relay);
             eprintln!("podvm: exec: {program:?}: {e}");
             return code;
         }
@@ -240,7 +287,9 @@ pub fn run_command(ns: &Namespaces, spec: &super::boot::Spec) -> i32 {
     // The wait of pod-enter reaps the child; the handle of std must not.
     std::mem::forget(child);
     let mut err = std::io::stderr();
-    match podvm_enter::Child::of(pid).wait_forwarding(&mut err) {
+    let code = podvm_enter::Child::of(pid).wait_forwarding(&mut err);
+    drop(relay);
+    match code {
         Ok(code) => code,
         Err(e) => {
             eprintln!("podvm: --podvm-init=image: the wait for the command: {e}");

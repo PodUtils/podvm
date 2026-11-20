@@ -122,14 +122,14 @@ fn the_groups_of_a_user_come_from_the_files_of_the_image() {
         // A uid that the image does not name.
         ((1234, 1234), vec![]),
     ] {
-        assert_eq!(groups_of(passwd, group, ids), want, "{ids:?}");
+        assert_eq!(groups::groups_of(passwd, group, ids), want, "{ids:?}");
     }
     for (p, g) in [("", group), (passwd, ""), ("\u{0}:::", "\u{fffd}:::::")] {
-        assert_eq!(groups_of(p, g, (33, 33)), Vec::<u32>::new());
+        assert_eq!(groups::groups_of(p, g, (33, 33)), Vec::<u32>::new());
     }
     // More groups than a command gets: the list is cut, not refused.
     let many: String = (1000..2000).map(|g| format!("g{g}:x:{g}:http\n")).collect();
-    assert_eq!(groups_of(passwd, &many, (33, 33)).len(), 256);
+    assert_eq!(groups::groups_of(passwd, &many, (33, 33)).len(), 256);
 }
 
 #[test]
@@ -160,15 +160,80 @@ fn a_wrong_argument_of_the_supervisor_is_named() {
 #[test]
 fn only_the_flag_sets_the_mark() {
     let mut env = v(&["A=1", "PODVM_INIT=image", "PODVM_INIT_LOG=1"]);
-    mark_env(&mut env, false, true, true);
+    mark_env(&mut env, false, true, true, true);
     assert_eq!(env, v(&["A=1"]));
-    mark_env(&mut env, true, false, false);
+    mark_env(&mut env, true, false, false, false);
     assert_eq!(env, v(&["A=1", MARK]));
-    mark_env(&mut env, true, true, true);
+    mark_env(&mut env, true, true, true, false);
     assert_eq!(
         env,
         v(&["A=1", MARK, "PODVM_INIT_LOG=1", "PODVM_INIT_DISCARD=1"])
     );
+    mark_env(&mut env, true, false, false, true);
+    assert_eq!(env, v(&["A=1", MARK, "PODVM_INIT_TTY=1"]));
+}
+
+/// TODO/enter.md T-2002: the supervisor of a detached run gets the state
+/// file, the cgroups and the tree of the record, and the command after
+/// `--`, also where a word of the command looks like a flag.
+#[test]
+fn the_supervisor_of_a_detached_run_gets_the_record() {
+    let mut c: podvm_supervise::table::Container = serde_json::from_value(serde_json::json!({
+        "id": "abc", "name": "n", "argv": ["sh", "--state", "-c", "true"], "env": [],
+        "working_dir": "", "created_at": "", "started_at": null, "finished_at": null,
+        "state": "created", "pid": null, "launcher_pid": null, "exit_code": null,
+        "noticed": null, "image": "img", "manifest_digest": "sha256:0",
+        "rootfs": "/store/trees/t/rootfs", "rung": "namespace"
+    }))
+    .expect("a record of the table");
+    c.working_dir = "/srv".to_string();
+    let job = podvm_supervise::launcher::InitJob {
+        container: &c,
+        pass: &[],
+        state: "/store/containers/abc/init.state".into(),
+    };
+    let a = detach::args(&job, std::path::Path::new("/cg/podvm-init-1"));
+    assert_eq!(&a[..2], [VERB, detach::FLAG]);
+    let spec = parse(&a[2..]).expect("the supervisor reads its own arguments");
+    assert_eq!(
+        spec.state.as_deref(),
+        Some(std::path::Path::new("/store/containers/abc/init.state"))
+    );
+    assert_eq!(
+        spec.cgroup.as_deref(),
+        Some(std::path::Path::new("/cg/podvm-init-1"))
+    );
+    assert_eq!(spec.root, std::path::PathBuf::from("/store/trees/t/rootfs"));
+    assert_eq!(spec.cwd, "/srv");
+    assert_eq!(spec.argv, v(&["sh", "--state", "-c", "true"]));
+    assert!(!spec.tty && spec.hold.is_none() && spec.attach.is_none());
+}
+
+/// TODO/enter.md T-2002: which run keeps an init for a container that
+/// stays, and on which rung: each other case is a refusal by name.
+#[test]
+fn only_the_namespace_rung_keeps_the_init_of_a_container_that_stays() {
+    for (init, tier, detach, verb, rung, refused) in [
+        (true, false, true, "run", "namespace", false),
+        (true, false, false, "create", "namespace", false),
+        (true, false, true, "run", "userland", true),
+        (true, false, true, "run", "chroot", true),
+        (true, false, false, "create", "userland", true),
+        // A foreground run has its own routes; a tier has its own check.
+        (true, false, false, "run", "userland", false),
+        (true, true, true, "run", "userland", false),
+        (false, false, true, "run", "userland", false),
+    ] {
+        let why = stays::wrong_rung(stays::stays(init, tier, detach, verb), rung);
+        assert_eq!(
+            why.is_some(),
+            refused,
+            "{init} {tier} {detach} {verb} {rung}"
+        );
+        if let Some(w) = why {
+            assert!(w.contains(rung), "{w}");
+        }
+    }
 }
 
 #[test]
@@ -260,5 +325,75 @@ fn a_run_discards_only_with_rm_and_read_only_volumes() {
         (false, vec![vol("/a")], false),
     ] {
         assert_eq!(discards(rm, &volumes, &ro), want, "{rm} {}", volumes.len());
+    }
+}
+
+/// TODO/enter.md T-2017: each limit of a run that the supervisor of the
+/// init does not apply is refused by its name, the first one that the
+/// caller gave; a run with none of them goes on.
+#[test]
+fn a_limit_that_the_init_route_drops_is_named() {
+    for (asked, want) in [
+        ([false, false, false, false], None),
+        ([true, false, false, false], Some("--podvm-confine")),
+        ([false, true, false, false], Some("--ulimit")),
+        (
+            [false, false, true, false],
+            Some("--security-opt no-new-privileges"),
+        ),
+        ([false, false, false, true], Some("--device")),
+        ([true, true, true, true], Some("--podvm-confine")),
+        ([false, true, false, true], Some("--ulimit")),
+    ] {
+        assert_eq!(stays::unserved(asked), want, "{asked:?}");
+    }
+}
+
+/// TODO/enter.md T-2002: the pid that the caller has for the init comes
+/// from the `Pid:` line of a pidfd; 0 and -1 are a process that the
+/// `/proc` of the caller cannot see, and no pid.
+#[test]
+fn the_pid_of_the_caller_is_read_from_the_fdinfo_of_a_pidfd() {
+    for (text, want) in [
+        (
+            "pos:\t0\nflags:\t02000002\nmnt_id:\t16\nPid:\t4242\nNSpid:\t4242\t2\n",
+            Some(4242),
+        ),
+        ("Pid:\t0\n", None),
+        ("Pid:\t-1\n", None),
+        ("Pid:\tx\n", None),
+        ("NSpid:\t7\n", None),
+        ("", None),
+    ] {
+        assert_eq!(detach::caller_pid(text), want, "{text:?}");
+    }
+}
+
+#[test]
+fn only_the_identity_map_is_the_initial_user_namespace() {
+    for (map, want) in [
+        ("         0          0 4294967295\n", false),
+        (
+            "         0       1000          1\n         1     100000      65536\n",
+            true,
+        ),
+        ("0 1000 1", true),
+        ("", true),
+    ] {
+        assert_eq!(boot::in_user_namespace(map), want, "{map:?}");
+    }
+}
+
+#[test]
+fn a_wait_status_gives_the_code_or_128_and_the_signal() {
+    for (status, want) in [
+        (0, 0),
+        (7 << 8, 7),
+        (255 << 8, 255),
+        (9, 137),
+        (15, 143),
+        (2, 130),
+    ] {
+        assert_eq!(boot::code_of(status), want, "{status}");
     }
 }

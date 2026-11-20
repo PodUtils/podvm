@@ -92,6 +92,15 @@ impl Pty {
         })
     }
 
+    /// TODO/enter.md T-2002: the slave in raw mode, before a byte goes
+    /// through. The command of a run with the init of the image gets a pty
+    /// of the devpts of the init, and this one only carries its bytes: in
+    /// its first mode it made a second echo, and an end of input that came
+    /// before the supervisor was ready became a NUL byte.
+    pub fn carry_only(&self) {
+        crate::machine::guest::tty::make_raw(self.slave.as_raw_fd());
+    }
+
     /// Three descriptors of the slave, for the payload's 0, 1 and 2: the
     /// child closes each host descriptor after its `dup2`, so each needs
     /// its own.
@@ -146,11 +155,7 @@ impl Pty {
                     // one at the start of a line, and one more after a
                     // partial line, which the first only delivers. A fresh
                     // pty's VEOF is 0x04.
-                    let eof: &[u8] = match last {
-                        Some(b'\n') | None => &[VEOF],
-                        Some(_) => &[VEOF, VEOF],
-                    };
-                    let _ = to.write_all(eof);
+                    let _ = to.write_all(crate::machine::guest::tty::end_of_input(last));
                     break;
                 }
                 if send(&mut to, &buf[..n]).is_err() {
@@ -216,6 +221,7 @@ fn intr_of(fd: c_int) -> Option<u8> {
 }
 
 /// The VEOF character of a fresh pty (`^D`).
+#[cfg(test)]
 const VEOF: u8 = 0x04;
 
 /// The relay of a running payload.

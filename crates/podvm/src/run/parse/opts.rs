@@ -275,15 +275,17 @@ pub(super) fn init_eq(verb: &str, a: &str, o: &mut Opts) -> Result<(), i32> {
 }
 
 /// `--podvm-init=image` holds on an incus instance that stays (`run -d`
-/// and `create`, T-1993), and on a foreground `run` of the namespace rung
-/// or the machine tier (TODO/enter.md T-2002); elsewhere it is a refusal by
-/// name, never a silent podvm init.
+/// and `create`, T-1993), on a foreground `run` of the namespace rung, the
+/// runsc tier or the machine tier, and on `run -d` and `create` with no
+/// tier, which take the namespace rung (TODO/enter.md T-2002); elsewhere
+/// it is a refusal by name, never a silent podvm init.
 pub(super) fn init_check(verb: &str, o: &Opts) -> Result<(), i32> {
     use crate::tier::Want;
     let stays = o.detach || verb == "create";
     let holds = match o.tier {
         Some(Want::Incus) => stays,
-        Some(Want::Machine) | Some(Want::Runsc) | None => verb == "run" && !stays,
+        Some(Want::Machine) | Some(Want::Runsc) => verb == "run" && !stays,
+        None => verb == "run" || verb == "create",
         Some(_) => false,
     };
     if !o.init_image || holds {
@@ -291,8 +293,9 @@ pub(super) fn init_check(verb: &str, o: &Opts) -> Result<(), i32> {
     }
     eprintln!(
         "podvm {verb}: --podvm-init=image holds on a foreground run (the namespace rung, \
-         else the runsc tier, else the machine tier) and on --podvm-tier=incus with run -d \
-         or create (TODO/machine.md T-1993, TODO/enter.md T-2002, T-2007)"
+         else the runsc tier, else the machine tier), on run -d and create with no tier (the \
+         namespace rung) and on --podvm-tier=incus with run -d or create (TODO/machine.md \
+         T-1993, TODO/enter.md T-2002, T-2007)"
     );
     Err(podvm_image::error::EXIT_FLAG_ERROR)
 }

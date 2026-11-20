@@ -102,8 +102,12 @@ The init mounts cgroup2 and brings `lo` up. `--podvm-net none`,
 PID namespace and runs the command in its namespaces
 (`crates/podvm/src/initns/`, the internal verb `guest-init`, T-2002). The
 same supervisor runs in the user namespace of a foreground run on the
-namespace rung, and as the command of `/podvm-init` in a guest of the
-machine tier. `initns::decide` selects the place before the user
+namespace rung, as the payload of the launcher of `run -d` and `create`
+(`initns/detach.rs`: a user namespace with the range and a PID
+namespace of its own; `exec` joins the init, `initns/enter.rs`; the
+refusals of the caller are in `initns/stays.rs`), and as the command of
+`/podvm-init`
+in a guest of the machine tier. `initns::decide` selects the place before the user
 namespace opens: the namespace rung needs the subordinate id range and a
 delegated cgroup2 subtree, which the user manager of systemd can give
 (`initns/scope.rs`, T-2004). On the runsc tier the init is PID 1 of a

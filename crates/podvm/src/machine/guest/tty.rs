@@ -73,6 +73,34 @@ pub fn stdin_is_tty() -> bool {
     unsafe { isatty(0) == 1 }
 }
 
+/// What a terminal gets at the end of the input that podvm relays to it,
+/// after the last byte `last` (TODO/cli.md T-1817): a pty has no
+/// half-close, and the end of input of a terminal is VEOF (`^D`, 0x04 of a
+/// new pty). One at the start of a line; after a line that is not
+/// complete, the first one only gives that line to the reader.
+pub fn end_of_input(last: Option<u8>) -> &'static [u8] {
+    match last {
+        Some(b'\n') | None => &[0x04],
+        Some(_) => &[0x04, 0x04],
+    }
+}
+
+/// Put the terminal `fd` in raw mode, for good: a pty of podvm that only
+/// carries the bytes of another terminal (TODO/enter.md T-2002). Nothing
+/// where `fd` is no terminal.
+pub fn make_raw(fd: i32) {
+    let mut t = std::mem::MaybeUninit::<Termios>::zeroed();
+    // SAFETY: tcgetattr fills the termios of this frame; cfmakeraw edits
+    // it, and tcsetattr reads it.
+    unsafe {
+        if tcgetattr(fd, t.as_mut_ptr()) == 0 {
+            let mut raw = t.assume_init();
+            cfmakeraw(&mut raw);
+            tcsetattr(fd, TCSANOW, &raw);
+        }
+    }
+}
+
 /// The host terminal in raw mode until drop; nothing where stdin is no
 /// terminal.
 pub struct Raw(Option<Termios>);
@@ -147,11 +175,7 @@ pub fn pump(sock: PathBuf, deadline: std::time::Instant) -> std::thread::JoinHan
                         // TODO/cli.md T-1817: the end of input of the guest's
                         // terminal is VEOF (`^D`), as in the pty relay of the
                         // rootfs rungs: the socket stays open for the output.
-                        let eof: &[u8] = match last {
-                            Some(b'\n') | None => &[0x04],
-                            Some(_) => &[0x04, 0x04],
-                        };
-                        let _ = w.write_all(eof);
+                        let _ = w.write_all(end_of_input(last));
                         break;
                     }
                     if w.write_all(&buf[..n]).is_err() {

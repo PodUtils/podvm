@@ -679,10 +679,12 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2014](enter.md) | P2 | S | none | enter | open | On the userland rung, `--podvm-confine read=/` does not cover a volume |
 | [T-2015](enter.md) | P2 | M | none | enter | open | On the syscall tier, the interpreter of a `#!` script that the payload starts is not checked against `exec=` |
 | [T-2016](machine.md) | P2 | M | none | machine | partial | QEMU before 10.0.4 can end on SIGSEGV in the boot of a guest with more than one vCPU under TCG |
+| [T-2017](enter.md) | P1 | M | none | enter | partial | A run with the init of the image on the namespace rung dropped `--podvm-confine`, `--ulimit`, no-new-privileges and `--device` with no line |
+| [T-2018](supervise.md) | P3 | S | none | supervise | open | The launcher waits for one process of the tree at a time, and the init of a PID namespace waits for the reap of a process that the launcher holds |
 
 ## Counts
 
-613 entries: 24 open, 37 partial, 5 blocked, 547 done.
+615 entries: 25 open, 38 partial, 5 blocked, 547 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -692,10 +694,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 17 | 0 | 249 | 269 |
+| P1 | 3 | 18 | 0 | 249 | 270 |
 | P2 | 16 | 15 | 4 | 181 | 216 |
-| P3 | 5 | 5 | 1 | 42 | 53 |
-| **All** | 24 | 37 | 5 | 547 | 613 |
+| P3 | 6 | 5 | 1 | 42 | 54 |
+| **All** | 25 | 38 | 5 | 547 | 615 |
 
 ## Work order
 

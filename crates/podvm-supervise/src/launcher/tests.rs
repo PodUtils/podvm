@@ -54,3 +54,30 @@ fn nothing_on_the_spawn_path_can_spawn_a_thread() {
     }
     assert!(looked >= 4, "only {looked} sources were read");
 }
+
+/// TODO/enter.md T-2002: the launcher starts the supervisor of an init of
+/// the image only for a record of the namespace rung with the mark of the
+/// flag: a value of the caller that looks like the mark starts none.
+#[test]
+fn only_a_record_of_the_namespace_rung_with_the_mark_boots_the_init() {
+    for (rung, env, want) in [
+        ("namespace", &["A=1", "PODVM_INIT=image"][..], true),
+        ("namespace", &["A=1"][..], false),
+        ("namespace", &["PODVM_INIT=images"][..], false),
+        ("namespace", &["XPODVM_INIT=image"][..], false),
+        ("namespace", &["PODVM_INIT_LOG=1"][..], false),
+        ("userland", &["PODVM_INIT=image"][..], false),
+        ("chroot", &["PODVM_INIT=image"][..], false),
+        ("", &["PODVM_INIT=image"][..], false),
+    ] {
+        let c: crate::table::Container = serde_json::from_value(serde_json::json!({
+            "id": "abc", "name": "n", "argv": ["true"], "env": env,
+            "working_dir": "", "created_at": "", "started_at": null, "finished_at": null,
+            "state": "created", "pid": null, "launcher_pid": null, "exit_code": null,
+            "noticed": null, "image": "img", "manifest_digest": "sha256:0",
+            "rootfs": "/r", "rung": rung
+        }))
+        .expect("a record of the table");
+        assert_eq!(super::init_of_image(&c), want, "{rung} {env:?}");
+    }
+}

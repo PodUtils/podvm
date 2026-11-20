@@ -224,7 +224,8 @@ pub(super) fn machine_tier(
     };
     env.extend(crate::sandprobe::host_env(store.root()));
     let discard = crate::initns::discards(true, &o.volumes, &o.ro_volumes); // a guest keeps no root
-    crate::initns::mark_env(&mut env, o.init_image, o.ask.verbose, discard); // T-2002, T-2010
+                                                                            // A guest has the terminal of `-t` in the /dev of its init (hvc0): no pty of the init.
+    crate::initns::mark_env(&mut env, o.init_image, o.ask.verbose, discard, false); // T-2002, T-2010
     if o.net_none && o.broker {
         eprintln!(
             "podvm {verb}: --podvm-net none leaves no NIC for --network broker: the broker \

@@ -92,11 +92,16 @@ pub struct Spec {
     pub hold: Option<PathBuf>,
     /// Run the command in the init of this state file, which `hold` made.
     pub attach: Option<PathBuf>,
+    /// Write the state of the init to this file after its boot, and go on
+    /// with the command: a detached run, whose `exec` reads it (T-2002).
+    pub state: Option<PathBuf>,
+    /// The command gets a pty of the devpts of the init (`-t`).
+    pub tty: bool,
     pub argv: Vec<String>,
 }
 
 /// The exit status of a wait as a code: the code, or 128 and the signal.
-fn code_of(st: i32) -> i32 {
+pub(super) fn code_of(st: i32) -> i32 {
     if st & 0x7f == 0 {
         (st >> 8) & 0xff
     } else {
@@ -200,6 +205,11 @@ fn drain(mut master: std::fs::File, verbose: bool) -> Arc<Mutex<Vec<u8>>> {
     let tail = Arc::new(Mutex::new(Vec::new()));
     let keep = tail.clone();
     std::thread::spawn(move || {
+        // Each signal that the waiter of the command forwards stays with
+        // the waiter: this thread would take it with the default action,
+        // and the end of the supervisor is a SIGKILL of the init.
+        let mut old = 0u64;
+        let _ = podvm_probe::sys::sigblock(podvm_enter::WAIT_FORWARDED, &mut old);
         let mut buf = [0u8; 4096];
         while let Ok(n) = master.read(&mut buf) {
             if n == 0 {
@@ -378,11 +388,38 @@ pub(super) fn start(spec: &Spec) -> Result<Booted, String> {
 /// Run the whole of `guest-init`: the exit code of the command, or 125
 /// with one line that says what happened.
 pub fn supervise(spec: &Spec) -> i32 {
-    let b = match start(spec) {
+    use super::hold::{write, Held};
+    let started = start(spec);
+    // The state of a detached run, for the process that waits for the boot
+    // and for each later `exec`. With no state file, no `exec` can join:
+    // the run ends here with the line.
+    // The pid of the state file is the one that the reader has for the
+    // init: the supervisor of a detached run is in a PID namespace.
+    let held = match &started {
+        Ok(b) => match super::detach::host_view(b.init) {
+            Ok(pid) => Held::Up {
+                pid,
+                systemd: b.systemd,
+                cgroup: b.cgroup,
+            },
+            Err(why) => Held::Failed(why),
+        },
+        Err(why) => Held::Failed(why.clone()),
+    };
+    let written = spec.state.as_deref().map(|f| write(f, &held));
+    let b = match started {
         Ok(b) => b,
         Err(why) => return refuse(&why),
     };
-    let code = join::run_command(&b.ns, spec);
+    if let (Held::Failed(why), true) = (&held, spec.state.is_some()) {
+        stop(b.init, false, true);
+        return refuse(why);
+    }
+    if let (Some(Err(e)), Some(f)) = (written, &spec.state) {
+        stop(b.init, false, true);
+        return refuse(&format!("the state file {}: {e}", f.display()));
+    }
+    let code = join::run_command(&b.ns, spec, b.init, None);
     stop(b.init, b.systemd, spec.discard);
     code
 }
@@ -429,37 +466,3 @@ pub(super) fn stop_signal(systemd: bool) -> i32 {
 
 pub(super) const KILL: i32 = SIGKILL;
 pub(super) const BOUND_OF_STOP: Duration = STOP_BOUND;
-
-#[cfg(test)]
-mod tests {
-    use super::{code_of, in_user_namespace};
-
-    #[test]
-    fn only_the_identity_map_is_the_initial_user_namespace() {
-        for (map, want) in [
-            ("         0          0 4294967295\n", false),
-            (
-                "         0       1000          1\n         1     100000      65536\n",
-                true,
-            ),
-            ("0 1000 1", true),
-            ("", true),
-        ] {
-            assert_eq!(in_user_namespace(map), want, "{map:?}");
-        }
-    }
-
-    #[test]
-    fn a_wait_status_gives_the_code_or_128_and_the_signal() {
-        for (status, want) in [
-            (0, 0),
-            (7 << 8, 7),
-            (255 << 8, 255),
-            (9, 137),
-            (15, 143),
-            (2, 130),
-        ] {
-            assert_eq!(code_of(status), want, "{status}");
-        }
-    }
-}
