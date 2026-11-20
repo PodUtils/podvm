@@ -319,6 +319,8 @@ pub const INTERNAL: &[&str] = &[
     "PODVM_SANDPROBE_HOST",
     "PODVM_USERNS_IDS",
     "PODVM_USERNS_JOIN",
+    // `--podvm-volume-base` for the handler and the interposer (T-1972).
+    "PODVM_VOLUME_BASE",
 ];
 
 /// The variables of tests, measures, builds and developer tools. No run of a
