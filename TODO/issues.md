@@ -506,6 +506,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #610 | [gh action] requested | closed (gate 44668370887, arm 44668375205, secrets 44668379276, issue-sync 44668383916: success) | the gate, arm, secrets and issue-sync runs of eb93a34 (T-1969, T-1972, T-2001, T-2011) |
 | #611 | COORD-213: one beneath-open of a volume under a base, with no allocation, for the four copies in podvm and pod-enter (to podcrates) | open | T-1955, T-1972 |
 | #612 | COORD-214: the answer to PodUtils/podrunner#326: exec into a run -d container of the namespace rung joins its namespaces and sees its volumes; fixed on main (T-2012) (to podrunner) | open | T-2012 |
+| #613 | COORD-215: pod-enter's check_exec and the program of a dynamic loader; a write table of pod-confine beside its exec table (to podcrates) | open | T-1955, T-1984, T-1985, T-2013 |
 
 ## Messages whose title does not start with COORD-NNN
 
