@@ -5182,7 +5182,7 @@ The test `a_signal_that_stops_a_call_runs_on_the_alternate_stack_of_the_payload`
 
 # T-2002: `--podvm-init=image` holds only on the incus tier: the namespace rung maps one uid, and the userland rung has no PID 1
 
-**Source:** the owner (2026-11-19, the table of the kinds for an image with systemd as PID 1, and two research bundles); PodUtils/podrunner#313, PodUtils/podrunner#316; T-1911, T-1993, T-1994
+**Source:** the owner (2026-11-19, the table of the kinds for an image with systemd as PID 1, and two research bundles); PodUtils/podrunner#313, PodUtils/podrunner#316; T-1911, T-1993, T-1994; COORD-209 (#605) tells podrunner
 **Category:** enter
 **Milestone:** none
 **Priority:** P1
@@ -5242,7 +5242,7 @@ Remaining:
 
 # T-2003: On the userland rung, a program with a library in a directory of its RUNPATH does not load (`systemctl`)
 
-**Source:** the measure of T-2002 (2026-11-19); the research bundle of the owner (2026-11-19, `run/libpath.rs` of a branch that is not in this tree)
+**Source:** the measure of T-2002 (2026-11-19); the research bundle of the owner (2026-11-19, `run/libpath.rs` of a branch that is not in this tree); COORD-207 (#603) asks podcrates
 **Category:** enter
 **Milestone:** none
 **Priority:** P2
@@ -5304,7 +5304,7 @@ Partial (2026-11-19). `crates/podvm/src/initns/scope.rs` (`ask`, called by `init
 
 # T-2005: An init of the image with no guest on a host that delegates no cgroup: a cgroup2 stand-in, or User-Mode Linux
 
-**Source:** T-2002 (2026-11-19); the two research bundles of the owner (2026-11-19); the owner's direction of 2026-11-19 ("look for a near-native route first; TCG is the last fallback") and the hints of the scout of that day
+**Source:** T-2002 (2026-11-19); the two research bundles of the owner (2026-11-19); the owner's direction of 2026-11-19 ("look for a near-native route first; TCG is the last fallback") and the hints of the scout of that day; COORD-206 (#602) asks podcrates for the kernel
 **Category:** enter
 **Milestone:** none
 **Priority:** P2
@@ -5354,12 +5354,12 @@ A manual run of the same harness with Debian 12, MariaDB 10.11 and PostgreSQL 15
 | UML 7.3.5, `seccomp=on ncpus=1` | 18.9 s | 8.6 s | 110 ms to 116 ms | 1.8 s | 4.1 s |
 | the machine tier under TCG, four vCPUs (T-2007) | 45.6 s | 8.8 s | 244 ms to 252 ms | 3.2 s to 3.4 s | 6.7 s |
 
-The builder wrote the base of that image (834 MiB) in 32 s. Remaining: each part of the Approach. The kernel of the measure is dynamic and has no network device, no volume and no exit code to the host; podcrates has no answer yet on a kernel that podvm carries (no COORD issue is written).
+The builder wrote the base of that image (834 MiB) in 32 s. Remaining: each part of the Approach. The kernel of the measure is dynamic and has no network device, no volume and no exit code to the host; COORD-206 (#602) asks podcrates for a kernel that podvm carries.
 
 
 # T-2007: The init of the image as PID 1 of a gVisor sandbox: the runsc tier, for a host with a user namespace and no delegated cgroup
 
-**Source:** the owner's direction of 2026-11-19 ("look for a near-native route first; TCG is the last fallback"), hint 1 of the scout; T-1729, T-2002
+**Source:** the owner's direction of 2026-11-19 ("look for a near-native route first; TCG is the last fallback"), hint 1 of the scout; T-1729, T-2002; COORD-209 (#605) tells podrunner
 **Category:** enter
 **Milestone:** none
 **Priority:** P1
@@ -5400,7 +5400,7 @@ Partial (2026-11-19). `runsc/init.rs`, `initns/sandbox.rs`, `userns/owners.rs::a
 
 # T-2009: podvm fetches no runsc: the gVisor route of an init is there only where the host has one
 
-**Source:** T-2007 (2026-11-19); the owner's rule of 2026-11-05 ("users download and use")
+**Source:** T-2007 (2026-11-19); the owner's rule of 2026-11-05 ("users download and use"); COORD-208 (#604) asks podcrates
 **Category:** enter
 **Milestone:** none
 **Priority:** P2

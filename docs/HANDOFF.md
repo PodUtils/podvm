@@ -157,8 +157,7 @@ and `docs/decisions.md`. Remove this file when each step below is done.
   of systemd for the delegated scope; `sh experiments/466-init-image-scope.sh`
   passes (the host of that measure is a guest with systemd, 5 minutes
   under TCG). T-2003 (RUNPATH on the userland rung: an ask for pod-enter)
-  and T-2005 (a cgroup2 stand-in, User-Mode Linux) are open. No COORD issue names them
-  yet. T-2006 (done): a SIGKILL of podvm ends each process of a
+  and T-2005 (a cgroup2 stand-in, User-Mode Linux) are open. T-2006 (done): a SIGKILL of podvm ends each process of a
   foreground run in the user namespace.
 
 * The owner's direction of 2026-11-19: a near-native route before TCG.
@@ -171,6 +170,12 @@ and `docs/decisions.md`. Remove this file when each step below is done.
   by `sh experiments/467-uml-seccomp.sh`, 15 s for a run with `ptrace`
   and each namespace denied; ask podcrates before a kernel that podvm
   carries), T-2008 (a saved state of the guest).
+
+* COORD-206 to COORD-209 (#602 to #605) are open: to podcrates the UML
+  kernel (T-2005), RUNPATH in pod-enter (T-2003) and the pinned fetch of
+  runsc (T-2009); to podrunner the routes of `--podvm-init=image`
+  (T-2002, T-2007). The owner's round 2 (2026-11-20): make each route as
+  fast as possible, with a measured baseline first.
 
 ## Next steps, in order
 

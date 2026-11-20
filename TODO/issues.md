@@ -495,6 +495,10 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #599 | COORD-203: the answer to PodUtils/podrunner#316: the hosted snapshot on podvm is T-1996, T-1999, T-1997, T-1994 and T-1998, in that order (to podrunner) | open | T-1994, T-1996, T-1997, T-1998, T-1999 |
 | #600 | COORD-204: podvm took podcrates v0.75.0 in f3beec1 (to podcrates) | closed (PodUtils/podcrates#238 lists the take) | T-1955 |
 | #601 | COORD-205: podvm took podcrates v0.76.0 in 16f2395; the form of the sidecar's xattrs fits (to podcrates) | closed (PodUtils/podcrates#239 lists the take and the answer on the form) | T-1955, T-1999 |
+| #602 | COORD-206: a User-Mode Linux kernel in seccomp mode for a guest with no KVM, no ptrace and no namespace (to podcrates) | open | T-2005 |
+| #603 | COORD-207: pod-enter adds the RUNPATH directories of a program to the library path of the loader family (to podcrates) | open | T-2003 |
+| #604 | COORD-208: a pinned fetch of a static tool (gVisor's runsc) for a project that needs it at run time (to podcrates) | open | T-2009 |
+| #605 | COORD-209: --podvm-init=image now holds on a foreground run with no tier, on --podvm-tier=runsc and on --podvm-tier=machine (to podrunner) | open | T-2002, T-2007 |
 
 ## Messages whose title does not start with COORD-NNN
 
