@@ -51,6 +51,9 @@ pod-manual = { git = "https://github.com/PodUtils/podcrates", tag = "v0.80.0" }
 # host's proxy through `pod-proxy`.
 pod-broker = { git = "https://github.com/PodUtils/podcrates", tag = "v0.80.0" }
 pod-proxy = { git = "https://github.com/PodUtils/podcrates", tag = "v0.80.0" }
+# TODO/deps.md T-2050 (PodUtils/podvm#611): the open of a volume under
+# `--podvm-volume-base` with no symbolic link (`userns/host.rs`).
+pod-beneath = { git = "https://github.com/PodUtils/podcrates", tag = "v0.80.0" }
 pod-core = { git = "https://github.com/PodUtils/podcrates", tag = "v0.80.0", default-features = false, features = ["async"] }
 tokio = { version = "1", default-features = false, features = ["rt", "fs", "net", "io-util", "time"] }
 podvm-supervise = { path = "../podvm-supervise" }

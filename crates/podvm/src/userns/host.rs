@@ -190,9 +190,9 @@ pub fn bind_onto(
         // opens under it with no symbolic link; the bind takes that
         // descriptor, so a link made after the check redirects nothing.
         let held = match base {
-            Some(b) => {
-                beneath(b, &v.host).map_err(|why| format!("-v {}:{}: {why}", v.host, v.guest))?
-            }
+            // `O_PATH` alone: the volume can be a file.
+            Some(b) => beneath(b, &v.host, pod_beneath::O_PATH)
+                .map_err(|r| format!("-v {}:{}: {}", v.host, v.guest, refusal(b, r)))?,
             None => None,
         };
         let host = std::path::Path::new(&v.host);
@@ -338,81 +338,47 @@ impl Drop for Held {
 /// again at each call. `Ok(())` where `host` is not under `base`, or opens
 /// under it as a directory with no symbolic link; else the refusal.
 pub fn check_volume_under_base(base: &str, host: &str) -> Result<(), String> {
-    let Some(held) = beneath(base, host)? else {
-        return Ok(());
-    };
-    let dir = std::fs::metadata(format!("/proc/self/fd/{}", held.0)).map(|m| m.is_dir());
-    match dir {
-        Ok(true) => Ok(()),
-        Ok(false) => Err(format!(
+    match beneath(base, host, pod_beneath::O_PATH | pod_beneath::O_DIRECTORY) {
+        Ok(_) => Ok(()),
+        Err(pod_beneath::Refusal::NotDirectory) => Err(format!(
             "the volume is refused: the loader family holds a directory under its base {} \
              (--podvm-volume-base), and its host path is not one",
             base.trim_end_matches('/')
         )),
-        Err(e) => Err(format!(
-            "the volume is refused: its host path under its base {} does not answer ({e})",
-            base.trim_end_matches('/')
-        )),
+        Err(r) => Err(refusal(base, r)),
     }
 }
 
-/// `host` opened with `O_PATH` under `base` with no symbolic link
-/// (`openat2(RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS)`), or `None` where
-/// `host` is not under `base` (PodUtils/podrunner#277).
-fn beneath(base: &str, host: &str) -> Result<Option<Held>, String> {
+/// `host` opened under `base` with `flags` and no symbolic link
+/// (`pod_beneath::open_under_base`: `openat2(RESOLVE_BENEATH |
+/// RESOLVE_NO_SYMLINKS)` under the base), or `None` where `host` is not
+/// under `base` (PodUtils/podrunner#277, podcrates' `pod-beneath`).
+fn beneath(base: &str, host: &str, flags: u64) -> Result<Option<Held>, pod_beneath::Refusal> {
+    let mut buf = [0u8; 4096];
+    match pod_beneath::open_under_base(
+        &pod_beneath::Libc,
+        base.as_bytes(),
+        host.as_bytes(),
+        flags,
+        &mut buf,
+    ) {
+        Ok(fd) => Ok(Some(Held(fd))),
+        Err(pod_beneath::Refusal::NotUnderBase) => Ok(None),
+        Err(r) => Err(r),
+    }
+}
+
+/// The line of a refusal of the open of a volume under its base.
+fn refusal(base: &str, r: pod_beneath::Refusal) -> String {
+    use pod_beneath::Refusal;
     let b = base.trim_end_matches('/');
-    let rel = if host == b {
-        "."
-    } else {
-        match host.strip_prefix(b).and_then(|r| r.strip_prefix('/')) {
-            Some(r) if !r.is_empty() => r,
-            _ => return Ok(None),
-        }
+    let why = match r {
+        Refusal::Base(_) => return format!("the volume base {b} does not open: {r}"),
+        Refusal::Link => "holds a symbolic link".to_string(),
+        Refusal::DotDot => "goes above its base by `..`".to_string(),
+        other => format!("does not open ({other})"),
     };
-    const O_PATH: i32 = 0o10000000;
-    use super::O_DIRECTORY;
-    const O_CLOEXEC: i32 = 0o2000000;
-    const RESOLVE_NO_SYMLINKS: u64 = 0x04;
-    const RESOLVE_BENEATH: u64 = 0x08;
-    const SYS_OPENAT2: i64 = 437;
-    let (Ok(cb), Ok(cr)) = (std::ffi::CString::new(b), std::ffi::CString::new(rel)) else {
-        return Err("a NUL byte in a path".to_string());
-    };
-    // SAFETY: a NUL-ended path and integer flags.
-    let bfd = unsafe { open(cb.as_ptr(), O_PATH | O_DIRECTORY | O_CLOEXEC) };
-    if bfd < 0 {
-        return Err(format!(
-            "the volume base {b} does not open: {}",
-            std::io::Error::last_os_error()
-        ));
-    }
-    let bfd = Held(bfd);
-    let how: [u64; 3] = [
-        (O_PATH | O_CLOEXEC) as u64,
-        0,
-        RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS,
-    ];
-    // SAFETY: openat2 reads the NUL-ended path and the 24-byte `open_how`.
-    let fd = unsafe {
-        syscall(
-            SYS_OPENAT2,
-            bfd.0 as i64,
-            cr.as_ptr(),
-            how.as_ptr(),
-            24usize,
-        )
-    };
-    if fd < 0 {
-        let e = std::io::Error::last_os_error();
-        let why = match e.raw_os_error() {
-            Some(40) | Some(18) => "holds a symbolic link".to_string(), // ELOOP, EXDEV
-            _ => format!("does not open ({e})"),
-        };
-        return Err(format!(
-            "the volume is refused: its host path {why} under its base {b} (--podvm-volume-base)"
-        ));
-    }
-    Ok(Some(Held(fd as i32)))
+    format!("the volume is refused: its host path {why} under its base {b} (--podvm-volume-base)")
 }
 
 #[cfg(test)]

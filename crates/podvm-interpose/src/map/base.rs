@@ -35,8 +35,6 @@ pub const BASE_VAR: &[u8] = b"PODVM_VOLUME_BASE";
 const ENOENT: c_int = 2;
 const EXDEV: c_int = 18;
 const ELOOP: c_int = 40;
-const RESOLVE_NO_SYMLINKS: u64 = 0x04;
-const RESOLVE_BENEATH: u64 = 0x08;
 const PINS: usize = 8;
 
 /// The calls that give the name on after they return, or that take flags
@@ -186,29 +184,42 @@ fn close(fd: c_int) {
     }
 }
 
-/// `openat2(dirfd, path, flags, resolve)`: a descriptor, or `-errno`.
-fn openat2(dirfd: c_int, path: &[u8], flags: c_int, resolve: u64) -> c_int {
-    let mut z = [0u8; OUT];
-    if path.len() >= OUT {
-        return -36;
+/// The calls of `pod-beneath` (TODO/deps.md T-2050, PodUtils/podvm#611):
+/// the raw `syscall` instruction of this object, which leaves `errno`
+/// alone. One call each: the walk tries `EAGAIN` again itself.
+struct Raw;
+
+impl pod_beneath::Calls for Raw {
+    fn openat2(
+        &self,
+        dirfd: c_int,
+        path: &core::ffi::CStr,
+        how: &pod_beneath::OpenHow,
+    ) -> Result<c_int, c_int> {
+        // SAFETY: the NUL-ended path and the `open_how` live for the call,
+        // and the size is the size of that struct.
+        let r = unsafe {
+            crate::raw_calls::raw(
+                crate::raw_calls::SYS_OPENAT2,
+                [
+                    dirfd as c_long,
+                    path.as_ptr() as c_long,
+                    how as *const pod_beneath::OpenHow as c_long,
+                    core::mem::size_of::<pod_beneath::OpenHow>() as c_long,
+                    0,
+                    0,
+                ],
+            )
+        };
+        if r < 0 {
+            return Err(-r as c_int);
+        }
+        Ok(r as c_int)
     }
-    z[..path.len()].copy_from_slice(path);
-    let how: [u64; 3] = [(flags | crate::oflags::O_CLOEXEC) as u64, 0, resolve];
-    // SAFETY: a NUL-ended path and the 24 bytes of `struct open_how`.
-    let r = unsafe {
-        crate::raw_calls::raw(
-            crate::raw_calls::SYS_OPENAT2,
-            [
-                dirfd as c_long,
-                z.as_ptr() as c_long,
-                how.as_ptr() as c_long,
-                24,
-                0,
-                0,
-            ],
-        )
-    };
-    r as c_int
+
+    fn close(&self, fd: c_int) {
+        close(fd);
+    }
 }
 
 /// What [`pin`] did with a host path.
@@ -250,10 +261,9 @@ fn under<'a>(dir: &[u8], path: &'a [u8]) -> Option<&'a [u8]> {
 }
 
 /// The host side of the volume of the host path `h` (the longest pair
-/// whose guest side is not `/`), where it is under `base`: that host side
-/// and its rest under the base.
-fn volume_of<'a>(t: &'a Table, base: &[u8], h: &[u8]) -> Option<(&'a [u8], &'a [u8])> {
-    let mut best: Option<(&[u8], &[u8])> = None;
+/// whose guest side is not `/`), where it is under `base`.
+fn volume_of<'a>(t: &'a Table, base: &[u8], h: &[u8]) -> Option<&'a [u8]> {
+    let mut best: Option<&[u8]> = None;
     for p in &t.pairs[..t.n.min(MAX_PAIRS)] {
         // SAFETY: each pair borrows environ memory of its lengths.
         let (from, to) = unsafe {
@@ -270,11 +280,11 @@ fn volume_of<'a>(t: &'a Table, base: &[u8], h: &[u8]) -> Option<(&'a [u8], &'a [
         if from == b"/" || to.len() < 2 || under(to, h).is_none() {
             continue;
         }
-        let Some(vrest) = under(base, to) else {
+        if under(base, to).is_none() {
             continue;
-        };
-        if best.is_none_or(|(b, _)| to.len() > b.len()) {
-            best = Some((to, vrest));
+        }
+        if best.is_none_or(|b| to.len() > b.len()) {
+            best = Some(to);
         }
     }
     best
@@ -335,74 +345,62 @@ pub unsafe fn pin(
     let mut host = [0u8; OUT];
     host[..n].copy_from_slice(&out[..n]);
     let h = &host[..n];
-    let Some((vol, vrest)) = volume_of(t, base, h) else {
+    let Some(vol) = volume_of(t, base, h) else {
         return Ok(Pin::Apart);
     };
     let Some(rest) = under(vol, h) else {
         return Ok(Pin::Apart);
     };
-    let vrest: &[u8] = if vrest.is_empty() { b"." } else { vrest };
-    let dir = crate::oflags::O_PATH | crate::oflags::O_DIRECTORY;
-    let bfd = openat2(AT_FDCWD, base, dir, 0);
-    if bfd < 0 {
-        return Err(refuse(what, -bfd, b"the volume base does not open"));
-    }
-    let vfd = openat2(bfd, vrest, dir, RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS);
-    close(bfd);
-    if vfd == -ELOOP || vfd == -EXDEV {
-        return Err(refuse(
-            what,
-            -vfd,
-            b"the host path of the volume holds a symbolic link under its base",
-        ));
-    }
-    if vfd < 0 {
-        return Err(refuse(
-            what,
-            -vfd,
-            b"the host path of the volume does not open under its base",
-        ));
-    }
-    // The last name, and the directory before it.
-    let cut = rest.iter().rposition(|&c| c == b'/');
-    let (parent, name): (&[u8], &[u8]) = match cut {
-        Some(i) => (&rest[..i], &rest[i + 1..]),
-        None => (b".", rest),
+    let mut buf = [0u8; OUT];
+    let dir = pod_beneath::O_PATH | pod_beneath::O_DIRECTORY;
+    let vfd = match pod_beneath::open_under_base(&Raw, base, vol, dir, &mut buf) {
+        Ok(fd) => fd,
+        Err(pod_beneath::Refusal::Base(e)) => {
+            return Err(refuse(what, e, b"the volume base does not open"));
+        }
+        Err(r @ (pod_beneath::Refusal::Link | pod_beneath::Refusal::DotDot)) => {
+            return Err(refuse(
+                what,
+                r.errno(),
+                b"the host path of the volume holds a symbolic link under its base",
+            ));
+        }
+        Err(r) => {
+            return Err(refuse(
+                what,
+                r.errno(),
+                b"the host path of the volume does not open under its base",
+            ));
+        }
     };
-    let parent: &[u8] = if parent.is_empty() { b"." } else { parent };
-    let dots = name == b"." || name == b"..";
+    let dots = {
+        let (_, name) = pod_beneath::last_name(rest);
+        name == b"." || name == b".."
+    };
     let (fd, last): (c_int, &[u8]) = if rest.is_empty() {
         // The volume itself: a mount point of the guest, never a link.
         (vfd, b".")
     } else if follow || dots {
-        let fd = openat2(
-            vfd,
-            rest,
-            crate::oflags::O_PATH,
-            RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS,
-        );
-        if fd == -ENOENT && writes && !dots && CREATORS.contains(&what) {
-            let pfd = openat2(vfd, parent, dir, RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS);
-            close(vfd);
-            if pfd < 0 {
-                return Err(link_or(what, -pfd));
+        let opened = pod_beneath::open_beneath(&Raw, vfd, rest, pod_beneath::O_PATH, 0, &mut buf);
+        match opened {
+            Err(pod_beneath::Refusal::Open(ENOENT))
+                if writes && !dots && CREATORS.contains(&what) =>
+            {
+                let parent = pod_beneath::open_parent_beneath(&Raw, vfd, rest, &mut buf);
+                close(vfd);
+                let (pfd, name) = parent.map_err(|r| link_or(what, r.errno()))?;
+                HELD.with(|h| h.by_name.set(true));
+                (pfd, name)
             }
-            HELD.with(|h| h.by_name.set(true));
-            (pfd, name)
-        } else {
-            close(vfd);
-            if fd < 0 {
-                return Err(link_or(what, -fd));
+            opened => {
+                close(vfd);
+                (opened.map_err(|r| link_or(what, r.errno()))?, b"")
             }
-            (fd, b"")
         }
     } else {
-        let pfd = openat2(vfd, parent, dir, RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS);
+        let parent = pod_beneath::open_parent_beneath(&Raw, vfd, rest, &mut buf);
         close(vfd);
-        if pfd < 0 {
-            return Err(link_or(what, -pfd));
-        }
-        (pfd, name)
+        parent.map_err(|r| link_or(what, r.errno()))?
     };
     let by_name = HELD.with(|h| h.by_name.get());
     if CHECK_ONLY.contains(&what) || !keep(fd) {

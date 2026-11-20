@@ -7,51 +7,62 @@ use std::ffi::OsString;
 use std::os::unix::ffi::OsStrExt;
 use std::sync::atomic::Ordering;
 
-/// `host` under the directory `base`: the base and the rest after it
-/// (`.` for the base itself), or `None` where it is not under it.
-fn under_base<'a>(base: &'a [u8], host: &'a [u8]) -> Option<(&'a [u8], &'a [u8])> {
-    let b = base.strip_suffix(b"/").unwrap_or(base);
-    if host == b {
-        return Some((b, b"."));
+/// The calls of `pod-beneath` through the trap of the handler: `syscall`
+/// instructions of podvm's own code, which Syscall User Dispatch lets
+/// through. One call each: the walk tries `EAGAIN` again itself.
+struct Trap;
+
+impl pod_beneath::Calls for Trap {
+    fn openat2(
+        &self,
+        dirfd: core::ffi::c_int,
+        path: &core::ffi::CStr,
+        how: &pod_beneath::OpenHow,
+    ) -> Result<core::ffi::c_int, core::ffi::c_int> {
+        // SAFETY: the NUL-ended path and the `open_how` live for the call,
+        // and the size is the size of that struct.
+        let r = unsafe {
+            sys::sc6(
+                nr::OPENAT2,
+                dirfd as i64,
+                path.as_ptr() as i64,
+                how as *const pod_beneath::OpenHow as i64,
+                core::mem::size_of::<pod_beneath::OpenHow>() as i64,
+                0,
+                0,
+            )
+        };
+        if r < 0 {
+            return Err(-r as core::ffi::c_int);
+        }
+        Ok(r as core::ffi::c_int)
     }
-    host.strip_prefix(b)
-        .and_then(|r| r.strip_prefix(b"/"))
-        .filter(|r| !r.is_empty())
-        .map(|r| (b, r))
+
+    fn close(&self, fd: core::ffi::c_int) {
+        sys::close(fd as i64);
+    }
 }
 
-/// The directory `rest` opened under `base` with no symbolic link and
-/// nothing above the base: a descriptor, or a negative errno (`-40` ELOOP
-/// or `-18` EXDEV for a link).
-fn beneath(base: &[u8], rest: &[u8]) -> Result<i64, String> {
-    let mut zb = base.to_vec();
-    zb.push(0);
-    let bfd = sys::openat2(
-        sys::AT_FDCWD,
-        &zb,
-        sys::O_PATH | sys::O_DIRECTORY | sys::O_CLOEXEC,
-        0,
-        0,
-    );
-    if bfd < 0 {
-        return Err(format!("the volume base: errno {}", -bfd));
+/// The directory `host` opened under `base` with no symbolic link and
+/// nothing above the base (podcrates' `pod-beneath`): a descriptor, `None`
+/// where `host` is not under `base`, or the refusal.
+fn beneath(base: &[u8], host: &[u8]) -> Result<Option<i64>, String> {
+    let mut buf = [0u8; state::PATH_MAX];
+    match pod_beneath::open_under_base(
+        &Trap,
+        base,
+        host,
+        pod_beneath::O_PATH | pod_beneath::O_DIRECTORY,
+        &mut buf,
+    ) {
+        Ok(fd) => Ok(Some(fd as i64)),
+        Err(pod_beneath::Refusal::NotUnderBase) => Ok(None),
+        Err(r @ (pod_beneath::Refusal::Link | pod_beneath::Refusal::DotDot)) => Err(format!(
+            "its host path under its base (--podvm-volume-base): {}",
+            r.text()
+        )),
+        Err(r) => Err(format!("its host path under its base: {r}")),
     }
-    let mut zr = rest.to_vec();
-    zr.push(0);
-    let fd = sys::openat2(
-        bfd,
-        &zr,
-        sys::O_PATH | sys::O_DIRECTORY | sys::O_CLOEXEC,
-        0,
-        sys::RESOLVE_BENEATH | sys::RESOLVE_NO_SYMLINKS,
-    );
-    sys::close(bfd);
-    if fd == -40 || fd == -18 {
-        return Err(
-            "its host path holds a symbolic link under its base (--podvm-volume-base)".into(),
-        );
-    }
-    Ok(fd)
 }
 
 /// The volumes of `PODVM_MAPS` in `envp` (`guest:host` pairs joined by
@@ -83,10 +94,13 @@ pub(crate) fn volumes(envp: &[OsString]) -> Result<(), String> {
         if n == state::MAX_VOLS {
             return Err(format!("more than {} volumes", state::MAX_VOLS));
         }
-        let (fd, z) = match base.and_then(|b| under_base(b, host)) {
-            Some((b, rest)) => {
-                let fd = beneath(b, rest)
-                    .map_err(|e| format!("the volume {}: {e}", String::from_utf8_lossy(pair)))?;
+        let held = match base {
+            Some(b) => beneath(b, host)
+                .map_err(|e| format!("the volume {}: {e}", String::from_utf8_lossy(pair)))?,
+            None => None,
+        };
+        let (fd, z) = match held {
+            Some(fd) => {
                 let mut z = host.to_vec();
                 z.push(0);
                 (fd, z)
@@ -181,19 +195,27 @@ mod tests {
         std::fs::create_dir_all(&out).unwrap();
         std::os::unix::fs::symlink(&out, base.join("away")).unwrap();
         std::os::unix::fs::symlink(base.join("work"), base.join("near")).unwrap();
-        let b = base.to_str().unwrap().as_bytes();
-        let fd = super::beneath(b, b"work/sub").unwrap();
-        assert!(fd >= 0, "{fd}");
-        crate::sys::close(fd);
-        for link in [&b"away"[..], b"near", b"near/sub"] {
-            assert!(
-                super::beneath(b, link).is_err(),
-                "{}",
-                String::from_utf8_lossy(link)
-            );
+        let b = base.to_str().unwrap();
+        for (host, opens) in [
+            (format!("{b}/work/sub"), Some(true)),
+            (b.to_string(), Some(true)),
+            (format!("{b}/away"), None),
+            (format!("{b}/near"), None),
+            (format!("{b}/near/sub"), None),
+            ("/elsewhere".to_string(), Some(false)),
+        ] {
+            match super::beneath(b.as_bytes(), host.as_bytes()) {
+                Ok(Some(fd)) => {
+                    assert_eq!(opens, Some(true), "{host}");
+                    crate::sys::close(fd);
+                }
+                Ok(None) => assert_eq!(opens, Some(false), "{host}"),
+                Err(e) => {
+                    assert_eq!(opens, None, "{host}: {e}");
+                    assert!(e.contains("symbolic link"), "{host}: {e}");
+                }
+            }
         }
-        assert_eq!(super::under_base(b, b"/elsewhere"), None);
-        assert_eq!(super::under_base(b, b), Some((b, &b"."[..])));
         let _ = std::fs::remove_dir_all(&d);
     }
 }

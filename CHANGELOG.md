@@ -10,6 +10,7 @@ They describe their recorded revision, not the current build.
 
 - podvm takes podcrates `v0.80.0` (PodUtils/podcrates#250). `pod-enter` writes the write table of the confine layer (`PODVM_WRITE_HOST`) for the entry with no chroot, and each entry removes a value of the caller (podcrates@T-999). The payload of each entry starts with an empty signal mask (podcrates@T-1010).
 - podvm no longer writes the write table of the confine layer itself: `pod-enter` writes it from the spec of the plan (`podvm_supervise::table::set_write_table` is gone; T-2050).
+- The open of a volume under `--podvm-volume-base` is the crate `pod-beneath` of podcrates on each route (the namespace rung, the syscall tier and the interposer of the loader family), in place of three copies of podvm; each open tries `EAGAIN` again (T-2050, #611).
 - The store copy of QEMU for a host with none is the static QEMU 11.0.0 of hermeticbuild/qemu-prebuilt (release `11.0.0.1`, the service `hermeticbuild-qemu` of `pod-services`), which holds the fix of the use-after-free of `address_space_translate_for_iotlb` (T-2016, #618), in place of QEMU 9.2.0 of pkgforge. podvm checks each archive and each member that it takes by its size and sha256. `podvm windows doctor` names a warm start from QEMU 11.1, the first QEMU that saves an NVMe disk (podcrates@T-1035), not from 11.0.
 
 ## 0.2.0-beta.37 (2026-11-21)

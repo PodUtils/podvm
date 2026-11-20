@@ -18,7 +18,6 @@ pub const O_PATH: i64 = 0o10000000;
 pub const O_CREAT: i64 = 0o100;
 pub const O_TMPFILE: i64 = 0o20200000;
 pub const RESOLVE_IN_ROOT: u64 = 0x10;
-pub const RESOLVE_NO_SYMLINKS: u64 = 0x04;
 pub const RESOLVE_BENEATH: u64 = 0x08;
 
 pub const ENOTDIR: i64 = 20;

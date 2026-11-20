@@ -3,5 +3,22 @@
 version = 4
 
 [[package]]
+name = "linux-raw-sys"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
+
+[[package]]
+name = "pod-beneath"
+version = "0.80.0"
+source = "git+https://github.com/PodUtils/podcrates?tag=v0.80.0#62b8039bd06ff412d42b211c70244d6ef53e2c63"
+dependencies = [
+ "linux-raw-sys",
+]
+
+[[package]]
 name = "podvm-interpose"
 version = "0.1.0"
+dependencies = [
+ "pod-beneath",
+]
