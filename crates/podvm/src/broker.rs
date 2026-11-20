@@ -155,6 +155,9 @@ pub fn policy(allow: &[String], ports: &[u16]) -> Policy {
             })
             .collect(),
         deny: Vec::new(),
+        // podvm gives no placeholder credential (pod-broker's TLS end,
+        // podcrates `v0.78.0`, is not wired for `--net broker` yet).
+        credentials: Vec::new(),
     }
 }
 
@@ -209,12 +212,12 @@ pub(crate) fn start_with(
     let dial = pod_broker::upstream("podvm", proxy, resolve.clone());
     let broker = Arc::new(Broker::new(settings, resolve, dial));
     broker
-        .load(Load {
-            job: JOB.to_string(),
-            token: Token::new(token.clone()),
-            ttl: Duration::from_secs(24 * 3600),
-            policy: policy(allow, ports),
-        })
+        .load(Load::new(
+            JOB,
+            Token::new(token.clone()),
+            Duration::from_secs(24 * 3600),
+            policy(allow, ports),
+        ))
         .map_err(|e| format!("the policy of --allow and --ports: {e}"))?;
     let listener =
         std::net::TcpListener::bind("127.0.0.1:0").map_err(|e| format!("127.0.0.1: {e}"))?;

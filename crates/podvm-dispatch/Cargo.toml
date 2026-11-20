@@ -15,7 +15,7 @@ repository.workspace = true
 [dependencies]
 # T-1983: the rule of the exec table of the confine layer, as the
 # interposer and pod-enter apply it.
-pod-confine = { git = "https://github.com/PodUtils/podcrates", tag = "v0.76.0" }
+pod-confine = { git = "https://github.com/PodUtils/podcrates", tag = "v0.78.1" }
 
 [[bin]]
 # The test host: `podvm-dispatch-run ROOT GUEST-PATH ARGV...`. podvm itself
