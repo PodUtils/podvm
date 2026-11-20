@@ -172,3 +172,72 @@ fn confine_required_link_out_of_the_tree_refuses_by_guest_path() {
     assert!(e.contains("T-1888"), "{e}");
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// TODO/enter.md T-2013: `exec=` for the first program of an entry with
+/// no chroot: the program by its path, by `PATH` and by a relative name,
+/// the program of the dynamic loader, and the interpreter of a script.
+#[test]
+fn the_first_program_takes_the_rule_of_exec() {
+    let root = scratch("first");
+    for d in ["bin", "lib64", "sc", "tmp"] {
+        std::fs::create_dir_all(root.join(d)).unwrap();
+    }
+    for f in ["bin/sh", "lib64/ld-linux-x86-64.so.2", "sc/m", "tmp/m"] {
+        std::fs::write(root.join(f), b"x").unwrap();
+    }
+    let maps = crate::userland::Maps::of_root(root.to_str().unwrap());
+    let ask = parse("read=/sc;write=/tmp;exec=/bin/sh,/lib64").unwrap();
+    let plan = pod_enter::Plan {
+        argv: Vec::new(),
+        env: Vec::new(),
+        working_dir: "/tmp".to_string(),
+        fds: pod_enter::Fds::default(),
+        banner: String::new(),
+        path_dirs: vec!["/bin".to_string(), "/sc".to_string()],
+        names: crate::NAMES,
+        limits: Vec::new(),
+        no_new_privs: false,
+        die_with_parent: false,
+        confine: Some(host_spec(&ask, &maps).unwrap()),
+        hostname: None,
+        volumes: Vec::new(),
+        userns_ids: None,
+        pid_namespace: false,
+    };
+    let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    let ld = "/lib64/ld-linux-x86-64.so.2";
+    // (argv, the rule holds)
+    for (argv, holds) in [
+        (v(&["/bin/sh", "-c", "true"]), true),
+        (v(&["sh"]), true),
+        (v(&["/sc/m"]), false),
+        (v(&["m"]), false),
+        (v(&["./m"]), false),
+        (v(&[ld, "/sc/m"]), false),
+        (v(&[ld, "--library-path", "/tmp", "/tmp/m"]), false),
+        (v(&[ld, "m"]), false),
+        (v(&[ld, "/bin/sh"]), true),
+        (v(&[ld, "--version"]), true),
+        (v(&["/nowhere/x"]), true),
+        (Vec::new(), true),
+    ] {
+        let got = check_first(&plan, &maps, &[&argv]);
+        assert_eq!(got.is_ok(), holds, "{argv:?}: {got:?}");
+        if let Err(e) = got {
+            assert!(
+                matches!(e, pod_enter::Error::CannotInvoke(_)),
+                "{argv:?}: {e:?}"
+            );
+        }
+    }
+    // The interpreter of a `#!` script: the argv of the kernel.
+    let kernel = v(&["/sc/m", "/bin/sh"]);
+    assert!(check_first(&plan, &maps, &[&v(&["/bin/sh"]), &kernel]).is_err());
+    // No confinement: each program runs.
+    let open = pod_enter::Plan {
+        confine: None,
+        ..plan
+    };
+    assert!(check_first(&open, &maps, &[&v(&["/sc/m"])]).is_ok());
+    let _ = std::fs::remove_dir_all(&root);
+}
