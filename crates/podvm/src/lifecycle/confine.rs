@@ -27,12 +27,14 @@ pub fn decide(
     userland: Option<&super::Userland>,
     env: &mut Vec<String>,
 ) -> Result<Option<Spec>, i32> {
-    // TODO/enter.md T-1819, T-1892: a caller's own exec table is dropped;
-    // `pod-enter` writes the table of the layer (host paths) at the spawn.
-    env.retain(|e| !e.starts_with("PODVM_EXEC=") && !e.starts_with("PODVM_EXEC_HOST="));
-    // TODO/enter.md T-1985: the same for the write table, which podvm
-    // writes below for a family of the userland rung.
-    let _ = podvm_supervise::table::set_write_table(env, None);
+    // TODO/enter.md T-1819, T-1892, T-1985: a caller's own exec table and
+    // write table are dropped; `pod-enter` writes the tables of the layer
+    // (host paths) at the spawn of a family of the userland rung.
+    env.retain(|e| {
+        !e.starts_with("PODVM_EXEC=")
+            && !e.starts_with("PODVM_EXEC_HOST=")
+            && !e.starts_with("PODVM_WRITE_HOST=")
+    });
     let Some(ask) = ask else {
         return Ok(None);
     };
@@ -54,10 +56,7 @@ pub fn decide(
     // T-1982: the rules of a family of the userland rung, which the
     // launcher of `run -d` takes too.
     match podvm_supervise::table::userland_host_spec(ask, &u.maps, u.emulator.as_deref()) {
-        Ok(s) => match podvm_supervise::table::set_write_table(env, Some(&s)) {
-            Ok(()) => Ok(Some(s)),
-            Err(why) => Err(refuse(verb, why)),
-        },
+        Ok(s) => Ok(Some(s)),
         // TODO/enter.md T-1888: `create` keeps the SPEC in the record, and
         // `start` resolves the paths on the tree that it starts, which can
         // hold a path by then. `start` refuses where it still does not.

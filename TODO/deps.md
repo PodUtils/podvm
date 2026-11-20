@@ -2350,3 +2350,36 @@ At the next take of podcrates: take `pod-guest`'s squashfs reader, `pod_core::cl
 
 **Partial (2026-11-18).** podcrates `v0.70.0` taken (`6b5a6cb`). `crates/podvm-image/src/clock.rs` keeps only the docker wording of an age and the parse of an image timestamp; its calendar is `pod_core::clock` (`rfc3339`, `days_from_civil`), and `grep -rn "fn civil_from_days\|fn rfc3339" crates/podvm-image/src` finds nothing. `host_bundle_bytes` of `podvm-image` is already `pod_oci::trust::host_bundle`, which reads the variables of the environment in podcrates; it is no copy. Remaining: the squashfs reader of `machine/guest/squashfs.rs` and the proxy variables of `machine/proxy.rs`, with `kvm.yml` experiment 390 as their proof; they come after the asks of podrunner.
 
+
+# T-2050: Take podcrates `v0.80.0`: the write table, `pod-beneath`, the loader rule, five `#!` levels, the signals, the saved state of a line, the static QEMU 11.0.0
+
+**Source:** PodUtils/podcrates#250 (the COORD message of `v0.80.0` to each session); the answers to #611, #613, #616, #618 and #624
+**Category:** deps
+**Milestone:** none
+**Priority:** P2
+**Effort:** L
+**Status:** partial
+
+## Problem
+
+podcrates `v0.80.0` answers five asks of podvm, and podvm keeps the copies that the answers replace: the write of the write table of the confine layer (`podvm_supervise::table::set_write_table`), three copies of the open of a volume under its base (`userns/host.rs`, `podvm-dispatch/src/vols.rs`, `podvm-interpose/src/map/base.rs`), the rule of the program of a dynamic loader (`podvm-interpose/src/exec/ldso.rs`) and `check_first` of `podvm-enter`, the blocks of `WAIT_FORWARDED` in each thread, and the save of the Linux guest (`machine/guest/state/save.rs`). The tag also has a breaking change (`pod_enter::Names::write_table`), and it removes the service `pkgforge-qemu` of the store copy of QEMU. Each counter of `#!` levels in podvm stops at four, and the kernel runs five.
+
+## Premise
+
+The release notes of the tag (the GitHub release `v0.80.0` of PodUtils/podcrates) name each change for podvm; the README of the crate `pod-beneath`, "The take of podvm", gives the take of each copy of the open under a base.
+
+## Approach
+
+One commit for each step, in the order of the message: the tag and the breaking change; the write table; `pod-beneath`; the loader rule, the check of an argv and five `#!` levels; the signals; the record of #624; the saved state of the Linux guest and the static QEMU.
+
+## Decision
+
+-
+
+## Prove
+
+`sh scripts/dev/checks.sh` exits 0 at each commit; `grep -rn "set_write_table\|fn check_first\|WAIT_FORWARDED, &mut" crates` finds nothing; the gate and the integration tests of CI pass on the take.
+
+## Done
+
+Partial (2026-11-20). Step 1: each podcrates dependency and `issue-sync.yml` take `v0.80.0`; `NAMES` has `write_table: "PODVM_WRITE_HOST"`. The store copy of QEMU is the static QEMU 11.0.0 of `hermeticbuild-qemu` (T-2016), and the doctor of a Windows guest names a warm start from QEMU 11.1 (`a_warm_start_needs_qemu_11_1`). Step 2: `pod-enter` writes the write table for the entry with no chroot and removes the value of a caller on each entry, so `podvm_supervise::table::set_write_table` and its calls in the launcher and in `lifecycle/confine.rs` are gone. The unit test `the_tables_of_the_confine_layer_have_one_name_each` holds the names that `pod-enter` writes against the names that the interposer and the handler of the syscall tier read.

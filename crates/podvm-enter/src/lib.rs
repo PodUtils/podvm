@@ -289,6 +289,32 @@ mod tests {
         assert_eq!(device::SPEC_VAR, "PODVM_DEVICE_SPEC");
     }
 
+    /// TODO/enter.md T-1819, T-1985: `pod-enter` writes the exec table and
+    /// the write table under the names of [`NAMES`], and the interposer and
+    /// the handler of the syscall tier read each one under the same name
+    /// (podcrates `v0.80.0` writes the write table; podvm no longer does).
+    #[test]
+    fn the_tables_of_the_confine_layer_have_one_name_each() {
+        let interpose_exec = include_str!("../../podvm-interpose/src/map/readonly.rs");
+        let interpose_write = include_str!("../../podvm-interpose/src/map/meta.rs");
+        let dispatch_exec = include_str!("../../podvm-dispatch/src/exec.rs");
+        let dispatch_write = include_str!("../../podvm-dispatch/src/meta.rs");
+        for (name, readers) in [
+            (NAMES.exec_table, [interpose_exec, dispatch_exec]),
+            (NAMES.write_table, [interpose_write, dispatch_write]),
+        ] {
+            assert!(name.starts_with("PODVM_"), "{name}");
+            assert_ne!(NAMES.exec_table, NAMES.write_table);
+            for (i, text) in readers.iter().enumerate() {
+                let spelt = [format!("b\"{name}\""), format!("b\"{name}=\"")];
+                assert!(
+                    spelt.iter().any(|s| text.contains(s.as_str())),
+                    "reader {i} does not read {name}"
+                );
+            }
+        }
+    }
+
     /// `host_env` gives the image's library directories to the interposer
     /// under podvm's variable, and drops the caller's value of it.
     #[test]

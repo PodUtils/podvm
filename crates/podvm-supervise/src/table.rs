@@ -295,42 +295,6 @@ pub fn userland_host_spec(
     Ok(spec)
 }
 
-/// TODO/enter.md T-1985: the variable of the write table of the confine
-/// layer, which the interposer and the handler of the syscall tier read.
-pub const WRITE_TABLE_VAR: &str = "PODVM_WRITE_HOST";
-
-/// TODO/enter.md T-1985: drop each write table of the caller from `env`,
-/// and add the table of `spec` (host paths, a family of the userland rung)
-/// where there is one. Landlock governs no change of mode, owner or times,
-/// so the interposer and the handler refuse each one on a file outside
-/// each path with write. A path that the table cannot spell (a `:` or a
-/// NUL) is a refusal by name: a run never goes on without its table.
-pub fn set_write_table(
-    env: &mut Vec<String>,
-    spec: Option<&podvm_enter::confine::Spec>,
-) -> Result<(), String> {
-    use podvm_enter::confine::{Access, Spec};
-    env.retain(|e| e.split_once('=').map(|(n, _)| n) != Some(WRITE_TABLE_VAR));
-    let Some(spec) = spec else {
-        return Ok(());
-    };
-    // The exec table of pod-confine spells the paths of the rules with
-    // write the same way (each path once, resolved, `:` separated), so they
-    // go through it as rules with execute: no second copy of its code.
-    let writes = spec
-        .paths
-        .iter()
-        .filter(|r| r.access.contains(Access::WRITE))
-        .fold(Spec::new(), |s, r| s.allow(r.path.clone(), Access::EXECUTE));
-    let table = writes
-        .exec_table()
-        .resolved()
-        .encode()
-        .map_err(|e| format!("the write table of the confine layer: {e}"))?;
-    env.push(format!("{WRITE_TABLE_VAR}={table}"));
-    Ok(())
-}
-
 /// PodUtils/podvm#396 (TODO/enter.md T-1902): the files that musl opens
 /// past each symbol of the interposer, so the kernel resolves them on the
 /// host. Where the spec lets the payload read the guest path, the host

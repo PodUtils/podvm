@@ -222,8 +222,6 @@ fn enter_in_launcher(
         init = Some(started.keep);
         podvm_enter::Child::of(started.pid)
     } else if container.userland_exec.is_empty() {
-        // TODO/enter.md T-1985: the write table is of the userland rung.
-        crate::table::set_write_table(&mut plan.env, None)?;
         let findings = podvm_probe::run();
         let selection = podvm_probe::select::Selection::choose(&findings);
         podvm_enter::spawn_selected(&root, &plan, selection.rung, log).map_err(|e| e.to_string())?
@@ -241,8 +239,9 @@ fn enter_in_launcher(
             .userland_exec
             .iter()
             .find_map(|a| a.strip_prefix("--podvm-dispatch-emu="));
+        // TODO/enter.md T-1985: `pod-enter` writes the write table of the
+        // spec (`NAMES.write_table`, podcrates `v0.80.0`).
         plan.confine = container.of.hardening.confine_host_spec(&maps, emu)?;
-        crate::table::set_write_table(&mut plan.env, plan.confine.as_ref())?;
         // TODO/enter.md T-2013: `exec=` for the first program.
         podvm_enter::confine::check_first(&plan, &maps, &[&plan.argv])
             .map_err(|e| format!("{e} (TODO/enter.md T-2013)"))?;
