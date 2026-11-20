@@ -102,7 +102,16 @@ pub unsafe fn resolve(
         }
         guest[dn..dn + len].copy_from_slice(&pend[start..pos]);
         dn += len;
-        if host_of(t, &guest[..dn], host)?.is_none() {
+        let mut mapped = host_of(t, &guest[..dn], host)?;
+        // TODO/enter.md T-2040: the host path of a volume (a link target
+        // that names it, or a path that reaches it) goes on in guest names.
+        if mapped.is_none()
+            && let Some(m) = unsafe { crate::map::to_volume_guest(t, guest, dn) }
+        {
+            dn = m;
+            mapped = host_of(t, &guest[..dn], host)?;
+        }
+        if mapped.is_none() {
             // Outside the table: the rest goes as it is written.
             literal = true;
             break;

@@ -453,16 +453,19 @@ fn a_nofollow_call_on_a_volume_root_takes_the_host_path() {
     let env = env_of([b"PODVM_MAPS=/:/nonexistent-rootfs-t1661,/workspace:/\0"]);
     let t = unsafe { parse(env.as_ptr()) };
     assert_eq!(t.n, 2);
-    let mut out = [0u8; OUT];
-    let n = unsafe { super::links::resolve_links(&t, b"/workspace", false, &mut out) }
-        .expect("resolve");
+    let (mut g, mut out) = ([0u8; OUT], [0u8; OUT]);
+    let n = unsafe { super::links::resolve_links(&t, b"/workspace", false, &mut g, &mut out) }
+        .expect("resolve")
+        .1;
     assert_eq!(&out[..n], b"/");
-    let n = unsafe { super::links::resolve_links(&t, b"/workspace/", false, &mut out) }
-        .expect("resolve");
+    let n = unsafe { super::links::resolve_links(&t, b"/workspace/", false, &mut g, &mut out) }
+        .expect("resolve")
+        .1;
     assert_eq!(&out[..n], b"/");
     // A sibling of the volume keeps its name under the rootfs.
-    let n = unsafe { super::links::resolve_links(&t, b"/workspacex", false, &mut out) }
-        .expect("resolve");
+    let n = unsafe { super::links::resolve_links(&t, b"/workspacex", false, &mut g, &mut out) }
+        .expect("resolve")
+        .1;
     assert_eq!(&out[..n], b"/nonexistent-rootfs-t1661/workspacex");
 }
 

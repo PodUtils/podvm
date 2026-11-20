@@ -192,9 +192,13 @@ pub const RUN_OPTIONS: &str = "\
                    source under DIR opens under it with no symbolic link;
                    the bind or the handler takes that descriptor, and the
                    interposer of the loader family opens it so again at
-                   each path call. A link under DIR is a refusal (exit
-                   125 at the start, ELOOP for the call after it). Each
-                   guest tier refuses it (PodUtils/podrunner#277, #300)
+                   each path call. A link under DIR at the start is a
+                   refusal (exit 125). A link in a volume after the start
+                   resolves in guest names, as a link of the payload does,
+                   so it never reaches a host file out of DIR; a link that
+                   the host makes between that walk and the call gives
+                   ELOOP. Each guest tier refuses it
+                   (PodUtils/podrunner#277, #300)
   --podvm-cpus N  podvm's own, machine tier only and refused elsewhere: the
                    guest's vCPUs, 1 to 64 (TODO/cli.md T-1654)
   --podvm-net none  podvm's own, machine and incus tiers: the guest has

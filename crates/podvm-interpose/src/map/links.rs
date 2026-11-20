@@ -55,7 +55,9 @@ pub fn follows(what: &[u8]) -> bool {
 
 /// The host path of the absolute guest path `g` into `out` (with a NUL),
 /// each link resolved in guest names: all of it where `follow`, else its
-/// directory, with the last name kept. The length, or an errno.
+/// directory, with the last name kept. The resolved guest path goes into
+/// `guest` (TODO/enter.md T-2040: the read-only table reads it). The two
+/// lengths, guest then host, or an errno.
 ///
 /// # Safety
 /// Calls the real `readlink`.
@@ -63,9 +65,9 @@ pub unsafe fn resolve_links(
     t: &Table,
     g: &[u8],
     follow: bool,
+    guest: &mut [u8; OUT],
     out: &mut [u8; OUT],
-) -> Result<usize, c_int> {
-    let mut guest = [0u8; OUT];
+) -> Result<(usize, usize), c_int> {
     let mut end = g.len();
     while end > 1 && g[end - 1] == b'/' {
         end -= 1;
@@ -77,22 +79,27 @@ pub unsafe fn resolve_links(
     // (`lstat("/workspace")` of node --permission, T-1661).
     let mount = is_mount_point(t, &g[..end]);
     if follow || mount || last.is_empty() || last == b"." || last == b".." {
-        let (_, hn) = unsafe { walk::resolve(t, g, &mut guest, out) }?;
-        return Ok(hn);
+        return unsafe { walk::resolve(t, g, guest, out) };
     }
     let parent = if cut == 0 { &g[..1] } else { &g[..cut] };
-    let (_, hn) = unsafe { walk::resolve(t, parent, &mut guest, out) }?;
-    let mut at = hn;
+    let (gn, hn) = unsafe { walk::resolve(t, parent, guest, out) }?;
+    Ok((join_last(guest, gn, last)?, join_last(out, hn, last)?))
+}
+
+/// `buf[..n]`, a `/` where it does not end in one, and `last`, with a NUL:
+/// the new length.
+fn join_last(buf: &mut [u8; OUT], n: usize, last: &[u8]) -> Result<usize, c_int> {
+    let mut at = n;
     if at + 1 + last.len() >= OUT {
         return Err(ENAMETOOLONG);
     }
-    if at == 0 || out[at - 1] != b'/' {
-        out[at] = b'/';
+    if at == 0 || buf[at - 1] != b'/' {
+        buf[at] = b'/';
         at += 1;
     }
-    out[at..at + last.len()].copy_from_slice(last);
+    buf[at..at + last.len()].copy_from_slice(last);
     at += last.len();
-    out[at] = 0;
+    buf[at] = 0;
     Ok(at)
 }
 
