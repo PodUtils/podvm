@@ -78,3 +78,11 @@ routes                 ns       run= 14.7s first= 11.4s mem=  237MiB state=runni
 routes                 runsc    run= 11.2s first=  6.5s mem=  883MiB state=running boot=3.429s unit=36ms mariadb=416ms postgres=2771ms sql=42,42 uid=100
 # 2026-11-20T07:42:04Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label runsc-boot-times
 runsc-boot-times       runsc    run=  8.6s first=  3.9s mem=  866MiB state=running boot=3.474s unit=34ms mariadb=452ms postgres=2644ms sql=42,42 uid=100
+# 2026-11-20T08:22:25Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label committed
+committed              machine  run= 38.9s first= 22.7s mem= 3301MiB state=running boot=8.003s unit=240ms mariadb=3078ms postgres=6125ms sql=42,42 uid=100
+committed              mach-sav run= 41.4s first= 25.0s mem= 3307MiB state=running boot=8.316s unit=254ms mariadb=3031ms postgres=6094ms sql=42,42 uid=100
+committed              mach-lod run= 17.9s first=  1.5s mem= 2325MiB state=running boot=8.316s unit=226ms mariadb=3328ms postgres=6279ms sql=42,42 uid=100
+committed              mach-lod the state files: 1547 MiB; markers of a failed state: 0
+# 2026-11-20T08:24:07Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label committed-again
+committed-again        mach-lod run= 17.9s first=  1.9s mem= 2326MiB state=running boot=8.316s unit=209ms mariadb=3093ms postgres=6213ms sql=42,42 uid=100
+committed-again        mach-lod the state files: 1547 MiB; markers of a failed state: 0
