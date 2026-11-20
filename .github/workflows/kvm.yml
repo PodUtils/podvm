@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       only:
-        description: "One job to run (guest, windows, cgroup, nonroot, arch or install); empty runs each"
+        description: "One job to run (guest, windows, cgroup, nonroot, init, arch or install); empty runs each"
         required: false
         default: ""
       windows:
@@ -367,6 +367,91 @@ jobs:
         with:
           name: machine-nonroot
           path: experiments/results/machine-nonroot.txt
+          if-no-files-found: warn
+
+  # TODO/machine.md T-2008, T-2016: the saved state of a guest that booted
+  # the init of an image (experiment 468, the routes of the machine tier)
+  # under KVM, and the starts of the emulator of the runner with four vCPUs
+  # under TCG (experiment 469).
+  init:
+    if: always() && (inputs.only == '' || inputs.only == 'init')
+    name: the saved state of an init guest under KVM (experiments 468 and 469)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: give the job /dev/kvm
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules >/dev/null
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sudo udevadm settle || true
+          [ -e /dev/kvm ] && sudo chmod 0666 /dev/kvm
+          if [ -w /dev/kvm ] && [ -r /dev/kvm ]; then
+            ls -l /dev/kvm
+          else
+            echo "no usable /dev/kvm on this runner: COULD NOT RUN"
+            exit 2
+          fi
+
+      - name: qemu and uidmap
+        run: |
+          sudo apt-get -qq update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq qemu-system-x86 uidmap >/dev/null
+          qemu-system-x86_64 --version | head -1
+
+      - name: bootstrap
+        run: ./scripts/common/bootstrap-env.sh rust cc zig tools
+
+      - name: build podvm
+        run: |
+          cargo build --release -p podvm-gate --bin podvm-interpose-build
+          mkdir -p target/release
+          cp target/x86_64-unknown-linux-musl/release/podvm-interpose-build target/release/
+          ./target/release/podvm-interpose-build
+          cargo build --release -p podvm
+
+      - name: experiment 468, the routes of the machine tier
+        run: |
+          rc=0
+          sudo env PODVM_468_USER="$USER" PODVM_468_WORK=/var/tmp/podvm-468-ci \
+            ROUTES="machine machine-save machine-load" \
+            timeout 60m sh experiments/468-init-bench.sh || rc=$?
+          if pgrep -a qemu-system; then
+            echo "an emulator stayed after the run"
+            sudo pkill -9 qemu-system || true
+            rc=1
+          fi
+          exit "$rc"
+
+      - name: experiment 469, the starts of the emulator of the runner under TCG
+        if: always()
+        run: |
+          k=$(sudo sh -c 'ls /var/tmp/podvm-468-ci/store/machine/vmlinuz-* 2>/dev/null | head -1')
+          i=$(sudo sh -c 'ls /var/tmp/podvm-468-ci/store/machine/base-*.cpio 2>/dev/null | head -1')
+          if [ -z "$k" ] || [ -z "$i" ]; then
+            echo "no guest kernel or initrd from experiment 468: COULD NOT RUN"
+            exit 2
+          fi
+          rc=0
+          sudo env PODVM_469_KERNEL="$k" PODVM_469_INITRD="$i" PODVM_469_N=200 \
+            timeout 40m sh experiments/469-tcg-smp-start.sh || rc=$?
+          if pgrep -a qemu-system; then
+            sudo pkill -9 qemu-system || true
+            rc=1
+          fi
+          exit "$rc"
+
+      - name: keep the transcripts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: init-state
+          path: |
+            experiments/results/init-bench.txt
+            experiments/results/tcg-smp-start.txt
           if-no-files-found: warn
 
   # TODO/probe.md T-1907: under QEMU user mode the open of /dev/kvm and its
