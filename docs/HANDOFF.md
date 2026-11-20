@@ -1,12 +1,11 @@
 # Handoff
 
-The state on 2026-11-20, 01:30 (UTC), at the end of a session. `main` is
-at the commit that changes this file. `0.2.0-beta.36` is the last release.
-After it, `main` carries T-1996, T-1997, T-1999, T-2001 (OP-02, OP-03),
-podcrates `v0.76.0`, and the systemd routes of `--podvm-init=image` (T-2002
-to T-2010). A fresh session with no memory reads this file first, then
-`AGENTS.md`, `TODO/PROGRESS.md` and `docs/decisions.md`. Remove this file
-when each step below is done.
+The state on 2026-11-20, 09:40 (UTC), during a session. `main` is at the
+commit that changes this file. `0.2.0-beta.36` is the last release. After
+it, `main` carries podcrates `v0.79.0` and the work of the sessions of
+2026-11-19 and 2026-11-20 (below). A fresh session with no memory reads
+this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
+`docs/decisions.md`. Remove this file when each step below is done.
 
 ## The rulings of this day
 
@@ -197,29 +196,56 @@ when each step below is done.
   the runsc fetch (#602 to #604; podcrates#242, #243). A housekeeping pass
   fixed the docs and closed #428.
 
+## This session (2026-11-20, from 01:30 UTC)
+
+* CI: a push of this session starts no workflow. Each run is a
+  `[gh action] requested` issue (AGENTS.md, section 9): #607, #610, #614,
+  #615 are closed (gate, `arm.yml`, secrets, issue-sync green on
+  `369f2d6`); #617 (gate, arm, secrets, issue-sync and `kvm.yml` job `init`
+  on `ec55ca9`) is open.
+* podcrates `v0.78.1` (COORD-210, #606) and `v0.79.0` (COORD-216, #616)
+  taken. `v0.79.0` gave the signals of pod-enter (T-2001 OP-05) and RUNPATH
+  (T-2003, done).
+* podrunner: #325 (T-2011, COORD-212 #609: the Entrypoint `/sbin/init` of
+  the snapshot ran as a prefix of the command), #326 (T-2012, COORD-214
+  #612: `exec` into a namespace-rung container joins its namespaces),
+  ask 3 of #300 (T-1972 done, #585 amended), ask 6 of #296 (T-1969 done,
+  #583 amended), #605 amended (T-2008, T-2010).
+* Done: T-1969, T-1972, T-1984, T-1985, T-2001, T-2003, T-2011, T-2012,
+  T-2013. Partial: T-2008 (the saved guest state: first output 1.5 s
+  against 19 s under TCG; call C27, owner question Q10), T-2010, T-2002
+  (the groups of `--user`). New open: T-2014, T-2015, T-2016 (QEMU 8.2
+  SIGSEGV with four vCPUs under TCG).
+* To podcrates: COORD-213 (#611, one beneath-open: `pod-beneath` is on
+  podcrates' `main`), COORD-215 (#613, the loader rule and a write table:
+  on podcrates' `main`), COORD-217 (#618, a warm save with no UEFI `Plan`;
+  a pinned QEMU 10.0.4).
+* `podvm man` has an ENVIRONMENT section from one table
+  (`crates/podvm/src/environ.rs`); a test fails on a `PODVM_*` name with
+  no row.
+
 ## Next steps, in order
 
 1. Start the session (`AGENTS.md`, section 8), with the watcher.
-2. Take podcrates `v0.78.1` (PodUtils/podcrates#241, COORD-146; it holds
-   `v0.77.0`, #240, COORD-145): the pins, `issue-sync.yml` at the tag
-   commit, the arm `Member` of `pod_extract::safety::Refusal` (a break of
-   `v0.77.0`), the schema change of `broker-policy`. Then one COORD issue
-   `(to podcrates)` that names both tags.
-3. podrunner first: watch #593, #596, #599 and #605. Amend COORD-209
-   (#605): a run of `--podvm-init=image` with only read-only volumes ends
-   its init with SIGKILL (T-2010); `PODVM_RUNSC_ARGS` exists.
-4. The next beta: it carries T-1996, T-1997, T-1999, T-2001 and T-2002 to
-   T-2010. Its gate needs a new outside pass (`docs/maintenance.md`).
-5. The systemd routes (the parity table of the owner, PodUtils/podrunner#316):
-   T-2008 (a saved guest state: 16.3 s to about 2 s to first output on the
-   TCG route), the T-2010 remainders (runsc boot times, TCG
-   `mitigations=off` and `tb-size`), then T-2002 and T-2007 remainders
-   (`run -d`, `exec`, pty, groups). T-2003, T-2005 and T-2009 wait for
-   podcrates@T-976, podcrates@T-975 and podcrates@T-977.
-6. [The hard problems](history/hard-problems-2026-11-20.md) is the brief of the hard and
-   blocked problems for outside research; read its ranked top ten.
-7. T-2001 OP-01 and the P3 findings, T-1972, T-1969, T-1968, T-1984,
-   T-1985, then the work order of `TODO/PROGRESS.md`.
+2. Read #617: close it with the run ids, or work a red run first.
+3. podrunner first: watch #583, #585, #592, #593, #596, #599, #605, #609
+   and #612.
+4. Take the next tag of podcrates: `pod-beneath` (#611: three copies of
+   podvm go; its README names each take), `pod_confine::loader`,
+   `Spec::table`, `Names::write_table` (a new field of `NAMES`:
+   `write_table: "PODVM_WRITE_HOST"`), `check_exec_argv` and
+   `check_exec_guest` (#613: podvm's `ldso.rs` and `check_first` go).
+5. The next beta: it carries each item above and the work of 2026-11-19
+   (T-1996 to T-2010). Its gate needs a new outside pass
+   (`docs/maintenance.md`, "Releases"), `workloads.yml` and the nightly
+   trial.
+6. T-2016 (one more boot where the emulator ends on a signal before its
+   ready marker), the T-2008 remainders (KVM: #617's job `init`; the runs
+   that boot as before; `rmi` and `prune` of a state), T-2002 and T-2007
+   (`run -d`, `exec`, the pty), T-2014, T-2015.
+7. [The hard problems](history/hard-problems-2026-11-20.md): the ranked
+   top ten. Then T-1964 (a pool with a quota), T-1968, and the work order
+   of `TODO/PROGRESS.md`.
 
 ## Rules learned
 
@@ -252,3 +278,13 @@ when each step below is done.
   `#[cfg(target_arch = "x86_64")]`: the nightly builds each arch.
 * An issue body that the sync tool rewrote has lost its footer: an amend
   puts it back before the block `pod-todo:state`.
+* A subagent in a worktree under `.claude/worktrees/` cannot run cargo
+  of `crates/podvm-interpose` there: cargo finds `/workspace/podvm/Cargo.toml`
+  above it ("believes it's in a workspace"). Build the interposer in the
+  main checkout, or from a copy.
+* A new module of `podvm-dispatch` carries `#[cfg(target_arch =
+  "x86_64")]`, as each module that it uses: `arm.yml` 44699859975 failed
+  on it. Check with `cargo check --target aarch64-unknown-linux-musl
+  --workspace` before a push.
+* A thread of a foreground run blocks `pod_enter::WAIT_FORWARDED`: a
+  thread that leaves a signal unblocked takes it with the default action.
