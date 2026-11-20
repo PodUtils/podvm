@@ -101,6 +101,21 @@ fn main() {
             texts.retain(|t| t.parent() == Some(ws.as_path()));
             source = ws;
         }
+        // A package of the registry that ships no text of its own
+        // (asn1-rs-impl 0.2.0): the texts of its upstream repository, kept
+        // in `vendor/licence-texts/NAME-VERSION` with their source
+        // (THIRD_PARTY.md, "Licence texts kept for a package").
+        if texts.is_empty() {
+            let kept = root
+                .join("vendor/licence-texts")
+                .join(format!("{name}-{version}"));
+            if kept.is_dir() {
+                if let Err(e) = gather_texts(&kept, &mut texts) {
+                    fail(e);
+                }
+                source = kept;
+            }
+        }
         if texts.is_empty() {
             fail(format!("no retained licence text: {name} {version}"));
         }

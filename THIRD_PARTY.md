@@ -43,6 +43,12 @@ Private path substitutions in a published result must be stated explicitly.
 Do not describe retained source as the active userland loader.
 The native loader is in `src/userland.rs` of `pod-enter` (PodUtils/podcrates).
 
+## Licence texts kept for a package
+
+[vendor/licence-texts](vendor/licence-texts/README.md) holds the upstream
+licence texts of a package of crates.io that ships none of its own
+(`asn1-rs-impl` 0.2.0), with the source of each.
+
 ## Fetched at run time
 
 podvm does not carry these files. A host with no QEMU fetches them on the
