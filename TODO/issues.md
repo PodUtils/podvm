@@ -321,7 +321,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #425 | COORD-141: the answer to PodUtils/podnet#584: what podvm's help and manual need (to podnet) (to podcrates) | closed (PodUtils/podnet#584 closed) | T-1917 |
 | #426 | [gh action] requested | closed (run 43735766607 failed) | the release of 0.2.0-beta.24 from b6f8958e (call C22); the trial failed on the cross targets |
 | #427 | COORD-142: the answer to PodUtils/podcrates#182: podvm has no installer yet (to podcrates) | open | T-1918 |
-| #428 | COORD-143: the answer to PodUtils/podcrates#183: how podvm maps an issue to its entries (to podcrates) | open | T-1919 |
+| #428 | COORD-143: the answer to PodUtils/podcrates#183: how podvm maps an issue to its entries (to podcrates) | closed (PodUtils/podcrates#183 closed 2026-11-18; T-1919 done) | T-1919 |
 | #429 | [gh action] requested | closed (run 43739088606) | the release of 0.2.0-beta.24 from 95d1f3eb (call C22) |
 | #430 | COORD-144: the answer to PodUtils/podrunner#182: podvm lab run is in v0.2.0-beta.24 (to podrunner) | closed (PodUtils/podrunner#182 closed: the answer holds, COORD-173) | T-1916 |
 | #431 | [gh action] requested | closed (a wrong hash; replaced by #432) | the kvm.yml run for T-1747, T-1907 and T-1867 |

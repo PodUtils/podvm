@@ -317,7 +317,7 @@
 425 issue closed
 426 issue closed
 427 issue open
-428 issue open
+428 issue closed
 429 issue closed
 430 issue closed
 431 issue closed
