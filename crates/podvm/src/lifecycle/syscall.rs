@@ -180,3 +180,12 @@ fn the_cap_comes_from_the_record_of_the_tier() {
     assert_eq!(cap_of(&v(&["PODVM_DISPATCH_TIERX=1"])), None);
     assert_eq!(cap_of(&v(&["A=1"])), None);
 }
+
+/// TODO/cli.md T-2001 OP-07: the help of `run` states the default cap of
+/// `/tmp` that the tier applies, from the same constant.
+#[cfg(test)]
+#[test]
+fn the_help_states_the_default_cap_of_tmp() {
+    let text = format!("/tmp of {} MiB", TMP_CAP >> 20);
+    assert!(crate::run::RUN_OPTIONS.contains(&text), "{text}");
+}

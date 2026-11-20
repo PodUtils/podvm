@@ -165,6 +165,13 @@ usage: podvm inspect [--format T] [--podvm-tier incus] <image> [image...]
     (TODO/enter.md T-0505), and a caller reads it rather than assuming
     docker's namespace entry.
 
+  A container: .Id .Name .Image .State .Status .Pid .ExitCode .Created
+    .StartedAt .FinishedAt .Rung .Tier .Labels .Command, and docker's
+    .State.Status .State.Running .State.ExitCode .State.Pid
+    .State.StartedAt .State.FinishedAt. .State alone is the word (created,
+    running, exited, dead); the JSON gives State as docker's object, with
+    null for an exit code that does not exist yet.
+
   Without --format, one JSON array, as docker prints.
 ";
 

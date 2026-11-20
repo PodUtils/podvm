@@ -351,6 +351,31 @@ pub(super) fn container_fields(
         ("Name", c.name.clone()),
         ("Image", c.image.clone()),
         ("State", c.state.word().to_string()),
+        // TODO/cli.md T-2001 OP-06: docker's `.State.*` names. `.State`
+        // alone stays the word; the JSON nests these as docker does.
+        ("State.Status", c.state.word().to_string()),
+        (
+            "State.Running",
+            matches!(c.state, State::Running).to_string(),
+        ),
+        (
+            "State.ExitCode",
+            c.exit_code
+                .map(|p| p.to_string())
+                .unwrap_or_else(|| "-".into()),
+        ),
+        (
+            "State.Pid",
+            c.pid.map(|p| p.to_string()).unwrap_or_else(|| "0".into()),
+        ),
+        (
+            "State.StartedAt",
+            c.started_at.clone().unwrap_or_else(|| "-".into()),
+        ),
+        (
+            "State.FinishedAt",
+            c.finished_at.clone().unwrap_or_else(|| "-".into()),
+        ),
         ("Status", c.status()),
         (
             "Pid",

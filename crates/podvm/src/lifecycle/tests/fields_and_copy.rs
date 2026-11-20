@@ -39,10 +39,27 @@ fn the_declared_container_fields_are_the_built_ones() {
     assert_eq!(built, CONTAINER_INSPECT_FIELDS);
     // ⛔ And a container with no exit code renders a dash, never a zero.
     let f = container_fields(&s, &c);
+    for k in ["ExitCode", "State.ExitCode"] {
+        assert_eq!(f.iter().find(|(n, _)| *n == k).unwrap().1, "-", "{k}");
+    }
+    // TODO/cli.md T-2001 OP-06: docker's `.State.*` render, and the JSON
+    // gives `State` as docker's object with a null code, not a zero.
     assert_eq!(
-        f.iter().find(|(k, _)| *k == "ExitCode").unwrap().1,
-        "-".to_string()
+        crate::format::render("{{.State}} {{.State.Status}} {{.State.Running}}", &f).unwrap(),
+        "created created false"
     );
+    let doc: serde_json::Value = serde_json::from_str(&container_json(&s, &c)).unwrap();
+    let st = &doc[0]["State"];
+    assert_eq!(st["Status"], "created");
+    assert_eq!(st["Running"], false);
+    assert!(st["ExitCode"].is_null());
+    let ended = Container {
+        state: State::Exited,
+        exit_code: Some(3),
+        ..c
+    };
+    let doc: serde_json::Value = serde_json::from_str(&container_json(&s, &ended)).unwrap();
+    assert_eq!(doc[0]["State"]["ExitCode"], 3);
     let _ = std::fs::remove_dir_all(&d);
 }
 

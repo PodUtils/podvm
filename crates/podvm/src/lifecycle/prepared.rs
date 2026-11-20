@@ -6,6 +6,11 @@ pub(super) fn container_json(s: &podvm_image::Store, c: &Container) -> String {
     let fields = container_fields(s, c);
     let mut o = serde_json::Map::new();
     for (k, v) in &fields {
+        // TODO/cli.md T-2001 OP-06: `State` is docker's object, with typed
+        // values; `--format '{{.State}}'` stays the word.
+        if *k == "State" || k.starts_with("State.") {
+            continue;
+        }
         // ⚠ The nested pair is nested here too, so a caller reading the
         // document and one reading `--format` do not find two shapes.
         if let Some((group, rest)) = k
@@ -23,7 +28,22 @@ pub(super) fn container_json(s: &podvm_image::Store, c: &Container) -> String {
         }
         o.insert(k.to_string(), serde_json::Value::String(v.clone()));
     }
+    o.insert("State".to_string(), state_json(c));
     serde_json::Value::Array(vec![serde_json::Value::Object(o)]).to_string()
+}
+
+/// docker's `State` of a container: a null where podvm has no value (no
+/// exit code, no start), never a zero for an unknown code.
+pub(super) fn state_json(c: &Container) -> serde_json::Value {
+    serde_json::json!({
+        "Status": c.state.word(),
+        "Running": matches!(c.state, State::Running),
+        "Dead": matches!(c.state, State::Dead),
+        "ExitCode": c.exit_code,
+        "Pid": c.pid.unwrap_or(0),
+        "StartedAt": c.started_at,
+        "FinishedAt": c.finished_at,
+    })
 }
 
 /// The image `run -d` and `create` need, and everything derived from it.

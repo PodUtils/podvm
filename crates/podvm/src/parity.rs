@@ -374,7 +374,7 @@ pub const TABLE: &[Row] = &[
     Row { verb: "rmi", flag: Some("-f, --force"), status: Stub, note: "accepted for parity. podvm never prompts, so there is no confirmation to suppress, and it refuses a held image whether or not this is given" },
     Row { verb: "rmi", flag: Some("-h, --help"), status: Native, note: "prints this verb's usage and exits 0" },
     Row { verb: "inspect", flag: Some("-f, --format"), status: Native, note: "the same template shape as `images --format`" },
-    Row { verb: "inspect", flag: Some("--podvm-tier"), status: Native, note: "podvm's own: incus inspects an instance of podvm in incus: JSON, or --format with .Id .Name .Image .State .Status .Running .ExitCode .Created .Cmd .EnteredRung; with no flag, tier = incus in $store/config routes a name that is an instance of podvm in incus (TODO/machine.md T-1722)" },
+    Row { verb: "inspect", flag: Some("--podvm-tier"), status: Native, note: "podvm's own: incus inspects an instance of podvm in incus: JSON, or --format with .Id .Name .Image .State .State.Status .State.Running .State.ExitCode .Status .Running .ExitCode .Created .Cmd .EnteredRung; with no flag, tier = incus in $store/config routes a name that is an instance of podvm in incus (TODO/machine.md T-1722)" },
     Row { verb: "inspect", flag: Some("-h, --help"), status: Native, note: "prints this verb's usage and exits 0" },
     Row { verb: "verify", flag: Some("-h, --help"), status: Native, note: "prints this verb's usage and exits 0" },
     Row { verb: "extract", flag: Some("--force"), status: Native, note: "extract again over an existing rootfs" },
