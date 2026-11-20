@@ -171,10 +171,69 @@ podrunner, the start of a `proxy` device failed with "Failed to safely
 open namespace file descriptor based on pidfd" (PodUtils/podrunner#90).
 Clause 15 of experiment 434 holds the tier.
 
+## The init of the image (T-1993)
+
+`run -d --podvm-tier=incus --podvm-init=image IMAGE CMD` (also `create`)
+starts the instance with no `lxc.init.cmd`, so `/sbin/init` of the image
+(systemd) is PID 1 of the instance. A foreground run takes another route
+(call C26 of [the decisions](decisions.md)); the flag with the incus tier
+and no `-d` is a flag error, exit 125. The code is
+`crates/podvm/src/incus/systemd.rs`. A run does this:
+
+1. podvm asks `systemctl is-system-running --wait` by the exec API each
+   second, for 180 s at most, until it gives `running` or `degraded`. An
+   answer before PID 1 opens its bus ("Failed to connect to bus") is
+   not a state: podvm asks again. Where the bound ends, the run ends with exit 125, and the
+   error names PID 1 and the state.
+2. podvm runs `guest-hold --run --detach` by the exec API, with the
+   command, the user and the environment of the run. The command is not
+   PID 1; the init of the image is.
+3. When the command ends, `guest-hold` sends SIGRTMIN+4 to PID 1, and the
+   instance stops. `inspect --format '{{.ExitCode}}'` gives the exit code of
+   the command.
+
+The unified tarball reads each file with the owner's bits and keeps the
+mode of the image, so an image with files of mode 0000 (`ubi-init`) imports
+(`incus/image.rs`). Experiment 434, clause 19, runs `ubi9/ubi-init` and
+starts `systemd-tmpfiles-clean.service` in it
+([its run](../experiments/results/incus-tier.txt)).
+
+## The hosted snapshot (T-1996, T-1997, T-1999)
+
+An image of a hosted runner is large and holds users, `fuse-overlayfs` and
+files with capabilities. Three changes serve it on the incus tier.
+
+* **Ids and devices (T-1996).** With `--podvm-init=image` the instance takes
+  `security.idmap.isolated=true` and `security.idmap.size=231072`, the
+  device `podvm-fuse` (`/dev/fuse` of the host, type `unix-char`) and an
+  empty `/etc/machine-id` before it starts. Two instances then have two
+  id maps and two machine-ids (clause 20). Where incusd has fewer free
+  ids, its error names the flag and `/etc/subuid`; the user of incusd needs
+  a larger range there. A host with no `/dev/fuse` starts the instance with
+  no device. A rootless `podman run` and a `fuse-overlayfs` mount of a user
+  with the range `165536:65536` are not measured: `ubi-init` does not carry
+  them (T-1996 keeps the rest).
+* **No third copy (T-1997).** `incus::run::ensure_image` writes the
+  unified tarball into a pipe, and the import of incusd reads the pipe in
+  chunks: no tarball file lies in the store. Clause 21 measures a tree of
+  850,228,783 bytes (`golang:1.24-bookworm`): the first run grows the disk
+  use of the store and of incusd by 2.38 times the tree, and no file stays
+  in `store/incus`. A tarball file would add the tree once more (about 3.4
+  times).
+* **Capabilities (T-1999).** The tarball carries the extended attributes of
+  the image as PAX records (`incus/xattrs.rs`): `security.capability` and
+  `user.*` of the tree, and each attribute of the sidecar that
+  `pod-extract` writes (podcrates `v0.76.0`). A v3 capability of the tree
+  goes as v2, so that the kernel of the instance sets its own root id.
+  Clause 22 checks `cap_net_raw+ep` on a file of an alpine layer in the
+  root of the instance. The root of the machine tier is not proven (T-1999
+  keeps it for `kvm.yml`).
+
 ## What stays open
 
 * incus virtual machines and their speed: they need `/dev/kvm`; the runner
   of `kvm.yml` (T-1682) has it.
+* An OCI image with a kernel as an incus virtual machine (T-1998).
 * The network of an instance under route A.
 * A static `incusd`.
 * A push of podvm that each instance does not repeat (a shared file, or a

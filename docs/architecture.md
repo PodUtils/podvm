@@ -111,7 +111,12 @@ gVisor sandbox (`crates/podvm/src/runsc/init.rs`, T-2007): the bundle
 starts `guest-init --pid1`, which gives the files their owners and
 becomes the init, and the command runs by `runsc exec`. `initns::route`
 takes the namespace rung, then the runsc tier, then the machine tier
-(call C26). [The limits](limits.md#the-init-of-an-image)
+(call C26). On the incus tier, `run -d` and `create` with the flag leave
+`lxc.init.cmd` out, so that `/sbin/init` of the image is PID 1 of the
+instance; podvm waits for `systemctl is-system-running` and runs the
+command by the exec API (`crates/podvm/src/incus/systemd.rs`, T-1993). The
+userland rung has no route of its own yet: T-2005 waits for a UML kernel
+from podcrates. [The limits](limits.md#the-init-of-an-image)
 state what each place gives.
 
 Three commands boot a guest now:

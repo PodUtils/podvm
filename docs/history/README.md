@@ -6,6 +6,7 @@ files explain earlier states; they do not override `README.md`, `AGENTS.md`, or
 
 | Record | Contents |
 | --- | --- |
+| [The hard and blocked problems (2026-11-20)](hard-problems-2026-11-20.md) | A standalone brief of the hard, blocked and "impossible" problems for outside research, with a ranked top ten |
 | [Repository audit review](reviews/2026-09-30-repository-audit.md) | Source paths, failure tests, and cold-start evidence |
 | [Earlier changelog](CHANGELOG.md-before-2026-09-30.txt) | Version and task change records before reconciliation |
 | [Earlier experiment guide](experiments-README.md-before-2026-09-30.txt) | Superseded script catalogue and host claims |

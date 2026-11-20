@@ -1,12 +1,12 @@
 # Handoff
 
-The state on 2026-11-19, 10:15 (UTC). `main` is at the commit that
-changes this file. `0.2.0-beta.36` is the last release (release run
-44466195422 on `94045a3`; the gate 44461846375, `workloads.yml`
-44457544162, `arm.yml` 44461850154, the nightly trial 44461846698, the
-uid-1000 tests and the fifth outside pass passed first). A fresh session
-with no memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md`
-and `docs/decisions.md`. Remove this file when each step below is done.
+The state on 2026-11-20, 01:30 (UTC), at the end of a session. `main` is
+at the commit that changes this file. `0.2.0-beta.36` is the last release.
+After it, `main` carries T-1996, T-1997, T-1999, T-2001 (OP-02, OP-03),
+podcrates `v0.76.0`, and the systemd routes of `--podvm-init=image` (T-2002
+to T-2010). A fresh session with no memory reads this file first, then
+`AGENTS.md`, `TODO/PROGRESS.md` and `docs/decisions.md`. Remove this file
+when each step below is done.
 
 ## The rulings of this day
 
@@ -188,28 +188,38 @@ and `docs/decisions.md`. Remove this file when each step below is done.
   `PODVM_RUNSC_ARGS`. T-2008 is measured by hand: a saved guest runs again
   2 s after the start of QEMU under TCG, against 16 s for a boot; its
   design is in the entry, and no code is written.
+* The session of 2026-11-19 and 20: T-1993 to T-1999 for the hosted
+  snapshot (#599), T-1995 (Go on the userland rung; podrunner closed #315),
+  T-2000 (the memo of apt), T-2001 (OP-02, OP-03), beta.36 released. Two
+  agent rounds on the owner's systemd table: T-2002 to T-2010 (the
+  namespace rung with a delegated cgroup: 5.3 s; runsc: 7.4 s; TCG: 28.8 s;
+  UML seccomp measured 14.7 s). podcrates took the UML kernel, RUNPATH and
+  the runsc fetch (#602 to #604; podcrates#242, #243). A housekeeping pass
+  fixed the docs and closed #428.
 
 ## Next steps, in order
 
-1. Start the session (`AGENTS.md`, section 8), with the watcher (filter
-   its output to the event lines: a network retry prints a traceback).
-2. podrunner first: watch #593 (T-1990 measured with beta.36; the hang of
-   T-1991, which T-1995 may have fixed), #596, #598 and #599. Then the
-   hosted snapshot in the order of #599: T-1997 is done (clause 21:
-   the import grows the disk by 2.38 times the tree); T-1999 is partial
-   (podcrates `v0.76.0`; clause 22: a file capability reaches the root of
-   an incus instance; the machine tier remains); then the steps of T-1994
-   and T-1998 on `kvm.yml`. T-1996 waits for podrunner's measure of
-   rootless podman. #598 is closed (podrunner closed #315 on beta.36).
-   The next beta carries T-1996, T-1997, T-1999 and T-2001 (OP-02, OP-03).
-3. T-2001 (the findings of the fifth outside pass; OP-02, a `-v` of one
-   file, and OP-03, `npm` on the syscall tier, are fixed): the rung of
-   `PODVM_USERNS=0` with no volume (OP-01), then the P3 findings.
-4. T-1972 remainder, T-1969 remainder, T-1968; T-1984 and T-1985 (P2).
-5. When podcrates answers COORD-188 (#584): set the controlling terminal
-   for `-t` and remove `run::pty::send`.
-6. T-1989, T-1980, T-1974 remainders, T-1970 remainder, T-1935, T-1955
-   remainder, then the work order of `TODO/PROGRESS.md`.
+1. Start the session (`AGENTS.md`, section 8), with the watcher.
+2. Take podcrates `v0.78.1` (PodUtils/podcrates#241, COORD-146; it holds
+   `v0.77.0`, #240, COORD-145): the pins, `issue-sync.yml` at the tag
+   commit, the arm `Member` of `pod_extract::safety::Refusal` (a break of
+   `v0.77.0`), the schema change of `broker-policy`. Then one COORD issue
+   `(to podcrates)` that names both tags.
+3. podrunner first: watch #593, #596, #599 and #605. Amend COORD-209
+   (#605): a run of `--podvm-init=image` with only read-only volumes ends
+   its init with SIGKILL (T-2010); `PODVM_RUNSC_ARGS` exists.
+4. The next beta: it carries T-1996, T-1997, T-1999, T-2001 and T-2002 to
+   T-2010. Its gate needs a new outside pass (`docs/maintenance.md`).
+5. The systemd routes (the parity table of the owner, PodUtils/podrunner#316):
+   T-2008 (a saved guest state: 16.3 s to about 2 s to first output on the
+   TCG route), the T-2010 remainders (runsc boot times, TCG
+   `mitigations=off` and `tb-size`), then T-2002 and T-2007 remainders
+   (`run -d`, `exec`, pty, groups). T-2003, T-2005 and T-2009 wait for
+   podcrates@T-976, podcrates@T-975 and podcrates@T-977.
+6. [The hard problems](history/hard-problems-2026-11-20.md) is the brief of the hard and
+   blocked problems for outside research; read its ranked top ten.
+7. T-2001 OP-01 and the P3 findings, T-1972, T-1969, T-1968, T-1984,
+   T-1985, then the work order of `TODO/PROGRESS.md`.
 
 ## Rules learned
 
