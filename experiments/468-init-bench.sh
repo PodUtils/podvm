@@ -37,9 +37,12 @@
 #             of the user and of its subordinate ids, read each 0.5 s
 #
 # The transcript is appended to, so that a baseline and a tuned run stand
-# in one file.
+# in one file. Exit 0: each row has its line of the bench and no process
+# stays; 1: a row has no line (its run failed or hung), or a process stays;
+# 2: the experiment could not run.
 
 set -u
+norow=""
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 BIN="${PODVM_468_BIN:-$ROOT/target/x86_64-unknown-linux-musl/release/podvm}"
 OUT="$ROOT/experiments/results/init-bench.txt"
@@ -178,6 +181,10 @@ one() { # the route, then the prefix of the command
 	rm -f "$WORK/stop"
 	first=$(cat "$WORK/first" 2>/dev/null || echo "$start")
 	b=$(grep '^BENCH' "$WORK/out" | sed 's/^BENCH //')
+	# A row with no line of the bench is a run that failed or hung: the
+	# experiment fails (TODO/machine.md T-2048: the rows mach-sav and
+	# mach-lod of kvm.yml run 44786700578 hung 900 s, and the step passed).
+	[ -n "$b" ] || norow="$norow $LABEL/$route"
 	say "$(printf '%-22s %-8s run=%5.1fs first=%5.1fs mem=%5sMiB %s' "$LABEL" "$route" \
 		"$(echo "$start $end" | awk '{print ($2-$1)/1e9}')" "$(echo "$start $first" | awk '{print ($2-$1)/1e9}')" \
 		"$(cat "$WORK/mem")" "${b:-NO BENCH LINE: $(tail -1 "$WORK/err" | cut -c1-120)}")"
@@ -229,4 +236,6 @@ sleep 2
 left=$(ps -u "$WHO" -o pid=,stat=,args= 2>/dev/null | grep -E 'qemu-system|runsc|systemd|guest-init' |
 	grep -v -e ' Z' -e 'systemd --user' -e 'dbus-daemon --session' || true)
 [ -z "$left" ] || say "A PROCESS STAYS: $left"
+[ -z "$norow" ] || say "ROWS WITH NO LINE OF THE BENCH:$norow"
+[ -z "$norow" ] && [ -z "$left" ] || exit 1
 exit 0
