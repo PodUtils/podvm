@@ -54,6 +54,66 @@ fn a_missing_workdir_is_made_and_never_through_a_link() {
     let _ = std::fs::remove_dir_all(&base);
 }
 
+/// TODO/cli.md T-2001: the mount point of each volume is made in the tree
+/// of the run, never through a link of the image, and a part that is
+/// there stays as it is.
+#[test]
+fn the_mount_point_of_a_volume_is_made_in_the_tree() {
+    let base = std::env::temp_dir().join(format!("podvm-mp-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&base);
+    let root = base.join("rootfs");
+    std::fs::create_dir_all(root.join("etc")).unwrap();
+    std::fs::create_dir_all(base.join("outside")).unwrap();
+    std::fs::write(base.join("host.conf"), "x").unwrap();
+    std::fs::write(root.join("etc/kept"), "image").unwrap();
+    std::os::unix::fs::symlink(base.join("outside"), root.join("out")).unwrap();
+    let dir = base.join("outside").to_string_lossy().into_owned();
+    let file = base.join("host.conf").to_string_lossy().into_owned();
+    let vol = |g: &str, h: &str| podvm_enter::userland::Volume {
+        guest: g.into(),
+        host: h.into(),
+    };
+    let vols = [
+        vol("/data", &dir),
+        vol("/deep/a/b", &dir),
+        vol("/etc/app.conf", &file),
+        vol("/etc/kept", &file),
+        vol("/out/x", &dir),
+        vol("/a/../b", &dir),
+        vol("/dev/fuse", &dir),
+        vol("/proc/x", &dir),
+    ];
+    crate::lifecycle::volume::make_mount_points(root.to_str().unwrap(), &vols);
+    // (guest path, a directory, a file) after the call.
+    for (path, dir, file) in [
+        ("data", true, false),
+        ("deep/a/b", true, false),
+        ("etc/app.conf", false, true),
+        ("etc/kept", false, true),
+        ("a", false, false),
+        ("b", false, false),
+        ("dev", false, false),
+        ("proc", false, false),
+    ] {
+        let m = std::fs::symlink_metadata(root.join(path));
+        assert_eq!(m.as_ref().is_ok_and(|m| m.is_dir()), dir, "{path}");
+        assert_eq!(m.as_ref().is_ok_and(|m| m.is_file()), file, "{path}");
+    }
+    assert_eq!(
+        std::fs::read_to_string(root.join("etc/kept")).unwrap(),
+        "image"
+    );
+    assert_eq!(
+        std::fs::metadata(root.join("etc/app.conf")).unwrap().len(),
+        0
+    );
+    assert!(
+        !base.join("outside/x").exists(),
+        "a link of the image is not followed"
+    );
+    let _ = std::fs::remove_dir_all(&base);
+}
+
 /// TODO/image.md T-1774. A shim file in place of a device of the rootfs,
 /// or no node at all, maps to the host's device; a volume of the caller at
 /// the path keeps the path.

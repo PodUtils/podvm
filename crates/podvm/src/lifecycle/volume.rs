@@ -173,6 +173,49 @@ pub fn make_workdir(rootfs: &str, workdir: &str, volumes: &[Volume]) {
     }
 }
 
+/// TODO/cli.md T-2001 (P3 of the fifth outside pass): the mount point of
+/// each volume in the run's own tree, as docker makes it in the layer of a
+/// container, so that a listing of its parent names the volume where the
+/// image lacks the path. A directory, or an empty file for a volume of one
+/// file. The walk never follows a link of the image and stops at the first
+/// part that is not a directory; `/dev`, `/proc` and `/sys` stay the
+/// completion's. Best effort: a part that fails leaves the table to serve
+/// the path, as before.
+pub fn make_mount_points(rootfs: &str, volumes: &[Volume]) {
+    for v in volumes {
+        let parts: Vec<&str> = v.guest.split('/').filter(|p| !p.is_empty()).collect();
+        if is_device_pair(v)
+            || !v.guest.starts_with('/')
+            || parts.is_empty()
+            || parts.iter().any(|p| *p == "." || *p == "..")
+            || matches!(parts[0], "dev" | "proc" | "sys")
+        {
+            continue;
+        }
+        let file = std::fs::metadata(&v.host).is_ok_and(|m| !m.is_dir());
+        let mut at = std::path::PathBuf::from(rootfs);
+        for (i, part) in parts.iter().enumerate() {
+            at.push(part);
+            let last = i + 1 == parts.len();
+            match std::fs::symlink_metadata(&at) {
+                Ok(m) if m.file_type().is_dir() && !last => continue,
+                Ok(_) => break,
+                Err(_) if last && file => {
+                    let _ = std::fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .open(&at);
+                }
+                Err(_) => {
+                    if std::fs::create_dir(&at).is_err() {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// One refusal line at 125, naming the first volume.
 fn refuse(verb: &str, volumes: &[Volume], why: &str) -> Result<(), i32> {
     if let Some(v) = volumes.first() {

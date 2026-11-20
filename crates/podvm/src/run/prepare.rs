@@ -348,6 +348,7 @@ pub(crate) fn prepare(
     super::user_ns::push(verb, &o, &cfg.config.user, &rootfs, ul, &findings, &mut env)?;
     // T-1412, T-1772: make a missing workdir as docker; refuse a bad one at 125.
     crate::lifecycle::volume::make_workdir(&rootfs, &working_dir, &o.volumes);
+    crate::lifecycle::volume::make_mount_points(&rootfs, &o.volumes); // T-2001
     if let Err(e) = podvm_enter::check_workdir(&maps, &working_dir, &image) {
         eprintln!("podvm {verb}: {e}");
         return Err(e.exit_code());
