@@ -377,7 +377,7 @@ jobs:
     if: always() && (inputs.only == '' || inputs.only == 'init')
     name: the saved state of an init guest under KVM (experiments 468 and 469)
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -421,7 +421,19 @@ jobs:
           ./target/release/podvm-interpose-build
           cargo build --release -p podvm
 
+      - name: experiment 465, the routes of an init (run -d, exec, the pty; clauses 10 to 12)
+        run: |
+          rc=0
+          timeout 45m sh experiments/465-init-image.sh || rc=$?
+          if pgrep -a qemu-system; then
+            echo "an emulator stayed after the run"
+            sudo pkill -9 qemu-system || true
+            rc=1
+          fi
+          exit "$rc"
+
       - name: experiment 468, the routes of the machine tier
+        if: always()
         run: |
           rc=0
           sudo env PODVM_468_USER="$USER" PODVM_468_WORK=/var/tmp/podvm-468-ci \
@@ -458,6 +470,7 @@ jobs:
         with:
           name: init-state
           path: |
+            experiments/results/init-image.txt
             experiments/results/init-bench.txt
             experiments/results/tcg-smp-start.txt
           if-no-files-found: warn
