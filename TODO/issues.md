@@ -520,6 +520,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #624 | COORD-218: pod-supervise's end_tree waits on one pidfd at a time; a tree with the init of a PID namespace waits the whole TREE_KILL_MS (to podcrates) | open | T-2018 |
 | #625 | [gh action] requested | closed (on 55a3dce: gate 44749181258, arm 44749187795, secrets, issue-sync passed; kvm 44749207855 init failed: the save under KVM, fixed in aae49a5, and experiment 465 on a host with a user manager, fixed in 9cec096) | the gate, arm, secrets, issue-sync and kvm.yml init runs of 289b9d1 (T-2002, T-2008, T-2017) |
 | #626 | [gh action] requested | open | the gate, arm and kvm.yml init runs of 9cec096 (T-2008, T-2040) |
+| #627 | [gh action] requested | open | the beta gate of c20f245, the release commit of 0.2.0-beta.37: gate, workloads, the nightly trial, arm and kvm.yml init (T-1949) |
 
 ## Messages whose title does not start with COORD-NNN
 
