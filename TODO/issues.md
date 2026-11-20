@@ -485,7 +485,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #589 | COORD-193: pod-enter: abi interp() refuses a PT_INTERP past the head read; Fedora 42's bash has it at 0xf2000 (to podcrates) | closed (podcrates `v0.72.0` carries it; podvm took it in b3ff9c3) | T-1981 |
 | #590 | COORD-194: the answer to PodUtils/podrunner#304: the tier hides no host process; run -d with --podvm-confine on the tier failed to start (fixed on main) (to podrunner) | open | T-1982 |
 | #591 | COORD-195: podvm took podcrates v0.72.0 in b3ff9c3 (to podcrates) | closed (PodUtils/podcrates#229 lists the take) | T-1981 |
-| #592 | COORD-196: three limits of --podvm-confine that podvm's fourth outside pass found: exec= on the syscall tier, a program through ld.so, chmod and times (to podrunner) | open | T-1983, T-1984, T-1985 |
+| #592 | COORD-196: three limits of --podvm-confine that podvm's fourth outside pass found: exec= on the syscall tier, a program through ld.so, chmod and times (to podrunner) | open | T-1983, T-1984, T-1985, T-2013 |
 | #593 | COORD-197: the answer to PodUtils/podrunner#308: errno 11 is an openat2 that a rename or a mount raced (a retry on main); the cargo doc hang does not reproduce here (to podrunner) | open | T-1990, T-1991 |
 | #594 | COORD-198: podvm took podcrates v0.73.0 in 20313a0 (to podcrates) | closed (PodUtils/podcrates#231 lists the take) | T-1955 |
 | #595 | COORD-199: podvm's entry for the ruling "ghcr.io": T-1992, image.yml in the form of C789 (to podcrates) | closed (T-1992 done: run 44452103325, index sha256:e11a9a70 in the notes of v0.2.0-beta.35) | T-1992 |
@@ -507,6 +507,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #611 | COORD-213: one beneath-open of a volume under a base, with no allocation, for the four copies in podvm and pod-enter (to podcrates) | open | T-1955, T-1972 |
 | #612 | COORD-214: the answer to PodUtils/podrunner#326: exec into a run -d container of the namespace rung joins its namespaces and sees its volumes; fixed on main (T-2012) (to podrunner) | open | T-2012 |
 | #613 | COORD-215: pod-enter's check_exec and the program of a dynamic loader; a write table of pod-confine beside its exec table (to podcrates) | open | T-1955, T-1984, T-1985, T-2013 |
+| #614 | [gh action] requested | open | the gate, arm, secrets and issue-sync runs of cdbcaa6 (T-1984, T-1985, T-2012, T-2013) |
 
 ## Messages whose title does not start with COORD-NNN
 
