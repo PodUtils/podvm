@@ -105,8 +105,8 @@ if [ -n "${HTTPS_PROXY:-}" ]; then
 		[ -f /vol/ca.crt ] && echo 'Acquire::https::CaInfo "/vol/ca.crt";'
 	} >/etc/apt/apt.conf.d/99proxy
 fi
-apt-get update >/dev/null 2>&1
-apt-get install -y --no-install-recommends systemd systemd-sysv dbus mariadb-server postgresql >/dev/null 2>&1
+apt-get update -qq >/dev/null
+apt-get install -y -qq --no-install-recommends systemd systemd-sysv dbus mariadb-server postgresql >/dev/null
 rm -f /etc/apt/apt.conf.d/99proxy
 tar --numeric-owner --one-file-system --exclude='./proc/*' --exclude='./sys/*' --exclude='./dev/*' \
 	--exclude='./tmp/*' --exclude=./vol -cf /vol/rootfs.tar -C / . 2>/dev/null
@@ -114,8 +114,8 @@ EOF
 	chown -R "$WHO" "$WORK"
 	as env PODVM_USERNS_RANGE=1 HTTPS_PROXY="${HTTPS_PROXY:-}" timeout 1200 "$P" run --rm -e HTTPS_PROXY \
 		-v "$WORK/vol:/vol" mirror.gcr.io/library/debian:12 sh /vol/build.sh >/dev/null 2>"$WORK/build.err" &&
-		as timeout 600 "$P" import "$WORK/vol/rootfs.tar" "$IMG" >/dev/null 2>&1 ||
-		{ echo "the image: the build FAILED: COULD NOT RUN" >&2; tail -3 "$WORK/build.err" >&2; exit 2; }
+		as timeout 600 "$P" import "$WORK/vol/rootfs.tar" "$IMG" >/dev/null 2>>"$WORK/build.err" ||
+		{ echo "the image: the build FAILED: COULD NOT RUN" >&2; tail -12 "$WORK/build.err" >&2; exit 2; }
 	rm -f "$WORK/vol/rootfs.tar"
 fi
 chown -R "$WHO" "$WORK/fx" "$WORK/home" "$WORK/podvm" 2>/dev/null

@@ -401,6 +401,11 @@ jobs:
           sudo apt-get -qq update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq qemu-system-x86 uidmap >/dev/null
           qemu-system-x86_64 --version | head -1
+          # The build of experiment 468 maps the subordinate range of the user.
+          for f in /etc/subuid /etc/subgid; do
+            grep -q "^$USER:" "$f" 2>/dev/null || echo "$USER:200000:65536" | sudo tee -a "$f" >/dev/null
+          done
+          grep "^$USER:" /etc/subuid /etc/subgid
 
       - name: bootstrap
         run: ./scripts/common/bootstrap-env.sh rust cc zig tools

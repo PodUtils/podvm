@@ -465,10 +465,25 @@ pub fn boot(r: &Request) -> i32 {
         }
     }
     with_cpus(&mut argv, r.cpus);
-    let code = match drive(r, &qemu, &argv, &nonce, &dir, &sock, None) {
-        state::Driven::Code(code) => code,
-        // Only the guest of a state ends so, and this guest is none.
-        state::Driven::Cold(why) => fail(why),
+    // TODO/machine.md T-2016: one more boot where the emulator crashed
+    // before the command ran.
+    let mut again = true;
+    let code = loop {
+        match drive(r, &qemu, &argv, &nonce, &dir, &sock, None) {
+            state::Driven::Code(code) => break code,
+            state::Driven::Again(why) if again => {
+                again = false;
+                eprintln!(
+                    "podvm {}: machine tier: {why}; podvm boots the guest once more \
+                     (TODO/machine.md T-2016)",
+                    r.verb
+                );
+                let _ = std::fs::remove_file(&sock);
+                let _ = std::fs::remove_file(tty::socket_path(&sock));
+            }
+            // Only the guest of a state ends Cold, and this guest is none.
+            state::Driven::Cold(why) | state::Driven::Again(why) => break fail(why),
+        }
     };
     let _ = std::fs::remove_file(&sock);
     let _ = std::fs::remove_file(tty::socket_path(&sock));
@@ -479,5 +494,7 @@ pub fn boot(r: &Request) -> i32 {
     code
 }
 
+#[cfg(test)]
+mod crash_tests;
 #[cfg(test)]
 mod tests;

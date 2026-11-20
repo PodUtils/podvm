@@ -5820,7 +5820,7 @@ The unit tests `the_entrypoint_of_the_image_is_the_init_with_podvm_init_image` a
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -5842,3 +5842,6 @@ In this order: (1) measure the pinned QEMU 9.2.0 and a QEMU with the fix (10.0.4
 
 `sh experiments/469-tcg-smp-start.sh` with `PODVM_469_N=200` on the cloud host, for the QEMU that podvm takes: 0 starts end early; and a run of `--podvm-init=image` whose emulator ends on a signal before the ready marker gives the exit code of its command.
 
+## Done
+
+Partial (2026-11-20). Step (3) of the Approach: `drive` ends with `Driven::Again` where the emulator ended on SIGABRT, SIGBUS or SIGSEGV with no exit code of the payload, before the guest reached the command and before the bound (`drive::crashed_early`); `guest::boot` then boots the same guest once more, with one line that names the signal, and a second crash ends the run with 125 as before. A SIGKILL (of a person, of the OOM killer, of the bound) gives no more boot. A guest of a saved state takes `Again` as `Cold` (a boot with no state). The unit test `a_crash_of_the_emulator_before_the_command_boots_once_more` holds the table (each crash signal, SIGKILL and SIGTERM, after the command, with a code, at the bound). Steps (1) and (2) wait for podcrates (a pinned QEMU 10.0.4 or later, COORD-217, #618) and for `kvm.yml` job `init` (experiment 469 on the runner's QEMU, 200 starts). Remaining: the Prove (469 with 0 early ends for the QEMU that podvm takes).

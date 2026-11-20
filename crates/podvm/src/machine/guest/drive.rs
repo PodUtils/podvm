@@ -286,6 +286,13 @@ pub(super) fn drive(
         let _ = s.join();
     }
     drop(job_in);
+    // TODO/machine.md T-2016: a crash of the emulator before the command
+    // ran: the caller boots once more, as nothing of the command ran.
+    if let Some(sig) = crashed_early(code.is_some(), ready, timed_out, status) {
+        return Driven::Again(format!(
+            "the emulator ended on signal {sig} before the guest reached the command"
+        ));
+    }
     Driven::Code(match code {
         Some(c) => c,
         // TODO/machine.md T-1809: the contract of `--timeout` of the other
@@ -389,6 +396,25 @@ fn wait_bounded(child: &mut std::process::Child, d: Duration) -> Option<std::pro
         }
         std::thread::sleep(Duration::from_millis(50));
     }
+}
+
+/// TODO/machine.md T-2016: the signal of a crash of the emulator (SIGABRT,
+/// SIGBUS, SIGSEGV) where it ended with no exit code of the payload,
+/// before the guest reached the command and before the bound; `None` for
+/// each other end, a SIGKILL of a person or of the OOM killer included.
+pub(super) fn crashed_early(
+    payload_code: bool,
+    ready: bool,
+    timed_out: bool,
+    status: Option<std::process::ExitStatus>,
+) -> Option<i32> {
+    use std::os::unix::process::ExitStatusExt;
+    if payload_code || ready || timed_out {
+        return None;
+    }
+    status
+        .and_then(|s| s.signal())
+        .filter(|sig| matches!(sig, 6 | 7 | 11))
 }
 
 /// How the emulator ended, and whether the guest reached the command

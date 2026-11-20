@@ -67,6 +67,10 @@ pub enum Driven {
     /// The guest of a state did not reach the command, for this reason:
     /// the caller boots a guest with no state.
     Cold(String),
+    /// TODO/machine.md T-2016: the emulator ended on a signal of a crash
+    /// before the guest reached the command (QEMU 8.2 under TCG with more
+    /// than one vCPU): the caller boots once more.
+    Again(String),
 }
 
 /// What [`run`] gives the boot of a guest.
@@ -349,7 +353,7 @@ pub fn run(r: &Request, c: &Ctx) -> Outcome {
     }
     match driven {
         Driven::Code(code) => Outcome::Done(code),
-        Driven::Cold(why) => {
+        Driven::Cold(why) | Driven::Again(why) => {
             eprintln!(
                 "podvm {}: machine tier: the guest that podvm {} did not reach the command \
                  after {:.1} s ({why}); podvm boots a guest with no state (TODO/machine.md T-2008)",

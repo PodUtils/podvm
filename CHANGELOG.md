@@ -8,6 +8,9 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- On the machine tier, a guest whose emulator crashes (SIGSEGV, SIGBUS,
+  SIGABRT) before the command runs boots once more, with one line that
+  names the signal (T-2016: QEMU 8.2 under TCG with more than one vCPU).
 - A SIGQUIT, SIGUSR1, SIGUSR2, SIGALRM or SIGPWR to a foreground `run` is
   forwarded to the payload, as SIGHUP, SIGINT and SIGTERM were; before, it
   ended podvm and left the payload and a record `Dead` (T-2001, OP-05;
