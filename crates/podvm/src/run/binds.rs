@@ -82,35 +82,40 @@ pub(super) fn push_env(
 }
 
 /// PodUtils/podrunner#277: a bind holds a descriptor of a source, and so
-/// does the handler of the syscall tier, which opens each volume once
-/// (T-1972); the loader family of the userland rung maps each path at each
-/// call and holds none.
-pub(super) fn refuse_base_off_binds(
+/// does the handler of the syscall tier, which opens each volume once.
+/// The interposer of the loader family opens each volume under the base
+/// again at each call (TODO/enter.md T-1972); at the start, each volume
+/// under the base must open under it as a directory with no symbolic link.
+pub(super) fn check_base_off_binds(
     verb: &str,
-    base: bool,
+    o: &super::Opts,
     userland: Option<&crate::lifecycle::Userland>,
 ) -> Result<(), i32> {
-    if base && userland.is_some_and(|u| u.dispatch_exe.is_none()) {
-        eprintln!(
-            "podvm {verb}: --podvm-volume-base needs a bind of each volume (the namespace \
-             rung) or the syscall tier (--podvm-tier=syscall), and this run entered the \
-             loader family of the userland rung, which maps each path at each call and \
-             holds no descriptor of a source"
-        );
-        return Err(podvm_image::error::EXIT_RUNTIME_ERROR);
+    let (Some(base), Some(u)) = (o.volume_base.as_deref(), userland) else {
+        return Ok(());
+    };
+    if u.dispatch_exe.is_some() {
+        return Ok(());
+    }
+    for v in &o.volumes {
+        if let Err(why) = crate::userns::check_volume_under_base(base, &v.host) {
+            eprintln!("podvm {verb}: -v {}:{}: {why}", v.host, v.guest);
+            return Err(podvm_image::error::EXIT_RUNTIME_ERROR);
+        }
     }
     Ok(())
 }
 
-/// The base of `--podvm-volume-base` for the handler of the syscall tier,
-/// which opens each volume under it (`PODVM_VOLUME_BASE`, T-1972).
-pub(super) fn push_dispatch_base(
+/// The base of `--podvm-volume-base` for the userland rung: the handler of
+/// the syscall tier opens each volume under it once, and the interposer of
+/// the loader family at each call (`PODVM_VOLUME_BASE`, T-1972).
+pub(super) fn push_volume_base(
     userland: Option<&crate::lifecycle::Userland>,
     base: Option<&str>,
     env: &mut Vec<String>,
 ) {
     env.retain(|e| !e.starts_with("PODVM_VOLUME_BASE="));
-    if let (Some(b), true) = (base, userland.is_some_and(|u| u.dispatch_exe.is_some())) {
+    if let (Some(b), true) = (base, userland.is_some()) {
         env.push(format!("PODVM_VOLUME_BASE={b}"));
     }
 }

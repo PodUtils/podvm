@@ -45,7 +45,19 @@ pub unsafe fn again(
     let fn_ = crate::map::strnlen(first, OUT);
     let first = unsafe { core::slice::from_raw_parts(first as *const u8, fn_) };
     match walked {
-        Some((_, hn)) if first != &out[..hn] => Some(out.as_ptr() as *const c_char),
+        // TODO/enter.md T-1972: a walked path in a volume under the base is
+        // held as the first path was.
+        Some((_, hn)) if first != &out[..hn] => {
+            match unsafe { crate::map::base::pin(&t, b"stat", true, false, out, hn) } {
+                Ok(crate::map::base::Pin::Held(m)) => out[m] = 0,
+                Ok(_) => out[hn] = 0,
+                Err(e2) => {
+                    crate::set_errno(e2);
+                    return None;
+                }
+            }
+            Some(out.as_ptr() as *const c_char)
+        }
         // The walk reads links, which sets `errno`: the caller's miss stays.
         _ => {
             crate::set_errno(e);

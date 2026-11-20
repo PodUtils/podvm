@@ -7,7 +7,7 @@ start.
 
 ## State
 
-607 entries: 25 open, 38 partial, 6 blocked, 538 done.
+607 entries: 25 open, 37 partial, 6 blocked, 539 done.
 
 The state on 2026-11-19 (`docs/HANDOFF.md` has the detail):
 
@@ -96,8 +96,7 @@ status with `podvm-count` in the same commit as the work.
 00. podrunner first (the owner's ruling, 2026-11-18, `docs/decisions.md`;
    PodUtils/podcrates#225): after a red run of podvm's CI, each ask of
    podrunner comes first (PodUtils/podrunner#277, #216, #189, #168, #110,
-   and each new COORD issue `(to podvm)` of podrunner: #300 is T-1972
-   (ask 3); #296 is T-1964 to
+   and each new COORD issue `(to podvm)` of podrunner: #296 is T-1964 to
    T-1969, in the order the T-1964 remainder (a pool with a quota), the
    T-1969 remainder, then T-1968); #313 and #316 (the hosted snapshot)
    are T-1996, T-1999 (it waits for the xattrs of `pod-extract`,

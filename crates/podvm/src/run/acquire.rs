@@ -206,7 +206,7 @@ pub(super) fn hostname_env(
     if userland.is_none() && crate::userns::active() {
         super::binds::push_foreground(&at_tmp, &o.ro_volumes, o.volume_base.as_deref(), env);
     }
-    super::binds::push_dispatch_base(userland, o.volume_base.as_deref(), env); // T-1972
+    super::binds::push_volume_base(userland, o.volume_base.as_deref(), env); // T-1972
     let Some(name) = o.hostname.clone() else {
         return Ok(());
     };

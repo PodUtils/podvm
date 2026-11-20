@@ -74,7 +74,7 @@ pub mod owners;
 mod range;
 mod sigrelay;
 mod sweep; // PodUtils/podvm#535
-pub use host::{bind_devices, bind_volumes, host_pid};
+pub use host::{bind_devices, bind_volumes, check_volume_under_base, host_pid};
 pub use join::{joined_pidfd, rejoin};
 pub use range::{again_in_range, available as range_available, cp_in_range};
 pub use sweep::sweep;

@@ -52,6 +52,10 @@ pub unsafe fn in_volume(host: *const c_char) -> bool {
     if host.is_null() {
         return false;
     }
+    // T-1972: a name under a descriptor that the volume base holds.
+    if unsafe { super::base::is_held(host) } {
+        return true;
+    }
     let n = strnlen(host, OUT);
     // SAFETY: `n` bytes of `host` are readable.
     let h = unsafe { core::slice::from_raw_parts(host as *const u8, n) };

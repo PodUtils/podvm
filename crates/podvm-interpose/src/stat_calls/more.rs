@@ -42,6 +42,7 @@ pub unsafe extern "C" fn inotify_add_watch(fd: c_int, path: *const c_char, mask:
         set_errno(EINVAL);
         return -1;
     };
+    let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
     let mut buf = [0u8; crate::map::OUT];
     let p =
         unsafe { crate::map::prepare(b"inotify_add_watch", crate::map::AT_FDCWD, path, &mut buf) };

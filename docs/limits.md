@@ -56,6 +56,20 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   (T-1655): a write through libc under a read-only guest path fails with
   `EROFS`, and `/dev` stays writable. A raw `syscall` instruction passes
   the layer. Each entry with no interposer table refuses both by name.
+- `--podvm-volume-base DIR` on the loader family (T-1972): at the start,
+  each volume under DIR must open under it as a directory with no
+  symbolic link (else exit 125 and one line). At each path call of libc
+  in such a volume, the interposer opens the volume and the rest of the
+  path under DIR again with `openat2(RESOLVE_BENEATH |
+  RESOLVE_NO_SYMLINKS)`, and the call takes that descriptor
+  (`/proc/self/fd/N`) until it returns. So a link that the host makes
+  under DIR after the start gives the call `ELOOP` and one line, not a
+  file out of DIR. No descriptor stays open between two calls. An exec
+  route, `dlopen`, `glob`, the `ftw` family, `openat2` and `mount` of the
+  payload, and a socket address get the check only: the same opens, then
+  the host path, so a link that the host makes in the short time between
+  the check and the call still moves them. A raw `syscall` instruction
+  passes the interposer, as above.
 - Interposition covers cooperative library calls, without a security boundary.
 - The embedded interposer pair is x86_64, and only the x86_64 binary embeds it (T-1721). Other payload architectures need another execution path.
 - A foreign architecture needs the host interpreter support required by the selected path.

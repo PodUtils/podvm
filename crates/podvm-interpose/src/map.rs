@@ -283,6 +283,8 @@ mod links;
 pub use links::{follows, resolve_links};
 mod literal;
 pub use literal::{in_volume, in_volume_of, prepare_literal};
+pub mod base; // TODO/enter.md T-1972
+pub use base::{take_by_name, Scope};
 
 #[cfg(test)]
 mod tests;
