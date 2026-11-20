@@ -5637,3 +5637,32 @@ As uid 1000 under `scripts/dev/nouserns.c` on the syscall tier with `exec=/usr/b
 ## Done
 
 **Done (2026-11-20).** `podvm-dispatch` reads the `#!` line of a script that the payload starts into a buffer of its pool (`script::chain`, with `shebang` and `HEAD` of the interposer's own pure file `exec/parse.rs`, included as it is) where the exec table is on: each interpreter of the chain, up to 4 levels as the kernel (ELOOP after), resolves in the root (a relative name from the working directory), must be executable and must be in the exec table; where the last one is a dynamic loader, `ldso::each_program` judges the arguments that the kernel gives it (the argument of each `#!` level, the script, the payload's `argv[1..]`). A refusal is EACCES with one line that names `--podvm-confine` and this entry; an interpreter that is absent gives ENOENT, and an empty `#!` line ENOEXEC, as the kernel. The table tests pass as root and as uid 1000: `the_interpreter_of_a_script_takes_the_exec_rule` (`tests/confine.rs`: an interpreter outside and inside the table, a relative one, the loader with an argument outside the table, with no argument and with an option, two and more levels, absent, empty, a line over 256 bytes, a loop, no table) and `the_reader_of_a_shebang_line_and_the_lead_of_a_chain` (the reader and the arguments of the loader). As uid 1000 under `nouserns` with `mirror.gcr.io/library/ubuntu:24.04`, `--podvm-confine 'read=/sc;write=/tmp;exec=/usr/bin/sh,/w'`, `-v S:/sc -v S2:/w`, on the syscall tier: `sh -c /w/s` (`#!/sc/m`) exits 126 with the line of T-2015, the same for `#!/lib64/ld-linux-x86-64.so.2 /sc/m`, `#!/w/s` and a script that runs `/w/s`; `#!/usr/bin/sh` runs; the same through `run -d` + `exec`; a binary of `main` from before this change ran `/sc/m` in each case. The loader family gives 126 for each, as before. The script of the Prove must be in a path of `exec=` (here `/w`): with `exec=/usr/bin/sh` alone the script itself is refused before its interpreter. The help of `--podvm-confine` and `docs/limits.md` name where the rule holds.
+
+# T-2040: On the userland rung, a payload writes a `:ro` volume through its host path
+
+**Source:** the sixth outside pass (2026-11-20, the gate of the next beta; `docs/history/outside-pass-2026-11-20.md`): an agent with the binary of `2fc28af` and `podvm man` only, as uid 1000, OQ-01 (P0 by the pass) and OQ-11
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+On the loader family, `sh -c 'echo X > HOSTPATH/f'` writes the host source of a `-v HOSTPATH:/cfg:ro` volume, also without `--podvm-volume-base`, through `exec` into `run -d`, and on a change of mode; the payload reads HOSTPATH in `PODVM_MAPS`. The manual says that `:ro` refuses a write and that host pass-through happens only under `--unsafe-host-paths`. OQ-11: with `--podvm-volume-base`, a link that the host makes under the base after the start resolves into the image's root, where the manual says ELOOP.
+
+## Premise
+
+T-1705 (2026-11-11, `map::rewrite::under_host_side`): a path that already names the host side of a pair (the rootfs, or the source of a volume) passes with no rewrite, so that a runtime can open the host paths that its loader gives it. The read-only table (`PODVM_RO`) is keyed on guest paths, so such a host path skips it. A static program and a raw system call reach host paths on this rung anyway (the banner: no isolation), and `--podvm-confine` holds it (the pass measured it): the fault is that a documented feature fails for a libc call.
+
+## Approach
+
+A host path under the host side of a volume takes the rules of that volume: its guest path for the read-only table and for the base of T-1972 (`map::rewrite::longest_to` gives the pair). Keep T-1705 for the rootfs and the loader's library directories.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 under `scripts/dev/nouserns.c` with `mirror.gcr.io/library/alpine:3.20` and `-v H:/cfg:ro`: `sh -c 'echo X > H/f'` fails with EROFS and `H/f` is unchanged, on the loader family; a table test of the interposer holds the class (a host path of a `:ro` volume: open, create, unlink, rename, chmod, utimes; a host path of the rootfs and of a library directory still passes); experiment of OQ-11: ELOOP.

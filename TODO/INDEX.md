@@ -679,10 +679,15 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2014](enter.md) | P2 | S | none | enter | done | On the userland rung, `--podvm-confine read=/` does not cover a volume |
 | [T-2015](enter.md) | P2 | M | none | enter | done | On the syscall tier, the interpreter of a `#!` script that the payload starts is not checked against `exec=` |
 | [T-2016](machine.md) | P2 | M | none | machine | partial | QEMU before 10.0.4 can end on SIGSEGV in the boot of a guest with more than one vCPU under TCG |
+| [T-2040](enter.md) | P1 | M | none | enter | open | On the userland rung, a payload writes a `:ro` volume through its host path |
+| [T-2041](machine.md) | P1 | M | none | machine | open | On the machine tier, a SIGTERM, SIGINT or SIGHUP to a foreground run ends podvm and does not reach the payload |
+| [T-2042](machine.md) | P1 | M | none | machine | open | After `run -d --podvm-tier=machine`, `inspect`, `kill`, `wait` and the filters of `ps` do not find the container |
+| [T-2043](cli.md) | P1 | S | none | cli | open | `exec -t` gives the command no terminal and does not refuse |
+| [T-2044](cli.md) | P2 | M | none | cli | open | The faults of the sixth outside pass (2026-11-20, the gate of the next beta) |
 
 ## Counts
 
-613 entries: 22 open, 37 partial, 5 blocked, 549 done.
+618 entries: 27 open, 37 partial, 5 blocked, 549 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -692,10 +697,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 17 | 0 | 249 | 269 |
-| P2 | 14 | 15 | 4 | 183 | 216 |
+| P1 | 7 | 17 | 0 | 249 | 273 |
+| P2 | 15 | 15 | 4 | 183 | 217 |
 | P3 | 5 | 5 | 1 | 42 | 53 |
-| **All** | 22 | 37 | 5 | 549 | 613 |
+| **All** | 27 | 37 | 5 | 549 | 618 |
 
 ## Work order
 

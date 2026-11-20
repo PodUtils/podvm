@@ -6412,3 +6412,60 @@ As uid 1000: `podvm run --rm --podvm-tier=syscall -v FILE:/f IMAGE cat /f` print
 
 Partial (2026-11-19): OP-02 is fixed. On the syscall tier a `-v` of one file is a volume of one file (`vols.rs` opens it with no `O_DIRECTORY` and marks it `file`): its path reopens the file through `/proc/self/fd/N` (`path::in_file_volume`), a call on its parent reaches the host file in its host directory (`path::parent`), a path under it is ENOTDIR, and an unlink or a rename of it is EBUSY, as of a bound file. The dispatch test `a_volume_of_one_file_is_the_file` passes. As uid 1000 on the tier with `alpine:3.20`: `cat`, `stat`, `chmod`, `touch` and `>>` of the file work, `rm` and `mv` give "Resource busy", `:ro` refuses a write, and a CA bundle of 121 certificates reads through `-v ca.crt:/ca.crt:ro`. OP-03 is fixed too: the entry of the tier laid the strings of argv and of the environment in falling order, and libuv, which takes `argv[0]` to the end of the last argument as the room of the process title, wrote past the stack at `process.title = "npm"`; they now lie in one block in rising order, as the kernel lays them (`enter::stack`). The dispatch test `the_strings_of_argv_lie_in_rising_order_below_the_environment` fails without the change and passes with it; on the tier, `npm -v` and `npx --version` of `node:22-slim` print 10.9.9 (before: SIGSEGV, 139). OP-06 is fixed (2026-11-20): `inspect` of a container gives docker's `.State.Status`, `.State.Running`, `.State.ExitCode`, `.State.Pid`, `.State.StartedAt` and `.State.FinishedAt` through `--format`, and its JSON gives `State` as docker's object with typed values (`ExitCode` is null, not 0, before an end); `--format '{{.State}}'` stays the word. An instance of the incus tier gives the first three too. The unit test `the_declared_container_fields_are_the_built_ones` holds the names, the render and the JSON. OP-07 is fixed: the help of `--podvm-tier` states the cap of `/tmp` of the syscall tier (256 MiB, set by `--tmpfs /tmp:size=N`, ENOSPC past it), and the unit test `the_help_states_the_default_cap_of_tmp` reads it from `TMP_CAP`. OP-05, measured on `163c231` as uid 1000: a SIGHUP is forwarded (exit 129, no record stays); a SIGUSR1 ends podvm with 138 and leaves the payload and a record `Dead`, as pod-enter's `wait_forwarding` forwards SIGHUP, SIGINT and SIGTERM only; COORD-211 (#608) asks podcrates for the set of call C769 of podcrates, and the parity row of `run` names the limit until then. OP-01 is fixed (2026-11-20): `podvm man` has an ENVIRONMENT section, and the facts of `man --json`, `--roff` and `--llms`, from one table (`crates/podvm/src/environ.rs`) of each variable that a user sets, with its values and its effect. The table says what `PODVM_USERNS=0` does: a foreground run with a volume gets the userland loader family, and a run with no volume gets the namespace rung of pod-enter. The other `PODVM_*` names are sorted as internal or as dev in the same module. The unit test `each_variable_of_the_sources_has_one_home_and_a_user_variable_is_in_the_manual` scans the sources of each crate, so a new name with no home fails it. The `probes` line of the banner now reads `probes (host, outside any user namespace):`, so `mode=namespace` beside `clone(NEWNS)=EPERM` is no contradiction (`podvm_probe::report::PROBES_LABEL`, unit test `the_probe_rows_say_that_they_are_of_the_host_outside_a_user_namespace`). The P3 finding is fixed (2026-11-20): the run makes the mount point of each volume in its own tree, as docker makes it in the layer of a container (`lifecycle::volume::make_mount_points`: a directory, or an empty file for a volume of one file; no link of the image is followed; `/dev`, `/proc` and `/sys` stay the completion's), so a listing of `/` names a volume whose guest path the image lacks. The unit test `the_mount_point_of_a_volume_is_made_in_the_tree` holds the table. As uid 1000 with `alpine:3.20` and `-v DIR:/data`: `ls /` names `data` on the syscall tier and on the loader family of the userland rung (`PODVM_USERNS=0`). OP-05 is fixed (2026-11-20): podcrates `v0.79.0` (podcrates@T-995, the answer to COORD-211) forwards SIGHUP, SIGINT, SIGQUIT, SIGUSR1, SIGUSR2, SIGTERM, SIGALRM and SIGPWR in `wait_forwarding` (`pod_enter::WAIT_FORWARDED`). podvm's part: the outer process of the user namespace relays SIGALRM and SIGPWR too (`userns::sigrelay`), and each thread of a foreground run (the pump of `tee`, the bound of `wall`, the relay of the pty, the start of the hold) blocks the whole set, as a thread that left one unblocked took it with the default action and ended podvm with the payload still running (measured: pid 2 had threads, and SIGUSR1 ended podvm with 138 and left the payload under the reaper). The unit test `the_outer_process_relays_each_signal_that_the_waiter_forwards` holds the set of pod-enter, the relay and the parity row of `run` to one table. As uid 1000 on the cloud host, `run --rm alpine:3.20 sh -c 'sleep 20'`: SIGUSR1, SIGALRM and SIGPWR to podvm print "forwarded SIG... to the payload", podvm exits 138, 142 and 158, and no record and no process stays; SIGHUP gives 129 as before.
 
+# T-2043: `exec -t` gives the command no terminal and does not refuse
+
+**Source:** the sixth outside pass (2026-11-20, the gate of the next beta; `docs/history/outside-pass-2026-11-20.md`): an agent with the binary of `2fc28af` and `podvm man` only, as uid 1000, OQ-04 (P1)
+**Category:** cli
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** open
+
+## Problem
+
+`exec -t NAME tty` (also `-it`, also from a real pty) prints `not a tty` and exits 1, where `run -t` gets `/dev/pts/0` on the same host; the manual says that `-t` is refused by name only where `/dev/ptmx` is unusable.
+
+## Premise
+
+`run -t` opens a pty for the payload (`run::pty`); `exec` takes `-t` and opens none.
+
+## Approach
+
+`exec -t` opens a pty as `run -t` does, on each rung where `run -t` does, and refuses by name elsewhere.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000: `exec -t NAME tty` prints a `/dev/pts/N` path and exits 0 on the namespace rung and the loader family; `exec -it` of a shell takes input; a table test holds the refusal where no pty opens.
+
+# T-2044: The faults of the sixth outside pass (2026-11-20, the gate of the next beta)
+
+**Source:** the sixth outside pass (2026-11-20, the gate of the next beta; `docs/history/outside-pass-2026-11-20.md`): an agent with the binary of `2fc28af` and `podvm man` only, as uid 1000
+**Category:** cli
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+The pass found 1 P0 (OQ-01: T-2040), 3 P1 (OQ-02: T-2041, OQ-03: T-2042, OQ-04: T-2043) and these: OQ-05 (P2) `run -it`: a Ctrl-C does not stop the child of the payload; OQ-06 (P2) `inspect --format` gives lists and maps as flat strings, and the JSON of a container gives `Labels`, `ExitCode` and `Pid` as strings and `Config` as null; OQ-07 (P2) the banner of the namespace rung says no /proc and no PID isolation beside the PID namespace and the /proc that it opens, and `.Exec.Shares` says `filesystem` only; OQ-08 (P2) on the namespace rung, podvm's process is PID 1 of the payload with its argv (the values of `-e`), the environment shows host paths, and the payload inherits descriptors of the lock and the memo; OQ-09 (P2) docker differences that the manual does not name (`TERM` of `-t`, `HOSTNAME`, `exec` into an exited container, `logs --tail all`, `start -a`, `cp CONTAINER:path -`, the text of `-v ...:z` on the namespace rung); OQ-10 (P2) exit codes: E2BIG at `execve` gives 127, and refusals after the parse of `rmi`, `load`, `import` and `cp` give 125 where the manual says 1; OQ-12 (P3) `store/staging/memo-*.tmp` stays after a SIGKILL of podvm; OQ-13 (P3) texts of the manual and of messages.
+
+## Premise
+
+Each finding was reproduced at least twice by the pass, on the binary of `2fc28af` (`docs/history/outside-pass-2026-11-20.md`).
+
+## Approach
+
+Work each by its class: OQ-06 with the fields of `inspect` (T-2001 OP-06), OQ-07 and OQ-13 with the help and the banner, OQ-08 with the entry of the namespace rung, OQ-10 with the table of exit codes, OQ-05 with the pty relay (T-1974).
+
+## Decision
+
+-
+
+## Prove
+
+`sh scripts/dev/checks.sh` passes with a test of the class of each fixed finding; each other finding is a line in "Known gaps" of the release.

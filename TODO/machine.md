@@ -5846,3 +5846,61 @@ In this order: (1) measure the pinned QEMU 9.2.0 and a QEMU with the fix (10.0.4
 ## Done
 
 Partial (2026-11-20). Step (3) of the Approach: `drive` ends with `Driven::Again` where the emulator ended on SIGABRT, SIGBUS or SIGSEGV with no exit code of the payload, before the guest reached the command and before the bound (`drive::crashed_early`); `guest::boot` then boots the same guest once more, with one line that names the signal, and a second crash ends the run with 125 as before. A SIGKILL (of a person, of the OOM killer, of the bound) gives no more boot. A guest of a saved state takes `Again` as `Cold` (a boot with no state). The unit test `a_crash_of_the_emulator_before_the_command_boots_once_more` holds the table (each crash signal, SIGKILL and SIGTERM, after the command, with a code, at the bound). Steps (1) and (2) wait for podcrates (a pinned QEMU 10.0.4 or later, COORD-217, #618) and for `kvm.yml` job `init` (experiment 469 on the runner's QEMU, 200 starts). Measured in `kvm.yml` run 44709519610 (job `init`, on `2a23242`): the runner's QEMU is now 10.2.1 (Ubuntu), after the upstream fix, and experiment 469 gives 0 of 200 starts that ended early (4 vCPUs, 4 9p devices, 4 busy shells). Remaining: the Prove for the pinned static QEMU (9.2.0, before the fix) or a pin at 10.0.4 or later (COORD-217, #618), and 469 on the cloud host's QEMU 8.2.2 with the one more boot.
+
+# T-2041: On the machine tier, a SIGTERM, SIGINT or SIGHUP to a foreground run ends podvm and does not reach the payload
+
+**Source:** the sixth outside pass (2026-11-20, the gate of the next beta; `docs/history/outside-pass-2026-11-20.md`): an agent with the binary of `2fc28af` and `podvm man` only, as uid 1000, OQ-02 (P1)
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+`run --rm --podvm-tier=machine IMAGE sh -c "trap 'echo got; exit 4' TERM; ..."` and a `kill -TERM` of podvm: podvm ends with 143 (130 for SIGINT, 129 for SIGHUP), the trap of the guest never runs, and stderr names nothing. The manual says that these signals are forwarded to the payload and named on stderr; the namespace rung does so.
+
+## Premise
+
+The machine tier runs the payload in a guest: a forward is a message to the init of the guest, not a `kill`. No emulator stays after the run.
+
+## Approach
+
+The waiter of the machine tier blocks the set of `pod_enter::WAIT_FORWARDED` and gives each signal to the guest (the serial line or the channel of the init), which sends it to the command; one line names the forward; a guest that cannot take it ends as before, with one true line.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 under TCG: a `kill -TERM` of podvm of `run --rm --podvm-tier=machine ... trap ... TERM` prints the line of the trap, podvm exits 4, and stderr names the forward; the same for SIGINT and SIGHUP; no emulator stays.
+
+# T-2042: After `run -d --podvm-tier=machine`, `inspect`, `kill`, `wait` and the filters of `ps` do not find the container
+
+**Source:** the sixth outside pass (2026-11-20, the gate of the next beta; `docs/history/outside-pass-2026-11-20.md`): an agent with the binary of `2fc28af` and `podvm man` only, as uid 1000, OQ-03 (P1)
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+`run -d --name md2 --podvm-tier=machine IMAGE sleep 600` prints the name, not an id; `ps` and `ps -q` list it (ID `md2`, COMMAND `(linux guest)`), but `inspect md2` gives `no such image` and `[]` (rc 1), `ps --format` and `ps --filter name=md2` leave it out, and `kill` and `wait` give `no such container` (rc 1); `stop`, `rm -f`, `logs` and `exec` work.
+
+## Premise
+
+A detached guest of the machine tier is kept by its keeper (`exec::keeper_args`), with a record of its own, not a record of `podvm_supervise::table`.
+
+## Approach
+
+Each verb resolves a name in the records of both kinds, through one lookup; `run -d` prints an id as docker does; `inspect` gives the fields of a container; `kill` and `wait` reach the keeper.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 under TCG: after `run -d --name m --podvm-tier=machine IMAGE sleep 600`, `inspect m`, `ps --filter name=m`, `ps --format '{{.Names}}'`, `kill m` and `wait m` each find it; a table test of the lookup holds each verb.

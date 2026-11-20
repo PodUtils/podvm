@@ -7,7 +7,7 @@ start.
 
 ## State
 
-613 entries: 22 open, 37 partial, 5 blocked, 549 done.
+618 entries: 27 open, 37 partial, 5 blocked, 549 done.
 
 The state on 2026-11-19 (`docs/HANDOFF.md` has the detail):
 
@@ -106,6 +106,9 @@ status with `podvm-count` in the same commit as the work.
    T-1998; then the asks of
    githome and cfb for their CI, then the items below. A quality item
    that a podrunner unit meets counts as an ask of podrunner.
+0a. The gate of the next beta (2026-11-20): the P0 and P1 findings of the
+   sixth outside pass, [T-2040](enter.md), [T-2041](machine.md),
+   [T-2042](machine.md) and [T-2043](cli.md); then [T-2044](cli.md).
 0. Quality first (the owner's ruling, 2026-11-17; `docs/methodology/quality.md`):
    each beta passes the gate of `docs/maintenance.md`, "Releases". Verify and
    work the reports of the external
