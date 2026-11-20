@@ -327,9 +327,11 @@ pub(super) fn enter(
     ) {
         return code;
     }
-    // T-2043: a pty as `run -t` gives, or a refusal by name (T-0503).
-    let term = match super::tty::open(o.tty, podvm_probe::probes::ptmx_usable(&findings), &mut err)
-    {
+    // T-2043: a pty as `run -t` gives (of the devpts of a joined run), or a
+    // refusal by name (T-0503).
+    let joined = joins_the_run(state, &container.rung, container.pid).then_some(container.pid);
+    let ptmx = podvm_probe::probes::ptmx_usable(&findings);
+    let term = match super::tty::open(o.tty, ptmx, joined.flatten(), &mut err) {
         Ok(t) => t,
         Err(c) => return c,
     };

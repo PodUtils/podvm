@@ -370,7 +370,12 @@ pub fn exec(args: &[String]) -> i32 {
     // ⛔ T-0503, and the same shared predicate `enter` asks: `Ok` and
     // nothing else, because a skip is not a pass. T-2043: a pty, or a
     // refusal by name.
-    let term = match tty::open(o.tty, podvm_probe::probes::ptmx_usable(&findings), &mut err) {
+    let term = match tty::open(
+        o.tty,
+        podvm_probe::probes::ptmx_usable(&findings),
+        None,
+        &mut err,
+    ) {
         Ok(t) => t,
         Err(c) => return c,
     };

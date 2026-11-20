@@ -55,7 +55,16 @@ pub(crate) struct Term {
 /// Open the pty of `exec -t` where `want`; `Ok(None)` without `-t`. A
 /// refusal or a pty that does not open prints one line and gives the
 /// exit code.
-pub(crate) fn open(want: bool, ptmx: bool, err: &mut dyn Write) -> Result<Option<Term>, i32> {
+/// `joined` is the payload of a running container that the command joins:
+/// the pty is then one of its `/dev/pts`, else one of the host's, where the
+/// name of the slave does not resolve in the container but the terminal
+/// works.
+pub(crate) fn open(
+    want: bool,
+    ptmx: bool,
+    joined: Option<i64>,
+    err: &mut dyn Write,
+) -> Result<Option<Term>, i32> {
     if !want {
         return Ok(None);
     }
@@ -63,7 +72,11 @@ pub(crate) fn open(want: bool, ptmx: bool, err: &mut dyn Write) -> Result<Option
         writeln!(err, "{text}").unwrap_or(());
         return Err(podvm_enter::EXIT_RUNTIME_ERROR);
     }
-    match Pty::open().and_then(|pty| Ok((pty.slaves()?, pty))) {
+    let inner = joined.and_then(|p| Pty::open_in(&format!("/proc/{p}/root/dev")).ok());
+    match inner
+        .map_or_else(Pty::open, Ok)
+        .and_then(|pty| Ok((pty.slaves()?, pty)))
+    {
         Ok((slaves, pty)) => Ok(Some(Term { pty, slaves })),
         Err(e) => {
             writeln!(
@@ -159,10 +172,13 @@ mod tests {
         }
         let mut err = Vec::new();
         assert_eq!(
-            open(true, false, &mut err).err(),
+            open(true, false, None, &mut err).err(),
             Some(podvm_enter::EXIT_RUNTIME_ERROR)
         );
         assert!(String::from_utf8_lossy(&err).contains("/dev/ptmx"));
-        assert!(matches!(open(false, false, &mut Vec::new()), Ok(None)));
+        assert!(matches!(
+            open(false, false, None, &mut Vec::new()),
+            Ok(None)
+        ));
     }
 }

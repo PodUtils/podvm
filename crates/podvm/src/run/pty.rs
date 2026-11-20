@@ -62,11 +62,24 @@ pub struct Pty {
 impl Pty {
     /// Open a pty, unlocked, with the window size of podvm's terminal.
     pub fn open() -> std::io::Result<Pty> {
+        Pty::open_in("/dev")
+    }
+
+    /// [`Pty::open`] in the devpts instance of `dev` (`dev/pts/ptmx`, or
+    /// `dev/ptmx` of the host): `exec -t` into a running container of the
+    /// namespace rung takes one of its `/dev/pts`, so that the name of the
+    /// slave resolves in the container (TODO/cli.md T-2043).
+    pub fn open_in(dev: &str) -> std::io::Result<Pty> {
+        let ptmx = if dev == "/dev" {
+            "/dev/ptmx".to_string()
+        } else {
+            format!("{dev}/pts/ptmx")
+        };
         let master = std::fs::OpenOptions::new()
             .read(true)
             .write(true)
             .custom_flags(O_NOCTTY)
-            .open("/dev/ptmx")?;
+            .open(ptmx)?;
         let fd = master.as_raw_fd();
         let unlock: c_int = 0;
         let mut n: u32 = 0;
@@ -80,7 +93,7 @@ impl Pty {
             .read(true)
             .write(true)
             .custom_flags(O_NOCTTY)
-            .open(format!("/dev/pts/{n}"))?;
+            .open(format!("{dev}/pts/{n}"))?;
         let mut size = [0u16; 4];
         // SAFETY: `struct winsize` is four unsigned shorts.
         if unsafe { ioctl(0, TIOCGWINSZ, size.as_mut_ptr()) } == 0 {
