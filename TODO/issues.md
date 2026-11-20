@@ -514,7 +514,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #618 | COORD-217: a saved guest state of pod_guest::warm with no UEFI Plan; a pinned static QEMU with the use-after-free fix of 10.0.4 (to podcrates) | open | T-2008, T-2016 |
 | #619 | [gh action] requested | closed (kvm 44707550400 on 2f3b155 failed: the build of experiment 468 on the userland rung; 4e022de lifts the AppArmor restriction; again in #620) | kvm.yml job init of 06f0d29, after run 44706277889 failed in the build of experiment 468 (T-2008, T-2016) |
 | #620 | [gh action] requested | closed (kvm 44708331241 on 15c1208: experiment 468 ran, but its machine routes took the namespace rung; fc1aad9 names the tier; again in #621) | kvm.yml job init of 4e022de (T-2008, T-2016) |
-| #621 | [gh action] requested | open | kvm.yml job init of fc1aad9 (T-2008, T-2016) |
+| #621 | [gh action] requested | closed (kvm 44709519610 on 2a23242: success; 468 under KVM: the save failed; 469 on QEMU 10.2.1: 0 of 200 early ends) | kvm.yml job init of fc1aad9 (T-2008, T-2016) |
 
 ## Messages whose title does not start with COORD-NNN
 

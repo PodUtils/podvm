@@ -181,6 +181,11 @@ one() { # the route, then the prefix of the command
 	say "$(printf '%-22s %-8s run=%5.1fs first=%5.1fs mem=%5sMiB %s' "$LABEL" "$route" \
 		"$(echo "$start $end" | awk '{print ($2-$1)/1e9}')" "$(echo "$start $first" | awk '{print ($2-$1)/1e9}')" \
 		"$(cat "$WORK/mem")" "${b:-NO BENCH LINE: $(tail -1 "$WORK/err" | cut -c1-120)}")"
+	# TODO/machine.md T-2008: each line of podvm on the saved state of the
+	# guest (a save that failed, a load that booted) stands in the transcript.
+	grep -h 'T-2008' "$WORK/err" 2>/dev/null | head -3 | while IFS= read -r l; do
+		say "$(printf '%-22s %-8s %s' "$LABEL" "$route" "$(echo "$l" | cut -c1-300)")"
+	done
 }
 
 say "# $(date -u +%Y-%m-%dT%H:%M:%SZ) podvm $("$P" version 2>/dev/null | cut -d' ' -f2), host $(uname -r), $(nproc) CPUs, kvm $([ -w /dev/kvm ] && echo yes || echo no), label $LABEL${EXTRA:+, flags $EXTRA}"
