@@ -8,6 +8,28 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- `run --podvm-init=image` of an image whose Entrypoint is its init
+  (`/sbin/init`, as podrunner's hosted snapshot declares) runs the command
+  beside the init; before, the instance ran `/sbin/init CMD` as a second
+  process, which printed "Too many arguments." and ran nothing (T-2011,
+  PodUtils/podrunner#325). An explicit `--entrypoint` stays the caller's. A
+  boot that does not come up names the failed units of systemd.
+- The run report of a foreground run of the incus tier has `oom_kills`,
+  read from the metrics of incusd (T-1969, PodUtils/podrunner#296 ask 6).
+- `inspect` of a container gives docker's `.State.Status`,
+  `.State.Running`, `.State.ExitCode`, `.State.Pid`, `.State.StartedAt`
+  and `.State.FinishedAt`, and its JSON gives `State` as docker's object
+  (T-2001, OP-06). `--format '{{.State}}'` stays the word.
+- `podvm man` has an ENVIRONMENT section: each variable that a user can
+  set, its values and its effect, from one table (T-2001, OP-01). The
+  `probes` line of `--verbose` says that its rows are of the host outside
+  a user namespace.
+- The help of `--podvm-tier` states the cap of `/tmp` of the syscall tier:
+  256 MiB, set by `--tmpfs /tmp:size=N` (T-2001, OP-07).
+- A run makes the mount point of each volume in its own tree, so `ls /`
+  names a volume whose guest path the image lacks (T-2001).
+- podcrates `v0.78.1` (with `v0.77.0`).
+
 - `--podvm-volume-base DIR` holds on the loader family of the userland
   rung (T-1972, PodUtils/podrunner#300 ask 3): each volume under DIR must
   open under it as a directory with no symbolic link at the start (else
