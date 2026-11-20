@@ -5720,3 +5720,32 @@ Experiment 465, clause 12: `run --podvm-confine read=/usr --podvm-init=image` an
 ## Done
 
 Partial (2026-11-20). `initns::stays::check` refuses `--podvm-confine`, `--ulimit`, `--security-opt no-new-privileges` and `--device` with 125 and the name of the flag, for each run with `--podvm-init=image` and no tier (the namespace rung, in the foreground and with `-d` or `create`); the unit test `a_limit_that_the_init_route_drops_is_named` is the table. Experiment 465, clause 12, passes on the cloud host as uid 1000. Remaining: (1) apply each of the four flags in the supervisor; (2) `--memory`, `--cpus` and `--pids-limit` with the init on a host with cgroup2 at `/sys/fs/cgroup` are not measured; (3) the runsc tier and the machine tier are not measured for these flags; (4) the table test of each flag of `run` against each route.
+
+# T-2045: On the userland rung, a link to the host path of the rootfs with `..` reads host files
+
+**Source:** the work of T-2040 (2026-11-20), also in `0.2.0-beta.36`
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+On the loader family, `ln -s ROOTFS/../../../../../../../etc /tmp/esc; cat /tmp/esc/hostname` prints the host's name, where `cat /etc/hostname` gives the image's: a link whose target names the host path of the rootfs and then `..` leaves the rootfs. The manual says that host pass-through happens only under `--unsafe-host-paths`.
+
+## Premise
+
+T-1705 lets a host path under the host side of a pair pass with no rewrite (`map::rewrite::under_host_side`); T-2040 reads the host path of a volume by its guest path, but a host path of the rootfs stays literal, and the walk of links (T-1725) gives the rest of the path, `..` included, to the kernel with no normalisation.
+
+## Approach
+
+The walk reads a host path of the rootfs by its guest path, as T-2040 does for a volume, so that `..` stops at the guest root; the paths of `/.podvm/` and the paths of the loader of T-1705 keep their pass-through where they name no `..`.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 under `scripts/dev/nouserns.c` with `mirror.gcr.io/library/alpine:3.20`: `ln -s ROOTFS/../../../../../../../etc /tmp/esc; cat /tmp/esc/hostname` gives the image's name or ENOENT, never the host's; a table test of the interposer holds the class (a host path of the rootfs with `..`, through a link and as given; the loader paths of T-1705 still open).
