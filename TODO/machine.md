@@ -5789,6 +5789,8 @@ Remaining (added): (7) the cause under KVM: `kvm.yml`, job `init`, until one run
 
 The cause under KVM (2026-11-20, `kvm.yml` run 44749207855 on `55a3dce`, experiment 468 with the lines of podvm on the state): "the monitor of the emulator gave no answer to query-migrate within its bound (qmp read: Resource temporarily unavailable)". The emulator answers nothing while it writes the last part of the state, for longer than the read bound of 5 s of `pod_guest::qmp::Monitor`, which the caller cannot set (ask 3 of COORD-217, #618). Fixed in podvm: where one `query-migrate` gets no answer, `state::save::migrate` drops that connection, connects again (`reconnect`, tried until the bound of the save) and asks again; the late answer goes to the closed connection. The unit test `a_save_leaves_a_whole_state_or_nothing` has the case `Peer::Late` (a first `query-migrate` with no answer for 5.6 s, then a second connection that answers): the save holds. Remaining (added): a run of `kvm.yml` job `init` with the fix.
 
+Correction (2026-11-20, [T-2048](machine.md)): that fix opened the new connection while the old one was open. QEMU serves one client of its monitor at a time, so the save hung with no bound (`kvm.yml` run 44786700578: experiment 465 clause 2 and experiment 468 rows `mach-sav` and `mach-lod`, 900 s each). The stand-in of `Peer::Late` closed the first connection itself. T-2048 has the cause and the fix.
+
 # T-2011: `run -d --podvm-init=image` of an image whose Entrypoint is its init runs `/sbin/init CMD` and not the command
 
 **Source:** PodUtils/podrunner#325 (COORD-112 of podrunner, podrunner@T-556): `hosted-boot.yml` run 44663656956 on `0.2.0-beta.36`
@@ -5949,3 +5951,48 @@ An experiment of `kvm.yml`: images of about 256, 512, 1024 and 2048 MiB of incom
 ## Prove
 
 The experiment's run on `kvm.yml` gives the smallest memory for each size; `mem.rs` takes the rule that holds each point, and its test holds each point of the table.
+
+# T-2048: The save of the state of a guest hangs the run with no line when the monitor of the emulator answers late
+
+**Source:** `kvm.yml` run 44786700578, job `init` (job 136463348114): experiment 465 clause 2 and experiment 468 rows `mach-sav` and `mach-lod`; T-2008
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+Under KVM on a GitHub-hosted runner (QEMU 10.2.1), a run of `--podvm-init=image` on the machine tier that boots and saves the state of its guest (T-2008) ran until the `timeout` of its caller and gave 124 after 900 s. Its stderr had the line of the route and no other line. Experiment 465 clause 2 (`run --rm --podvm-init=image` as uid 1001, no delegated cgroup, no user bus, `PODVM_RUNSC=/nonexistent/runsc`) and experiment 468 rows `mach-sav` and `mach-lod` (`--podvm-tier=machine`, each with no state before the run) hung so in the same job. Clause 3 (`PODVM_USERNS=0`) saved its state in 9 s, and the row `machine` (`PODVM_MACHINE_STATE=0`) took 11 s.
+
+## Premise
+
+The report of the session (2026-11-20) put the hang in the user namespace of the run and its fall back to the machine tier. The code does not do that: `initns::decide` refuses the namespace rung before `userns::enter_if`, so the run of clause 2 enters no user namespace, and a run with `--podvm-tier=machine` (experiment 468) enters none either. The route is not the cause; the save is.
+
+## Approach
+
+Reproduce under TCG as a user with no root, with an emulator that answers late: `SIGSTOP` of QEMU for 8 s when the partial file of the state appears. Read the stack of each thread of podvm and the sockets of the monitor. Then fix each wait of the save that has no bound.
+
+## Decision
+
+(1) The fix stays in podvm on podcrates `v0.79.0`. podcrates@0ac7745 (the ask of COORD-217) gives `Monitor::ask_within` and `Monitor::late`, which read a late answer on the same connection, but no tag holds it yet, and its `Monitor::connect` still calls a `connect` with no bound. An ask for podcrates: a bound for that `connect`. (2) A monitor that does not come back within the bound of the save takes no second migration through the pipe: the run then says why, and boots a guest with no state.
+
+## Prove
+
+The unit test `a_save_leaves_a_whole_state_or_nothing` with the row `Peer::Late` (a stand-in of the monitor as QEMU: one client at a time, a queue of one connection, the late answer on the same connection) and the row `Peer::Hangs` (no answer, no new client, a full queue): the save ends within its bound in each row. Under TCG with QEMU stopped for 8 s at the start of the migration, the run gives 7 and saves the state. A run of `kvm.yml` job `init`: experiment 465 clause 2 gives 7 and saves a state, clause 9 passes on the machine tier, and the rows `mach-sav` and `mach-lod` of experiment 468 have their bench lines.
+
+## Done
+
+Partial (2026-11-20). The cause, measured on the cloud host (4 CPUs, no `/dev/kvm`, QEMU 8.2.2, TCG, uid 30034 with a subordinate range and no delegated cgroup, `XDG_RUNTIME_DIR` with no user bus, the build of `86144d0`): two runs of clause 2 by hand gave 0 and 7 in 34 s and 31 s (the save: 1,268 MiB in 1.9 s, the longest answer of the monitor 208 ms), so TCG with a fast disk does not show the hang. With QEMU stopped for 8 s at the start of the migration, the run hung. After 420 s the SIGTERM of `timeout` did not end it: SIGTERM was pending for the process (`ShdPnd` 0x4000) and blocked in each of its three threads, as the drive blocks the signals of the run (T-2041) and reads them only between two lines of the console. The stack of the main thread was `unix_stream_connect` and `unix_wait_for_peer`. `ss -xl` gave the socket of the monitor with 2 connections in its queue and a backlog of 1, and QEMU held the first connection open with 1,280 bytes that podvm did not read (the late answers). A SIGKILL ended the run after 467 s, and no emulator stayed.
+
+So the reconnect of T-2008 (`kvm.yml` run 44749207855) caused the hang: where `query-migrate` got no answer in 5 s, `state::save::migrate` opened a new connection while the old one was open. QEMU serves one client of its monitor at a time and queues one more connection. Each try that waited 5 s for a greeting left its connection in the queue, and the third `connect` waited in the kernel with no bound. The stand-in of the monitor in the unit test closed the first connection itself and took each new client, so the test did not see it.
+
+The fix (`machine/guest/state/save.rs`): `migrate` closes the old connection before a new one; each connection to the monitor (the first one, each one during a migration, the one for `cont`, and the one of `running` for a load) runs its tries in a thread of its own, and the caller waits for it within a bound (15 s; during a migration, the rest of the bound of the save and at least 6 s); a monitor that did not come back takes no second migration; `cont` connects again where the connection is closed. The stand-in of the test (`state/tests_monitor.rs`, now apart from `tests_save.rs` for the limit of 500 lines of a source file) takes one client at a time with a backlog of 1, gives the late answer on the same connection, and drops a client that closed in the queue. With the old order of the close and the connection (planted by hand), the row `Peer::Late` fails. The 11 tests of `machine::guest::state` pass.
+
+Measured with the fix on the same host: QEMU stopped for 8 s at the start of the migration, the run gives 7 in 41 s, and the state is saved (1,274 MiB in 9.8 s, the longest answer of the monitor 5,029 ms: one new connection). QEMU stopped for 400 s (a monitor that does not come back): the run gives 7 in 252 s. Its stderr has one line for the save ("no connection within 174.9 s: the emulator takes no new client", 180.0 s after the start of the migration, 69 MiB written), one line for the boot with no state ("cont: a new connection to the monitor: no connection within 15.0 s"), and the marker of the state counts one failure.
+
+Experiment 465 (`experiments/465-init-image.sh`): each run of clause 9 takes the machine tier on each host (no user bus, `PODVM_USERNS=0`, no runsc), checks that its stderr names that tier, and the first run of the clause saves the state that the later runs load and cut. Before, the runs of clause 9 had the user bus of the runner, took the namespace rung (their `uid_map` was the one of clause 1), and so tested no state: `PODVM_MACHINE_STATE=maybe` gave 0, as the machine tier never read the variable. Clause 2 now also fails where its run saved no state, and `run_check` keeps the lines of a save that failed.
+
+Experiment 465 with the fix, as root for that user (`PODVM_465_USER`), under TCG, with the stand-in of a delegated cgroup2 directory on the hybrid hierarchy of the host: "THE INIT OF THE IMAGE RUNS" in 327 s (`experiments/results/init-image.txt`). Clause 2 gives 7 in 34 s and saves one state; clause 3 gives 7 in 11 s from that state. In clause 9 each run has the `uid_map` of the guest (`0 0 4294967295`): the run that saves, 39 s; the cut state, 33 s; the failed load, 29 s, one line and one marker; `PODVM_MACHINE_STATE=0`, 32 s; `maybe`, 125. No emulator stays. A first run of the experiment with a build with no interposer object failed only clause 4: the userland rung declines a payload with a volume when podvm has no interposer.
+
+Remaining: (1) the run of `kvm.yml` job `init` of the Prove: the late answer under KVM is the case that the stall stands in for. (2) A SIGTERM that comes during a save waits for the end of the save (at most about 7 minutes with each bound, an estimate from the bounds); the drive reads the signal after it. (3) The ask for podcrates of the Decision, and the take of `Monitor::ask_within` when podcrates tags it.

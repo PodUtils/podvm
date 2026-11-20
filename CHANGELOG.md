@@ -10,6 +10,21 @@ They describe their recorded revision, not the current build.
 
 - `logs` writes the log through one buffer of 64 KiB, not a copy of the whole log in memory, and `logs --limit-bytes N` stops after the first N bytes with exit 0, also with `--tail`, `-f` and `--podvm-tier=incus` (T-2046, PodUtils/podrunner#333).
 
+### Fixed: the save of the state of a machine guest that hung, 2026-11-20
+
+Record: T-2048.
+Deployed: no; it waits for the next beta.
+
+- On the machine tier, a run of `--podvm-init=image` that saves the state of
+  its guest no longer hangs with no line when the monitor of the emulator
+  answers late (under KVM, while QEMU writes the last part of the state).
+  podvm opened a second connection to the monitor while the first one was
+  open; QEMU takes one client at a time, and the third connection waited
+  with no bound, also past a SIGTERM. podvm now closes the first connection,
+  and each connection has a bound: the save holds, or one line says why and
+  the run boots a guest with no state (T-2048, `kvm.yml` run 44786700578).
+  Experiment 465, clause 9, now runs each check on the machine tier.
+
 ## 0.2.0-beta.37 (2026-11-20)
 
 ### Known gaps: what the checks of 0.2.0-beta.37 prove, and what stays open, 2026-11-20

@@ -689,10 +689,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2045](enter.md) | P1 | M | none | enter | done | On the userland rung, a link to the host path of the rootfs with `..` reads host files |
 | [T-2046](cli.md) | P1 | S | none | cli | done | `logs` loads the whole log into memory and has no bound of bytes |
 | [T-2047](machine.md) | P2 | M | none | machine | open | The memory that a guest of the machine tier needs for an initrd of N bytes, as a curve |
+| [T-2048](machine.md) | P1 | M | none | machine | partial | The save of the state of a guest hangs the run with no line when the monitor of the emulator answers late |
 
 ## Counts
 
-623 entries: 25 open, 38 partial, 5 blocked, 555 done.
+624 entries: 25 open, 39 partial, 5 blocked, 555 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -702,10 +703,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 18 | 0 | 255 | 276 |
+| P1 | 3 | 19 | 0 | 255 | 277 |
 | P2 | 16 | 15 | 4 | 183 | 218 |
 | P3 | 6 | 5 | 1 | 42 | 54 |
-| **All** | 25 | 38 | 5 | 555 | 623 |
+| **All** | 25 | 39 | 5 | 555 | 624 |
 
 ## Work order
 

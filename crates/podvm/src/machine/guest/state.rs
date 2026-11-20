@@ -44,9 +44,9 @@ mod save;
 mod store;
 
 pub use run::{run, send_job, Ctx, Driven, Mode, Outcome, Warm};
-#[cfg(test)]
-use save::running;
 pub use save::save;
+#[cfg(test)]
+use save::{running, save_within, Bounds};
 #[cfg(test)]
 use store::{files, mark_bad, marked_bad, plan, strikes, sweep, touch, valid, Files, Meta, Plan};
 
@@ -301,5 +301,7 @@ pub fn fingerprint(s: &Shape) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_monitor;
 #[cfg(test)]
 mod tests_save;

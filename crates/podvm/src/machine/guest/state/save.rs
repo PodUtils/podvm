@@ -9,6 +9,27 @@ use podvm_windows::qmp::Monitor;
 use super::store::{Files, Meta};
 use super::{Transport, READY_BOUND, SAVE_BOUND};
 
+/// The bound of one connection to the monitor, outside a migration.
+const CONNECT_BOUND: Duration = Duration::from_secs(15);
+/// The shortest bound of a new connection during a migration: one whole
+/// try, which is the read bound of `pod_guest::qmp::Monitor` (5 s) for
+/// the greeting, and a margin.
+const GREETING: Duration = Duration::from_secs(6);
+
+/// The bounds of one save: the migration of one transport, and each
+/// connection to the monitor outside a migration.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Bounds {
+    pub save: Duration,
+    pub connect: Duration,
+}
+
+/// The bounds of a save of a run.
+const BOUNDS: Bounds = Bounds {
+    save: SAVE_BOUND,
+    connect: CONNECT_BOUND,
+};
+
 /// One save that ended well.
 #[derive(Debug, Clone, Copy)]
 pub struct Saved {
@@ -82,36 +103,56 @@ fn disk(part: &str) -> String {
 
 /// One `migrate` of the guest to `part`, to its end: the longest time of
 /// one answer of the monitor. An error names the transport, the request
-/// that failed, the status before it, the time, and the disk.
+/// that failed, the status before it, the time, and the disk. `m` is
+/// `None` after the call where the monitor did not come back: then no
+/// other request can go to the emulator.
 pub(super) fn migrate(
-    m: &mut Monitor,
+    m: &mut Option<Monitor>,
     qmp: &Path,
     transport: Transport,
     part: &str,
+    bounds: Bounds,
 ) -> Result<Duration, String> {
     let uri = transport.save_uri(part);
     let via = transport.word();
     let body = serde_json::json!({"execute": "migrate", "arguments": {"uri": uri}}).to_string();
-    m.ask(&body)
+    m.as_mut()
+        .ok_or_else(|| format!("through {via}: no connection to the monitor"))?
+        .ask(&body)
         .map_err(|e| format!("through {via}: {}", asked("migrate", &e)))?;
     let started = Instant::now();
-    let end = started + SAVE_BOUND;
+    let end = started + bounds.save;
     let mut longest = Duration::ZERO;
     let mut before = "none".to_string();
     let mut quiet = 0u32;
     loop {
         let at = Instant::now();
-        let line = match m.ask("{\"execute\":\"query-migrate\"}") {
+        let asked_now = match m.as_mut() {
+            Some(mon) => mon.ask("{\"execute\":\"query-migrate\"}"),
+            None => return Err(format!("through {via}: no connection to the monitor")),
+        };
+        let line = match asked_now {
             Ok(line) => line,
             // T-2008 (`kvm.yml` run 44749207855): under KVM the emulator
             // answered nothing for longer than the read bound of the
             // monitor while it wrote the last part of the state. The late
             // answer goes to this connection, which no read can follow: a
             // new connection asks again, until the bound of the save.
+            //
+            // T-2048 (`kvm.yml` run 44786700578): QEMU serves one client
+            // of the monitor at a time, and its socket queues one more
+            // connection. The new connection came while this one was open:
+            // QEMU never took it, the third `connect` waited in the kernel
+            // with no bound, and the run hung until the `timeout` of the
+            // caller with no line. This connection closes first.
             Err(e) if no_answer(&e) && Instant::now() < end => {
                 quiet += 1;
                 longest = longest.max(at.elapsed());
-                *m = reconnect(qmp, end).map_err(|again| {
+                *m = None;
+                // At least one whole try: the greeting comes when the
+                // emulator lets go of its lock.
+                let wait = end.saturating_duration_since(Instant::now()).max(GREETING);
+                *m = Some(connect(qmp, wait).map_err(|again| {
                     format!(
                         "through {via}: {}; a new connection to the monitor: {again} ({:.1} s \
                          after the start of the migration; {})",
@@ -119,7 +160,7 @@ pub(super) fn migrate(
                         started.elapsed().as_secs_f64(),
                         disk(part)
                     )
-                })?;
+                })?);
                 continue;
             }
             Err(e) => {
@@ -144,10 +185,12 @@ pub(super) fn migrate(
                 ));
             }
             _ if Instant::now() >= end => {
-                let _ = m.ask("{\"execute\":\"migrate_cancel\"}");
+                if let Some(mon) = m.as_mut() {
+                    let _ = mon.ask("{\"execute\":\"migrate_cancel\"}");
+                }
                 return Err(format!(
                     "through {via}: the migration did not end in {} s (status {status:?}; {})",
-                    SAVE_BOUND.as_secs(),
+                    bounds.save.as_secs(),
                     disk(part)
                 ));
             }
@@ -157,15 +200,39 @@ pub(super) fn migrate(
     }
 }
 
-/// A new connection to the monitor at `qmp`, tried again until `end`: the
-/// emulator greets a new client only when it lets go of its lock.
-fn reconnect(qmp: &Path, end: Instant) -> Result<Monitor, String> {
-    loop {
-        match Monitor::connect(qmp, Duration::from_secs(5)) {
-            Ok(m) => return Ok(m),
-            Err(e) if Instant::now() >= end => return Err(e.to_string()),
-            Err(_) => std::thread::sleep(Duration::from_millis(200)),
-        }
+/// A connection to the monitor at `qmp` within `wait`, tried again until
+/// then: the emulator greets a new client only when it lets go of its
+/// lock, and only when no other client is connected.
+///
+/// QEMU queues one connection that it does not take (the backlog of its
+/// socket is 1), and a `connect` to a full queue waits in the kernel with
+/// no bound (T-2048). So each try runs in a thread of its own. Where no
+/// try ends within the bound, the caller goes on with an error; the
+/// thread ends when the emulator takes its connection (the connection
+/// then closes at once) or when the emulator ends.
+fn connect(qmp: &Path, wait: Duration) -> Result<Monitor, String> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let path = qmp.to_path_buf();
+    let end = Instant::now() + wait;
+    std::thread::spawn(move || {
+        let got = loop {
+            // The wait of `Monitor::connect` is the wait for the socket:
+            // the emulator makes it when it starts.
+            match Monitor::connect(&path, end.saturating_duration_since(Instant::now())) {
+                Ok(m) => break Ok(m),
+                Err(e) if Instant::now() >= end => break Err(asked("the connection", &e)),
+                Err(_) => std::thread::sleep(Duration::from_millis(200)),
+            }
+        };
+        let _ = tx.send(got);
+    });
+    match rx.recv_timeout(wait) {
+        Ok(got) => got,
+        Err(_) => Err(format!(
+            "no connection within {:.1} s: the emulator takes no new client (it holds its \
+             lock, or it hangs)",
+            wait.as_secs_f64()
+        )),
     }
 }
 
@@ -181,16 +248,25 @@ pub fn save(
     first: Transport,
     unique: &str,
 ) -> (Result<Saved, String>, Result<(), String>) {
+    save_within(qmp, f, fingerprint, mem_mib, first, unique, BOUNDS)
+}
+
+/// [`save`] with the bounds of `bounds`: each wait of a save has one.
+pub(super) fn save_within(
+    qmp: &Path,
+    f: &Files,
+    fingerprint: &str,
+    mem_mib: u64,
+    first: Transport,
+    unique: &str,
+    bounds: Bounds,
+) -> (Result<Saved, String>, Result<(), String>) {
     let started = Instant::now();
-    let mut m = match Monitor::connect(qmp, Duration::from_secs(10)) {
-        Ok(m) => m,
+    let mut m = match connect(qmp, bounds.connect) {
+        Ok(m) => Some(m),
         // Nothing was asked of the emulator: its guest runs as before.
         Err(e) => {
-            let why = format!(
-                "the monitor of the emulator ({}): {}",
-                qmp.display(),
-                asked("the connection", &e)
-            );
+            let why = format!("the monitor of the emulator ({}): {e}", qmp.display());
             return (Err(why), Ok(()));
         }
     };
@@ -199,24 +275,49 @@ pub fn save(
     let path = part.to_string_lossy().into_owned();
     // No limit of the rate: the default is 1 Gbit/s on some versions. A
     // refusal leaves the default, and the save is then slower.
-    let _ = m.ask("{\"execute\":\"migrate-set-parameters\",\"arguments\":{\"max-bandwidth\":0}}");
+    if let Some(mon) = m.as_mut() {
+        let _ =
+            mon.ask("{\"execute\":\"migrate-set-parameters\",\"arguments\":{\"max-bandwidth\":0}}");
+    }
     // The guest stops for the save, as `pod_guest::warm::save` does: the
     // state is the one of this moment, and no page changes under the copy.
-    let cont = |m: &mut Monitor| {
-        m.ask("{\"execute\":\"cont\"}")
-            .map(drop)
-            .map_err(|e| asked("cont", &e))
+    // A connection that a late answer closed is made again, within its
+    // bound, for `cont`.
+    let cont = |m: &mut Option<Monitor>| -> Result<(), String> {
+        if m.is_none() {
+            *m = Some(
+                connect(qmp, bounds.connect)
+                    .map_err(|e| format!("cont: a new connection to the monitor: {e}"))?,
+            );
+        }
+        match m.as_mut() {
+            Some(mon) => mon
+                .ask("{\"execute\":\"cont\"}")
+                .map(drop)
+                .map_err(|e| asked("cont", &e)),
+            None => Err("cont: no connection to the monitor".to_string()),
+        }
     };
-    if let Err(e) = m.ask("{\"execute\":\"stop\"}") {
+    let stopped = match m.as_mut() {
+        Some(mon) => mon.ask("{\"execute\":\"stop\"}"),
+        None => {
+            return (
+                Err("stop: no connection to the monitor".to_string()),
+                Ok(()),
+            )
+        }
+    };
+    if let Err(e) = stopped {
         return (Err(asked("stop", &e)), cont(&mut m));
     }
     let mut transport = first;
-    let mut done = migrate(&mut m, qmp, transport, &path);
-    // A QEMU before 8.2 has no `file:` transport: the pipe is the second path.
-    if done.is_err() && transport == Transport::File {
+    let mut done = migrate(&mut m, qmp, transport, &path, bounds);
+    // A QEMU before 8.2 has no `file:` transport: the pipe is the second
+    // path. A monitor that did not come back takes no second migration.
+    if done.is_err() && transport == Transport::File && m.is_some() {
         let _ = std::fs::remove_file(&part);
         transport = Transport::Pipe;
-        let second = migrate(&mut m, qmp, transport, &path);
+        let second = migrate(&mut m, qmp, transport, &path, bounds);
         done = match (second, done) {
             (Ok(t), _) => Ok(t),
             (Err(pipe), Err(file)) => Err(format!("{file}; then {pipe}")),
@@ -276,7 +377,7 @@ pub fn save(
 /// starts it. An error where the monitor does not answer or the guest
 /// does not run within [`READY_BOUND`].
 pub fn running(qmp: &Path) -> Result<(), String> {
-    let mut m = Monitor::connect(qmp, Duration::from_secs(10)).map_err(|e| e.to_string())?;
+    let mut m = connect(qmp, Duration::from_secs(10))?;
     let end = Instant::now() + READY_BOUND;
     loop {
         let line = m
