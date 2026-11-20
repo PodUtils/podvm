@@ -8,13 +8,61 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+## 0.2.0-beta.37 (2026-11-20)
+
+### Known gaps: what the checks of 0.2.0-beta.37 prove, and what stays open, 2026-11-20
+
+Record: T-1949, T-2002, T-2008, T-2016, T-2044.
+Deployed: version 0.2.0-beta.37.
+
+What the checks of this beta prove: the gate, `arm.yml`, the integration
+tests as uid 1000, `workloads.yml`, the nightly trial, `kvm.yml` (experiment
+468: the saved state of a guest under KVM; experiment 469), experiments 434
+and 465, and the sixth outside pass with the binary and `podvm man` only
+(T-2044), whose one P0 and three P1 faults are fixed (T-2040 to T-2043), with
+T-2045 that the work found beside them.
+
+Each open fault that a user can meet:
+
+- `run -it`: a Ctrl-C does not stop a child of the payload (T-2044, OQ-05).
+- `inspect --format` gives lists and maps as flat strings, and the JSON of
+  a container gives `Labels`, `ExitCode` and `Pid` as strings (T-2044,
+  OQ-06).
+- On the namespace rung, the banner of `--verbose` names no /proc and no PID
+  isolation beside the PID namespace that it opens; podvm's process is
+  PID 1 of the payload with its argv; the payload inherits descriptors of
+  the store (T-2044, OQ-07, OQ-08).
+- docker differences that the manual does not name: `TERM` of `-t`,
+  `HOSTNAME`, `exec` into an exited container, `logs --tail all`, `start
+  -a`, `cp CONTAINER:path -` (T-2044, OQ-09).
+- Exit codes: an E2BIG at `execve` gives 127, and the refusals of `rmi` of
+  a referenced image, of `load` and `import` of a file of the caller, and
+  of `cp` with `..` give 125 where the manual says 1 (T-2044, OQ-10).
+- A SIGKILL of podvm leaves a file `store/staging/memo-*.tmp`, and some
+  texts of the manual and of messages are wrong (T-2044, OQ-12, OQ-13).
+- The save of the state of a guest under KVM failed in 1 of 2 runs of a
+  hosted runner before the fix of this beta (a new connection to the
+  monitor); the fix holds in a unit test, and `kvm.yml` measures it
+  (T-2008).
+- The pinned static QEMU 9.2.0 is older than the upstream fix of a crash of
+  a guest with more than one vCPU under TCG; podvm boots once more after
+  such a crash (T-2016).
+- With `--podvm-init=image`, a caller that is uid 0 gets no namespace
+  rung, and `run -d` is refused on the runsc and machine tiers (T-2002).
+- The faults of `0.2.0-beta.36`'s known gaps stay open where this list
+  does not name them as fixed.
+
+### Fixed: the faults of the sixth outside pass, the confine layer, the signals of a run, 2026-11-20
+
+Record: T-1984, T-2001, T-2002, T-2006, T-2011, T-2012, T-2013, T-2014, T-2015, T-2016, T-2040, T-2041, T-2042, T-2043, T-2045.
+Deployed: version 0.2.0-beta.37.
+
 - On the userland rung (the loader family), a path that names the host
   path of the rootfs (`PODVM_MAPS` gives it) resolves its links from the
   rootfs, and `..` stops there. Before, a link to `ROOTFS/../../etc`, or
   `ROOTFS/tmp/l/f` with a relative link `l` that climbs out, read a host
   file (T-2045). An absolute link of the image under such a path resolves
   in the image now, not on the host.
-
 - On the userland rung (the loader family), a write through the host path
   of a `:ro` volume (`echo X > HOST/f`, also `chmod`, `touch`, `mv`, `rm`,
   `ln`, `mkstemp`, or a link to the volume by its host or its guest path)
@@ -25,7 +73,6 @@ They describe their recorded revision, not the current build.
 - `link`, `rename` and their `*at` forms give the errno of their first
   path when it fails; before, the second path could replace it (`EINVAL`
   for `EROFS`).
-
 - On the machine tier, a guest whose emulator crashes (SIGSEGV, SIGBUS,
   SIGABRT) before the command runs boots once more, with one line that
   names the signal (T-2016: QEMU 8.2 under TCG with more than one vCPU).
@@ -35,44 +82,21 @@ They describe their recorded revision, not the current build.
   podcrates `v0.79.0`).
 - `ld-musl-ARCH.so.1`, a link to musl's libc, counts as a dynamic loader
   for `--podvm-confine exec=` (T-1984).
-- podcrates `v0.79.0`.
 - `--podvm-confine exec=` holds for the first program of a run on the
   userland rung and the syscall tier, also through the dynamic loader and
   for the interpreter of a `#!` script: a program out of `exec=` exits 126
   with one line, as on the namespace rung (T-2013). Before, the first
   program ran.
-- `--podvm-confine` on the userland rung refuses an exec of the dynamic
-  loader of a program out of `exec=`, and a change of mode, owner or times
-  of a file out of `write=` (T-1984, T-1985).
-- The command of `run --podvm-init=image --user NAME` on the namespace
-  rung gets the supplementary groups that `/etc/group` of the image gives
-  the user (T-2002); before, it had the primary group only. On the machine
-  tier, an argument of the run that holds `"$@"` (`sh -c 'exec "$@"'`)
-  reaches the command as it is.
-- A guest under TCG takes a translation cache of 512 MiB in place of
-  QEMU's 1 GiB (T-2010): the peak memory of a run with MariaDB and
-  PostgreSQL under systemd goes from 3,670 MiB to about 3,300 MiB on the
-  cloud host, and its time does not change.
 - `exec` into a `run -d` container of the namespace rung enters by the
   join of its namespaces, where its volumes are, also where the probe of
   the host denies chroot to the user; before, it took the entry with no
   chroot and refused each volume (T-2012, PodUtils/podrunner#326).
-- The machine tier saves the state of a guest that booted the init of an
-  image (`--podvm-init=image`), and each later run of the image and guest
-  shape starts from that state (T-2008): under TCG on the cloud host the
-  first output of a run with MariaDB and PostgreSQL under systemd comes
-  after 1.3 s to 1.6 s, against 19 s to 20 s for a boot. A state that is
-  missing, stale or does not load gives a boot. `PODVM_MACHINE_STATE=0`
-  turns the save off; [the limits](docs/limits.md#the-init-of-an-image)
-  name what each run of one state shares.
 - `run --podvm-init=image` of an image whose Entrypoint is its init
   (`/sbin/init`, as podrunner's hosted snapshot declares) runs the command
   beside the init; before, the instance ran `/sbin/init CMD` as a second
   process, which printed "Too many arguments." and ran nothing (T-2011,
   PodUtils/podrunner#325). An explicit `--entrypoint` stays the caller's. A
   boot that does not come up names the failed units of systemd.
-- The run report of a foreground run of the incus tier has `oom_kills`,
-  read from the metrics of incusd (T-1969, PodUtils/podrunner#296 ask 6).
 - `inspect` of a container gives docker's `.State.Status`,
   `.State.Running`, `.State.ExitCode`, `.State.Pid`, `.State.StartedAt`
   and `.State.FinishedAt`, and its JSON gives `State` as docker's object
@@ -85,7 +109,51 @@ They describe their recorded revision, not the current build.
   256 MiB, set by `--tmpfs /tmp:size=N` (T-2001, OP-07).
 - A run makes the mount point of each volume in its own tree, so `ls /`
   names a volume whose guest path the image lacks (T-2001).
-- podcrates `v0.78.1` (with `v0.77.0`).
+- A SIGKILL of podvm during a foreground run of a user with no root ends
+  each process of the run; before, the payload stayed (T-2006).
+- On the syscall tier, a `-v` of one file works: the path is the file,
+  `:ro` holds, a path under it is ENOTDIR, and `rm` or `mv` of it is
+  EBUSY, as for a bound file (T-2001, OP-02 of the fifth outside pass).
+- On the syscall tier, `npm` and `npx` run: a program that sets its process
+  title (Node's `process.title`) no longer writes past its stack (T-2001,
+  OP-03 of the fifth outside pass).
+- `exec -t` gives the command a terminal, as `run -t` does: in a running
+  container of the namespace rung a pty of its own devpts, elsewhere a
+  pty of the host; it refuses by name where `/dev/ptmx` is unusable and
+  in a guest (T-2043, OQ-04 of the sixth outside pass).
+- On the machine tier, a SIGTERM, SIGINT or SIGHUP to a foreground run
+  goes to the command in the guest, and stderr names the forward; before,
+  it ended podvm and the guest's trap never ran (T-2041, OQ-02).
+- After `run -d --podvm-tier=machine`, `inspect`, `kill`, `wait` and the
+  filters and the format of `ps` find the container by its name or its id
+  (T-2042, OQ-03).
+- On the rungs with no chroot, `--podvm-confine read=/` covers a volume,
+  and on the syscall tier each interpreter of a `#!` chain takes the rule
+  of `exec=` (T-2014, T-2015).
+- A SIGTERM of a foreground run of `--podvm-init=image` on the namespace
+  rung reaches the command, and `rm -f` of such a container no longer
+  waits 5 s (T-2002).
+
+### Added: systemd as PID 1 on each route, the saved state of a guest, the volume base on the loader family, 2026-11-20
+
+Record: T-1969, T-1972, T-1984, T-1985, T-1996, T-1997, T-1999, T-2002, T-2004, T-2007, T-2008, T-2010.
+Deployed: version 0.2.0-beta.37.
+
+- The command of `run --podvm-init=image --user NAME` on the namespace
+  rung gets the supplementary groups that `/etc/group` of the image gives
+  the user (T-2002); before, it had the primary group only. On the machine
+  tier, an argument of the run that holds `"$@"` (`sh -c 'exec "$@"'`)
+  reaches the command as it is.
+- The machine tier saves the state of a guest that booted the init of an
+  image (`--podvm-init=image`), and each later run of the image and guest
+  shape starts from that state (T-2008): under TCG on the cloud host the
+  first output of a run with MariaDB and PostgreSQL under systemd comes
+  after 1.3 s to 1.6 s, against 19 s to 20 s for a boot. A state that is
+  missing, stale or does not load gives a boot. `PODVM_MACHINE_STATE=0`
+  turns the save off; [the limits](docs/limits.md#the-init-of-an-image)
+  name what each run of one state shares.
+- The run report of a foreground run of the incus tier has `oom_kills`,
+  read from the metrics of incusd (T-1969, PodUtils/podrunner#296 ask 6).
 - `--podvm-confine` on the userland rung (T-1984, T-1985): an exec of the
   dynamic loader (`ld.so PROGRAM`, each name and link of the loader) takes
   the `exec=` rule of its program, and a change of mode, owner or times
@@ -96,7 +164,6 @@ They describe their recorded revision, not the current build.
   chroot rungs the advice of a `:ro` volume stays. Cost with the layer: about
   2.5 microseconds for each change of mode, owner or times on the loader
   family, 1.9 on the syscall tier (an estimate).
-
 - `--podvm-volume-base DIR` holds on the loader family of the userland
   rung (T-1972, PodUtils/podrunner#300 ask 3): each volume under DIR must
   open under it as a directory with no symbolic link at the start (else
@@ -105,7 +172,6 @@ They describe their recorded revision, not the current build.
   RESOLVE_NO_SYMLINKS)`, so that a link that the host makes after the
   start gives `ELOOP`, not a file out of DIR. Cost: about 3 microseconds for each
   path call in such a volume.
-
 - A run of `--podvm-init=image` waits for the boot with `systemctl
   is-system-running --wait` and no poll, and where nothing of the run can
   stay (each volume read-only, and `--rm` on the namespace rung) the init
@@ -127,19 +193,11 @@ They describe their recorded revision, not the current build.
   in a guest of the machine tier (KVM or TCG), with one line that names the
   missing part (call C26). Where a user manager of systemd answers, podvm
   asks it for the delegated subtree (a scope with `Delegate=yes`, T-2004).
-- A SIGKILL of podvm during a foreground run of a user with no root ends
-  each process of the run; before, the payload stayed (T-2006).
 - The machine tier boots an image with a file that its owner cannot read
   (a helper of mode 4110): the archive of the guest reads it with the
   owner's bits (T-2002).
 - The wait for the boot of `--podvm-init=image` on the incus tier reads the
   bus error of systemd 262 as "not up yet" (T-2002).
-- On the syscall tier, a `-v` of one file works: the path is the file,
-  `:ro` holds, a path under it is ENOTDIR, and `rm` or `mv` of it is
-  EBUSY, as for a bound file (T-2001, OP-02 of the fifth outside pass).
-- On the syscall tier, `npm` and `npx` run: a program that sets its process
-  title (Node's `process.title`) no longer writes past its stack (T-2001,
-  OP-03 of the fifth outside pass).
 - On the incus tier, `--podvm-init=image` gives the instance an isolated
   map of 231,072 ids, `/dev/fuse` and an empty machine-id for the hosted
   snapshot (T-1996), and the image goes to incusd through a pipe, with no
@@ -147,9 +205,34 @@ They describe their recorded revision, not the current build.
 - On the incus tier, the tarball of the image carries `security.capability`
   and `user.*` as PAX records, so a file capability reaches the root of the
   instance (T-1999).
+- `run -d`, `create`, `start`, `stop`, `rm -f` and `exec` (with `-t`,
+  `-u`, `-e`, `-w`) hold with `--podvm-init=image` on the namespace rung,
+  for a caller that is not uid 0 with a subordinate id range and a
+  delegated cgroup2 subtree; `run -t` and `exec -t` of such a run get a pty
+  of the devpts of the init (T-2002).
+
+### Changed: podcrates v0.79.0, the refusals of an init, the id of run -d of a machine, 2026-11-20
+
+Record: T-2010, T-2017, T-2042.
+Deployed: version 0.2.0-beta.37.
+
+- podcrates `v0.79.0`.
+- podcrates `v0.78.1` (with `v0.77.0`).
 - podvm takes podcrates `v0.75.0` (PodUtils/podcrates#238) and `v0.76.0`
   (PodUtils/podcrates#239: `pod-extract` sets the extended attributes of a
   layer and names each one that it cannot set).
+- A guest under TCG takes a translation cache of 512 MiB in place of
+  QEMU's 1 GiB (T-2010): the peak memory of a run with MariaDB and
+  PostgreSQL under systemd goes from 3,670 MiB to about 3,300 MiB on the
+  cloud host, and its time does not change.
+- With `--podvm-init=image` on the namespace rung, `--podvm-confine`,
+  `--ulimit`, `--security-opt no-new-privileges` and `--device` refuse by
+  name with 125, and so does `run -d` on a host with no delegated cgroup2
+  subtree; before, the route dropped the flags with no line (T-2017, call
+  C28).
+- `run -d --podvm-tier=machine` and `run -d windows:NAME` print the id of
+  the container (64 hex digits), as docker does, in place of its name; each
+  verb takes the id, a prefix of 12 digits, or the name (T-2042).
 
 ## 0.2.0-beta.36 (2026-11-19)
 
