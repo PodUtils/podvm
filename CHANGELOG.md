@@ -8,6 +8,15 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- `--podvm-volume-base DIR` holds on the loader family of the userland
+  rung (T-1972, PodUtils/podrunner#300 ask 3): each volume under DIR must
+  open under it as a directory with no symbolic link at the start (else
+  exit 125), and the interposer opens the volume and the rest of each
+  path under DIR again at each path call, with `openat2(RESOLVE_BENEATH |
+  RESOLVE_NO_SYMLINKS)`, so that a link that the host makes after the
+  start gives `ELOOP`, not a file out of DIR. Cost: about 3 microseconds for each
+  path call in such a volume.
+
 - A run of `--podvm-init=image` waits for the boot with `systemctl
   is-system-running --wait` and no poll, and where nothing of the run can
   stay (each volume read-only, and `--rm` on the namespace rung) the init

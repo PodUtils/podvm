@@ -36,6 +36,7 @@ pub unsafe extern "C" fn statx(
             return rc;
         }
     }
+    let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
     let mut buf = [0u8; crate::map::OUT];
     // T-1725: AT_SYMLINK_NOFOLLOW keeps the last link.
     let p = unsafe {
@@ -95,6 +96,7 @@ macro_rules! path_int {
         #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $name($($arg: $ty),*) -> c_int {
             let Some(f) = $real() else { set_errno(EINVAL); return -1; };
+            let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
             let mut buf = [0u8; crate::map::OUT];
             let p = unsafe {
                 crate::map::prepare(
@@ -121,6 +123,7 @@ macro_rules! path_nonneg {
         pub unsafe extern "C" fn $name($($arg: $ty),*) -> $ret {
             let fail: $ret = -1 as $ret;
             let Some(f) = $real() else { set_errno(EINVAL); return fail; };
+            let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
             let mut buf = [0u8; crate::map::OUT];
             let p = unsafe {
                 crate::map::prepare(
@@ -148,6 +151,7 @@ macro_rules! path_ptr {
         #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $name($($arg: $ty),*) -> *mut c_void {
             let Some(f) = $real() else { set_errno(EINVAL); return core::ptr::null_mut(); };
+            let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
             let mut buf = [0u8; crate::map::OUT];
             let writes = unsafe { crate::map::mode_writes($mode) };
             let p = unsafe {
@@ -162,8 +166,20 @@ macro_rules! path_ptr {
             if p.is_null() {
                 return core::ptr::null_mut();
             }
+            // T-1972: a file that is absent at the check of the volume base.
+            let mut made = [0u8; 32];
+            let (p, fd) = match unsafe { created::by_name($mode, p, &mut made) } {
+                Ok(q) => q,
+                Err(()) => return core::ptr::null_mut(),
+            };
             let $path = p;
-            unsafe { f($($arg),*) }
+            let r = unsafe { f($($arg),*) };
+            if fd >= 0 {
+                if let Some(close) = next_close() {
+                    unsafe { close(fd) };
+                }
+            }
+            r
         }
     };
     ($name:ident, $real:ident, ( $($arg:ident : $ty:ty),* ), $path:ident) => {
@@ -172,6 +188,7 @@ macro_rules! path_ptr {
         #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $name($($arg: $ty),*) -> *mut c_void {
             let Some(f) = $real() else { set_errno(EINVAL); return core::ptr::null_mut(); };
+            let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
             let mut buf = [0u8; crate::map::OUT];
             let p = unsafe {
                 crate::map::prepare(
@@ -197,6 +214,7 @@ macro_rules! path_at_int {
         #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $name($($arg: $ty),*) -> c_int {
             let Some(f) = $real() else { set_errno(EINVAL); return -1; };
+            let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
             let mut buf = [0u8; crate::map::OUT];
             let p = unsafe {
                 crate::map::prepare(stringify!($name).as_bytes(), $dirfd, $path, &mut buf)
@@ -241,6 +259,7 @@ unsafe fn faccess(
     flags: c_int,
     call: impl Fn(*const c_char) -> Option<c_int>,
 ) -> c_int {
+    let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
     let mut buf = [0u8; crate::map::OUT];
     let p = unsafe { crate::map::prepare(what, dirfd, path, &mut buf) };
     if p.is_null() {
@@ -302,8 +321,6 @@ path_int!(ftw64, next_ftw64, (path: *const c_char, func: FtwFunc, nfds: c_int), 
 path_int!(nftw, next_nftw, (path: *const c_char, func: NftwFunc, nfds: c_int, flags: c_int), path);
 path_int!(nftw64, next_nftw64, (path: *const c_char, func: NftwFunc, nfds: c_int, flags: c_int), path);
 
-path_nonneg!(creat, next_creat, (path: *const c_char, mode: c_uint), path, c_int);
-path_nonneg!(creat64, next_creat64, (path: *const c_char, mode: c_uint), path, c_int);
 path_nonneg!(scandir, next_scandir, (dir: *const c_char, list: *mut *mut c_void, filter: Filter, compar: Compar), dir, c_int);
 
 path_ptr!(opendir, next_opendir, (path: *const c_char), path);
@@ -469,5 +486,7 @@ pub unsafe extern "C" fn getcwd(buf: *mut c_char, size: usize) -> *mut c_char {
 }
 
 // TODO/interpose.md T-1754, T-1755: the path calls of the audit.
-mod more;
+mod created;
+mod more; // TODO/enter.md T-1972
+pub use created::{creat, creat64};
 pub use more::*;

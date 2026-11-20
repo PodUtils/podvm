@@ -58,6 +58,21 @@ pub(crate) use nr::*;
 /// # Safety
 /// The kernel's own contract for number `n`.
 pub(crate) unsafe fn forward(n: c_long, a: [c_long; 6]) -> c_long {
+    // SAFETY: the caller's contract.
+    let r = unsafe { raw(n, a) };
+    if (-4095..0).contains(&r) {
+        set_errno(-r as c_int);
+        return -1;
+    }
+    r
+}
+
+/// One system call that leaves `errno` alone: the kernel's own result,
+/// `-errno` for a failure (TODO/enter.md T-1972 reads it so).
+///
+/// # Safety
+/// The kernel's own contract for number `n`.
+pub(crate) unsafe fn raw(n: c_long, a: [c_long; 6]) -> c_long {
     let r: c_long;
     // SAFETY: the caller upholds the contract of number `n`; the
     // instruction changes `rcx` and `r11`, which are named.
@@ -92,10 +107,6 @@ pub(crate) unsafe fn forward(n: c_long, a: [c_long; 6]) -> c_long {
             in("x5") a[5],
             options(nostack),
         );
-    }
-    if (-4095..0).contains(&r) {
-        set_errno(-r as c_int);
-        return -1;
     }
     r
 }

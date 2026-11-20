@@ -108,6 +108,7 @@ macro_rules! open_fixed {
                     return e;
                 }
             }
+            let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
             let mut buf = [0u8; crate::map::OUT];
             let p = unsafe {
                 crate::map::prepare_follow(
@@ -123,6 +124,13 @@ macro_rules! open_fixed {
             if p.is_null() {
                 return -1;
             }
+            // T-1972: a file that is absent at the check of the volume base
+            // opens by its directory and its name, with no link to follow.
+            let $flags = if crate::map::take_by_name() {
+                $flags | crate::oflags::O_NOFOLLOW
+            } else {
+                $flags
+            };
             let rc = unsafe { f(p, $flags, mode) };
             // T-0413: where no procfs is mounted the real call fails
             // `ENOENT`, and only there does the emulation answer. `p` is
@@ -164,6 +172,7 @@ macro_rules! open_fixed {
                     return e;
                 }
             }
+            let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
             let mut buf = [0u8; crate::map::OUT];
             let p = unsafe {
                 crate::map::prepare_follow(
@@ -179,6 +188,12 @@ macro_rules! open_fixed {
             if p.is_null() {
                 return -1;
             }
+            // T-1972, as above.
+            let $flags = if crate::map::take_by_name() {
+                $flags | crate::oflags::O_NOFOLLOW
+            } else {
+                $flags
+            };
             // T-0413, as above. Relative paths never name the emulated
             // leaves (the matchers anchor on absolute spellings), so the
             // pointer comparison is the whole guard here too. T-0501's
@@ -212,6 +227,7 @@ macro_rules! path_dual {
         #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $name($($arg: $ty),*) -> c_int {
             let Some(f) = $real() else { set_errno(EINVAL); return -1; };
+            let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
             let mut bufa = [0u8; crate::map::OUT];
             let mut bufb = [0u8; crate::map::OUT];
             let pa = unsafe {
@@ -234,6 +250,7 @@ macro_rules! path_dual {
         #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $name($($arg: $ty),*) -> c_int {
             let Some(f) = $real() else { set_errno(EINVAL); return -1; };
+            let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
             let mut bufa = [0u8; crate::map::OUT];
             let mut bufb = [0u8; crate::map::OUT];
             let pa = unsafe {
@@ -284,6 +301,7 @@ pub unsafe extern "C" fn symlink(target: *const c_char, linkpath: *const c_char)
         set_errno(EINVAL);
         return -1;
     };
+    let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
     let mut linkb = [0u8; crate::map::OUT];
     let mut targb = [0u8; crate::map::OUT];
     let lp = unsafe { crate::map::prepare(b"symlink", crate::map::AT_FDCWD, linkpath, &mut linkb) };
@@ -311,6 +329,7 @@ pub unsafe extern "C" fn symlinkat(
         set_errno(EINVAL);
         return -1;
     };
+    let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
     let mut linkb = [0u8; crate::map::OUT];
     let mut targb = [0u8; crate::map::OUT];
     let lp = unsafe { crate::map::prepare(b"symlinkat", newdirfd, linkpath, &mut linkb) };

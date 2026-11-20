@@ -634,7 +634,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1969](supervise.md) | P1 | M | none | supervise | done | The run report holds no OOM fact of a unit |
 | [T-1970](cli.md) | P1 | M | none | cli | partial | The outside pass of 2026-11-18: three P1 and seven P2 faults on the path of a unit |
 | [T-1971](cli.md) | P1 | S | none | cli | done | `--env-file` cannot hold a value with a newline |
-| [T-1972](enter.md) | P1 | L | none | enter | partial | `--podvm-volume-base` holds on the namespace rung only, and job containers of podrunner run on the userland and supervise rungs |
+| [T-1972](enter.md) | P1 | L | none | enter | done | `--podvm-volume-base` holds on the namespace rung only, and job containers of podrunner run on the userland and supervise rungs |
 | [T-1973](enter.md) | P1 | S | none | enter | done | On the syscall tier, a payload cannot connect to a Unix socket of a volume |
 | [T-1974](cli.md) | P1 | M | none | cli | partial | The outside pass of 2026-11-18, the second: a P0 and four P1 faults of the new surface |
 | [T-1975](enter.md) | P1 | M | none | enter | done | On the syscall tier, a link inside a volume that names an absolute path or leaves the volume does not resolve |
@@ -677,7 +677,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-608 entries: 25 open, 38 partial, 6 blocked, 539 done.
+608 entries: 25 open, 37 partial, 6 blocked, 540 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -687,10 +687,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 19 | 0 | 245 | 267 |
+| P1 | 3 | 18 | 0 | 246 | 267 |
 | P2 | 16 | 15 | 5 | 177 | 213 |
 | P3 | 6 | 4 | 1 | 42 | 53 |
-| **All** | 25 | 38 | 6 | 539 | 608 |
+| **All** | 25 | 37 | 6 | 540 | 608 |
 
 ## Work order
 

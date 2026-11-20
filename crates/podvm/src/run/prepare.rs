@@ -271,7 +271,7 @@ pub(crate) fn prepare(
     };
     crate::lifecycle::refuse_detached_userland(verb, userland.as_ref(), o.detach)?;
     crate::lifecycle::volume::refuse_unserved(verb, &o.volumes, userland.as_ref(), ladder)?; // T-1653
-    super::binds::refuse_base_off_binds(verb, o.volume_base.is_some(), userland.as_ref())?;
+    super::binds::check_base_off_binds(verb, &o, userland.as_ref())?;
     // ⭐ T-0702, T-0706: classify and place the object BEFORE the banner, which
     // names the write. T-1649: a `#!` payload classifies its interpreter.
     let gargv = userland.as_ref().map_or(&argv, |u| &u.guest_argv);

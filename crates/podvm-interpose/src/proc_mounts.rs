@@ -296,6 +296,7 @@ pub(super) fn say_newnet(what: &[u8], flags: u32) {
 /// # Safety
 /// `path` must be readable up to its NUL within `OUT` bytes.
 unsafe fn mknod_make(path: *const c_char, mode: c_uint) -> c_int {
+    let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
     let mut buf = [0u8; crate::map::OUT];
     let p = unsafe { crate::map::prepare(b"mknod", crate::map::AT_FDCWD, path, &mut buf) };
     if p.is_null() {

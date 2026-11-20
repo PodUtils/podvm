@@ -123,6 +123,7 @@ unsafe fn ids_of_fd(fd: c_int) -> Option<(u64, u64)> {
 /// The payload's own contract for `chown(2)`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn chown(path: *const c_char, uid: c_uint, gid: c_uint) -> c_int {
+    let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
     let mut buf = [0u8; crate::map::OUT];
     let p = unsafe { crate::map::prepare(b"chown", crate::map::AT_FDCWD, path, &mut buf) };
     if p.is_null() {
@@ -137,6 +138,7 @@ pub unsafe extern "C" fn chown(path: *const c_char, uid: c_uint, gid: c_uint) ->
 /// The payload's own contract for `lchown(2)`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn lchown(path: *const c_char, uid: c_uint, gid: c_uint) -> c_int {
+    let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
     let mut buf = [0u8; crate::map::OUT];
     let p = unsafe { crate::map::prepare(b"lchown", crate::map::AT_FDCWD, path, &mut buf) };
     if p.is_null() {
@@ -175,6 +177,7 @@ pub unsafe extern "C" fn fchownat(
     // the file the kernel actually changed. Where the rewrite moved it, the
     // call goes with an absolute path; where it did not, the original
     // descriptor and path go through untouched.
+    let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
     let mut buf = [0u8; crate::map::OUT];
     // T-1725: AT_SYMLINK_NOFOLLOW keeps the last link.
     let p = unsafe {
@@ -275,6 +278,7 @@ macro_rules! stat_path_entry {
                     return rc;
                 }
             }
+            let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
             let mut buf = [0u8; crate::map::OUT];
             let p = unsafe {
                 crate::map::prepare(
@@ -339,6 +343,7 @@ macro_rules! stat_at_entry {
                 }
             }
             let follow = $follow;
+            let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
             let mut buf = [0u8; crate::map::OUT];
             // T-1725: the walk follows the last link as the call does.
             let p = unsafe {

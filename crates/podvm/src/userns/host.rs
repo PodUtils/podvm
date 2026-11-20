@@ -321,6 +321,29 @@ impl Drop for Held {
     }
 }
 
+/// TODO/enter.md T-1972: the check at the start of the loader family of
+/// the userland rung, whose interposer opens each volume under the base
+/// again at each call. `Ok(())` where `host` is not under `base`, or opens
+/// under it as a directory with no symbolic link; else the refusal.
+pub fn check_volume_under_base(base: &str, host: &str) -> Result<(), String> {
+    let Some(held) = beneath(base, host)? else {
+        return Ok(());
+    };
+    let dir = std::fs::metadata(format!("/proc/self/fd/{}", held.0)).map(|m| m.is_dir());
+    match dir {
+        Ok(true) => Ok(()),
+        Ok(false) => Err(format!(
+            "the volume is refused: the loader family holds a directory under its base {} \
+             (--podvm-volume-base), and its host path is not one",
+            base.trim_end_matches('/')
+        )),
+        Err(e) => Err(format!(
+            "the volume is refused: its host path under its base {} does not answer ({e})",
+            base.trim_end_matches('/')
+        )),
+    }
+}
+
 /// `host` opened with `O_PATH` under `base` with no symbolic link
 /// (`openat2(RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS)`), or `None` where
 /// `host` is not under `base` (PodUtils/podrunner#277).
@@ -378,4 +401,41 @@ fn beneath(base: &str, host: &str) -> Result<Option<Held>, String> {
         ));
     }
     Ok(Some(Held(fd as i32)))
+}
+
+#[cfg(test)]
+mod tests {
+    /// T-1972: at the start of the loader family, each volume under the
+    /// base opens under it as a directory with no symbolic link; a path out
+    /// of the base is no business of the base.
+    #[test]
+    fn a_volume_of_the_loader_family_opens_under_its_base_as_a_directory() {
+        let d = std::env::temp_dir().join(format!("podvm-hostbase-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let (base, out) = (d.join("base"), d.join("out"));
+        std::fs::create_dir_all(base.join("work/sub")).unwrap();
+        std::fs::create_dir_all(&out).unwrap();
+        std::fs::write(base.join("file"), b"f").unwrap();
+        std::os::unix::fs::symlink(&out, base.join("away")).unwrap();
+        std::os::unix::fs::symlink(base.join("work"), base.join("near")).unwrap();
+        let b = base.to_str().unwrap();
+        let s = |p: &str| format!("{b}/{p}");
+        for (host, ok, why) in [
+            (s("work"), true, ""),
+            (s("work/sub"), true, ""),
+            (b.to_string(), true, ""),
+            (out.to_str().unwrap().to_string(), true, ""),
+            (s("away"), false, "symbolic link"),
+            (s("near/sub"), false, "symbolic link"),
+            (s("file"), false, "directory"),
+            (s("absent"), false, "does not open"),
+        ] {
+            let r = super::check_volume_under_base(b, &host);
+            assert_eq!(r.is_ok(), ok, "{host}: {r:?}");
+            if let Err(e) = r {
+                assert!(e.contains(why) && e.contains(b), "{host}: {e}");
+            }
+        }
+        let _ = std::fs::remove_dir_all(&d);
+    }
 }

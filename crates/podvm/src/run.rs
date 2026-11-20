@@ -187,12 +187,14 @@ pub const RUN_OPTIONS: &str = "\
                    guest over the RLIMIT_FSIZE ceiling is refused before it
                    starts, naming both numbers (TODO/machine.md T-1305)
   --podvm-volume-base DIR
-                   podvm's own, the namespace rung and the syscall tier:
-                   each -v source under DIR opens under it with no symbolic
-                   link, and the bind or the handler takes that
-                   descriptor; a link under DIR is a refusal (exit 125).
-                   The loader family of the userland rung and each guest
-                   tier refuse it (PodUtils/podrunner#277, #300)
+                   podvm's own, the namespace rung and the userland rung
+                   (the syscall tier and the loader family): each -v
+                   source under DIR opens under it with no symbolic link;
+                   the bind or the handler takes that descriptor, and the
+                   interposer of the loader family opens it so again at
+                   each path call. A link under DIR is a refusal (exit
+                   125 at the start, ELOOP for the call after it). Each
+                   guest tier refuses it (PodUtils/podrunner#277, #300)
   --podvm-cpus N  podvm's own, machine tier only and refused elsewhere: the
                    guest's vCPUs, 1 to 64 (TODO/cli.md T-1654)
   --podvm-net none  podvm's own, machine and incus tiers: the guest has

@@ -29,6 +29,7 @@ pub unsafe extern "C" fn realpath(path: *const c_char, resolved: *mut c_char) ->
     };
     let mut exe = [0u8; crate::map::OUT];
     let path = unsafe { exe_input(path, &mut exe) };
+    let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
     let mut buf = [0u8; crate::map::OUT];
     let p = unsafe { crate::map::prepare(b"realpath", crate::map::AT_FDCWD, path, &mut buf) };
     if p.is_null() {
@@ -80,6 +81,7 @@ pub unsafe extern "C" fn canonicalize_file_name(path: *const c_char) -> *mut c_c
     };
     let mut exe = [0u8; crate::map::OUT];
     let path = unsafe { exe_input(path, &mut exe) };
+    let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
     let mut buf = [0u8; crate::map::OUT];
     let p = unsafe {
         crate::map::prepare(
@@ -123,6 +125,7 @@ pub unsafe extern "C" fn readlink(path: *const c_char, buf: *mut c_char, n: usiz
     {
         return e;
     }
+    let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
     let mut ibuf = [0u8; crate::map::OUT];
     let p = unsafe { crate::map::prepare(b"readlink", crate::map::AT_FDCWD, path, &mut ibuf) };
     if p.is_null() {
@@ -196,6 +199,7 @@ pub unsafe extern "C" fn readlinkat(
     {
         return e;
     }
+    let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
     let mut ibuf = [0u8; crate::map::OUT];
     let p = unsafe { crate::map::prepare(b"readlinkat", dirfd, path, &mut ibuf) };
     if p.is_null() {

@@ -4601,7 +4601,7 @@ On a host with a delegated cgroup2 subtree, a shell that forks and reparents a s
 **Milestone:** none
 **Priority:** P1
 **Effort:** L
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -4619,7 +4619,7 @@ On the namespace rung the flag holds (T-1945): pod-enter binds the descriptor. T
 
 ## Decision
 
--
+The loader family holds no descriptor between two calls (2026-11-20, the session's call). At each path call in a volume under the base, the interposer opens the base by its path, the volume under it and the rest of the path under the volume with `openat2(RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS)`, and the real call takes `/proc/self/fd/N` (or `/proc/self/fd/N/NAME` for a call that does not follow its last link) until it returns. A reserved range of descriptors, restored after `close_range`, is not necessary: no descriptor of podvm is open while the payload runs its own code. Measured cost: about 3 microseconds more for each call (`stat` 27.1 to 30.4 microseconds, `open` and `close` 25.1 to 27.9 microseconds, a release build of the interposer, 50 000 calls).
 
 ## Prove
 
@@ -4627,7 +4627,9 @@ As uid 1000 under the seccomp filter that denies user namespaces (`scripts/dev/n
 
 ## Done
 
-**Partial (2026-11-18, the syscall tier).** On a host with no user namespace, podrunner's units take `--podvm-tier=syscall` (T-1935), which `--podvm-volume-base` now serves: the handler of `podvm-dispatch` opens each volume under `PODVM_VOLUME_BASE` with `openat2(RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS)` (`vols::beneath`), where it opened the canonical path before, and resolves each later path under that descriptor with `RESOLVE_IN_ROOT` as before; `run::binds::refuse_base_off_binds` refuses only the loader family now. The "supervise" selection enters through the chroot sequence (`pod_enter::spawn_selected`), so no entry of a supervise rung holds volumes of its own. Measured as uid 1000 under `scripts/dev/nouserns.c` (`inspect`: `userland syscall`) with `docker.io/library/python:3.13-slim`: the loader family refuses the flag with exit 125 and one line; `-v BASE/work:/w` writes and reads; `-v BASE/link:/w` (a link out of BASE) exits 125; in a `run -d`, a link that the host makes at `BASE/work/sub` to a directory out of BASE after the start gives the payload `No such file or directory` for `/w/sub/f`, not the file out of BASE. `a_volume_opens_under_its_base_with_no_link` pins the open. Remaining: the loader family (step 3 of the Approach).
+**Done (2026-11-20, the loader family).** `podvm-interpose/src/map/base.rs`: `pin` holds each host path of a volume under `PODVM_VOLUME_BASE` as the Decision says; each entry point of a path call holds a `Scope`, whose drop closes the descriptors after the real call. A name that is absent at the check opens by its directory: the `open` shapes add `O_NOFOLLOW`, `creat` is the `open` shape, and the `fopen` shapes make the file with `O_NOFOLLOW` first. An exec route, `dlopen`, `glob`, the `ftw` family, `openat2`, `mount` and a socket address get the check only (`docs/limits.md`). At the start, `run::binds::check_base_off_binds` opens each volume under the base as a directory with no link (`userns::check_volume_under_base`), else exit 125 and one line. Measured as uid 1000 under `scripts/dev/nouserns.c` (`mode=userland`, the loader family) with `docker.io/library/alpine:3.20`: `-v BASE/work:/w` reads, writes, `mkdir` and `mv`; `-v BASE/link:/w` and a volume of one file under the base exit 125; links that the host makes after the start at `BASE/work/sub`, `BASE/work/rel` and `BASE/work/flink`, and a link that replaces `BASE/work`, give `No such file or directory`, never the file out of BASE. With a process of the host that exchanges `BASE/work/sub` and a link out of BASE (`renameat2(RENAME_EXCHANGE)`) for 25 s, 4 000 reads of `/w/sub/f` gave 1 505 times the file out of BASE with no flag, and 0 times with the flag (358 `ELOOP` with one line each). `a_volume_under_the_base_reaches_no_file_out_of_the_base` (podvm-interpose) and `a_volume_of_the_loader_family_opens_under_its_base_as_a_directory` (podvm) pin the class, as root and as uid 1000.
+
+**Partial (2026-11-18, the syscall tier).** On a host with no user namespace, podrunner's units take `--podvm-tier=syscall` (T-1935), which `--podvm-volume-base` now serves: the handler of `podvm-dispatch` opens each volume under `PODVM_VOLUME_BASE` with `openat2(RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS)` (`vols::beneath`), where it opened the canonical path before, and resolves each later path under that descriptor with `RESOLVE_IN_ROOT` as before; `run::binds::refuse_base_off_binds` refuses only the loader family now. The "supervise" selection enters through the chroot sequence (`pod_enter::spawn_selected`), so no entry of a supervise rung holds volumes of its own. Measured as uid 1000 under `scripts/dev/nouserns.c` (`inspect`: `userland syscall`) with `docker.io/library/python:3.13-slim`: the loader family refuses the flag with exit 125 and one line; `-v BASE/work:/w` writes and reads; `-v BASE/link:/w` (a link out of BASE) exits 125; in a `run -d`, a link that the host makes at `BASE/work/sub` to a directory out of BASE after the start gives the payload `No such file or directory` for `/w/sub/f`, not the file out of BASE. `a_volume_opens_under_its_base_with_no_link` pins the open.
 
 # T-1973: On the syscall tier, a payload cannot connect to a Unix socket of a volume
 

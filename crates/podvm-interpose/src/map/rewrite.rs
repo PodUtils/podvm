@@ -441,7 +441,15 @@ pub unsafe fn prepare_follow(
         // absolutized copy: the bytes the kernel sees stay exactly the
         // payload's, including any symlinks in the working directory prefix.
         // The kernel then resolves a relative path against the real base.
-        -1 => path,
+        // T-1972: a host path in a volume under the base is held as well.
+        -1 => {
+            out[..abs_n].copy_from_slice(&abs[..abs_n]);
+            match unsafe { super::base::held(&t, what, follow, writes, out, abs_n) } {
+                Ok(true) => out.as_ptr() as *const c_char,
+                Ok(false) => path,
+                Err(()) => core::ptr::null(),
+            }
+        }
         -2 => {
             crate::say::line(&[what, b": the mapped path does not fit, so the call fails"]);
             crate::set_errno(ENAMETOOLONG);
@@ -455,12 +463,18 @@ pub unsafe fn prepare_follow(
         n => match unsafe { resolve_links(&t, &abs[..abs_n], follow, out) } {
             Ok(m) => {
                 out[m] = 0;
-                out.as_ptr() as *const c_char
+                match unsafe { super::base::held(&t, what, follow, writes, out, m) } {
+                    Ok(_) => out.as_ptr() as *const c_char,
+                    Err(()) => core::ptr::null(),
+                }
             }
             Err(EINVAL) => {
                 let n = unsafe { rewrite(&t, abs.as_ptr(), abs_n, out) }.max(n);
                 out[n as usize] = 0;
-                out.as_ptr() as *const c_char
+                match unsafe { super::base::held(&t, what, follow, writes, out, n as usize) } {
+                    Ok(_) => out.as_ptr() as *const c_char,
+                    Err(()) => core::ptr::null(),
+                }
             }
             Err(e) => {
                 crate::say::line(&[what, b": a link of the path does not resolve inside the rootfs, so the call fails (TODO/interpose.md T-1725)"]);

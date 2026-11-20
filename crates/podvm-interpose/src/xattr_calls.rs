@@ -11,6 +11,7 @@ macro_rules! path_syscall {
         /// The payload's own contract for this entry point.
         #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $name($($arg: $ty),*) -> $ret {
+            let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
             let mut buf = [0u8; crate::map::OUT];
             let p = unsafe {
                 crate::map::prepare(

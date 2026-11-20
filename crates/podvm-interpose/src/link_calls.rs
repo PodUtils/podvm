@@ -13,6 +13,7 @@ macro_rules! path_at_int_flags {
         #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $name($($arg: $ty),*) -> c_int {
             let Some(f) = $real() else { set_errno(EINVAL); return -1; };
+            let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
             let mut buf = [0u8; crate::map::OUT];
             let name = stringify!($name).as_bytes();
             let follow = $flags & crate::owner_calls::AT_SYMLINK_NOFOLLOW == 0;
