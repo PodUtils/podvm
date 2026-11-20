@@ -99,6 +99,11 @@
 #      of `true` has `oom_kills` 0 or no such field (incusd's metrics name
 #      no sample yet for an instance that lived for less than their cache:
 #      the field is optional, never a false count).
+#  24. An image whose Entrypoint is its init (PodUtils/podrunner#325):
+#      the image of clause 19, saved again with `Entrypoint
+#      ["/sbin/init"]` as podrunner's hosted snapshot declares; `run -d
+#      --podvm-init=image` of it runs the command beside the init with no
+#      such prefix: its line is in `logs` and its exit code in `inspect`.
 #
 # Exit: 0 every clause matched, 1 a clause disagreed, 2 the lane could not
 # run (not root, no user namespaces, no package).
@@ -602,6 +607,54 @@ c23() { grep -Eq "$1" "$WORK/c23.txt" || { note "23: $2"; fail=1; }; }
 c23 "^  oom      rc 137$" "a command over --memory did not end with 137"
 c23 '^  report   "oom_kills": *[1-9]' "the report of an OOM kill has no oom_kills of 1 or more"
 c23 '^  report   ("oom_kills": *0|none)$' "the report of true has oom_kills above 0"
+
+# ---- clause 24 ----------------------------------------------------------
+echo ""; echo "== 24. an image whose Entrypoint is its init" >>"$REPORT"
+cat >"$B/mkentry.py" <<'PYEOF'
+import hashlib, io, json, sys, tarfile
+src, dst = sys.argv[1], sys.argv[2]
+blobs = {}
+with tarfile.open(src) as t:
+    for m in t.getmembers():
+        if m.isfile():
+            blobs[m.name] = t.extractfile(m).read()
+idx = json.loads(blobs["index.json"])
+mdesc = idx["manifests"][0]
+man = json.loads(blobs["blobs/" + mdesc["digest"].replace(":", "/")])
+cfg = json.loads(blobs["blobs/" + man["config"]["digest"].replace(":", "/")])
+cfg.setdefault("config", {})["Entrypoint"] = ["/sbin/init"]
+cfg["config"]["Cmd"] = None
+def put(b):
+    d = "sha256:" + hashlib.sha256(b).hexdigest()
+    blobs["blobs/" + d.replace(":", "/")] = b
+    return d
+cb = json.dumps(cfg).encode(); man["config"]["digest"] = put(cb); man["config"]["size"] = len(cb)
+mb = json.dumps(man).encode(); mdesc["digest"] = put(mb); mdesc["size"] = len(mb)
+mdesc.setdefault("annotations", {})["org.opencontainers.image.ref.name"] = "localhost/entry434:1"
+idx["manifests"] = [mdesc]
+blobs["index.json"] = json.dumps(idx).encode()
+with tarfile.open(dst, "w") as t:
+    for name, b in blobs.items():
+        i = tarfile.TarInfo(name); i.size = len(b); t.addfile(i, io.BytesIO(b))
+PYEOF
+{
+P save -o "$B/init.tar" "$INIT_IMG" >/dev/null 2>&1; echo "  save     rc $?"
+python3 -I "$B/mkentry.py" "$B/init.tar" "$B/entry.tar" >"$WORK/c24.py" 2>&1; echo "  build    rc $?"
+chown "$U:$U" "$B/entry.tar" 2>/dev/null
+echo "  load     $(P load -i "$B/entry.tar" 2>&1 | tail -1)"
+echo "  run -d   $(P run -d --name en434 --podvm-tier=incus --podvm-init=image localhost/entry434:1 sh -c 'echo "started $(cat /proc/1/comm)"; exit 3' </dev/null 2>&1 | tail -1)"
+i=0; st=""
+while [ $i -lt 30 ]; do st=$(RI list --format csv -c ns 2>/dev/null | sed -n 's/^en434,//p'); [ "$st" = STOPPED ] && break; i=$((i+1)); sleep 2; done
+echo "  stopped  ${st:--}"
+echo "  exitcode $(P inspect --podvm-tier=incus --format '{{.ExitCode}}' en434 2>&1)"
+echo "  logs     $(P logs --podvm-tier=incus en434 2>&1 | tr '\n' ' ')"
+P rm -f --podvm-tier=incus en434 >/dev/null 2>&1
+} >"$WORK/c24.txt" 2>&1
+cat "$WORK/c24.txt" >>"$REPORT"
+c24() { grep -Eq "$1" "$WORK/c24.txt" || { note "24: $2"; fail=1; }; }
+c24 "^  run -d   en434$" "run -d of an image whose Entrypoint is its init did not start"
+c24 "^  logs     started systemd" "the command did not run beside the init (the Entrypoint was its prefix)"
+c24 "^  exitcode 3$" "inspect did not give the exit code of the command"
 
 # ---- clause 9 -----------------------------------------------------------
 left_i=$(RI list --format csv -c n 2>&1 | grep -c .)

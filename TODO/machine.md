@@ -5755,3 +5755,36 @@ Boot the init of the image once for each digest and each guest shape, save the s
 ## Prove
 
 `sh experiments/465-init-image.sh`, clause 3, on the cloud host as uid 1000 with `ghcr.io/pkgforge-dev/archlinux:latest`: the second run of the same digest gives exit 7, and its time is under 15 s under TCG.
+
+# T-2011: `run -d --podvm-init=image` of an image whose Entrypoint is its init runs `/sbin/init CMD` and not the command
+
+**Source:** PodUtils/podrunner#325 (COORD-112 of podrunner, podrunner@T-556): `hosted-boot.yml` run 44663656956 on `0.2.0-beta.36`
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** partial
+
+## Problem
+
+podrunner's hosted snapshot declares `"Entrypoint": ["/sbin/init"]`. `run -d --podvm-tier=incus --podvm-init=image IMAGE /bin/sh /out/checks.sh` booted systemd as PID 1 to `degraded`, then ran `/sbin/init /bin/sh /out/checks.sh` beside it, as docker's rule puts the Entrypoint before the command. That second systemd printed "Too many arguments." into the log and exited 1, so the command never ran and the instance powered off. podrunner read the line of `logs` as a fault of `logs`, and asked for three changes: a `degraded` boot runs the command, a boot that does not come up is a named failure with its failed units, and `logs` gives the output of the command.
+
+## Premise
+
+With `--podvm-init=image` the init of the image boots as PID 1, so the init stands for the Entrypoint of an image made for an init. A `degraded` state already ran the command (`incus::systemd::step`, T-1993), a state that does not come up already ended `run -d` with 125 and its state, and `logs` already gave the log of the command: the log held the line of the second systemd.
+
+## Approach
+
+`run::entrypoints` gives no Entrypoint of the image with `--podvm-init=image` (an explicit `--entrypoint` stays the caller's), for each route: the incus tier, the machine tier and the native routes of T-2002 and T-2007. The refusal of a run with no command names the init. The failure of a boot names the failed units of `systemctl --failed`.
+
+## Decision
+
+-
+
+## Prove
+
+The unit tests `the_entrypoint_of_the_image_is_the_init_with_podvm_init_image` and `the_failed_units_give_one_line` pass; experiment 434 clause 24: the image of clause 19 saved with `Entrypoint ["/sbin/init"]`, `run -d --podvm-init=image` of it logs the line of its command and `inspect` gives its exit code.
+
+## Done
+
+Partial (2026-11-20). The change and its unit tests; experiment 434 clause 24 runs.

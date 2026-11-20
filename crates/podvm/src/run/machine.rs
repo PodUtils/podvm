@@ -58,10 +58,7 @@ pub(super) fn prepare_image(
     let argv = Plan::argv_for(image_entry, cfg.config.cmd.as_deref(), &o.command, entry);
     let argv = super::wrapped(o, argv); // T-1654: `fs.wrap`
     if argv.is_empty() {
-        eprintln!(
-            "podvm {verb}: {image} declares neither an Entrypoint nor a Cmd, and no \
-             command was given. There is nothing to run"
-        );
+        eprintln!("{}", super::nothing_to_run(verb, &image, o.init_image));
         return Err(EXIT_FLAG_ERROR);
     }
     // TODO/machine.md T-1823: an absolute program that the tree lacks

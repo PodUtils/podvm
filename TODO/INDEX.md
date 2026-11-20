@@ -673,10 +673,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2008](machine.md) | P3 | L | none | machine | open | The machine tier boots systemd at each run: a saved state of the guest for each digest |
 | [T-2009](enter.md) | P2 | M | none | enter | blocked | podvm fetches no runsc: the gVisor route of an init is there only where the host has one |
 | [T-2010](enter.md) | P1 | L | none | enter | partial | Each route of `--podvm-init=image` as fast as it can be: a measured baseline, then each gain |
+| [T-2011](machine.md) | P1 | S | none | machine | partial | `run -d --podvm-init=image` of an image whose Entrypoint is its init runs `/sbin/init CMD` and not the command |
 
 ## Counts
 
-607 entries: 25 open, 37 partial, 6 blocked, 539 done.
+608 entries: 25 open, 38 partial, 6 blocked, 539 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -686,10 +687,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 18 | 0 | 245 | 266 |
+| P1 | 3 | 19 | 0 | 245 | 267 |
 | P2 | 16 | 15 | 5 | 177 | 213 |
 | P3 | 6 | 4 | 1 | 42 | 53 |
-| **All** | 25 | 37 | 6 | 539 | 607 |
+| **All** | 25 | 38 | 6 | 539 | 608 |
 
 ## Work order
 

@@ -304,7 +304,52 @@ fn entrypoints<'a>(
 ) -> (Option<&'a [String]>, Option<&'a str>) {
     match o.entrypoint.as_deref() {
         Some("") => (None, None),
+        // PodUtils/podrunner#325 (TODO/machine.md T-1993): with
+        // `--podvm-init=image` the init of the image boots as PID 1 and
+        // stands for its Entrypoint (an image made for an init declares
+        // `/sbin/init`). The command runs beside it with no such prefix:
+        // before, the instance ran `/sbin/init CMD...` as a second process,
+        // which printed "Too many arguments." and ran nothing.
+        None if o.init_image => (None, None),
         given => (image, given),
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn the_entrypoint_of_the_image_is_the_init_with_podvm_init_image() {
+    let image = ["/sbin/init".to_string()];
+    for (init_image, given, want_image, want_given) in [
+        (false, None, true, None),
+        (true, None, false, None),
+        (false, Some(""), false, None),
+        (true, Some(""), false, None),
+        (true, Some("/bin/x"), true, Some("/bin/x")),
+    ] {
+        let mut o = Opts::new();
+        o.init_image = init_image;
+        o.entrypoint = given.map(str::to_string);
+        let (img, g) = entrypoints(Some(&image), &o);
+        assert_eq!(img.is_some(), want_image, "{init_image} {given:?}");
+        assert_eq!(g, want_given, "{init_image} {given:?}");
+    }
+}
+
+/// The refusal of a run with no command. With `--podvm-init=image` the
+/// Entrypoint of the image is its init, never the command
+/// (PodUtils/podrunner#325).
+fn nothing_to_run(verb: &str, image: &str, init_image: bool) -> String {
+    if init_image {
+        format!(
+            "podvm {verb}: --podvm-init=image boots the Entrypoint of {image} as its init, \
+             and the image declares no Cmd and no command was given. There is nothing to \
+             run beside the init"
+        )
+    } else {
+        format!(
+            "podvm {verb}: {image} declares neither an Entrypoint nor a Cmd, and no \
+             command was given. There is nothing to run"
+        )
     }
 }
 

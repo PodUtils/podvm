@@ -73,7 +73,8 @@ pub async fn boot_then_run(c: &Client, name: &str) -> Result<(), String> {
                 Step::Run => break,
                 Step::Fail => {
                     return Err(format!(
-                        "--podvm-init=image: the init of the image is not up: {last}"
+                        "--podvm-init=image: the init of the image is not up: {last}{}",
+                        failed_units(c, name).await
                     ))
                 }
                 Step::Again => {}
@@ -82,9 +83,10 @@ pub async fn boot_then_run(c: &Client, name: &str) -> Result<(), String> {
         if tokio::time::Instant::now() >= end {
             return Err(format!(
                 "--podvm-init=image: the init of the image did not finish its boot in {} s: {last}; \
-                 PID 1 is {}; an image with no systemd has no such init",
+                 PID 1 is {}; an image with no systemd has no such init{}",
                 BOOT_BOUND.as_secs(),
-                pid1(c, name).await
+                pid1(c, name).await,
+                failed_units(c, name).await
             ));
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -104,6 +106,32 @@ pub async fn boot_then_run(c: &Client, name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// PodUtils/podrunner#325 ask 2: the failed units of systemd for the line
+/// of a boot that did not come up, as `; failed units: a, b`; nothing
+/// where systemctl gives none or does not answer.
+async fn failed_units(c: &Client, name: &str) -> String {
+    let list = Exec::new(["systemctl", "--failed", "--no-legend", "--plain"]);
+    match c.exec_recorded(name, &list).await {
+        Ok(o) => units_line(&String::from_utf8_lossy(&o.stdout)),
+        Err(_) => String::new(),
+    }
+}
+
+/// The first word of each line of `systemctl --failed --no-legend
+/// --plain`, at most 20, as `; failed units: a, b`.
+pub(crate) fn units_line(text: &str) -> String {
+    let units: Vec<&str> = text
+        .lines()
+        .filter_map(|l| l.split_whitespace().next())
+        .take(20)
+        .collect();
+    if units.is_empty() {
+        String::new()
+    } else {
+        format!("; failed units: {}", units.join(", "))
+    }
+}
+
 /// The name of PID 1 of the instance, for the error of the bound.
 async fn pid1(c: &Client, name: &str) -> String {
     let comm = Exec::new(["cat", "/proc/1/comm"]);
@@ -116,7 +144,21 @@ async fn pid1(c: &Client, name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{step, Step};
+    use super::{step, units_line, Step};
+
+    #[test]
+    fn the_failed_units_give_one_line() {
+        for (text, want) in [
+            ("", ""),
+            ("\n", ""),
+            (
+                "chrony.service loaded failed failed chrony\nsystemd-remount-fs.service loaded failed failed Remount\n",
+                "; failed units: chrony.service, systemd-remount-fs.service",
+            ),
+        ] {
+            assert_eq!(units_line(text), want, "{text:?}");
+        }
+    }
 
     #[test]
     fn the_state_of_systemd_gives_the_step() {
