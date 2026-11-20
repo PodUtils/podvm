@@ -357,6 +357,12 @@ C26). Experiment 465 measures each line below as uid 1000.
   route is the guest. Experiment 467 measured User-Mode Linux in its
   seccomp mode on a host that denies `ptrace` and each namespace: 15 s
   for a run with systemd as PID 1. T-2005 plans it as a tier.
+- When the command ends, the init gets SIGRTMIN+4 and 10 s for the stop of
+  its units. Where nothing of the run can stay (each volume read-only;
+  on the namespace rung also `--rm`), it gets SIGKILL at once (T-2010).
+  `PODVM_RUNSC_ARGS` gives more flags of `runsc`, each a flag, after the
+  flags of the tier; a flag that breaks the tier is the caller's.
+  Experiment 468 has the times of each route.
 - `run -d`, `create` and `exec` with the init hold on the incus tier only
   (T-1993). On the namespace rung, the command gets the primary group of
   `--user` and no supplementary group, and `tty` in a command of `-t`

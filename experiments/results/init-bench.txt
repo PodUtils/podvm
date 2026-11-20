@@ -1,0 +1,29 @@
+# 2026-11-20T00:21:11Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label baseline
+baseline               ns       run=  5.4s first=  2.6s mem=  249MiB state=running boot=2.282s unit=6ms mariadb=146ms postgres=2319ms sql=42,42 uid=100
+baseline               runsc    run=  8.0s first=  3.7s mem=  925MiB state=running boot=3.334s unit=36ms mariadb=355ms postgres=2607ms sql=42,42 uid=100
+baseline               machine  run= 28.8s first= 16.3s mem= 3709MiB state=running boot=6.706s unit=163ms mariadb=2279ms postgres=5332ms sql=42,42 uid=100
+# 2026-11-20T00:22:09Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label baseline-again
+baseline-again         ns       run=  5.5s first=  2.6s mem=  246MiB state=running boot=2.258s unit=6ms mariadb=173ms postgres=2321ms sql=42,42 uid=100
+baseline-again         runsc    run=  8.2s first=  3.8s mem=  978MiB state=running boot=3.409s unit=32ms mariadb=387ms postgres=2612ms sql=42,42 uid=100
+baseline-again         machine  run= 28.7s first= 16.5s mem= 3703MiB state=running boot=6.689s unit=178ms mariadb=2196ms postgres=5256ms sql=42,42 uid=100
+# 2026-11-20T00:25:32Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label runsc self(default)
+runsc self(default)    runsc    run=  9.3s first=  3.6s mem=  864MiB state=running boot=3.240s unit=34ms mariadb=355ms postgres=2700ms sql=42,42 uid=100
+# 2026-11-20T00:25:44Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label runsc memory
+runsc memory           runsc    run=  8.0s first=  3.7s mem=  875MiB state=running boot=3.248s unit=33ms mariadb=374ms postgres=2602ms sql=42,42 uid=100
+# 2026-11-20T00:25:54Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label runsc directfs-off
+runsc directfs-off     runsc    run=  8.3s first=  3.9s mem=  853MiB state=running boot=3.326s unit=30ms mariadb=370ms postgres=2622ms sql=42,42 uid=100
+# 2026-11-20T00:26:06Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label runsc ptrace
+runsc ptrace           runsc    run= 11.1s first=  4.8s mem=  496MiB state=running boot=4.235s unit=68ms mariadb=672ms postgres=3074ms sql=42,42 uid=100
+# 2026-11-20T00:26:21Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label runsc hostsettings-ignore
+runsc hostsettings-ignore runsc    run=  7.9s first=  3.6s mem=  812MiB state=running boot=3.221s unit=31ms mariadb=354ms postgres=2589ms sql=42,42 uid=100
+# 2026-11-20T00:26:32Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label runsc no-hugepages
+runsc no-hugepages     runsc    run=  8.0s first=  3.6s mem=  834MiB state=running boot=3.256s unit=31ms mariadb=351ms postgres=2588ms sql=42,42 uid=100
+# 2026-11-20T00:26:45Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label runsc file-shared
+# 2026-11-20T00:48:27Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label wait+rw
+wait+rw                ns       run=  5.4s first=  2.4s mem=  246MiB state=running boot=2.267s unit=7ms mariadb=166ms postgres=2332ms sql=42,42 uid=100
+wait+rw                runsc    run=  8.6s first=  3.8s mem=  853MiB state=running boot=3.466s unit=42ms mariadb=448ms postgres=2793ms sql=42,42 uid=100
+wait+rw                machine  run= 30.2s first= 18.7s mem= 3684MiB state=running boot=7.689s unit=159ms mariadb=2053ms postgres=4901ms sql=42,42 uid=100
+# 2026-11-20T00:49:20Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label wait+discard
+wait+discard           ns       run=  5.3s first=  2.4s mem=  247MiB state=running boot=2.266s unit=5ms mariadb=236ms postgres=2311ms sql=42,42 uid=100
+wait+discard           runsc    run=  7.4s first=  3.5s mem=  831MiB state=running boot=3.238s unit=28ms mariadb=314ms postgres=2561ms sql=42,42 uid=100
+wait+discard           machine  run= 28.8s first= 17.5s mem= 3630MiB state=running boot=7.107s unit=190ms mariadb=2261ms postgres=5363ms sql=42,42 uid=100

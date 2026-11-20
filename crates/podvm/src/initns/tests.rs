@@ -97,12 +97,15 @@ fn a_wrong_argument_of_the_supervisor_is_named() {
 #[test]
 fn only_the_flag_sets_the_mark() {
     let mut env = v(&["A=1", "PODVM_INIT=image", "PODVM_INIT_LOG=1"]);
-    mark_env(&mut env, false, true);
+    mark_env(&mut env, false, true, true);
     assert_eq!(env, v(&["A=1"]));
-    mark_env(&mut env, true, false);
+    mark_env(&mut env, true, false, false);
     assert_eq!(env, v(&["A=1", MARK]));
-    mark_env(&mut env, true, true);
-    assert_eq!(env, v(&["A=1", MARK, "PODVM_INIT_LOG=1"]));
+    mark_env(&mut env, true, true, true);
+    assert_eq!(
+        env,
+        v(&["A=1", MARK, "PODVM_INIT_LOG=1", "PODVM_INIT_DISCARD=1"])
+    );
 }
 
 #[test]
@@ -175,4 +178,24 @@ fn the_scope_of_the_user_manager_is_asked_for_and_read() {
     }
     assert_eq!(scope::user_bus(Some("/nonexistent-podvm-dir"), 1000), None);
     assert_eq!(scope::user_bus(Some("relative"), 4_000_000_000), None);
+}
+
+/// TODO/enter.md T-2010: a run keeps nothing only with `--rm` and with
+/// each volume read-only.
+#[test]
+fn a_run_discards_only_with_rm_and_read_only_volumes() {
+    let vol = |g: &str| podvm_enter::userland::Volume {
+        host: "/h".into(),
+        guest: g.into(),
+    };
+    let ro = v(&["/a"]);
+    for (rm, volumes, want) in [
+        (true, vec![], true),
+        (false, vec![], false),
+        (true, vec![vol("/a")], true),
+        (true, vec![vol("/a"), vol("/b")], false),
+        (false, vec![vol("/a")], false),
+    ] {
+        assert_eq!(discards(rm, &volumes, &ro), want, "{rm} {}", volumes.len());
+    }
 }

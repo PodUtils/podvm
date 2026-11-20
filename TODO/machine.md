@@ -5742,11 +5742,11 @@ A run of `--podvm-init=image` on the machine tier boots the kernel and systemd e
 
 ## Premise
 
-QEMU saves and loads the state of a guest (`savevm`, `migrate` to a file, `-incoming`), with the disks on a copy-on-write overlay. Not measured here.
+QEMU saves and loads the state of a guest (`savevm`, `migrate` to a file, `-incoming`), with the disks on a copy-on-write overlay. Measured by hand on the cloud host as uid 1000 (2026-11-20, QEMU of the host under TCG, the guest of `run --podvm-tier=machine --podvm-init=image` of Debian 12 with MariaDB and PostgreSQL, 3072 MiB, four vCPUs, no volume, a QMP socket by `--podvm-qemu-arg`): after the boot (the command ran 17 s after the start), `migrate` to a file took 12 s and wrote 1.55 GiB; a new QEMU with the same arguments and `-incoming` ran the guest again 1.9 s and 2.1 s after its start (the loop of the command printed its next line), against 16.3 s to the first output of a boot. The clock of the guest stays at the time of the save. Not measured: a volume (QEMU refuses a migration with a mounted 9p export), the network, and KVM.
 
 ## Approach
 
-Boot the init of the image once for each digest and each guest shape, save the state of the guest after `systemctl is-system-running`, and start each run from that state on a new overlay; the command, the volumes and the environment of the run go in after the load. It needs the root on a disk (T-1994). A state of another QEMU version or shape is made again.
+Boot the init of the image once for each digest and each guest shape, save the state of the guest after `systemctl is-system-running`, and start each run from that state; the command, the volumes and the environment of the run go in after the load. The root in the initramfs is part of the state, so the root on a disk (T-1994) is not needed first; it makes the state smaller. What the design must hold: (1) `guest-init` in a serve mode: after the boot it waits for one job on the serial line (the nonce of the markers, the command, the environment, the directory, the volumes, the time, 32 bytes for the kernel's random pool); (2) the 9p devices of the volumes are in the saved guest as a fixed count of slots that are not mounted, and a run with more volumes boots as before; (3) the key of a state is the digest, the memory, the vCPUs, the kernel, the QEMU version and the version of podvm, and a state under a lock; (4) each run of one state has the machine-id and the boot id of the save: the limits name it.
 
 ## Decision
 

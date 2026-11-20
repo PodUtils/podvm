@@ -81,6 +81,10 @@ pub struct Spec {
     pub tmp: Option<Vec<mounts::Bind>>,
     /// The console of the init goes to stderr as it comes.
     pub verbose: bool,
+    /// Nothing of the run stays after it (the tree goes, and each volume is
+    /// read-only): the init gets SIGKILL at the end, with no wait for the
+    /// stop of its units (TODO/enter.md T-2010).
+    pub discard: bool,
     pub argv: Vec<String>,
 }
 
@@ -222,11 +226,12 @@ fn ended(pid: i32) -> Option<i32> {
     (unsafe { waitpid(pid, &mut st, WNOHANG) } == pid).then_some(st)
 }
 
-/// End the init: the signal of a power off, the bound, then SIGKILL.
-fn stop(pid: i32, systemd: bool) {
+/// End the init: the signal of a power off, the bound, then SIGKILL; with
+/// `discard`, SIGKILL at once.
+fn stop(pid: i32, systemd: bool, discard: bool) {
     // SAFETY: kill takes two integers.
     unsafe { kill(pid, if systemd { SIGRTMIN_4 } else { SIGTERM }) };
-    let end = Instant::now() + STOP_BOUND;
+    let end = Instant::now() + if discard { Duration::ZERO } else { STOP_BOUND };
     while Instant::now() < end {
         if ended(pid).is_some() {
             return;
@@ -323,7 +328,7 @@ pub fn supervise(spec: &Spec) -> i32 {
     let ns = match join::Namespaces::of(init, leaves.is_some()) {
         Ok(ns) => ns,
         Err(e) => {
-            stop(init, false);
+            stop(init, false, true);
             return fail(format!("the namespaces of the init: {e}"));
         }
     };
@@ -331,7 +336,7 @@ pub fn supervise(spec: &Spec) -> i32 {
     let systemd = match booted {
         Ok(systemd) => systemd,
         Err(e) => {
-            stop(init, false);
+            stop(init, false, true);
             let console = tail_text(&tail);
             return fail(if console.is_empty() {
                 e
@@ -341,7 +346,7 @@ pub fn supervise(spec: &Spec) -> i32 {
         }
     };
     let code = join::run_command(&ns, spec);
-    stop(init, systemd);
+    stop(init, systemd, spec.discard);
     code
 }
 

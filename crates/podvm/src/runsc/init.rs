@@ -227,7 +227,7 @@ pub fn drive(
     let out = std::fs::File::create(&log).map_err(|e| format!("{}: {e}", log.display()))?;
     let err = out.try_clone().map_err(|e| e.to_string())?;
     let mut run = Command::new(runsc);
-    run.args(args(state, bundle, id))
+    run.args(super::with_extra(args(state, bundle, id), "run")?)
         .stdin(Stdio::null())
         .stdout(out)
         .stderr(err);
@@ -249,7 +249,10 @@ pub fn drive(
         .spawn()
         .map_err(|e| format!("{}: {e}", runsc.display()))?;
     let result = boot_then_run(job, runsc, state, id, &mut sandbox, &log);
-    stop(runsc, state, id, &mut sandbox);
+    // The root of the sandbox ends with the run: where each volume is
+    // read-only too, nothing waits for a stop of the units (T-2010).
+    let discard = crate::initns::discards(true, job.volumes, job.ro);
+    stop(runsc, state, id, &mut sandbox, discard || result.is_err());
     match (result, SIGNAL.load(Ordering::Relaxed)) {
         (_, sig) if sig != 0 => Ok(128 + sig),
         (r, _) => r,
@@ -273,16 +276,11 @@ fn boot_then_run(
             )
         })
     };
-    let ask = exec_args(
-        state,
-        id,
-        None,
-        "/",
-        &[format!("PATH={}", crate::initns::join::PATH)],
-        &["systemctl".to_string(), "is-system-running".to_string()],
-    );
     let end = Instant::now() + BOOT_BOUND;
-    let wait = has_systemctl(job.rootfs);
+    let systemctl = has_systemctl(job.rootfs);
+    // `--wait` returns at the moment the boot is complete (T-2010); an old
+    // systemctl has none, and podvm then asks again.
+    let mut wait = systemctl;
     loop {
         if let Some(why) = ended(sandbox, log) {
             return Err(why);
@@ -290,16 +288,46 @@ fn boot_then_run(
         if SIGNAL.load(Ordering::Relaxed) != 0 {
             return Ok(125);
         }
-        let o = Command::new(runsc)
-            .args(&ask)
+        let mut words = vec!["systemctl".to_string(), "is-system-running".to_string()];
+        if wait {
+            words.push("--wait".to_string());
+        }
+        let path = [format!("PATH={}", crate::initns::join::PATH)];
+        let mut ask = Command::new(runsc)
+            .args(exec_args(state, id, None, "/", &path, &words))
             .stdin(Stdio::null())
-            .output()
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
             .map_err(|e| format!("runsc exec: {e}"))?;
-        let state_word = String::from_utf8_lossy(&o.stdout).trim().to_string();
-        let err = String::from_utf8_lossy(&o.stderr).trim().to_string();
+        let left = end.saturating_duration_since(Instant::now());
+        let mut answer = (String::new(), String::new());
+        loop {
+            if wait_bounded(&mut ask, Duration::from_millis(100).min(left)).is_some() {
+                let o = ask
+                    .wait_with_output()
+                    .map_err(|e| format!("runsc exec: {e}"))?;
+                answer = (
+                    String::from_utf8_lossy(&o.stdout).trim().to_string(),
+                    String::from_utf8_lossy(&o.stderr).trim().to_string(),
+                );
+                break;
+            }
+            let over = Instant::now() >= end || SIGNAL.load(Ordering::Relaxed) != 0;
+            if over || sandbox.try_wait().ok().flatten().is_some() {
+                let _ = ask.kill();
+                let _ = ask.wait();
+                break;
+            }
+        }
+        let (state_word, err) = answer;
+        if wait && crate::initns::join::no_wait_flag(&err) {
+            wait = false;
+            continue;
+        }
         // Before the sandbox runs, `runsc exec` names the state of the
         // container; before PID 1 has its bus, systemctl names the bus.
-        let up = if wait {
+        let up = if systemctl {
             step(&state_word, &err) == Step::Run
         } else {
             !err.contains("cannot execute in container") && !err.contains("loading container")
@@ -314,7 +342,7 @@ fn boot_then_run(
                 BOOT_BOUND.as_secs()
             ));
         }
-        std::thread::sleep(Duration::from_millis(100));
+        std::thread::sleep(Duration::from_millis(25));
     }
     let user = (job.user != (0, 0)).then_some(job.user);
     let mut cmd = Command::new(runsc);
@@ -357,8 +385,10 @@ fn boot_then_run(
 /// no real-time signal), until PID 1 is no longer the manager (systemd
 /// stopped each unit and became `systemd-shutdown`, which does not end a
 /// sandbox of the Sentry), within the bound; then SIGKILL of the sandbox.
-fn stop(runsc: &Path, state: &Path, id: &str, sandbox: &mut Child) {
-    if sandbox.try_wait().ok().flatten().is_none() && SIGNAL.load(Ordering::Relaxed) == 0 {
+/// With `at_once`, only the SIGKILL.
+fn stop(runsc: &Path, state: &Path, id: &str, sandbox: &mut Child, at_once: bool) {
+    let alive = sandbox.try_wait().ok().flatten().is_none();
+    if alive && !at_once && SIGNAL.load(Ordering::Relaxed) == 0 {
         let script = "kill -38 1 2>/dev/null; i=0; \
                       while [ \"$(cat /proc/1/comm 2>/dev/null)\" = systemd ] && [ $i -lt 100 ]; \
                       do sleep 0.1; i=$((i+1)); done";

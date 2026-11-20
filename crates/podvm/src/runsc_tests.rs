@@ -95,3 +95,19 @@ fn a_runsc_variable_that_names_no_file_is_refused() {
         "{e}"
     );
 }
+
+/// TODO/enter.md T-2010: the variable gives flags only, before the verb.
+#[test]
+fn the_extra_arguments_are_flags_before_the_verb() {
+    assert_eq!(extra_args(None), Ok(vec![]));
+    assert_eq!(
+        extra_args(Some(" --overlay2=root:memory  -directfs=false ")),
+        Ok(vec![
+            "--overlay2=root:memory".to_string(),
+            "-directfs=false".to_string()
+        ])
+    );
+    for bad in ["run", "--a x", "-", "--ok delete"] {
+        assert!(extra_args(Some(bad)).is_err(), "{bad}");
+    }
+}

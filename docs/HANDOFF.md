@@ -182,6 +182,13 @@ and `docs/decisions.md`. Remove this file when each step below is done.
   `podcrates@T-977` (the `fetch` module of `pod-release`),
   PodUtils/podcrates#243. podvm carries no kernel and writes no fetch.
 
+* T-2010 (partial): `sh experiments/468-init-bench.sh` gives the baseline
+  of each route (the run, the first output, the memory). Done: the wait
+  with `--wait`, the stop at once of a run that keeps nothing,
+  `PODVM_RUNSC_ARGS`. T-2008 is measured by hand: a saved guest runs again
+  2 s after the start of QEMU under TCG, against 16 s for a boot; its
+  design is in the entry, and no code is written.
+
 ## Next steps, in order
 
 1. Start the session (`AGENTS.md`, section 8), with the watcher (filter

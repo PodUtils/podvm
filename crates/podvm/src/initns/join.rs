@@ -89,32 +89,69 @@ impl Namespaces {
     }
 }
 
+/// True for the error of a `systemctl` that does not know `--wait`
+/// (before systemd 240).
+pub fn no_wait_flag(stderr: &str) -> bool {
+    stderr.contains("unrecognized option") || stderr.contains("invalid option")
+}
+
+/// The output of `c`, or `None` where `stop` says so before `c` ends (the
+/// bound of the boot, or the end of the init): `c` is then killed.
+fn output_until(
+    mut c: Command,
+    stop: &mut dyn FnMut() -> bool,
+) -> std::io::Result<Option<std::process::Output>> {
+    let mut child = c.stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()?;
+    loop {
+        if child.try_wait()?.is_some() {
+            return child.wait_with_output().map(Some);
+        }
+        if stop() {
+            child.kill()?;
+            child.wait()?;
+            return Ok(None);
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
 /// Wait until the init is up. `Ok(true)`: systemd is up (`running` or
 /// `degraded`). `Ok(false)`: the image has no `systemctl`, so its init has
 /// no state to ask for, and the command starts at once. `ended` gives the
 /// exit code of the init where it ended.
+///
+/// `systemctl is-system-running --wait` returns at the moment the boot is
+/// complete, so no time goes to a poll (TODO/enter.md T-2010); before PID 1
+/// has its bus, and with a systemctl that has no `--wait`, podvm asks again.
 pub fn wait_boot(ns: &Namespaces, ended: &mut dyn FnMut() -> Option<i32>) -> Result<bool, String> {
     let end = Instant::now() + BOOT_BOUND;
+    let mut wait = true;
+    let mut last = String::from("no answer");
     loop {
         if let Some(code) = ended() {
             return Err(format!(
                 "the init of the image ended during its boot with status {code}"
             ));
         }
-        let out = ns
-            .command("systemctl", None, "/")
-            .arg("is-system-running")
-            .env_clear()
-            .env("PATH", PATH)
-            .stdin(Stdio::null())
-            .output();
-        let last = match out {
+        let mut c = ns.command("systemctl", None, "/");
+        c.arg("is-system-running");
+        if wait {
+            c.arg("--wait");
+        }
+        c.env_clear().env("PATH", PATH).stdin(Stdio::null());
+        let out = output_until(c, &mut || Instant::now() >= end || ended().is_some());
+        match out {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
             Err(e) => return Err(format!("systemctl is-system-running: {e}")),
-            Ok(o) => {
+            Ok(None) => {}
+            Ok(Some(o)) => {
                 let state = String::from_utf8_lossy(&o.stdout).trim().to_string();
                 let err = String::from_utf8_lossy(&o.stderr).trim().to_string();
-                let last = format!("systemctl is-system-running gives {state:?}: {err}");
+                last = format!("systemctl is-system-running gives {state:?}: {err}");
+                if wait && no_wait_flag(&err) {
+                    wait = false;
+                    continue;
+                }
                 match step(&state, &err) {
                     Step::Run => return Ok(true),
                     Step::Again => {}
@@ -122,16 +159,15 @@ pub fn wait_boot(ns: &Namespaces, ended: &mut dyn FnMut() -> Option<i32>) -> Res
                     Step::Fail if state == "offline" || state == "unknown" => {}
                     Step::Fail => return Err(format!("the init of the image is not up: {last}")),
                 }
-                last
             }
-        };
+        }
         if Instant::now() >= end {
             return Err(format!(
                 "the init of the image did not finish its boot in {} s: {last}",
                 BOOT_BOUND.as_secs()
             ));
         }
-        std::thread::sleep(Duration::from_millis(200));
+        std::thread::sleep(Duration::from_millis(25));
     }
 }
 
@@ -191,6 +227,18 @@ pub fn run_command(ns: &Namespaces, spec: &super::boot::Spec) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::internal;
+
+    #[test]
+    fn an_old_systemctl_is_read_from_its_error() {
+        for (err, want) in [
+            ("systemctl: unrecognized option '--wait'", true),
+            ("systemctl: invalid option -- 'w'", true),
+            ("Failed to connect to bus: No such file or directory", false),
+            ("", false),
+        ] {
+            assert_eq!(super::no_wait_flag(err), want, "{err}");
+        }
+    }
 
     #[test]
     fn the_command_gets_no_variable_of_the_entry() {

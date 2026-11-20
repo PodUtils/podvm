@@ -8,6 +8,12 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- A run of `--podvm-init=image` waits for the boot with `systemctl
+  is-system-running --wait` and no poll, and where nothing of the run can
+  stay (each volume read-only, and `--rm` on the namespace rung) the init
+  ends at once when the command ends (T-2010): 8.0 s to 7.4 s on the runsc
+  tier for MariaDB and PostgreSQL under systemd. `PODVM_RUNSC_ARGS` gives
+  more flags of `runsc`.
 - `run --podvm-init=image` holds on the runsc tier (T-2007): the init of
   the image is PID 1 of a gVisor sandbox, with a cgroup2 tree and each uid
   from gVisor's kernel, so the host needs no delegated cgroup and no id

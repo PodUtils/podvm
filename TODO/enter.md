@@ -5435,3 +5435,50 @@ On a host with a user namespace and no `runsc` on PATH, as a user with no root: 
 ## Blocker
 
 Blocked (2026-11-20) on `podcrates@T-977` (PodUtils/podcrates#243, COORD-148, the answer to COORD-208, #604): a `fetch` module of `pod-release` (a pinned URL for each architecture with its SHA-256, a cache under a lock, the hash checked before the first exec). podvm writes no fetch; `PODVM_RUNSC` and PATH stay. podvm keeps the pin and the order of its tiers. The pin for x86_64, read from the file that experiment 436 checks by its SHA-512: `https://storage.googleapis.com/gvisor/releases/release/20261102/x86_64/gvisor.tar.bz2`, 75,332,313 bytes, SHA-256 `6f6b1a8f0f4665a403238135167d0d990bfaeaff5544abf68f5e0d822b35484a`; the tier needs its members `runsc` and `gvisor-bin/` (the release has no `runsc` as a file of its own: that URL gives 404). The call site is `runsc::binary` (`crates/podvm/src/runsc.rs`) and the check of `initns::route`. The condition that clears it: the tag of podcrates with the module.
+
+# T-2010: Each route of `--podvm-init=image` as fast as it can be: a measured baseline, then each gain
+
+**Source:** the owner (2026-11-20, round 2: "make each route as fast as possible", with a measured baseline first); T-2002, T-2007, T-2008
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** L
+**Status:** partial
+
+## Problem
+
+The routes of an init of the image had one time each, from different runs. No measure gave the time to the first output of the command or the peak memory, and no change of a route had a number before and after.
+
+## Premise
+
+`sh experiments/468-init-bench.sh` on the cloud host as uid 1000 (4 CPUs, no `/dev/kvm`, gVisor `release-20261102.0`), with Debian 12, MariaDB 10.11 and PostgreSQL 15 under systemd 252, each row one run with a spare tree, twice (`experiments/results/init-bench.txt`, the labels `baseline` and `baseline-again`):
+
+| the route | the run | the first output | `systemd-analyze` | a unit of `/bin/true` | a restart of MariaDB | a restart of PostgreSQL | the peak memory |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| the namespace rung (a cgroup2 directory that root gave) | 5.4 s, 5.5 s | 2.6 s | 2.3 s | 6 ms | 0.15 s to 0.17 s | 2.3 s | 249 MiB |
+| the runsc tier | 8.0 s, 8.2 s | 3.7 s, 3.8 s | 3.3 s to 3.4 s | 32 ms to 36 ms | 0.36 s to 0.39 s | 2.6 s | 925 MiB to 978 MiB |
+| the machine tier under TCG, four vCPUs | 28.8 s, 28.7 s | 16.3 s, 16.5 s | 6.7 s | 163 ms to 178 ms | 2.2 s to 2.3 s | 5.3 s | 3.7 GiB |
+
+What the baseline shows: (1) on the namespace rung systemd reaches `basic.target` in 80 ms, and 2.17 s of the 2.28 s is the start of `postgresql@15-main.service` of the image: no unit of systemd is worth a mask there; (2) podvm's own setup with a spare tree is 0.2 s, and a run with no spare tree copies the 797 MiB of the tree first (about 4.5 s); (3) the guest spends about 10 s before systemd starts (the kernel and the initramfs of 800 MiB) and holds the root twice in memory; (4) a pipe on the stdout of podvm stays open for seconds after the exit of podvm, as the helper that removes the tree holds it: a measure reads the exit of podvm, not the end of the pipe.
+
+## Approach
+
+In the order of the owner: the runsc tier (its flags, its start, its stop), the boot of systemd on each route, the machine tier (T-2008 and the settings of TCG), podvm's own setup on the namespace rung. The UML route waits for `podcrates@T-975` (T-2005), and the fetch of runsc for `podcrates@T-977` (T-2009).
+
+## Decision
+
+-
+
+## Prove
+
+`sh experiments/468-init-bench.sh` as root with `PODVM_468_USER` on the cloud host, with `mirror.gcr.io/library/debian:12` as the base of its image: each row of the routes `ns`, `runsc` and `machine` has `state=running`, `sql=42,42` and `uid=100`, and the transcript holds the rows of the baseline and of each change.
+
+## Done
+
+Partial (2026-11-20). Experiment 468 and its transcript. Three changes, each measured:
+
+1. The wait for the boot asks `systemctl is-system-running --wait` once, which returns when the boot is complete, in place of a poll each 200 ms (`initns/join.rs::wait_boot`, `runsc/init.rs`); a systemctl with no `--wait` (before systemd 240) is read from its error, and podvm polls each 25 ms. The first output on the namespace rung: 2.6 s before, 2.4 s after.
+2. Where nothing of a run can stay (`--rm` on the namespace rung, each run of the runsc tier and of the machine tier; and each volume read-only), the init gets SIGKILL when the command ends, with no wait for the stop of its units (`initns::discards`, `--discard` of `guest-init`). The run on the runsc tier: 8.0 s before, 7.4 s after (the label `wait+discard`, with the volume `:ro`); the namespace rung 5.4 s and 5.3 s; the machine tier 28.8 s and 28.8 s (its runs differ by 1.5 s). With a writable volume the stop is as before (the label `wait+rw`).
+3. `PODVM_RUNSC_ARGS` gives more flags of `runsc` for a measure (`runsc::extra_args`). One run each: `--overlay2=root:memory` 8.0 s, `--directfs=false` 8.3 s, `--host-settings=ignore` 7.9 s, `--app-huge-pages=false` 8.0 s, against 8.0 s to 9.3 s with the flags of the tier; `--platform=ptrace` 11.1 s with a first output at 4.8 s; `--file-access=shared` is refused by runsc with the overlay of the root. No flag gains more than the difference between two runs, so the flags of the tier stay.
+
+Remaining, in order: (1) the runsc tier: its 0.9 s over the namespace rung before the first output (read `--boot-times-log`; the copy of each file whose owner changes into the overlay), and its memory; (2) T-2008, measured: the restore of a saved guest takes 2 s; (3) the settings of the guest under TCG (`mitigations=off`, `tb-size`), not measured; (4) a run with no spare tree copies the tree: the overlay root of podcrates@T-486 for the namespace rung; (5) the runs on `kvm.yml`.

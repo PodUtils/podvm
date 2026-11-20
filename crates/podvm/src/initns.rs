@@ -37,6 +37,9 @@ pub const MARK: &str = "PODVM_INIT=image";
 pub const VERB: &str = "guest-init";
 /// The variable that sends the console of the init to stderr (`--verbose`).
 pub const LOG_VAR: &str = "PODVM_INIT_LOG";
+/// The variable of a run whose tree and volumes keep nothing (`--rm`, and
+/// each volume read-only): the init ends with SIGKILL (T-2010).
+pub const DISCARD_VAR: &str = "PODVM_INIT_DISCARD";
 
 /// True where [`decide`] found each part of the namespace rung.
 static EARLY: AtomicBool = AtomicBool::new(false);
@@ -197,14 +200,23 @@ pub fn route(verb: &str, mut o: crate::run::Opts) -> crate::run::Opts {
 /// The mark of an init of the image in the environment of a run, and its
 /// console on stderr under `--verbose`. A value of the caller is removed
 /// first: only the flag sets the mark.
-pub fn mark_env(env: &mut Vec<String>, init_image: bool, verbose: bool) {
+pub fn mark_env(env: &mut Vec<String>, init_image: bool, verbose: bool, discard: bool) {
     env.retain(|e| !e.starts_with("PODVM_INIT"));
     if init_image {
         env.push(MARK.to_string());
         if verbose {
             env.push(format!("{LOG_VAR}=1"));
         }
+        if discard {
+            env.push(format!("{DISCARD_VAR}=1"));
+        }
     }
+}
+
+/// True where nothing of a run can stay: `--rm`, and each volume
+/// read-only.
+pub fn discards(rm: bool, volumes: &[podvm_enter::userland::Volume], ro: &[String]) -> bool {
+    rm && volumes.iter().all(|v| ro.contains(&v.guest))
 }
 
 /// True where the prepared foreground run boots the init here.
@@ -280,6 +292,7 @@ pub fn parse(args: &[String]) -> Result<boot::Spec, String> {
                 s.tmp.get_or_insert_with(Vec::new).push(b);
             }
             "--verbose" => s.verbose = true,
+            "--discard" => s.discard = true,
             "--" => {
                 s.argv = it.cloned().collect();
                 break;
@@ -302,6 +315,7 @@ pub fn main(args: &[String]) -> i32 {
     match parse(args) {
         Ok(mut spec) => {
             spec.verbose |= std::env::var(LOG_VAR).is_ok_and(|v| v == "1");
+            spec.discard |= std::env::var(DISCARD_VAR).is_ok_and(|v| v == "1");
             boot::supervise(&spec)
         }
         Err(e) => {

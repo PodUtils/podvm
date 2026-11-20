@@ -29,6 +29,36 @@ pub const VAR: &str = "PODVM_RUNSC";
 /// The platform of the Sentry: `systrap` needs no ptrace and no KVM.
 pub const PLATFORM: &str = "systrap";
 
+/// The variable with more flags of `runsc`, in words with spaces between
+/// them, for a measure or a host that needs one (TODO/enter.md T-2010).
+/// They go after the flags of the tier and before the verb, so a flag of
+/// the same name wins over the one of the tier.
+pub const ARGS_VAR: &str = "PODVM_RUNSC_ARGS";
+
+/// The words of [`ARGS_VAR`]: each must be a flag (`-name` or `--name`,
+/// with `=value` or not), so that no word becomes the verb or the id.
+pub fn extra_args(var: Option<&str>) -> Result<Vec<String>, String> {
+    let words: Vec<String> = var
+        .unwrap_or_default()
+        .split_whitespace()
+        .map(str::to_string)
+        .collect();
+    match words.iter().find(|w| !w.starts_with('-') || w.len() < 2) {
+        Some(bad) => Err(format!("{ARGS_VAR} takes flags of runsc, not {bad:?}")),
+        None => Ok(words),
+    }
+}
+
+/// [`extra_args`] of the environment, put before the verb of `args`.
+pub fn with_extra(mut args: Vec<String>, verb: &str) -> Result<Vec<String>, String> {
+    let extra = extra_args(std::env::var(ARGS_VAR).ok().as_deref())?;
+    let at = args.iter().position(|x| x == verb).unwrap_or(args.len());
+    for (i, flag) in extra.into_iter().enumerate() {
+        args.insert(at + i, flag);
+    }
+    Ok(args)
+}
+
 /// One run of the tier.
 pub struct Job<'a> {
     pub verb: &'a str,
@@ -218,7 +248,7 @@ pub fn run(job: &Job) -> i32 {
             return init::drive(job, &runsc, &state, &bundle, &id);
         }
         let mut cmd = Command::new(&runsc);
-        cmd.args(args(&state, &bundle, &id));
+        cmd.args(with_extra(args(&state, &bundle, &id), "run")?);
         if job.stdin.is_some() {
             cmd.stdin(Stdio::piped());
         }
