@@ -503,6 +503,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #607 | [gh action] requested | closed (gate 44661449164, secrets 44661453546, issue-sync 44661458479: success) | the gate, secrets and issue-sync runs of 163c231, the take of podcrates v0.78.1 (T-1955) |
 | #608 | COORD-211: pod-enter's wait_forwarding forwards SIGHUP, SIGINT and SIGTERM only: a SIGUSR1 or SIGQUIT kills the waiter and the payload stays (to podcrates) | open | T-2001 |
 | #609 | COORD-212: the answer to PodUtils/podrunner#325: the Entrypoint /sbin/init of the snapshot ran as a prefix of the command; fixed on main (T-2011) (to podrunner) | open | T-2011 |
+| #610 | [gh action] requested | open | the gate, arm, secrets and issue-sync runs of eb93a34 (T-1969, T-1972, T-2001, T-2011) |
 
 ## Messages whose title does not start with COORD-NNN
 
