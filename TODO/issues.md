@@ -523,6 +523,8 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #627 | [gh action] requested | open | the beta gate of c20f245, the release commit of 0.2.0-beta.37: gate, workloads, the nightly trial, arm and kvm.yml init (T-1949) |
 | #628 | [gh action] requested | open | the gate and the nightly trial of 3924ccd, after the nightly trial 44792968495 failed on the licence text of asn1-rs-impl 0.2.0 (T-1949) |
 | #629 | COORD-219: the memory of a microvm guest for an image of N unpacked bytes (to podrunner) | open | T-1922, T-1994, T-2047 |
+| #630 | COORD-220: logs streams the log and takes --limit-bytes N (to podrunner) | open | T-2046 |
+| #631 | COORD-221: a streamed read of a log in pod-supervise, and a ranged read of a file in pod-incus (to podcrates) | open | T-2046 |
 
 ## Messages whose title does not start with COORD-NNN
 
