@@ -5920,3 +5920,32 @@ As uid 1000 under TCG: after `run -d --name m --podvm-tier=machine IMAGE sleep 6
 ## Done
 
 **Done (2026-11-20).** Each verb that takes a container finds a detached machine (the machine tier and the Windows and DOS guests) through one lookup, `crate::windows::machine::find` over `podvm_windows::machines::find_in`: the name, else the id or a unique prefix of 12 hex digits or more. The record of a machine has an id of 64 hex digits (`machines::new_id`), and `run -d` prints it, as docker prints the id of a container. One view (`crates/podvm/src/lifecycle/target.rs`, `view`) reads a machine as a record of the container table, so `inspect` (the fields and the JSON of a container, with `Rung` machine and `LogPath` the serial log) and `ps` (`-q`, `--format`, `--filter`, the table) render it as a container. `kill` gives a signal of the forwarded set to the keeper, which forwards it to the command in the guest (T-2041), ends the emulator on SIGKILL (exit 137 in the record), and refuses another signal and a machine that does not run by name, with 1. `wait` waits for the keeper and the emulator, bounded, and prints the exit code of the guest, or refuses with 125 where the record has none. The keeper blocks the forwarded set from its start, so a `kill` during the boot ends it with the signal and writes the end (143). `stop`, `rm`, `logs`, `start` and `exec` take the name of the record that the lookup found, so an id works there too. The unit tests `a_machine_is_found_by_its_name_or_its_id` (the lookup), `a_machine_reads_as_a_container_of_the_table` (the view and the exit code of each end) and `kill_has_one_route_for_each_kind_of_guest_and_signal` (the routes of `kill`) hold each class. As uid 1000 under TCG with `alpine:3.20`, before (`d9b152f`): `run -d --name mb` printed `mb`; `inspect --format '{{.State.Status}}' mb` gave "no such image: mb" and 1; `ps --filter name=mb` and `ps --format` left it out; `kill mb` and `wait mb` gave "no such container" and 1. After: `run -d --name m` prints `0c91e63d029e...` (64 digits); `inspect --format '{{.Id}} {{.Name}} {{.State.Status}} {{.State.Running}} {{.State.Pid}} {{.Rung}} {{.LogPath}}' m` gives the id, `m running true 30120 machine .../machines/m/serial.log`; `ps --filter name=m` and `ps --format '{{.ID}} {{.Names}} {{.Status}} {{.Command}}'` give `0c91e63d029e m Up (linux guest)`; `inspect` of the 12 digits of `ps -q` gives `m`. With a guest whose command traps TERM: `kill -s TERM m2` gives `m2`, `wait m2` prints 4, `logs` shows the trap line, and `ps -a` shows `Exited (4)`. `exec` of the 12 digits works; `kill -s STOP` refuses by name with 1; `kill` (SIGKILL) and `wait` give 137; a second `kill` says that it does not run, with 1; `stop` of the 12 digits works; a `kill -s TERM` at once after `run -d` gives `wait` 143. No emulator stays.
+
+# T-2047: The memory that a guest of the machine tier needs for an initrd of N bytes, as a curve
+
+**Source:** PodUtils/podrunner#334 (COORD-116 of podrunner); the answer is #629 (COORD-219)
+**Category:** machine
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+The rule of T-1922 (three times the initrd and 512 MiB) comes from one image: an initrd of 1416 MiB resets the guest at `-m 4G` and boots at 5G. podrunner sets the bound of its microvm unit from it, and a rule from one point can be wrong for a small image and for a large one.
+
+## Premise
+
+The initrd is a `newc` cpio with no compression (`crates/podvm/src/machine/guest/cpio.rs`), so its size is the size of the unpacked tree and the headers.
+
+## Approach
+
+An experiment of `kvm.yml`: images of about 256, 512, 1024 and 2048 MiB of incompressible files on Alpine, and for each one the smallest `--podvm-mem` in steps of 256 MiB at which `run --podvm-tier=machine IMAGE true` ends with 0, each guest under a timeout. A line for each image: the size of the initrd and the smallest memory that boots.
+
+## Decision
+
+-
+
+## Prove
+
+The experiment's run on `kvm.yml` gives the smallest memory for each size; `mem.rs` takes the rule that holds each point, and its test holds each point of the table.

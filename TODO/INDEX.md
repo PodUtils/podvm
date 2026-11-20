@@ -687,10 +687,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2043](cli.md) | P1 | S | none | cli | done | `exec -t` gives the command no terminal and does not refuse |
 | [T-2044](cli.md) | P2 | M | none | cli | open | The faults of the sixth outside pass (2026-11-20, the gate of the next beta) |
 | [T-2045](enter.md) | P1 | M | none | enter | done | On the userland rung, a link to the host path of the rootfs with `..` reads host files |
+| [T-2047](machine.md) | P2 | M | none | machine | open | The memory that a guest of the machine tier needs for an initrd of N bytes, as a curve |
 
 ## Counts
 
-621 entries: 24 open, 38 partial, 5 blocked, 554 done.
+622 entries: 25 open, 38 partial, 5 blocked, 554 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -701,9 +702,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 18 | 0 | 254 | 275 |
-| P2 | 15 | 15 | 4 | 183 | 217 |
+| P2 | 16 | 15 | 4 | 183 | 218 |
 | P3 | 6 | 5 | 1 | 42 | 54 |
-| **All** | 24 | 38 | 5 | 554 | 621 |
+| **All** | 25 | 38 | 5 | 554 | 622 |
 
 ## Work order
 
