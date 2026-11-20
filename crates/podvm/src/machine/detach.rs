@@ -39,7 +39,7 @@ pub fn keeper() -> Option<Keeper> {
 }
 
 /// `run -d --podvm-tier=machine`: make the record, start the keeper, and
-/// print the name once the emulator runs.
+/// print the id once the emulator runs (TODO/machine.md T-2042).
 pub fn start(
     verb: &str,
     name: Option<&str>,
@@ -80,15 +80,17 @@ pub fn start(
             .unwrap_or(0),
         lifetime: lifetime.unwrap_or(machines::DEFAULT_LIFETIME_SECS),
         memory_mib: mem.map(|m| m / (1 << 20)).unwrap_or(0),
+        id: machines::new_id(&name),
         ..Default::default()
     };
+    let r_id = r.id.clone();
     if let Err(e) = std::fs::create_dir_all(&dir).and_then(|()| machines::write(&root, &r)) {
         eprintln!("podvm {verb}: {}: {e}", dir.display());
         return EXIT_RUNTIME_ERROR;
     }
     match spawn(&argv, &name, &dir).and_then(|pid| wait_up(&root, r, &dir, pid)) {
         Ok(()) => {
-            println!("{name}");
+            println!("{}", r_id); // T-2042: the id, as docker prints it
             0
         }
         Err(why) => {

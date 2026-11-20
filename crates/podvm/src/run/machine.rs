@@ -164,6 +164,9 @@ pub(super) fn machine_tier(
     // TODO/machine.md T-1750: `run -d` starts a keeper of the guest; the
     // keeper is this same run, in the foreground.
     let keeper = crate::machine::detach::keeper();
+    if keeper.is_some() {
+        crate::machine::guest::signals::block_early(); // T-2042: `kill` of a boot
+    }
     if o.detach && keeper.is_none() {
         let image = o.image.as_deref().unwrap_or_default();
         return crate::machine::detach::start(verb, o.name.as_deref(), image, o.mem, o.timeout);

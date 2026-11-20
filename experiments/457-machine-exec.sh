@@ -12,7 +12,8 @@
 #   store   a fresh HOME and PODVM_STORE under .work/exp457
 #
 # Clauses:
-#   1. `run -d --name w1 --podvm-tier=machine` exits 0 and prints w1;
+#   1. `run -d --name w1 --podvm-tier=machine` exits 0 and prints its id
+#      of 64 hex digits (TODO/machine.md T-2042);
 #      `ps` lists w1 as Up;
 #   2. `exec w1 uname -r` prints the release of the guest kernel, exit 0;
 #   3. `exec -e K=v -w /tmp w1 sh -c 'echo $K $(pwd); echo err >&2; exit 7'`
@@ -44,7 +45,7 @@ t0=$(date +%s)
 out=$(timeout 300 "$BIN" run -d --name w1 --timeout 600 --podvm-tier=machine "$IMG" sh -c 'echo started; sleep 600' 2>"$WORK/run.err")
 rc=$?
 say "run -d    rc $rc in $(( $(date +%s) - t0 )) s: $out; $("$BIN" ps 2>&1 | grep w1)"
-[ "$rc" -eq 0 ] && [ "$out" = w1 ] && "$BIN" ps 2>&1 | grep -q "w1.*Up" || { bad "clause 1"; cat "$WORK/run.err" | tee -a "$OUT"; }
+[ "$rc" -eq 0 ] && printf '%s' "$out" | grep -qxE '[0-9a-f]{64}' && "$BIN" ps 2>&1 | grep -q "w1.*Up" || { bad "clause 1"; cat "$WORK/run.err" | tee -a "$OUT"; }
 
 out=$(timeout 120 "$BIN" exec w1 uname -r 2>&1); rc=$?
 say "uname -r  rc $rc: $out"

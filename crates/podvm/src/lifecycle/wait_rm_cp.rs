@@ -60,6 +60,14 @@ pub fn wait(args: &[String]) -> i32 {
     };
     let mut code = 0;
     for want in args {
+        // TODO/machine.md T-2042: a machine, through its keeper.
+        if let Some(r) = crate::windows::machine::find(want) {
+            match super::target::wait(&r, WAIT_BOUND_MS) {
+                Ok(n) => println!("{n}"),
+                Err(c) => code = c,
+            }
+            continue;
+        }
         match podvm_supervise::wait(&s, want, WAIT_BOUND_MS).map(|(c, n)| settle(&s, c, n)) {
             Ok((_, Some(n))) => println!("{n}"),
             Ok((c, None)) => {

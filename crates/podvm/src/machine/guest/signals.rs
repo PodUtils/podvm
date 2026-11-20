@@ -74,6 +74,15 @@ pub fn wrap(run: &str) -> String {
     format!("sh -c 'echo $$ >{PID_FILE} 2>/dev/null; exec \"$@\"' /podvm-init {run}")
 }
 
+/// Block the set in this thread from the start of the keeper of `run -d`
+/// (T-2042): a `kill` during its boot then waits for the drive, which ends
+/// the keeper with the signal and writes the end of the record, where the
+/// default action ended it with no end.
+pub fn block_early() {
+    let mut old = 0u64;
+    let _ = k::sigblock(podvm_enter::WAIT_FORWARDED, &mut old);
+}
+
 /// The forward of the host for one drive of an emulator.
 pub struct Forward {
     sfd: Option<i64>,
@@ -160,6 +169,8 @@ impl Forward {
                          and the guest with it (TODO/machine.md T-2041)",
                         self.verb
                     );
+                    // The keeper of `run -d` writes the end (T-2042).
+                    crate::machine::detach::ended(128 + signo);
                     raise(signo);
                 }
             }

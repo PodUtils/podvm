@@ -137,8 +137,8 @@ pub fn logs(args: &[String]) -> i32 {
         Err(c) => return c,
     };
     // TODO/machine.md T-1870: the serial line of a detached machine.
-    if crate::windows::machine::find(&o.want).is_some() {
-        return crate::windows::machine::logs(&o.want, o.follow);
+    if let Some(r) = crate::windows::machine::find(&o.want) {
+        return crate::windows::machine::logs(&r.name, o.follow);
     }
     let s = match store() {
         Ok(s) => s,
@@ -244,8 +244,8 @@ pub fn stop(args: &[String]) -> i32 {
     let mut code = 0;
     for want in &names {
         // TODO/machine.md T-1870: a detached Windows or DOS machine.
-        if crate::windows::machine::find(want).is_some() {
-            let c = crate::windows::machine::stop(want);
+        if let Some(r) = crate::windows::machine::find(want) {
+            let c = crate::windows::machine::stop(&r.name);
             if c != 0 {
                 code = c;
             }
@@ -423,6 +423,14 @@ pub fn kill(args: &[String]) -> i32 {
     };
     let mut code = 0;
     for want in &names {
+        // TODO/machine.md T-2042: a machine, through its keeper.
+        if let Some(r) = crate::windows::machine::find(want) {
+            match super::target::kill(&r, sig) {
+                Ok(()) => println!("{}", r.name),
+                Err(c) => code = c,
+            }
+            continue;
+        }
         match podvm_supervise::kill(&s, want, sig) {
             Ok(c) => println!("{}", c.name),
             Err(e) => code = fail("kill", e),

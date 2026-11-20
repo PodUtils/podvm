@@ -368,12 +368,13 @@ pub fn ps(args: &[String]) -> i32 {
         Ok(s) => s,
         Err(c) => return c,
     };
-    let list = match podvm_supervise::list(&s, all) {
+    let mut list = match podvm_supervise::list(&s, all) {
         Ok(l) => l,
         Err(e) => return fail("ps", e),
     };
-    // ⭐ TODO/cli.md T-1331. Caller-side predicate over the listed
-    // records: every `--filter` must match (docker ANDs them).
+    list.extend(target::views(all)); // T-2042: and the machines, as containers
+                                     // ⭐ TODO/cli.md T-1331. Caller-side predicate over the listed
+                                     // records: every `--filter` must match (docker ANDs them).
     let list: Vec<_> = list
         .into_iter()
         .filter(|c| {
@@ -385,14 +386,11 @@ pub fn ps(args: &[String]) -> i32 {
             })
         })
         .collect();
-    // TODO/machine.md T-1870: the detached Windows and DOS machines, with
-    // no filter (a filter reads the fields of a container).
-    // TODO/machine.md T-1846: and the instances of podvm where the
-    // configuration selects the incus tier.
+    // TODO/machine.md T-1846: the instances of podvm where the
+    // configuration selects the incus tier, with no filter (a filter reads
+    // the fields of a container).
     let machines = if filters.is_empty() {
-        let mut m = crate::windows::machine::ps_rows(all);
-        m.extend(crate::incus::verbs::ps_rows(all));
-        m
+        crate::incus::verbs::ps_rows(all)
     } else {
         Vec::new()
     };
@@ -457,6 +455,8 @@ pub use prune::container_group;
 
 mod entry;
 mod prepared;
+pub(crate) mod target; // TODO/machine.md T-2042
+#[cfg(test)]
 use prepared::container_json;
 pub use prepared::Prepared;
 // TODO/cli.md T-1660: the loader's --argv0 on the first exec.

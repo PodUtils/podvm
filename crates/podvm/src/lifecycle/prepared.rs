@@ -2,10 +2,15 @@
 
 use super::*;
 
+#[cfg(test)] // inspect renders through `json_of`
 pub(super) fn container_json(s: &podvm_image::Store, c: &Container) -> String {
-    let fields = container_fields(s, c);
+    json_of(&container_fields(s, c), c)
+}
+
+/// The document of `c` with its `fields` (a machine's are its own, T-2042).
+pub(super) fn json_of(fields: &[(&'static str, String)], c: &Container) -> String {
     let mut o = serde_json::Map::new();
-    for (k, v) in &fields {
+    for (k, v) in fields {
         // TODO/cli.md T-2001 OP-06: `State` is docker's object, with typed
         // values; `--format '{{.State}}'` stays the word.
         if *k == "State" || k.starts_with("State.") {

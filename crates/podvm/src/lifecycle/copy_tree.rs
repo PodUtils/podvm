@@ -282,16 +282,23 @@ pub(super) fn copy_tree(
 /// in one array; `None` where no container has the name.
 pub fn inspect_container(want: &str, template: Option<&str>) -> Option<Result<String, i32>> {
     let s = podvm_image::open_store().ok()?;
-    let c = podvm_supervise::get(&s, want).ok()?;
-    let fields = container_fields(&s, &c);
+    // TODO/machine.md T-2042: a machine reads as a container (`target`).
+    let (c, fields) = match crate::windows::machine::find(want) {
+        Some(r) => super::target::fields(&s, &r),
+        None => {
+            let c = podvm_supervise::get(&s, want).ok()?;
+            let f = container_fields(&s, &c);
+            (c, f)
+        }
+    };
     Some(match template {
         Some(t) => format::render(t, &fields).map_err(|bad| {
             eprintln!("podvm inspect: {bad}");
             EXIT_CLI_ERROR
         }),
         None => {
-            let doc = container_json(&s, &c);
-            // `container_json` gives an array of one object.
+            let doc = super::prepared::json_of(&fields, &c);
+            // `json_of` gives an array of one object.
             Ok(doc
                 .strip_prefix('[')
                 .and_then(|d| d.strip_suffix(']'))

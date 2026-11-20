@@ -63,25 +63,6 @@ pub(crate) fn logs(name: &str, follow: bool) -> i32 {
     }
 }
 
-/// The rows of `podvm ps` for the machines: each one with `all`, else the
-/// running ones. The columns are those of the containers.
-pub(crate) fn ps_rows(all: bool) -> Vec<Vec<String>> {
-    machines::list(&machines::root())
-        .into_iter()
-        .filter(|r| all || r.running())
-        .map(|r| {
-            vec![
-                r.name.clone(),
-                r.image.clone(),
-                format!("({} guest)", r.flavor),
-                podvm_image::clock::iso8601(std::time::UNIX_EPOCH + Duration::from_secs(r.created)),
-                r.status(),
-                r.name.clone(),
-            ]
-        })
-        .collect()
-}
-
 /// `podvm port NAME [PORT[/PROTO]]` (TODO/machine.md T-1869): the forwards
 /// of a machine, as docker prints them (`3389/tcp -> 127.0.0.1:33890`). A
 /// name of no machine keeps the refusal of the parity table: a container

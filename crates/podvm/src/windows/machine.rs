@@ -106,8 +106,8 @@ fn mailbox(flavor: &str) -> podvm_windows::Result<podvm_windows::Fat16> {
     Ok(m)
 }
 
-/// `run -d windows:NAME`: make the machine, start its keeper, print the
-/// name.
+/// `run -d windows:NAME`: make the machine, start its keeper, print its
+/// id, as docker prints the id of a container (TODO/machine.md T-2042).
 pub(crate) fn run_detached(
     verb: &str,
     name: Option<&str>,
@@ -118,7 +118,10 @@ pub(crate) fn run_detached(
 ) -> i32 {
     match create(verb, name, image, mem, lifetime, publish) {
         Ok(name) => {
-            println!("{name}");
+            println!(
+                "{}",
+                find(&name).map_or(name, |r| r.id_or_name().to_string())
+            );
             0
         }
         Err(c) => c,
@@ -180,6 +183,7 @@ fn create(
             .map(|m| m / (1 << 20))
             .unwrap_or(if flavor == "dos" { 512 } else { 4096 }),
         forwards: publish.join(","),
+        id: machines::new_id(&name),
         ..Default::default()
     };
     if let Err(why) = make(&r, &dir, accel) {
@@ -341,9 +345,7 @@ pub(crate) fn keeper(args: &[String]) -> i32 {
 
 /// The record of `name`, when a machine has that name.
 pub(crate) fn find(name: &str) -> Option<Record> {
-    machines::valid_name(name)
-        .then(|| machines::read(&machines::root(), name))
-        .flatten()
+    machines::find_in(&machines::root(), name) // T-2042: or its id
 }
 
 /// End the emulator of `name`: `guest-shutdown` through the agent of a
@@ -409,7 +411,7 @@ pub(crate) fn stop(name: &str) -> i32 {
 
 /// `rm` of `want` where a machine has that name; `None` for no machine.
 pub(crate) fn rm_if(want: &str, force: bool) -> Option<i32> {
-    find(want).map(|_| rm(want, force))
+    find(want).map(|r| rm(&r.name, force))
 }
 
 /// `run -d windows:NAME`, where the run is detached and names the catalog.
@@ -443,6 +445,6 @@ pub(crate) use life::{rm, start_if};
 pub(crate) mod once;
 // TODO/machine.md T-1869, T-1870: the verbs that read a machine.
 mod view;
-pub(crate) use view::{logs, port, ps_rows, screenshot};
+pub(crate) use view::{logs, port, screenshot};
 mod viewer; // TODO/machine.md T-1899
 pub(crate) use viewer::view;

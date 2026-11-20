@@ -24,6 +24,9 @@ pub const DEFAULT_LIFETIME_SECS: u64 = 24 * 3600;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Record {
     pub name: String,
+    /// 64 hex digits, as docker's container id (TODO/machine.md T-2042);
+    /// empty in a record written before it.
+    pub id: String,
     /// The image as the caller wrote it, for example `windows:dos`.
     pub image: String,
     /// The base or golden image under the overlay.
@@ -151,8 +154,9 @@ impl Record {
 
     /// The JSON of the record: one object, each value a string.
     pub fn to_json(&self) -> String {
-        let pairs: [(&str, String); 13] = [
+        let pairs: [(&str, String); 14] = [
             ("name", self.name.clone()),
+            ("id", self.id.clone()),
             ("image", self.image.clone()),
             ("base", self.base.clone()),
             ("flavor", self.flavor.clone()),
@@ -187,6 +191,7 @@ impl Record {
         let name = s("name");
         valid_name(&name).then(|| Record {
             name,
+            id: s("id"),
             image: s("image"),
             base: s("base"),
             flavor: s("flavor"),
@@ -289,6 +294,62 @@ pub fn list(root: &Path) -> Vec<Record> {
     v
 }
 
+impl Record {
+    /// The id of the record, or its name where a record has none.
+    pub fn id_or_name(&self) -> &str {
+        if self.id.is_empty() {
+            &self.name
+        } else {
+            &self.id
+        }
+    }
+}
+
+/// A new id of 64 hex digits from the random source of the kernel; where
+/// it does not read, one from the clock, the pid and `name` (TODO/machine.md
+/// T-2042: a run that cannot read the source still gets an id).
+pub fn new_id(name: &str) -> String {
+    use std::io::Read;
+    let mut b = [0u8; 32];
+    if std::fs::File::open("/dev/urandom")
+        .and_then(|mut f| f.read_exact(&mut b))
+        .is_err()
+    {
+        use std::hash::{Hash, Hasher};
+        let t = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        for (i, chunk) in b.chunks_mut(8).enumerate() {
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            (t, std::process::id(), name, i).hash(&mut h);
+            chunk.copy_from_slice(&h.finish().to_be_bytes());
+        }
+    }
+    b.iter().map(|x| format!("{x:02x}")).collect()
+}
+
+/// The shortest prefix of an id that finds a machine: the 12 digits of the
+/// CONTAINER ID column of `ps`.
+pub const ID_PREFIX: usize = 12;
+
+/// The machine of `want` under `root` (TODO/machine.md T-2042): the one
+/// with that name, else the one whose id starts with `want`, where `want`
+/// is [`ID_PREFIX`] hex digits or more and one id only starts so.
+pub fn find_in(root: &Path, want: &str) -> Option<Record> {
+    if valid_name(want)
+        && let Some(r) = read(root, want)
+    {
+        return Some(r);
+    }
+    if want.len() < ID_PREFIX || !want.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    let mut hits = list(root).into_iter().filter(|r| r.id.starts_with(want));
+    let one = hits.next()?;
+    hits.next().is_none().then_some(one)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -299,6 +360,7 @@ mod tests {
     fn windows_lifecycle_record_round_trips() {
         let r = Record {
             name: "dos1".into(),
+            id: new_id("dos1"),
             image: "windows:dos".into(),
             base: "/s/windows/freedos-base.img".into(),
             flavor: "dos".into(),
@@ -314,6 +376,46 @@ mod tests {
         };
         assert_eq!(Record::from_json(&r.to_json()), Some(r));
         assert_eq!(Record::from_json("{\"name\":\"../x\"}"), None);
+    }
+
+    /// TODO/machine.md T-2042: one lookup of a machine: by its name, else
+    /// by its whole id or a unique prefix of 12 hex digits or more; a
+    /// shorter, ambiguous or unknown one finds none.
+    #[test]
+    fn a_machine_is_found_by_its_name_or_its_id() {
+        let root = std::env::temp_dir().join(format!("podvm-find-{}", &new_id("t")[..16]));
+        let id_a = format!("abcdef012345{}", "0".repeat(52));
+        let id_b = format!("abcdef012399{}", "1".repeat(52));
+        for (name, id) in [("ma", id_a.as_str()), ("mb", id_b.as_str()), ("old", "")] {
+            std::fs::create_dir_all(dir_in(&root, name)).unwrap();
+            let r = Record {
+                name: name.into(),
+                id: id.into(),
+                ..Default::default()
+            };
+            write(&root, &r).unwrap();
+        }
+        let cases: [(&str, Option<&str>); 8] = [
+            ("ma", Some("ma")),
+            ("old", Some("old")),
+            (id_a.as_str(), Some("ma")),
+            ("abcdef012345", Some("ma")),
+            ("abcdef012399", Some("mb")),
+            ("abcdef01234", None),
+            ("ffffffffffff", None),
+            ("nosuch", None),
+        ];
+        for (want, got) in cases {
+            assert_eq!(
+                find_in(&root, want).map(|r| r.name),
+                got.map(String::from),
+                "{want}"
+            );
+        }
+        assert_eq!(find_in(&root, "old").unwrap().id_or_name(), "old");
+        assert_eq!(new_id("x").len(), 64);
+        assert_ne!(new_id("x"), new_id("x"));
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// Field 22 is read after the last `)`, so a name with spaces and
