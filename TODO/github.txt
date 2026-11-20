@@ -505,7 +505,7 @@
 613 issue open
 614 issue closed
 615 issue closed
-616 issue open
+616 issue closed
 617 issue closed
 618 issue open
 619 issue open
