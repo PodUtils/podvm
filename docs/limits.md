@@ -282,7 +282,7 @@ kernel named by `PODVM_MACHINE_KERNEL_ARM64`, runs under TCG on an x86_64
 host, and has no `-t`, 9p volume or podvm in the guest (T-1890).
 The machine tier needs `qemu-system-x86_64` on the host; `podvm doctor`
 checks it. Where the host has none, `run --podvm-tier=machine`, `podvm
-windows` and `run windows:NAME` fetch a pinned static QEMU 9.2.0 and its
+windows` and `run windows:NAME` fetch a pinned static QEMU 11.0.0 and its
 firmware into the store (T-1875); `podvm machine ssh` and `podvm doctor`
 look on PATH only. `--podvm-mem` sizes the virtual machine, as QEMU's `-m` does,
 and the guest kernel keeps a part of it: `MemTotal` is 85 % of 256M,

@@ -57,9 +57,9 @@ first Windows or DOS run (noVNC: on the first `podvm windows view`), and podvm c
 
 | Material | Source | Licence |
 | --- | --- | --- |
-| `qemu-system-x86_64`, `qemu-img` 9.2.0, static musl builds | pkgforge `bincache`, package `ppkg.qemu` | GPL-2.0 (QEMU) |
+| `qemu-system-x86_64`, `qemu-img` 11.0.0, static musl builds | github.com/hermeticbuild/qemu-prebuilt, release `11.0.0.1` (the service `hermeticbuild-qemu` of `pod-services`) | GPL-2.0 (QEMU); the build scripts MIT |
 | noVNC 1.7.0 (`core/`, and `vendor/pako`), fetched by `podvm windows view` (T-1899) | registry.npmjs.org, package `@novnc/novnc` | MPL-2.0 (noVNC); MIT (pako) |
-| `pc-bios/` firmware and option ROMs of QEMU `v9.2.0` (SeaBIOS, the VGA BIOS, iPXE EFI ROMs, edk2) | github.com/qemu/qemu at tag `v9.2.0` | SeaBIOS and the VGA BIOS LGPL-3.0; iPXE GPL-2.0; edk2 BSD-2-Clause-Patent; qboot GPL-2.0 |
+| `share/qemu/` firmware and option ROMs of QEMU 11.0.0 (SeaBIOS, the VGA BIOS, iPXE EFI ROMs, edk2), from the data archive of the same release | github.com/hermeticbuild/qemu-prebuilt, release `11.0.0.1` | SeaBIOS and the VGA BIOS LGPL-3.0; iPXE GPL-2.0; edk2 BSD-2-Clause-Patent; qboot GPL-2.0 |
 
 ## Build dependencies
 

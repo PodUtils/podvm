@@ -178,6 +178,67 @@ fn each_host_that_podvm_names_is_in_pod_services() {
     );
 }
 
+/// T-1013 of podcrates (PodUtils/podvm#618): the store copy of QEMU is the
+/// service `hermeticbuild-qemu`, on `github.com`. Each archive of
+/// `podvm_windows::tools` is an endpoint of it, with the size and the
+/// sha256 of its facts, and each program in it has the member, the size and
+/// the sha256 of its facts: the pins of podvm and of podcrates are one.
+#[test]
+fn the_store_copy_of_qemu_holds_the_facts_of_pod_services() {
+    use podvm_windows::tools;
+    let q = pod_services::get("hermeticbuild-qemu").expect("the service of the static QEMU");
+    assert_eq!(q.text("version"), Some(tools::QEMU_VERSION));
+    assert_eq!(q.text("release"), Some(tools::RELEASE));
+    assert!(pod_services::get("pkgforge-qemu").is_none());
+    let mut endpoints = 0;
+    for e in q.endpoints() {
+        let name = e.name();
+        let Some(a) = tools::ARCHIVES.iter().find(|a| {
+            e.path()
+                .is_some_and(|p| p.ends_with(&format!("/{}", a.name)))
+        }) else {
+            // qemu-system-aarch64: the emulator of an arm64 guest, which
+            // the store of podvm does not take (TODO/machine.md T-1875).
+            assert_eq!(
+                name, "qemu-system-aarch64",
+                "an archive that podvm does not pin"
+            );
+            continue;
+        };
+        endpoints += 1;
+        assert_eq!(e.host(), "github.com", "{name}");
+        assert_eq!(
+            a.url,
+            format!("https://github.com{}", e.path().unwrap()),
+            "{name}"
+        );
+        assert_eq!(q.text(&format!("{name}-sha256")), Some(a.sha256), "{name}");
+        assert_eq!(
+            q.int(&format!("{name}-bytes")),
+            Some(a.size as i64),
+            "{name}"
+        );
+        if let Some(member) = q.text(&format!("{name}-member")) {
+            let m = a
+                .members
+                .iter()
+                .find(|m| m.path == member)
+                .unwrap_or_else(|| panic!("{name}: no member {member}"));
+            assert_eq!(
+                q.text(&format!("{name}-bin-sha256")),
+                Some(m.sha256),
+                "{name}"
+            );
+            assert_eq!(
+                q.int(&format!("{name}-bin-bytes")),
+                Some(m.size as i64),
+                "{name}"
+            );
+        }
+    }
+    assert_eq!(endpoints, tools::ARCHIVES.len());
+}
+
 #[test]
 fn the_scan_finds_a_url_and_an_image_reference() {
     let h = hosts_of(

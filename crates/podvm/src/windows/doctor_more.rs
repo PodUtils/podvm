@@ -6,8 +6,12 @@
 
 use super::plan;
 
-/// The QEMU that a warm start of a Windows guest needs (T-1874).
-const QEMU_WARM: u32 = 11;
+/// The QEMU that a warm start of a Windows guest needs (T-1874): the
+/// first that saves an NVMe disk, the root disk of the plan. The commit
+/// `9d378cab537d` "hw/nvme: add basic live migration support" is in
+/// `v11.1.0` and in no 11.0.x release (podcrates@T-1035, call C866; before
+/// it QEMU marks the device `unmigratable`).
+const QEMU_WARM: (u32, u32) = (11, 1);
 /// The free disk that a setup ISO and its disk take: an estimate.
 const FULL_INSTALL_BYTES: u64 = 40 << 30;
 
@@ -17,12 +21,13 @@ pub(super) fn report() -> i32 {
     let emulator = plan::emulator();
     let name = emulator.to_string_lossy().to_string();
     match version(&name) {
-        Some((v, major)) => {
+        Some((v, release)) => {
             println!("qemu: {v}");
-            if major < QEMU_WARM {
+            if release < QEMU_WARM {
                 println!(
-                    "note: QEMU {QEMU_WARM} or later keeps the state of a disk for a warm start \
-                     (TODO/machine.md T-1874); this one runs each guest from a cold boot"
+                    "note: QEMU {}.{} or later keeps the state of a disk for a warm start \
+                     (TODO/machine.md T-1874); this one runs each guest from a cold boot",
+                    QEMU_WARM.0, QEMU_WARM.1
                 );
             }
         }
@@ -110,7 +115,7 @@ pub(super) fn report() -> i32 {
 }
 
 /// The version line of `emulator`, and its major number.
-fn version(emulator: &str) -> Option<(String, u32)> {
+fn version(emulator: &str) -> Option<(String, (u32, u32))> {
     let out = std::process::Command::new(emulator)
         .arg("--version")
         .stdin(std::process::Stdio::null())
@@ -120,15 +125,20 @@ fn version(emulator: &str) -> Option<(String, u32)> {
         .lines()
         .next()?
         .to_string();
-    let major = line
-        .split("version ")
-        .nth(1)?
-        .split('.')
-        .next()?
-        .trim()
-        .parse()
-        .ok()?;
-    Some((line, major))
+    let release = release_of(&line)?;
+    Some((line, release))
+}
+
+/// The major and the minor version of `QEMU emulator version X.Y.Z ...`;
+/// a minor that is absent is 0. None where the line names no version.
+fn release_of(line: &str) -> Option<(u32, u32)> {
+    let text = line.split("version ").nth(1)?;
+    let mut part = text
+        .split(|c: char| !c.is_ascii_digit())
+        .take_while(|p| !p.is_empty());
+    let major = part.next()?.parse().ok()?;
+    let minor = part.next().and_then(|m| m.parse().ok()).unwrap_or(0);
+    Some((major, minor))
 }
 
 /// True where the CPU says that a hypervisor runs this host.
@@ -148,9 +158,32 @@ mod tests {
     #[test]
     fn windows_doctor_reads_the_version_of_an_emulator() {
         assert_eq!(version("/nonexistent-qemu-system"), None);
-        if let Some((line, major)) = version("qemu-system-x86_64") {
+        if let Some((line, release)) = version("qemu-system-x86_64") {
             assert!(line.contains("version"), "{line}");
-            assert!(major >= 2, "{line}");
+            assert!(release >= (2, 0), "{line}");
+        }
+    }
+
+    /// T-1874, podcrates@T-1035: a warm start from QEMU 11.1, not from 11.0
+    /// (the static QEMU 11.0.0 of the store runs each guest from a cold boot).
+    #[test]
+    fn a_warm_start_needs_qemu_11_1() {
+        for (line, warm) in [
+            (
+                "QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)",
+                Some(false),
+            ),
+            ("QEMU emulator version 10.2.1", Some(false)),
+            ("QEMU emulator version 11.0.0", Some(false)),
+            ("QEMU emulator version 11.0.5", Some(false)),
+            ("QEMU emulator version 11.1.0", Some(true)),
+            ("QEMU emulator version 11.1.3 (v11.1.3)", Some(true)),
+            ("QEMU emulator version 12", Some(true)),
+            ("QEMU emulator version 12.0.0", Some(true)),
+            ("qemu-system-x86_64: no version", None),
+            ("", None),
+        ] {
+            assert_eq!(release_of(line).map(|r| r >= QEMU_WARM), warm, "{line}");
         }
     }
 }

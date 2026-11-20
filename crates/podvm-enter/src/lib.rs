@@ -43,6 +43,11 @@ pub const NAMES: Names = Names {
     // paths in `PODVM_EXEC` (TODO/enter.md T-1819), so the crate's table
     // takes a name of its own (TODO/enter.md T-1892).
     exec_table: "PODVM_EXEC_HOST",
+    // podcrates `v0.80.0` (podcrates@T-999): the write table of the entry
+    // with no chroot (host paths), which the interposer and the handler of
+    // the syscall tier read (TODO/enter.md T-1985). `pod-enter` writes it
+    // from the spec of the plan and removes each value of the caller.
+    write_table: "PODVM_WRITE_HOST",
 };
 
 pub use pod_enter::{Limit, Resource};

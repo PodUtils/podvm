@@ -1,12 +1,15 @@
 //! TODO/machine.md T-1875: the emulator, `qemu-img` and the firmware that
 //! podvm fetches into its store when the host has none.
 //!
-//! The binaries are the static builds of QEMU 9.2.0 that pkgforge
-//! publishes (`ppkg.qemu`, musl, no `PT_INTERP`). The firmware and the
-//! option ROMs are the prebuilt files of `pc-bios/` in the QEMU tree at the
-//! tag `v9.2.0`: SeaBIOS, the VGA BIOS, the iPXE EFI ROMs and edk2 (code
-//! and variables, compressed with bzip2 in the tree). Each file has a size
-//! and a sha256 here; podvm checks both before it uses a byte.
+//! The store copy is the static QEMU 11.0.0 of the release `11.0.0.1` of
+//! hermeticbuild/qemu-prebuilt (the service `hermeticbuild-qemu` of
+//! `pod-services`, podcrates `v0.80.0`, T-1013): musl, static-pie, no
+//! `PT_INTERP`. It holds the QEMU commit `2865bf1c` (the fix of the
+//! use-after-free of `address_space_translate_for_iotlb`, a SIGSEGV at the
+//! boot of a guest with four vCPUs under TCG, PodUtils/podvm#618). Each
+//! archive keeps the installed layout (`./bin/NAME`, `./share/qemu/...`).
+//! podvm checks the size and the sha256 of each archive before it reads a
+//! byte of it, then the size and the sha256 of each member that it takes.
 //!
 //! The store keeps the layout of a relocatable install: `bin/` for the two
 //! programs, `share/qemu/` for the data, so the emulator finds its firmware
@@ -18,20 +21,21 @@
 use std::path::{Path, PathBuf};
 
 /// The version of QEMU in the store.
-pub const QEMU_VERSION: &str = "9.2.0";
+pub const QEMU_VERSION: &str = "11.0.0";
 
-/// Where one file of the table goes.
+/// The release of hermeticbuild/qemu-prebuilt that holds [`QEMU_VERSION`].
+pub const RELEASE: &str = "11.0.0.1";
+
+/// Where one file of the store goes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Dest {
     /// `bin/NAME`, mode 0755.
     Bin,
     /// `share/qemu/NAME`.
     Share,
-    /// `share/qemu/NAME` without `.bz2`, decompressed after the check.
-    ShareBz2,
 }
 
-/// One file of the store.
+/// One download: the noVNC package (T-1899).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Tool {
     /// The name of the download.
@@ -44,156 +48,179 @@ pub struct Tool {
     pub dest: Dest,
 }
 
-#[cfg(test)]
-const PKGFORGE: &str = "https://api.ghcr.pkgforge.dev/pkgforge/bincache/qemu/ppkg";
-#[cfg(test)]
-const PC_BIOS: &str = "https://raw.githubusercontent.com/qemu/qemu/v9.2.0/pc-bios";
+/// One file of the store: a member of an archive.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Member {
+    /// The path of the member in the archive, as `tar` lists it.
+    pub path: &'static str,
+    /// The size of the member in bytes.
+    pub size: u64,
+    /// The sha256 of the member, lower-case hex.
+    pub sha256: &'static str,
+    pub dest: Dest,
+}
 
-macro_rules! bin {
+/// One archive of the release, and the members that the store takes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Archive {
+    /// The name of the asset of the release.
+    pub name: &'static str,
+    pub url: &'static str,
+    /// The size of the archive in bytes.
+    pub size: u64,
+    /// The sha256 of the archive, lower-case hex.
+    pub sha256: &'static str,
+    pub members: &'static [Member],
+}
+
+#[cfg(test)]
+const RELEASES: &str = "https://github.com/hermeticbuild/qemu-prebuilt/releases/download/11.0.0.1/";
+
+macro_rules! archive {
+    ($name:literal, $size:literal, $sha:literal, $members:expr) => {
+        Archive {
+            name: $name,
+            url: concat!(
+                "https://github.com/hermeticbuild/qemu-prebuilt/releases/download/11.0.0.1/",
+                $name
+            ),
+            size: $size,
+            sha256: $sha,
+            members: $members,
+        }
+    };
+}
+
+macro_rules! share {
     ($name:literal, $size:literal, $sha:literal) => {
-        Tool {
-            name: $name,
-            url: concat!(
-                "https://api.ghcr.pkgforge.dev/pkgforge/bincache/qemu/ppkg/",
-                $name,
-                "?tag=9.2.0-x86_64-linux&download=",
-                $name
-            ),
+        Member {
+            path: concat!("./share/qemu/", $name),
             size: $size,
             sha256: $sha,
+            dest: Dest::Share,
+        }
+    };
+}
+
+/// The archives of the store, pinned 2026-11-20. The size and the sha256
+/// of each archive, and the member, the size and the sha256 of each
+/// program, are the facts of the service `hermeticbuild-qemu` of
+/// `pod-services` (a test of podvm compares them). The sha256 of each file
+/// of the data were measured on the members of the data archive.
+pub const ARCHIVES: &[Archive] = &[
+    archive!(
+        "qemu-system-bin-linux-amd64-x86_64-softmmu-11.0.0.1.tar.gz",
+        5_818_414,
+        "31399af8d874176f104679c6aae8c8741bcd86283dbc8de1fce8a140f67f1448",
+        &[Member {
+            path: "./bin/qemu-system-x86_64",
+            size: 31_204_448,
+            sha256: "4168a4bbd65eaea98ffd4ba4754146cf694e361148e84b7ad3d6eb4adcd981ac",
             dest: Dest::Bin,
-        }
-    };
-}
-
-macro_rules! bios {
-    ($name:literal, $size:literal, $sha:literal, $dest:expr) => {
-        Tool {
-            name: $name,
-            url: concat!(
-                "https://raw.githubusercontent.com/qemu/qemu/v9.2.0/pc-bios/",
-                $name
+        }]
+    ),
+    archive!(
+        "qemu-img-linux-amd64-11.0.0.1.tar.gz",
+        1_513_590,
+        "4cab6e3f186ec6c500dd340f84b794f8320e3d58a2b2b9d2f835416589279d3e",
+        &[Member {
+            path: "./bin/qemu-img",
+            size: 3_376_704,
+            sha256: "8708058aab6cc2937cfa82901406fd92ad435612db0f9d97d13e887e3dd8b60a",
+            dest: Dest::Bin,
+        }]
+    ),
+    archive!(
+        "qemu-system-data-linux-amd64-11.0.0.1.tar.gz",
+        18_190_583,
+        "27e5a04a32d56783ebf8277140ec52304dd2376f97a1c01c36982bd228f37cfc",
+        &[
+            share!(
+                "bios-256k.bin",
+                262_144,
+                "ae6f6aa973aaccc143f57aa960fb035fd9de4daee4ad0cd713322f8c259e7650"
             ),
-            size: $size,
-            sha256: $sha,
-            dest: $dest,
-        }
-    };
-}
-
-/// The files of the store, pinned 2026-11-15.
-pub const TOOLS: &[Tool] = &[
-    bin!(
-        "qemu-system-x86_64",
-        42_899_120,
-        "b0597850cc3aa3d473410d8da27102eddfcf3f23abbe58bd1efc7a06f197b0a1"
-    ),
-    bin!(
-        "qemu-img",
-        11_009_488,
-        "7311a2598164b3055097f8f0484c1bbb0cd92463889fd8108c2f40fcc9f597c6"
-    ),
-    bios!(
-        "bios-256k.bin",
-        262_144,
-        "f1d4f396011197eb989029659cde250751cc711c336b8fbbe6f77cfe0dc5dcd8",
-        Dest::Share
-    ),
-    bios!(
-        "bios-microvm.bin",
-        131_072,
-        "42780e1ab9161752848475529a25c39d7c76baee82a1b2ddff666c2f7de7bbee",
-        Dest::Share
-    ),
-    bios!(
-        "qboot.rom",
-        65_536,
-        "9b9dfc6c25740d6225625570d71cab6805cc9216e68c8932e343266daaeb8c4b",
-        Dest::Share
-    ),
-    bios!(
-        "kvmvapic.bin",
-        9_216,
-        "cdf057a71b07e3b52b19cbe210bdefa59250d01a9810b960f7fe1f98eed95a27",
-        Dest::Share
-    ),
-    bios!(
-        "linuxboot_dma.bin",
-        1_536,
-        "9c49e255340c78fc12e54ed043462bca02fb7fca29b7cfab62ff88a5344b6950",
-        Dest::Share
-    ),
-    bios!(
-        "multiboot_dma.bin",
-        1_024,
-        "e01667420ee78a318ea44627d2dd68058d3377d024e6eb7237700afe2e86507d",
-        Dest::Share
-    ),
-    bios!(
-        "pvh.bin",
-        1_536,
-        "918ff03a118615c2f4611a5df2d9496aabe099b5cfaaf69e544ebf973305d59d",
-        Dest::Share
-    ),
-    bios!(
-        "vgabios-stdvga.bin",
-        39_424,
-        "651513519f9e0d5b99d3b051a8f5c68db69e987339b59a441d371068c34c146b",
-        Dest::Share
-    ),
-    bios!(
-        "vgabios-virtio.bin",
-        39_424,
-        "746f38c2023dbbc071503113f970bcf69d49c6e7c55fa8c0e3748dbccba42772",
-        Dest::Share
-    ),
-    bios!(
-        "vgabios-cirrus.bin",
-        38_912,
-        "305d3b15f67e65f1899a1664621f6b471e4345d33fd9eb4f6320b4559f6a04f2",
-        Dest::Share
-    ),
-    bios!(
-        "vgabios-bochs-display.bin",
-        28_672,
-        "d5fd6992dfdf0c980996b79c5ea13b9c8b36342c1dc94fcd682a6c3e8df850ff",
-        Dest::Share
-    ),
-    bios!(
-        "vgabios-ramfb.bin",
-        28_672,
-        "31b26b2288ed5594b65a234e797ee7105d225d48086170b27ab518c3fb69b7de",
-        Dest::Share
-    ),
-    bios!(
-        "efi-e1000e.rom",
-        159_232,
-        "102c20348be2d0ebe45a77b076b31848182c2f7b4364775b6bc2ece6e97b4024",
-        Dest::Share
-    ),
-    bios!(
-        "efi-e1000.rom",
-        159_232,
-        "f37222fcdf0481bfbaf7a16d9aaf740aeb41d3d24c187801eb6e9a628cec0fc8",
-        Dest::Share
-    ),
-    bios!(
-        "efi-virtio.rom",
-        160_768,
-        "26be36901db7f8181c306cc62bd74891d8646528965a78e40cceadba5dd7c8e7",
-        Dest::Share
-    ),
-    bios!(
-        "edk2-x86_64-code.fd.bz2",
-        1_907_255,
-        "f4d7c29fccb5e1d4d851eaddc41a5c4feec7de96ca7ad9bbf96f4d09838ef973",
-        Dest::ShareBz2
-    ),
-    bios!(
-        "edk2-i386-vars.fd.bz2",
-        190,
-        "83470f393b9a200838b2292a65ca5708a109005d65a6422f3fa23cb21c8179b9",
-        Dest::ShareBz2
+            share!(
+                "bios-microvm.bin",
+                131_072,
+                "d226177d125aaf1b91e507738f4e9a0ade9474169b211751f78be08008cb394c"
+            ),
+            share!(
+                "qboot.rom",
+                65_536,
+                "9b9dfc6c25740d6225625570d71cab6805cc9216e68c8932e343266daaeb8c4b"
+            ),
+            share!(
+                "kvmvapic.bin",
+                9_216,
+                "cdf057a71b07e3b52b19cbe210bdefa59250d01a9810b960f7fe1f98eed95a27"
+            ),
+            share!(
+                "linuxboot_dma.bin",
+                1_536,
+                "9c49e255340c78fc12e54ed043462bca02fb7fca29b7cfab62ff88a5344b6950"
+            ),
+            share!(
+                "multiboot_dma.bin",
+                1_024,
+                "46def003b1c413cc4a5880d858ca54456ad6978d5fdb6e1b7d086b2905a66df0"
+            ),
+            share!(
+                "pvh.bin",
+                1_536,
+                "918ff03a118615c2f4611a5df2d9496aabe099b5cfaaf69e544ebf973305d59d"
+            ),
+            share!(
+                "vgabios-stdvga.bin",
+                39_424,
+                "e8fc9e55790dbe3cb31f019a3deb57206ba6c54f5e581adb2ab2677a9d391472"
+            ),
+            share!(
+                "vgabios-virtio.bin",
+                39_424,
+                "02853140c262001ecb7245b151ffe47a0f0c79767a6fb2a9eb60f5f1938c5cee"
+            ),
+            share!(
+                "vgabios-cirrus.bin",
+                39_424,
+                "10ecbac600620eb589f0c6d98f3f32a073d745c8a7f390b1704155d46a6b59d7"
+            ),
+            share!(
+                "vgabios-bochs-display.bin",
+                28_672,
+                "da07e26661279edb7935284a99f8ddfa77dbf04ddb939e4a8c7bc7e36e40cdc7"
+            ),
+            share!(
+                "vgabios-ramfb.bin",
+                28_672,
+                "24f6b98b2c263f3f562b1180df23e949f7dd27f194fa26aeba27f36bbf6265c6"
+            ),
+            share!(
+                "efi-e1000e.rom",
+                159_232,
+                "102c20348be2d0ebe45a77b076b31848182c2f7b4364775b6bc2ece6e97b4024"
+            ),
+            share!(
+                "efi-e1000.rom",
+                159_232,
+                "f37222fcdf0481bfbaf7a16d9aaf740aeb41d3d24c187801eb6e9a628cec0fc8"
+            ),
+            share!(
+                "efi-virtio.rom",
+                160_768,
+                "26be36901db7f8181c306cc62bd74891d8646528965a78e40cceadba5dd7c8e7"
+            ),
+            share!(
+                "edk2-x86_64-code.fd",
+                3_653_632,
+                "33090cc07675baa5190d9f1e84bf5176b33bcbfa9bacac522961150cdb6dbb2a"
+            ),
+            share!(
+                "edk2-i386-vars.fd",
+                540_672,
+                "5d2ac383371b408398accee7ec27c8c09ea5b74a0de0ceea6513388b15be5d1e"
+            ),
+        ]
     ),
 ];
 
@@ -231,17 +258,24 @@ pub fn root() -> PathBuf {
     data.join("tools").join(format!("qemu-{QEMU_VERSION}"))
 }
 
-impl Tool {
-    /// The file that the download becomes under `root`.
+impl Member {
+    /// The name of the file: the last component of its path.
+    pub fn name(&self) -> &'static str {
+        self.path.rsplit('/').next().unwrap_or(self.path)
+    }
+
+    /// The file that the member becomes under `root`.
     pub fn path_in(&self, root: &Path) -> PathBuf {
         match self.dest {
-            Dest::Bin => root.join("bin").join(self.name),
-            Dest::Share => root.join("share/qemu").join(self.name),
-            Dest::ShareBz2 => root
-                .join("share/qemu")
-                .join(self.name.strip_suffix(".bz2").unwrap_or(self.name)),
+            Dest::Bin => bin(root, self.name()),
+            Dest::Share => share(root).join(self.name()),
         }
     }
+}
+
+/// Each member of [`ARCHIVES`].
+pub fn members() -> impl Iterator<Item = &'static Member> {
+    ARCHIVES.iter().flat_map(|a| a.members.iter())
 }
 
 /// The program `name` of the store under `root`.
@@ -260,49 +294,50 @@ pub fn firmware(root: &Path) -> (PathBuf, PathBuf) {
     (s.join("edk2-x86_64-code.fd"), s.join("edk2-i386-vars.fd"))
 }
 
-/// True when each file of the table is in the store under `root`.
+/// True when each member of the table is in the store under `root`.
 pub fn complete(root: &Path) -> bool {
-    TOOLS.iter().all(|t| t.path_in(root).is_file())
+    members().all(|m| m.path_in(root).is_file())
 }
 
 /// The bytes of all downloads.
 pub fn total_bytes() -> u64 {
-    TOOLS.iter().map(|t| t.size).sum()
+    ARCHIVES.iter().map(|a| a.size).sum()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn hex64(h: &str) -> bool {
+        h.len() == 64
+            && h.bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    }
+
     /// Each pin is a size and 64 hex digits, each name is unique, each
-    /// URL is https on one of the two sources, and the store layout gives
-    /// the emulator, `qemu-img`, the data and the UEFI pair.
+    /// URL is an asset of the one release, and the store layout gives the
+    /// emulator, `qemu-img`, the data and the UEFI pair.
     #[test]
     fn tools_pins_are_complete_and_the_layout_is_relocatable() {
         let mut names = std::collections::BTreeSet::new();
-        for t in TOOLS {
-            assert!(names.insert(t.name), "{} twice", t.name);
-            assert!(t.size > 0, "{}", t.name);
-            assert_eq!(t.sha256.len(), 64, "{}", t.name);
-            assert!(t
-                .sha256
-                .bytes()
-                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)));
-            assert!(
-                t.url.starts_with(PKGFORGE) || t.url.starts_with(PC_BIOS),
-                "{}",
-                t.url
-            );
-            assert!(t.url.contains(t.name), "{}", t.url);
-            assert_eq!(
-                t.dest == Dest::ShareBz2,
-                t.name.ends_with(".bz2"),
-                "{}",
-                t.name
-            );
+        for a in ARCHIVES {
+            assert!(a.size > 0 && hex64(a.sha256), "{}", a.name);
+            assert!(a.url.starts_with(RELEASES), "{}", a.url);
+            assert!(a.url.ends_with(a.name) && a.name.ends_with(".tar.gz"));
+            assert!(a.name.contains(RELEASE), "{}", a.name);
+            assert!(!a.members.is_empty(), "{}", a.name);
+            for m in a.members {
+                assert!(names.insert(m.name()), "{} twice", m.name());
+                assert!(m.size > 0 && hex64(m.sha256), "{}", m.path);
+                let dir = match m.dest {
+                    Dest::Bin => "./bin/",
+                    Dest::Share => "./share/qemu/",
+                };
+                assert_eq!(m.path, format!("{dir}{}", m.name()), "{}", m.path);
+            }
         }
-        let root = Path::new("/store/tools/qemu-9.2.0");
-        let paths: Vec<PathBuf> = TOOLS.iter().map(|t| t.path_in(root)).collect();
+        let root = Path::new("/store/tools/qemu-11.0.0");
+        let paths: Vec<PathBuf> = members().map(|m| m.path_in(root)).collect();
         for want in [
             bin(root, "qemu-system-x86_64"),
             bin(root, "qemu-img"),

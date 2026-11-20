@@ -160,8 +160,8 @@ Read the named refusal when a required mechanism is absent.
 
 The machine tier runs a disposable disk guest through an emulator
 (`qemu-system-x86_64`; KVM where `/dev/kvm` opens, else TCG). A host with
-no QEMU needs no install: podvm fetches a pinned static QEMU 9.2.0 and its
-firmware (54 MiB) into its store on the first run, and a QEMU of the host
+no QEMU needs no install: podvm fetches a pinned static QEMU 11.0.0 and its
+firmware (24 MiB) into its store on the first run, and a QEMU of the host
 wins where it is present. `podvm pull windows:NAME` fetches a medium of
 the catalog from its vendor URL and checks its pinned sha256; podvm stores
 no Windows image of its own.
