@@ -508,6 +508,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #612 | COORD-214: the answer to PodUtils/podrunner#326: exec into a run -d container of the namespace rung joins its namespaces and sees its volumes; fixed on main (T-2012) (to podrunner) | open | T-2012 |
 | #613 | COORD-215: pod-enter's check_exec and the program of a dynamic loader; a write table of pod-confine beside its exec table (to podcrates) | open | T-1955, T-1984, T-1985, T-2013 |
 | #614 | [gh action] requested | open | the gate, arm, secrets and issue-sync runs of cdbcaa6 (T-1984, T-1985, T-2012, T-2013) |
+| #615 | [gh action] requested | open | arm and gate of 46b9079, after arm.yml 44699859975 failed on the aarch64 build of podvm-dispatch (T-1985) |
 
 ## Messages whose title does not start with COORD-NNN
 
