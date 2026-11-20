@@ -131,3 +131,62 @@ fn close_range_goes_around_the_kept_descriptors() {
         assert_eq!(got, want, "{lo} {hi} {keep:?}");
     }
 }
+
+/// TODO/enter.md T-2015: the handler's reader of a `#!` line (the
+/// interposer's `shebang`, with the kernel's bound of 256 bytes) and the
+/// arguments that the kernel gives the last interpreter of a chain.
+#[test]
+fn the_reader_of_a_shebang_line_and_the_lead_of_a_chain() {
+    use crate::parse::{shebang, HEAD};
+    use crate::script::{lead, Level, DEPTH};
+    let long = [b"#!/bin/sh ".as_slice(), &[b'a'; 300]].concat();
+    // (head, whole, interpreter, argument)
+    for (head, whole, want) in [
+        (&b"#!/bin/sh\n"[..], true, Some((&b"/bin/sh"[..], None))),
+        (
+            b"#! \t/usr/bin/env  node -x \t\nrest",
+            true,
+            Some((b"/usr/bin/env", Some(&b"node -x"[..]))),
+        ),
+        (b"#!/bin/sh", true, Some((b"/bin/sh", None))),
+        (b"#!/bin/sh", false, None),
+        (b"#!  \n", true, None),
+        (b"\x7fELF", true, None),
+        (
+            &long[..HEAD],
+            false,
+            Some((b"/bin/sh", Some(&long[10..HEAD]))),
+        ),
+    ] {
+        let got = shebang(head, whole).map(|s| {
+            (
+                &head[s.interp.0..s.interp.1],
+                s.arg.map(|(a, b)| &head[a..b]),
+            )
+        });
+        assert_eq!(got, want, "{:?}", String::from_utf8_lossy(head));
+    }
+    let heads = b"/ld A /i1 B /i2";
+    let lv = |i: (usize, usize), a: Option<(usize, usize)>| Level { interp: i, arg: a };
+    // (levels from the script down, the arguments before `file0`)
+    for (levels, want) in [
+        (vec![lv((0, 3), None)], vec![]),
+        (vec![lv((0, 3), Some((4, 5)))], vec![&b"A"[..]]),
+        (
+            vec![lv((6, 9), Some((10, 11))), lv((0, 3), Some((4, 5)))],
+            vec![&b"A"[..], b"/i1", b"B"],
+        ),
+        (
+            vec![
+                lv((12, 15), None),
+                lv((6, 9), Some((10, 11))),
+                lv((0, 3), None),
+            ],
+            vec![&b"/i1"[..], b"B", b"/i2"],
+        ),
+    ] {
+        let mut out: [&[u8]; 2 * DEPTH] = [&[]; 2 * DEPTH];
+        let k = lead(heads, &levels, &mut out);
+        assert_eq!(out[..k].to_vec(), want);
+    }
+}

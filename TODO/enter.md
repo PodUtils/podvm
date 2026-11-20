@@ -5579,7 +5579,7 @@ As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm --podvm-confine 'rea
 **Milestone:** none
 **Priority:** P2
 **Effort:** S
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -5601,6 +5601,9 @@ A rule on a guest path that holds a volume adds the same access on the host path
 
 As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm --podvm-confine 'read=/' -v S:/sc mirror.gcr.io/library/ubuntu:24.04 cat /sc/f` prints the file, on the loader family and on the syscall tier; a table test of `host_spec` holds the rule.
 
+## Done
+
+**Done (2026-11-20).** `podvm_enter::confine::host_spec` adds, for each rule of the spec (the system paths too), the same access on the host path of each volume whose guest path is under the guest path of the rule, at a component boundary; the guest paths are read lexically (`.` and `..` fold, no link of the image is followed), as the interposer matches them. The unit test `a_rule_holds_each_volume_under_its_guest_path` holds the table (`read=/`, a rule above one volume, a rule on a volume with a volume under it, a prefix that is not a component, `write=`, `exec=`, a file volume, a system path above a volume, a volume whose host path is absent, no rule). As uid 1000 under `nouserns` with `mirror.gcr.io/library/ubuntu:24.04` (`mode=userland`): `run --rm --podvm-confine 'read=/' -v S:/sc ... cat /sc/f` prints the file on the loader family and on the syscall tier (a binary of `main` from before this change: "Permission denied" on both); a write to `/sc` stays denied with `read=/`, `read=/etc` does not read `/sc/f`, `read=/;write=/` writes and removes a file of `/sc`, and `read=/;exec=/` runs `/sc/m`. The help of `--podvm-confine` and `docs/limits.md` name the rule.
 
 # T-2015: On the syscall tier, the interpreter of a `#!` script that the payload starts is not checked against `exec=`
 
@@ -5609,7 +5612,7 @@ As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm --podvm-confine 'rea
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -5630,3 +5633,7 @@ A reader of the `#!` line into a fixed buffer of the handler, with no allocation
 ## Prove
 
 As uid 1000 under `scripts/dev/nouserns.c` on the syscall tier with `exec=/usr/bin/sh` and a script `#!/sc/m` in a writable path: the payload's exec of the script exits 126; a table test of the reader of the `#!` line.
+
+## Done
+
+**Done (2026-11-20).** `podvm-dispatch` reads the `#!` line of a script that the payload starts into a buffer of its pool (`script::chain`, with `shebang` and `HEAD` of the interposer's own pure file `exec/parse.rs`, included as it is) where the exec table is on: each interpreter of the chain, up to 4 levels as the kernel (ELOOP after), resolves in the root (a relative name from the working directory), must be executable and must be in the exec table; where the last one is a dynamic loader, `ldso::each_program` judges the arguments that the kernel gives it (the argument of each `#!` level, the script, the payload's `argv[1..]`). A refusal is EACCES with one line that names `--podvm-confine` and this entry; an interpreter that is absent gives ENOENT, and an empty `#!` line ENOEXEC, as the kernel. The table tests pass as root and as uid 1000: `the_interpreter_of_a_script_takes_the_exec_rule` (`tests/confine.rs`: an interpreter outside and inside the table, a relative one, the loader with an argument outside the table, with no argument and with an option, two and more levels, absent, empty, a line over 256 bytes, a loop, no table) and `the_reader_of_a_shebang_line_and_the_lead_of_a_chain` (the reader and the arguments of the loader). As uid 1000 under `nouserns` with `mirror.gcr.io/library/ubuntu:24.04`, `--podvm-confine 'read=/sc;write=/tmp;exec=/usr/bin/sh,/w'`, `-v S:/sc -v S2:/w`, on the syscall tier: `sh -c /w/s` (`#!/sc/m`) exits 126 with the line of T-2015, the same for `#!/lib64/ld-linux-x86-64.so.2 /sc/m`, `#!/w/s` and a script that runs `/w/s`; `#!/usr/bin/sh` runs; the same through `run -d` + `exec`; a binary of `main` from before this change ran `/sc/m` in each case. The loader family gives 126 for each, as before. The script of the Prove must be in a path of `exec=` (here `/w`): with `exec=/usr/bin/sh` alone the script itself is refused before its interpreter. The help of `--podvm-confine` and `docs/limits.md` name where the rule holds.

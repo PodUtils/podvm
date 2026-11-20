@@ -167,6 +167,13 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   `/etc/resolv.conf`, `/etc/hosts` and `/etc/services` with raw system
   calls on the host path. Where the spec lets the payload read the guest
   path, the layer also gives read on the host file.
+- The paths of the confine layer on the userland rung are host paths
+  through the table (T-2014): a rule on a guest path that holds the guest
+  path of a volume gives the same access to the host path of each volume
+  under it, as Landlock holds a mount under the path of a rule on the
+  namespace rung (`read=/` reads `/sc` of `-v S:/sc`). The guest paths
+  are read lexically, as the interposer matches them: a link of the image
+  on the path of the rule is not followed.
 - Two limits of Landlock under the confine layer (T-1984, T-1985, call
   C25): Landlock checks the program that `execve` names, not one that the
   dynamic loader runs (`ld.so PROGRAM`), and it governs no change of mode,
@@ -176,15 +183,20 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   each argument that the loader can take as its program, and a program
   name with no `/` is denied, as glibc's loader searches such a name as a
   library; a change of mode, owner or times of a file (the target of a
-  link, a descriptor) needs a `write=` path. Where each rule holds:
+  link, a descriptor) needs a `write=` path. The kernel opens each
+  interpreter of a `#!` script for execution, so `exec=` holds for it on
+  each rung; on the native-static rung and the syscall tier, where each
+  program runs through podvm, the handler reads the `#!` line (up to 4
+  levels, as the kernel) and checks each interpreter, and the program of a
+  dynamic loader on that line (T-2015). Where each rule holds:
 
-  | Rung or tier | `exec=` through the loader | Mode, owner, times |
-  | --- | --- | --- |
-  | namespace and chroot rungs | no (Landlock only) | no: give the volume `:ro` |
-  | loader family of the userland rung | the interposer; a raw system call passes | the interposer; a raw system call passes |
-  | native-static rung | the handler | the handler |
-  | syscall tier | the handler | the handler |
-  | emulate tier | - | - |
+  | Rung or tier | `exec=` through the loader | The interpreter of a `#!` script | Mode, owner, times |
+  | --- | --- | --- | --- |
+  | namespace and chroot rungs | no (Landlock only) | Landlock; a loader on the `#!` line runs its program | no: give the volume `:ro` |
+  | loader family of the userland rung | the interposer; a raw system call passes | the interposer and Landlock | the interposer; a raw system call passes |
+  | native-static rung | the handler | the handler | the handler |
+  | syscall tier | the handler | the handler | the handler |
+  | emulate tier | - | - | - |
 
   The interposer and the handler are not a boundary (T-1657). The cost,
   only where the run has the layer: a change of mode, owner or times

@@ -241,3 +241,77 @@ fn the_first_program_takes_the_rule_of_exec() {
     assert!(check_first(&open, &maps, &[&v(&["/sc/m"])]).is_ok());
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// TODO/enter.md T-2014: a rule on a guest path that holds a volume gives
+/// the same access to the host path of each volume under it, at a
+/// component boundary, as the namespace rung holds a mount under the path
+/// of a rule.
+#[test]
+fn a_rule_holds_each_volume_under_its_guest_path() {
+    let root = scratch("vols-root");
+    for d in ["etc", "usr", "s", "data/deep"] {
+        std::fs::create_dir_all(root.join(d)).unwrap();
+    }
+    let host = scratch("vols-host");
+    for d in ["sc", "in", "x", "local"] {
+        std::fs::create_dir_all(host.join(d)).unwrap();
+    }
+    std::fs::write(host.join("f"), b"x").unwrap();
+    let h = |p: &str| host.join(p).to_str().unwrap().to_string();
+    let vols: Vec<crate::userland::Volume> = [
+        ("/sc", h("sc")),
+        ("/sc/in", h("in")),
+        ("/data/deep/x", h("x")),
+        ("/etc/f", h("f")),
+        ("/usr/local/v", h("local")),
+        ("/gone", h("absent")),
+    ]
+    .into_iter()
+    .map(|(g, h)| crate::userland::Volume {
+        guest: g.into(),
+        host: h,
+    })
+    .collect();
+    let maps = crate::userland::Maps::new(&crate::NAMES, root.to_str().unwrap(), &vols).unwrap();
+    let (r, rw, rx) = (
+        Access::READ,
+        Access::READ | Access::WRITE,
+        Access::READ | Access::EXECUTE,
+    );
+    // (spec, each volume host with the access it must get, each volume
+    // host with no rule)
+    for (ask, want, none) in [
+        (
+            "read=/",
+            vec![("sc", r), ("in", r), ("x", r), ("f", r), ("local", rx)],
+            vec!["absent"],
+        ),
+        ("read=/data", vec![("x", r)], vec!["sc", "in", "f"]),
+        ("read=/sc", vec![("sc", r), ("in", r)], vec!["x", "f"]),
+        ("read=/s", vec![], vec!["sc", "in"]),
+        ("write=/data/deep", vec![("x", rw)], vec!["sc"]),
+        ("exec=/sc", vec![("sc", rx), ("in", rx)], vec!["x"]),
+        ("read=/etc", vec![("f", r)], vec!["sc"]),
+        ("read=/sc/.", vec![("sc", r), ("in", r)], vec!["x"]),
+        ("", vec![("local", rx)], vec!["sc", "in", "x", "f"]),
+    ] {
+        let s = host_spec(&parse(ask).unwrap(), &maps).unwrap();
+        let got: Vec<(&String, Access)> = s.paths.iter().map(|r| (&r.path, r.access)).collect();
+        for (p, access) in want {
+            assert!(
+                s.paths
+                    .iter()
+                    .any(|r| r.path == h(p) && r.access.contains(access)),
+                "{ask}: {p} {access:?}: {got:?}"
+            );
+        }
+        for p in none {
+            assert!(
+                !s.paths.iter().any(|r| r.path == h(p)),
+                "{ask}: {p}: {got:?}"
+            );
+        }
+    }
+    let _ = std::fs::remove_dir_all(&root);
+    let _ = std::fs::remove_dir_all(&host);
+}

@@ -263,12 +263,15 @@ pub const RUN_OPTIONS: &str = "\
                    denied), and a change of mode, owner or times needs a
                    write= path. A raw system call of a dynamic program
                    passes the interposer (TODO/enter.md T-1984,
-                   T-1985). On a rung
+                   T-1985). Each interpreter of a #! script takes the
+                   exec= rule on each rung (on the syscall tier the
+                   handler, T-2015). On a rung
                    with a chroot and on each family of the userland rung
                    (the loader family, native-static, the syscall and the
                    emulate tier: host paths through the table, -v
-                   included); the record keeps it, so -d and each exec
-                   take it. The supervise rung, the machine tier, and a
+                   included; a rule on a path above a -v holds the -v
+                   too, as read=/ does, T-2014); the record keeps it, so
+                   -d and each exec take it. The supervise rung, the machine tier, and a
                    kernel with no Landlock refuse by name (TODO/enter.md
                    T-1658)
 

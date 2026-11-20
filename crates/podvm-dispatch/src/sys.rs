@@ -29,6 +29,7 @@ pub const EACCES: i64 = 13;
 pub const EPERM: i64 = 1;
 pub const EINVAL: i64 = 22;
 pub const ENOEXEC: i64 = 8;
+pub const ELOOP: i64 = 40;
 pub const ENOMEM: i64 = 12;
 pub const ENOSYS: i64 = 38;
 pub const ENAMETOOLONG: i64 = 36;

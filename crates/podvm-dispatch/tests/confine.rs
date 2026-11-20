@@ -163,3 +163,95 @@ fn a_change_of_mode_owner_or_times_takes_the_write_table() {
         assert_eq!(run(Some(&tmp), call, "/tmp/ln"), want, "{call} of the link");
     }
 }
+
+/// TODO/enter.md T-2015: an exec of a `#!` script takes the exec rule of
+/// each interpreter of its chain, and of the program of a dynamic loader
+/// on its `#!` line, as the kernel gives the loader its arguments. The
+/// probe stands in for the interpreter and the loader: it knows no verb of
+/// the script's name, and exits 2.
+#[test]
+fn the_interpreter_of_a_script_takes_the_exec_rule() {
+    let Some(r) = root("script") else { return };
+    std::fs::create_dir_all(r.0.join("sc")).unwrap();
+    std::fs::copy(r.0.join("bin/probe"), r.0.join("tmp/probe2")).unwrap();
+    std::fs::copy(r.0.join("bin/probe"), r.0.join("bin/ld-linux-x86-64.so.2")).unwrap();
+    let ld = "/bin/ld-linux-x86-64.so.2";
+    let long = format!("#!/bin/probe {}\n", "a".repeat(400));
+    for (name, text) in [
+        ("other", "#!/tmp/probe2\n".to_string()),
+        ("ok", "#!/bin/probe\n".to_string()),
+        ("rel", "#!../tmp/probe2\n".to_string()),
+        ("ldother", format!("#!{ld} /tmp/probe2\n")),
+        ("ldself", format!("#!{ld}\n")),
+        ("ldopt", format!("#!{ld} --inhibit-cache\n")),
+        ("nested", "#!/sc/ok\n".to_string()),
+        ("nestother", "#!/sc/other\n".to_string()),
+        ("nestld", "#!/sc/ldother\n".to_string()),
+        ("absent", "#!/tmp/absent\n".to_string()),
+        ("blank", "#!  \n".to_string()),
+        ("long", long),
+        ("loop1", "#!/sc/loop2\n".to_string()),
+        ("loop2", "#!/sc/loop1\n".to_string()),
+    ] {
+        let p = r.0.join("sc").join(name);
+        std::fs::write(&p, text).unwrap();
+        std::fs::set_permissions(&p, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    }
+    let real = std::fs::canonicalize(&r.0).unwrap();
+    let table = format!("{0}/bin:{0}/sc", real.display());
+    let denied = "ERR Permission denied";
+    let ran = "spawn 2";
+    // (table, the script and its arguments, the answer)
+    for (table, args, want) in [
+        (Some(table.as_str()), &["/sc/other"][..], denied),
+        (Some(&table), &["/sc/ok"], ran),
+        (Some(&table), &["/sc/ldother"], denied),
+        (Some(&table), &["/sc/ldself"], ran),
+        (Some(&table), &["/sc/ldself", "/tmp/probe2"], ran),
+        (Some(&table), &["/sc/ldopt"], ran),
+        (Some(&table), &["/sc/nested"], ran),
+        (Some(&table), &["/sc/nestother"], denied),
+        (Some(&table), &["/sc/nestld"], denied),
+        (
+            Some(&table),
+            &["/sc/absent"],
+            "ERR No such file or directory",
+        ),
+        (Some(&table), &["/sc/blank"], "ERR Exec format error"),
+        (Some(&table), &["/sc/long"], ran),
+        (Some(&table), &["/sc/loop1"], "ERR Symbolic link loop"),
+        (None, &["/sc/other"], ran),
+        (None, &["/sc/ldother"], ran),
+    ] {
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_podvm-dispatch-run"));
+        match table {
+            Some(t) => cmd.env("PODVM_EXEC_HOST", t),
+            None => cmd.env_remove("PODVM_EXEC_HOST"),
+        };
+        let out = cmd
+            .env_remove(podvm_dispatch::TIER_VAR)
+            .arg(&r.0)
+            .arg("/bin/probe")
+            .arg("probe")
+            .arg("spawn")
+            .args(args)
+            .current_dir(&r.0)
+            .output()
+            .unwrap();
+        let got = String::from_utf8_lossy(&out.stdout).trim_end().to_string();
+        assert!(got.starts_with(want), "{table:?} {args:?}: {got:?}");
+    }
+    // A relative interpreter resolves from the working directory, as the
+    // kernel opens it: `../tmp/probe2` from `/sc` is outside the table.
+    let out = Command::new(env!("CARGO_BIN_EXE_podvm-dispatch-run"))
+        .env("PODVM_EXEC_HOST", &table)
+        .env_remove(podvm_dispatch::TIER_VAR)
+        .arg(&r.0)
+        .arg("/bin/probe")
+        .args(["probe", "spawn", "/sc/rel"])
+        .current_dir(r.0.join("sc"))
+        .output()
+        .unwrap();
+    let got = String::from_utf8_lossy(&out.stdout).trim_end().to_string();
+    assert!(got.starts_with(denied), "/sc/rel: {got:?}");
+}

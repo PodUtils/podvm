@@ -43,7 +43,7 @@ pub(crate) fn table(envp: &[std::ffi::OsString]) -> Result<(), String> {
 
 /// Whether the exec table lets the program of the descriptor link `pp`
 /// run: no table, or a path of the table covers its host path.
-fn exec_allowed(pp: &[u8]) -> bool {
+pub(crate) fn exec_allowed(pp: &[u8]) -> bool {
     if !crate::state::EXEC_ON.load(core::sync::atomic::Ordering::Acquire) {
         return true;
     }
@@ -83,23 +83,27 @@ fn loader_allowed(pp: &[u8], argv: i64) -> bool {
         // SAFETY: the payload gave each entry as a C string. One that does
         // not fit is empty, and an empty program is refused.
         .map(|p| unsafe { sys::cstr(p, PATH_MAX) }.unwrap_or(&[]));
-    crate::ldso::each_program(args, |c| {
-        let Some(mut b) = crate::pool::Buf::get() else {
-            return false;
-        };
-        let buf = b.buf();
-        let Ok(t) = path::target(AT_FDCWD, c, buf) else {
-            return false;
-        };
-        let fd = path::open_path(AT_FDCWD, c, t, &buf[..], true, false);
-        if fd < 0 {
-            return true;
-        }
-        let mut link = [0u8; 32];
-        let r = sys::readlinkat(AT_FDCWD, path::fd_link(fd, &mut link), &mut buf[..]);
-        sys::close(fd);
-        r > 0 && pod_confine::exec::allows_in(crate::state::EXEC_TABLE.get(), &buf[..r as usize])
-    })
+    crate::ldso::each_program(args, program_allowed)
+}
+
+/// Whether the exec table lets the loader run the program `c`, a name that
+/// resolves in the root; a name that does not open runs nothing and passes.
+pub(crate) fn program_allowed(c: &[u8]) -> bool {
+    let Some(mut b) = crate::pool::Buf::get() else {
+        return false;
+    };
+    let buf = b.buf();
+    let Ok(t) = path::target(AT_FDCWD, c, buf) else {
+        return false;
+    };
+    let fd = path::open_path(AT_FDCWD, c, t, &buf[..], true, false);
+    if fd < 0 {
+        return true;
+    }
+    let mut link = [0u8; 32];
+    let r = sys::readlinkat(AT_FDCWD, path::fd_link(fd, &mut link), &mut buf[..]);
+    sys::close(fd);
+    r > 0 && pod_confine::exec::allows_in(crate::state::EXEC_TABLE.get(), &buf[..r as usize])
 }
 
 const X_OK: i64 = 1;
@@ -167,7 +171,12 @@ fn check(buf: &[u8; PATH_MAX], n: usize, argv: i64) -> i64 {
     let got = unsafe { sc6(nr::PREAD64, rd, head.as_mut_ptr() as i64, 64, 0, 0, 0) };
     let mut verdict = -sys::ENOEXEC;
     if got >= 2 && head[0] == b'#' && head[1] == b'!' {
-        verdict = 0;
+        // T-2015: each interpreter of the `#!` chain takes `exec=`.
+        verdict = if on {
+            crate::script::chain(rd, &buf[..n], argv)
+        } else {
+            0
+        };
     } else if got >= 64
         && crate::state::emulator_for(u16::from_le_bytes([head[18], head[19]])).is_some()
         && head[..4] == *b"\x7fELF"

@@ -283,9 +283,23 @@ pub fn host_resolved(maps: &crate::userland::Maps, guest: &str) -> Option<String
 /// tree that serves it is refused with the guest path that the caller
 /// wrote. A link of the image to a path that only the host has took a
 /// rule on the host's inode before.
+///
+/// TODO/enter.md T-2014: a rule on a guest path that holds a volume gives
+/// the same access to the host path of the volume, as a rule of the
+/// namespace rung holds the mounts under its path (`read=/` reads `/sc` of
+/// `-v S:/sc`).
 pub fn host_spec(ask: &Ask, maps: &crate::userland::Maps) -> Result<Spec, String> {
     let exists = |guest: &str| host_resolved(maps, guest).is_some();
     let mut s = spec(ask, &exists);
+    let under: Vec<(String, Access)> = s
+        .paths
+        .iter()
+        .flat_map(|r| {
+            volumes_under(maps, &r.path)
+                .filter_map(|v| host_resolved(maps, &v.guest))
+                .map(move |h| (h, r.access))
+        })
+        .collect();
     for r in &mut s.paths {
         r.path = host_resolved(maps, &r.path).ok_or_else(|| {
             let lexical = host_of(maps, &r.path);
@@ -312,7 +326,34 @@ pub fn host_spec(ask: &Ask, maps: &crate::userland::Maps) -> Result<Spec, String
     {
         s = s.allow(*p, Access::READ | Access::WRITE);
     }
+    for (host, access) in under {
+        s = s.allow(host, access);
+    }
     Ok(s)
+}
+
+/// TODO/enter.md T-2014: each volume whose guest path is under the guest
+/// path `guest` (at a component boundary, not the path itself), read
+/// lexically as the interposer matches: `.` and `..` fold, and no link of
+/// the image is followed. A volume at `guest` itself serves the rule
+/// already ([`host_resolved`]).
+fn volumes_under<'a>(
+    maps: &'a crate::userland::Maps,
+    guest: &str,
+) -> impl Iterator<Item = &'a crate::userland::Volume> {
+    let mut g: Vec<&str> = Vec::new();
+    for c in guest.split('/').filter(|c| !c.is_empty() && *c != ".") {
+        if c == ".." {
+            g.pop();
+        } else {
+            g.push(c);
+        }
+    }
+    let g: Vec<String> = g.into_iter().map(str::to_string).collect();
+    maps.volumes().iter().filter(move |v| {
+        let p: Vec<&str> = v.guest.split('/').filter(|c| !c.is_empty()).collect();
+        p.len() > g.len() && p.iter().zip(&g).all(|(a, b)| a == b)
+    })
 }
 
 /// Whether a rung can carry the layer: a rung with a chroot, where the

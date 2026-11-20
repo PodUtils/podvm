@@ -45,8 +45,16 @@ mod ro; // TODO/enter.md T-1901
 #[cfg(target_arch = "x86_64")]
 #[path = "../../podvm-interpose/src/exec/ldso.rs"]
 mod ldso;
+// TODO/enter.md T-2015: the reader of a `#!` line, the interposer's own
+// pure file; the handler takes `shebang` and `HEAD` of it.
 #[cfg(target_arch = "x86_64")]
 mod meta; // TODO/enter.md T-1985
+#[cfg(target_arch = "x86_64")]
+#[allow(dead_code)]
+#[path = "../../podvm-interpose/src/exec/parse.rs"]
+mod parse;
+#[cfg(target_arch = "x86_64")]
+mod script; // TODO/enter.md T-2015
 #[cfg(target_arch = "x86_64")]
 mod signals;
 #[cfg(target_arch = "x86_64")]

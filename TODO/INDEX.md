@@ -676,13 +676,13 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2011](machine.md) | P1 | S | none | machine | done | `run -d --podvm-init=image` of an image whose Entrypoint is its init runs `/sbin/init CMD` and not the command |
 | [T-2012](enter.md) | P1 | S | none | enter | done | `exec` into a `run -d` container of the namespace rung refuses its volumes where the probe of the host denies chroot |
 | [T-2013](enter.md) | P1 | S | none | enter | done | On the userland rung, `--podvm-confine exec=` does not hold for the first program of a run |
-| [T-2014](enter.md) | P2 | S | none | enter | open | On the userland rung, `--podvm-confine read=/` does not cover a volume |
-| [T-2015](enter.md) | P2 | M | none | enter | open | On the syscall tier, the interpreter of a `#!` script that the payload starts is not checked against `exec=` |
+| [T-2014](enter.md) | P2 | S | none | enter | done | On the userland rung, `--podvm-confine read=/` does not cover a volume |
+| [T-2015](enter.md) | P2 | M | none | enter | done | On the syscall tier, the interpreter of a `#!` script that the payload starts is not checked against `exec=` |
 | [T-2016](machine.md) | P2 | M | none | machine | partial | QEMU before 10.0.4 can end on SIGSEGV in the boot of a guest with more than one vCPU under TCG |
 
 ## Counts
 
-613 entries: 24 open, 37 partial, 5 blocked, 547 done.
+613 entries: 22 open, 37 partial, 5 blocked, 549 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -693,9 +693,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 17 | 0 | 249 | 269 |
-| P2 | 16 | 15 | 4 | 181 | 216 |
+| P2 | 14 | 15 | 4 | 183 | 216 |
 | P3 | 5 | 5 | 1 | 42 | 53 |
-| **All** | 24 | 37 | 5 | 547 | 613 |
+| **All** | 22 | 37 | 5 | 549 | 613 |
 
 ## Work order
 
