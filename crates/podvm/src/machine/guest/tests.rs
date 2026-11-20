@@ -478,7 +478,8 @@ fn the_init_of_the_image_wraps_the_command_of_the_guest() {
         assert_eq!(init::with_image_init(s.clone(), false), s);
         let with = init::with_image_init(s.clone(), true);
         assert_eq!(with.matches(run).count(), 1, "{with}");
-        assert_eq!(with.matches("\"$@\"").count(), 1, "{with}");
+        // The second is the `exec` of the wrap of the pid (T-2041).
+        assert_eq!(with.matches("\"$@\"").count(), 2, "{with}");
         assert!(with.contains("set -- 'sh' '-c' 'exit 7'"), "{with}");
         assert!(with.contains("echo PODVM-EXIT-n $rc"), "{with}");
     }

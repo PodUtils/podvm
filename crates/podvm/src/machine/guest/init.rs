@@ -167,6 +167,7 @@ fn body(
             &format!("the working directory {workdir} is not a directory in the image")
         )
     ));
+    s.push_str(&super::signals::start(nonce)); // T-2041: before the marker
     s.push_str(&format!("echo PODVM-READY-{nonce}\n"));
     if net {
         s.push_str("/podvm/podvm guest-net\n");
@@ -211,7 +212,8 @@ fn body(
             format!("{} ", sh_quote(size))
         };
         s.push_str(&format!(
-            "/podvm/podvm guest-tty {size}-- \"$@\"\nrc=$?\n{OOM}\necho; echo PODVM-EXIT-{nonce} $rc $o\n"
+            "{}\nrc=$?\n{OOM}\necho; echo PODVM-EXIT-{nonce} $rc $o\n",
+            super::signals::wrap(&format!("/podvm/podvm guest-tty {size}-- \"$@\""))
         ));
         s.push_str("sync\nreboot -f 2>/dev/null\necho b > /proc/sysrq-trigger\n");
         return s;
@@ -237,7 +239,8 @@ fn body(
         "\"$@\"".to_string()
     };
     s.push_str(&format!(
-        "{run} >/podvm-out 2>/podvm-err\nrc=$?\nwait $o $e\n"
+        "{} >/podvm-out 2>/podvm-err\nrc=$?\nwait $o $e\n",
+        super::signals::wrap(&run) // T-2041: the pid of the command
     ));
     s.push_str(&format!("{OOM}\necho; echo PODVM-EXIT-{nonce} $rc $o\n"));
     s.push_str("sync\nreboot -f 2>/dev/null\necho b > /proc/sysrq-trigger\n");

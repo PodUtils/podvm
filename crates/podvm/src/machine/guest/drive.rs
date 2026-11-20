@@ -26,15 +26,14 @@ pub(super) fn drive(
 ) -> Driven {
     use std::os::unix::process::CommandExt;
     let errlog = dir.join("qemu.err");
+    // TODO/machine.md T-2041: the set blocked before the emulator and each
+    // thread of the run, and each signal to the command in the guest.
+    let mut fwd = super::signals::Forward::new(r.verb, nonce);
     let mut cmd = Command::new(qemu);
     crate::machine::die_with_podvm(&mut cmd); // T-1884
     let mut child = match cmd
         .args(argv)
-        .stdin(if warm.is_some() {
-            Stdio::piped()
-        } else {
-            Stdio::null()
-        })
+        .stdin(Stdio::piped()) // the job (T-2008) and the signals (T-2041)
         .stdout(Stdio::piped())
         .stderr(
             std::fs::File::create(&errlog)
@@ -122,10 +121,14 @@ pub(super) fn drive(
             _ => deadline,
         };
         let left = bound.saturating_duration_since(Instant::now());
-        match rx.recv_timeout(left.max(Duration::from_millis(1))) {
+        fwd.poll(&mut job_in, &mut sent);
+        match rx.recv_timeout(left.clamp(Duration::from_millis(1), SIGNAL_STEP)) {
             Ok(line) => match console.line(&line) {
                 init::Line::Before => {
                     let l = line.trim_end_matches('\r').trim();
+                    if fwd.line(l) {
+                        continue;
+                    }
                     if let Some(w) = warm.as_deref_mut() {
                         if let Some(why) = l.strip_prefix(&format!("{}{} ", job::BAD, w.nonce)) {
                             cold = Some(format!("the guest did not take the job: {why}"));
@@ -368,6 +371,9 @@ pub(super) fn drive(
 unsafe extern "C" {
     fn kill(pid: i32, sig: i32) -> i32;
 }
+
+/// The longest wait for a line of the console before a look at the signals.
+const SIGNAL_STEP: Duration = Duration::from_millis(100);
 
 /// PodUtils/podrunner#198: what podvm waited for, how long, and the size
 /// of what the guest had to unpack first.

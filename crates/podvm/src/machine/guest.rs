@@ -32,6 +32,7 @@ mod mem; // TODO/machine.md T-1922
 pub(crate) mod net;
 mod rundir; // TODO/machine.md T-1906
 pub(crate) mod sealed;
+pub(crate) mod signals; // TODO/machine.md T-2041
 pub(crate) mod squashfs;
 pub(crate) mod state; // TODO/machine.md T-2008
 pub(crate) mod stderr;
@@ -40,7 +41,6 @@ pub(crate) mod vol;
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
-
 use std::time::Duration;
 
 use podvm_image::error::EXIT_RUNTIME_ERROR;

@@ -5860,7 +5860,7 @@ Partial (2026-11-20). Step (3) of the Approach: `drive` ends with `Driven::Again
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -5881,6 +5881,10 @@ The waiter of the machine tier blocks the set of `pod_enter::WAIT_FORWARDED` and
 ## Prove
 
 As uid 1000 under TCG: a `kill -TERM` of podvm of `run --rm --podvm-tier=machine ... trap ... TERM` prints the line of the trap, podvm exits 4, and stderr names the forward; the same for SIGINT and SIGHUP; no emulator stays.
+
+## Done
+
+**Done (2026-11-20).** The drive of the emulator blocks the set of `pod_enter::WAIT_FORWARDED` before it starts the emulator and each thread of the run, and reads each signal from a signalfd between the lines of the console (`crates/podvm/src/machine/guest/signals.rs`). The emulator's stdin (its first serial port) is a pipe on each run now; the host writes one line `PODVM-SIG-NONCE N` there. In the guest, `podvm guest-signals NONCE` starts before the ready marker: it puts the console in raw mode (no echo of the line), says `PODVM-SIGNALS-NONCE`, and sends each signal of a line of the run to the command, whose pid the init writes to `/podvm-cmd.pid` (`sh -c 'echo $$ >...; exec "$@"'`, so the command stays in the foreground and ignores no signal). stderr names each forward ("podvm run: forwarded SIGTERM to the payload in the guest"). A signal before the reader is up (the boot, a guest with no podvm) or a line that does not go out ends podvm with the signal as before, after one line that says so. The unit test `each_forwarded_signal_reaches_the_guest_and_nothing_else_does` holds the set against pod-enter, each frame, and the noise that gives no signal. As uid 1000 under TCG with `alpine:3.20`, `run --rm --podvm-tier=machine ... sh -c "trap 'echo guest-got-S; exit 4' S; ..."` and a `kill -S` of podvm: before (`d9b152f`), SIGTERM gave rc 143 and no trap line; now SIGTERM, SIGINT and SIGHUP each print `guest-got-S`, the forward line on stderr, and rc 4. With no trap, `sleep 100` gives 143 after the forward line. With `-t` the trap runs too (rc 5). A SIGTERM 0.5 s after the start gives the line "SIGTERM came, and the guest takes no signal yet ..." and 143. Exit codes (7, 127 for a missing command, with `/podvm-init: exec: line 0: nosuchcmd: not found`) and stdin of `-i` stay. No emulator stays after each run.
 
 # T-2042: After `run -d --podvm-tier=machine`, `inspect`, `kill`, `wait` and the filters of `ps` do not find the container
 
