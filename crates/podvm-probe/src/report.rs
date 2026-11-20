@@ -30,6 +30,12 @@ pub fn rows(f: &Findings) -> String {
     out
 }
 
+/// The label of the probe rows of the banner. The rows describe the host as
+/// podvm found it. pod-enter can then open a user namespace and a mount
+/// namespace, so `mode=namespace` can stand beside `clone(NEWNS)=EPERM`
+/// (T-2001 OP-01).
+pub const PROBES_LABEL: &str = "probes (host, outside any user namespace): ";
+
 /// `TOOL.md` section 6.8's banner. Two lines of mode, then the probe verdicts
 /// that decided it.
 pub fn banner(f: &Findings, sel: &Selection) -> String {
@@ -65,11 +71,11 @@ pub fn entry_banner(f: &Findings, sel: &Selection, entered: Rung) -> String {
         p.pids
     );
     let cells: Vec<String> = BANNER_ROWS.iter().map(|n| banner_cell(f, n)).collect();
-    out.push_str("probes: ");
+    out.push_str(PROBES_LABEL);
     out.push_str(&cells[..cells.len().min(4)].join(" "));
     out.push('\n');
     if cells.len() > 4 {
-        out.push_str("        ");
+        out.push_str(&" ".repeat(PROBES_LABEL.len()));
         out.push_str(&cells[4..].join(" "));
         out.push('\n');
     }

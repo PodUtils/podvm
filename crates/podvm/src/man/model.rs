@@ -148,6 +148,7 @@ pub fn manual(help: &dyn Fn(&str) -> Option<String>) -> Manual {
             .map(|s| s.to_string())
             .collect(),
         commands,
+        facts: crate::environ::facts(),
         ..Manual::default()
     }
 }

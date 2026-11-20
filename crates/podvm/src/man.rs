@@ -153,11 +153,19 @@ fn render(only: Option<&str>, help: &dyn Fn(&str) -> Option<String>) -> Option<S
     }
     out.push('\n');
     global(&mut out);
+    out.push_str(&crate::environ::section());
     out.push_str("COMMAND REFERENCE\n");
     for row in &verbs {
         render_section(&mut out, row, &help);
     }
     Some(out)
+}
+
+/// The whole manual over stub usage strings, for the test of the table of
+/// variables (`environ`).
+#[cfg(test)]
+pub(crate) fn render_for_test() -> String {
+    render(None, &|v: &str| Some(format!("usage: podvm {v}\n"))).expect("the manual renders")
 }
 
 fn header(out: &mut String) {
