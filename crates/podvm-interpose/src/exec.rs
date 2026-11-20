@@ -34,6 +34,10 @@ mod descriptor;
 pub(crate) use descriptor::fd_path;
 pub mod head;
 pub(crate) mod launch;
+// TODO/enter.md T-1984: the program of an exec of the dynamic loader.
+pub mod ldso;
+mod loader_rule;
+use loader_rule::{dispatches, loader_program_allowed};
 pub(crate) mod lookup;
 mod shell;
 pub(crate) mod walk;
@@ -331,10 +335,27 @@ pub(crate) unsafe fn plan(
             head::File::Direct => break (rn, Tail::Direct),
             // T-1724: podvm enters a static child on the native-static
             // rung where it named itself, else the kernel runs it.
-            head::File::Static => match unsafe { dispatch_into(t, s) } {
-                true => break (rn, Tail::Dispatch),
-                false => break (rn, Tail::Direct),
-            },
+            head::File::Static => {
+                // TODO/enter.md T-1984: an exec of the loader runs the
+                // program of its arguments, which Landlock does not check.
+                let dispatch = dispatches(t);
+                if ldso::is_loader(&s.host[..hn])
+                    && unsafe { crate::map::lookup_env(crate::map::EXEC_VAR) }.is_some()
+                    && !unsafe {
+                        loader_program_allowed(t, &levels[..depth], file0, argv, dispatch, s)
+                    }
+                {
+                    crate::say::line(&[
+                        what,
+                        b": --podvm-confine denies the exec of the program that the dynamic loader would run (exec=, TODO/enter.md T-1984)",
+                    ]);
+                    return Err(EACCES);
+                }
+                match dispatch && unsafe { dispatch_into(t, s) } {
+                    true => break (rn, Tail::Dispatch),
+                    false => break (rn, Tail::Direct),
+                }
+            }
             head::File::Foreign => {
                 // T-1703: the kernel would read the loader of another
                 // machine, or its binfmt handler, on the host root.
@@ -436,3 +457,5 @@ unsafe fn dispatch_into(t: &Table, s: &mut Scratch) -> bool {
 mod tests;
 #[cfg(test)]
 mod tests_t1703;
+#[cfg(test)]
+mod tests_t1984;

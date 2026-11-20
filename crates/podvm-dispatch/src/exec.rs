@@ -54,6 +54,54 @@ fn exec_allowed(pp: &[u8]) -> bool {
     let n = sys::readlinkat(AT_FDCWD, pp, &mut h[..]);
     n > 0 && pod_confine::exec::allows_in(crate::state::EXEC_TABLE.get(), &h[..n as usize])
 }
+/// TODO/enter.md T-1984: whether the exec table lets each argument run
+/// that the loader can take as its program, where the program of the
+/// descriptor link `pp` is a dynamic loader. The loader runs in a podvm
+/// process of its own, under this handler, so each name resolves in the
+/// root; a name that does not open runs nothing and passes.
+fn loader_allowed(pp: &[u8], argv: i64) -> bool {
+    let Some(mut g) = crate::pool::Buf::get() else {
+        return false;
+    };
+    let h = g.buf();
+    let n = sys::readlinkat(AT_FDCWD, pp, &mut h[..]);
+    if n <= 0 {
+        return false;
+    }
+    if !crate::ldso::is_loader(&h[..n as usize]) {
+        return true;
+    }
+    let args = (1..)
+        .map(|i| {
+            if argv == 0 {
+                return 0;
+            }
+            // SAFETY: the payload gave argv as a NULL-ended array.
+            unsafe { *(argv as *const i64).add(i) }
+        })
+        .take_while(|&p| p != 0)
+        // SAFETY: the payload gave each entry as a C string. One that does
+        // not fit is empty, and an empty program is refused.
+        .map(|p| unsafe { sys::cstr(p, PATH_MAX) }.unwrap_or(&[]));
+    crate::ldso::each_program(args, |c| {
+        let Some(mut b) = crate::pool::Buf::get() else {
+            return false;
+        };
+        let buf = b.buf();
+        let Ok(t) = path::target(AT_FDCWD, c, buf) else {
+            return false;
+        };
+        let fd = path::open_path(AT_FDCWD, c, t, &buf[..], true, false);
+        if fd < 0 {
+            return true;
+        }
+        let mut link = [0u8; 32];
+        let r = sys::readlinkat(AT_FDCWD, path::fd_link(fd, &mut link), &mut buf[..]);
+        sys::close(fd);
+        r > 0 && pod_confine::exec::allows_in(crate::state::EXEC_TABLE.get(), &buf[..r as usize])
+    })
+}
+
 const X_OK: i64 = 1;
 const MAP_PRIVATE_ANON: i64 = 0x22;
 
@@ -83,7 +131,7 @@ fn program(dirfd: i64, p: i64, flags: i64, buf: &mut [u8; PATH_MAX]) -> Result<u
 /// Check the program as the kernel would: it exists, it is executable, and
 /// it is an ELF of x86_64 (static, or dynamic with its interpreter in the
 /// root, T-1731) or a script.
-fn check(buf: &[u8; PATH_MAX], n: usize) -> i64 {
+fn check(buf: &[u8; PATH_MAX], n: usize, argv: i64) -> i64 {
     let t = Target::Root(n);
     let fd = path::open_path(AT_FDCWD, &[], t, &buf[..], true, false);
     if fd < 0 {
@@ -98,7 +146,14 @@ fn check(buf: &[u8; PATH_MAX], n: usize) -> i64 {
         return r;
     }
     // T-1983: the confine layer's `exec=`, as the interposer checks it.
+    // T-1984: an exec of the loader takes the rule of its program.
+    let on = crate::state::EXEC_ON.load(core::sync::atomic::Ordering::Acquire);
     if !exec_allowed(pp) {
+        sys::close(fd);
+        return -sys::EACCES;
+    }
+    if on && !loader_allowed(pp, argv) {
+        crate::meta::say(b"podvm: syscall tier: execve: --podvm-confine denies the exec of the program that the dynamic loader would run (exec=, TODO/enter.md T-1984)\n");
         sys::close(fd);
         return -sys::EACCES;
     }
@@ -206,7 +261,7 @@ fn execveat_here(a: &[i64]) -> i64 {
         Ok(n) => n,
         Err(e) => return e,
     };
-    let c = check(buf, n);
+    let c = check(buf, n, argv);
     if c < 0 {
         return c;
     }
@@ -244,8 +299,11 @@ fn execveat_here(a: &[i64]) -> i64 {
         + 1
         + EXEC_TABLE_VAR.len()
         + crate::state::EXEC_TABLE.get().len()
+        + 1
+        + crate::meta::WRITE_TABLE_VAR.len()
+        + crate::state::WRITE_TABLE.get().len()
         + 1;
-    let size = ((count + 6) * 8 + strings + 4095) & !4095;
+    let size = ((count + 7) * 8 + strings + 4095) & !4095;
     // SAFETY: an anonymous map for the new array; it ends with the exec.
     let mem = unsafe { sc6(nr::MMAP, 0, size as i64, 3, MAP_PRIVATE_ANON, -1, 0) };
     if mem < 0 {
@@ -263,6 +321,7 @@ fn execveat_here(a: &[i64]) -> i64 {
                 || s.starts_with(EMU_VAR)
                 || s.starts_with(TIER_VAR)
                 || s.starts_with(EXEC_TABLE_VAR)
+                || s.starts_with(crate::meta::WRITE_TABLE_VAR)
             {
                 continue;
             }
@@ -270,7 +329,7 @@ fn execveat_here(a: &[i64]) -> i64 {
             k += 1;
         }
         let mut at = mem as *mut u8;
-        at = at.add((count + 6) * 8);
+        at = at.add((count + 7) * 8);
         for (name, value) in [(ROOT_VAR, root), (EXE_VAR, &buf[..n])] {
             *arr.add(k) = at as i64;
             k += 1;
@@ -327,6 +386,19 @@ fn execveat_here(a: &[i64]) -> i64 {
             k += 1;
             core::ptr::copy_nonoverlapping(EXEC_TABLE_VAR.as_ptr(), at, EXEC_TABLE_VAR.len());
             at = at.add(EXEC_TABLE_VAR.len());
+            core::ptr::copy_nonoverlapping(t.as_ptr(), at, t.len());
+            at = at.add(t.len());
+            *at = 0;
+            at = at.add(1);
+        }
+        // T-1985: the handler's own write table, never the payload's.
+        if crate::state::WRITE_ON.load(core::sync::atomic::Ordering::Acquire) {
+            let t = crate::state::WRITE_TABLE.get();
+            let v = crate::meta::WRITE_TABLE_VAR;
+            *arr.add(k) = at as i64;
+            k += 1;
+            core::ptr::copy_nonoverlapping(v.as_ptr(), at, v.len());
+            at = at.add(v.len());
             core::ptr::copy_nonoverlapping(t.as_ptr(), at, t.len());
             at = at.add(t.len());
             *at = 0;

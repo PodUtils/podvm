@@ -153,6 +153,10 @@ pub unsafe extern "C" fn lchown(path: *const c_char, uid: c_uint, gid: c_uint) -
 /// The payload's own contract for `fchown(2)`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fchown(fd: c_int, uid: c_uint, gid: c_uint) -> c_int {
+    // TODO/enter.md T-1985: the confine layer, on the descriptor's file.
+    if !unsafe { crate::map::meta_fd_allowed(b"fchown", fd) } {
+        return -1;
+    }
     let ids = unsafe { ids_of_fd(fd) };
     let rc = next_fchown().map(|f| unsafe { f(fd, uid, gid) });
     unsafe { owned(rc, ids, uid, gid, b"fchown") }
@@ -177,6 +181,15 @@ pub unsafe extern "C" fn fchownat(
     // the file the kernel actually changed. Where the rewrite moved it, the
     // call goes with an absolute path; where it did not, the original
     // descriptor and path go through untouched.
+    // TODO/enter.md T-1985: an empty path with `AT_EMPTY_PATH` is the
+    // descriptor's own file.
+    if flags & 0x1000 != 0
+        && !path.is_null()
+        && unsafe { *path } == 0
+        && !unsafe { crate::map::meta_fd_allowed(b"fchownat", dirfd) }
+    {
+        return -1;
+    }
     let _pin = crate::map::Scope::new(); // TODO/enter.md T-1972
     let mut buf = [0u8; crate::map::OUT];
     // T-1725: AT_SYMLINK_NOFOLLOW keeps the last link.

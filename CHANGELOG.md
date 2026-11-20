@@ -33,6 +33,16 @@ They describe their recorded revision, not the current build.
 - A run makes the mount point of each volume in its own tree, so `ls /`
   names a volume whose guest path the image lacks (T-2001).
 - podcrates `v0.78.1` (with `v0.77.0`).
+- `--podvm-confine` on the userland rung (T-1984, T-1985): an exec of the
+  dynamic loader (`ld.so PROGRAM`, each name and link of the loader) takes
+  the `exec=` rule of its program, and a change of mode, owner or times
+  (`chmod`, `chown`, `utimes` and their kin, also through a link or a
+  descriptor) needs a `write=` path. The interposer of the loader family
+  and the handler of the native-static rung and the syscall tier answer
+  `EACCES` with one line; Landlock checks neither, so on the namespace and
+  chroot rungs the advice of a `:ro` volume stays. Cost with the layer: about
+  2.5 microseconds for each change of mode, owner or times on the loader
+  family, 1.9 on the syscall tier (an estimate).
 
 - `--podvm-volume-base DIR` holds on the loader family of the userland
   rung (T-1972, PodUtils/podrunner#300 ask 3): each volume under DIR must

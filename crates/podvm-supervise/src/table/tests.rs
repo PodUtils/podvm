@@ -157,3 +157,37 @@ fn the_userland_layer_runs_podvm_itself_and_the_emulator() {
     }
     let _ = std::fs::remove_dir_all(&d);
 }
+
+/// TODO/enter.md T-1985: the write table of a spec holds the resolved host
+/// path of each rule with write, once, and no other; a caller's own value
+/// never reaches the payload; a path that the table cannot spell refuses.
+#[test]
+fn the_write_table_holds_each_rule_with_write() {
+    use podvm_enter::confine::{Access, Spec};
+    let d = std::env::temp_dir().join(format!("podvm-t1985-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&d);
+    std::fs::create_dir_all(d.join("w")).unwrap();
+    std::os::unix::fs::symlink(d.join("w"), d.join("link")).unwrap();
+    let real = std::fs::canonicalize(d.join("w")).unwrap();
+    let w = real.to_string_lossy().to_string();
+    let link = d.join("link").to_string_lossy().to_string();
+    let spec = Spec::new()
+        .allow(w.clone(), Access::READ | Access::WRITE)
+        .allow(link, Access::WRITE)
+        .allow("/usr".to_string(), Access::READ | Access::EXECUTE)
+        .allow("/dev/null".to_string(), Access::WRITE);
+    let mut env = vec!["A=1".to_string(), format!("{WRITE_TABLE_VAR}=/")];
+    set_write_table(&mut env, Some(&spec)).unwrap();
+    assert_eq!(
+        env,
+        [
+            "A=1".to_string(),
+            format!("{WRITE_TABLE_VAR}={w}:/dev/null")
+        ]
+    );
+    set_write_table(&mut env, None).unwrap();
+    assert_eq!(env, ["A=1"], "no spec: no table, and the old one goes");
+    let bad = Spec::new().allow("/a:b".to_string(), Access::WRITE);
+    assert!(set_write_table(&mut env, Some(&bad)).is_err());
+    let _ = std::fs::remove_dir_all(&d);
+}

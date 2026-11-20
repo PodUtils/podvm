@@ -391,13 +391,12 @@ pub unsafe fn prepare_mode(
     unsafe { prepare_follow(what, dirfd, path, writes, follows(what), out) }
 }
 
-/// [`prepare_mode`] where the caller says whether the call follows the
-/// link of its last component: `O_NOFOLLOW`, `AT_SYMLINK_NOFOLLOW` and
-/// `AT_SYMLINK_FOLLOW` are flags of the call (TODO/interpose.md T-1725).
+/// [`prepare_follow`] with no check of the confine layer
+/// (`meta::prepare_follow` adds it, TODO/enter.md T-1985).
 ///
 /// # Safety
 /// As [`prepare`].
-pub unsafe fn prepare_follow(
+pub(super) unsafe fn prepare_inner(
     what: &[u8],
     dirfd: c_int,
     path: *const c_char,

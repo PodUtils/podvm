@@ -181,6 +181,45 @@ fn main() {
             let e = std::process::Command::new(arg(2)).args(&args[3..]).exec();
             println!("ERR {e}");
         }
+        // TODO/enter.md T-1985: one raw call of the family of a change of
+        // mode, owner or times on PATH, with no change (the mode 0644 of
+        // the test files, the owner -1, the time now): "meta ok", or
+        // "meta ERR" and the errno.
+        "meta" => {
+            let c = std::ffi::CString::new(arg(3)).unwrap_or_default();
+            let p = c.as_ptr() as i64;
+            let at = 0xFFFF_FF9Ci64;
+            let e = c"".as_ptr() as i64;
+            // SAFETY: each call reads the path and the probe's own memory.
+            let r = unsafe {
+                let fd = || syscall(2, p, 0i64, 0i64);
+                match arg(2).as_str() {
+                    "chmod" => syscall(90, p, 0o644i64),
+                    "fchmod" => syscall(91, fd(), 0o644i64),
+                    "fchmodat" => syscall(268, at, p, 0o644i64),
+                    "fchmodat2" => syscall(452, at, p, 0o644i64, 0i64),
+                    "chown" => syscall(92, p, -1i64, -1i64),
+                    "fchown" => syscall(93, fd(), -1i64, -1i64),
+                    "lchown" => syscall(94, p, -1i64, -1i64),
+                    "fchownat" => syscall(260, at, p, -1i64, -1i64, 0i64),
+                    "fchownat-empty" => syscall(260, fd(), e, -1i64, -1i64, 0x1000i64),
+                    "utime" => syscall(132, p, 0i64),
+                    "utimes" => syscall(235, p, 0i64),
+                    "utimensat" => syscall(280, at, p, 0i64, 0i64),
+                    "utimensat-fd" => syscall(280, fd(), 0i64, 0i64, 0i64),
+                    "futimesat" => syscall(261, at, p, 0i64),
+                    _ => -2,
+                }
+            };
+            match r {
+                0 => println!("meta ok"),
+                -2 => println!("meta no call {:?}", arg(2)),
+                _ => println!(
+                    "meta ERR {}",
+                    std::io::Error::last_os_error().raw_os_error().unwrap_or(-1)
+                ),
+            }
+        }
         "spawn" => {
             let o = std::process::Command::new(arg(2)).args(&args[3..]).output();
             match o {

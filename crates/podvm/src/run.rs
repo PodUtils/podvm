@@ -254,8 +254,16 @@ pub const RUN_OPTIONS: &str = "\
                    the program that execve names, not one that the
                    dynamic loader runs (ld.so PROGRAM), and it governs no
                    change of mode, owner or times (chmod, chown, utimes):
-                   give a -v that must stay as it is :ro (TODO/enter.md
-                   T-1984, T-1985). On a rung
+                   on a rung with a chroot only Landlock holds, so give
+                   a -v that must stay as it is :ro. On the userland
+                   rung the interposer (the loader family) and the
+                   handler (the native-static rung, the syscall tier)
+                   answer EACCES to both: an exec of the loader takes
+                   the exec= rule of its program (a program with no / is
+                   denied), and a change of mode, owner or times needs a
+                   write= path. A raw system call of a dynamic program
+                   passes the interposer (TODO/enter.md T-1984,
+                   T-1985). On a rung
                    with a chroot and on each family of the userland rung
                    (the loader family, native-static, the syscall and the
                    emulate tier: host paths through the table, -v

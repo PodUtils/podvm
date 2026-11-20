@@ -62,6 +62,12 @@ pub static EXE: Fixed = Fixed::new();
 pub static EXEC_TABLE: Fixed = Fixed::new();
 /// Whether the run has an exec table: an empty one lets nothing run.
 pub static EXEC_ON: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+/// TODO/enter.md T-1985: the write table of the confine layer
+/// (`PODVM_WRITE_HOST`, host paths joined by `:`), where [`WRITE_ON`].
+pub static WRITE_TABLE: Fixed = Fixed::new();
+/// Whether the run has a write table: an empty one lets no change of
+/// mode, owner or times run.
+pub static WRITE_ON: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
 /// The host path of podvm itself, for the re-exec of `execve`.
 pub static SELF: Fixed = Fixed::new();
 /// An `O_PATH` descriptor of the root, above the payload's usual range.

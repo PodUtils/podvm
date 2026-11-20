@@ -155,6 +155,10 @@
     faccessat;
     chmod;
     fchmodat;
+    /* TODO/enter.md T-1985: the descriptor forms under --podvm-confine. */
+    fchmod;
+    futimens;
+    futimes;
     truncate;
     utime;
     utimes;

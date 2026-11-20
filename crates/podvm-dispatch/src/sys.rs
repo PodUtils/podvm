@@ -55,6 +55,7 @@ pub mod nr {
     pub const TGKILL: i64 = 234;
     pub const RT_TGSIGQUEUEINFO: i64 = 297;
     pub const RT_SIGRETURN: i64 = 15;
+    pub const WRITE: i64 = 1;
     pub const PREAD64: i64 = 17;
     pub const ACCESS: i64 = 21;
     pub const DUP2: i64 = 33;

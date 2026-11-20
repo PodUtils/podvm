@@ -321,6 +321,8 @@ pub const INTERNAL: &[&str] = &[
     "PODVM_USERNS_JOIN",
     // `--podvm-volume-base` for the handler and the interposer (T-1972).
     "PODVM_VOLUME_BASE",
+    // The write table of `--podvm-confine` (TODO/enter.md T-1985).
+    "PODVM_WRITE_HOST",
 ];
 
 /// The variables of tests, measures, builds and developer tools. No run of a

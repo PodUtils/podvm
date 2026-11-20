@@ -4935,7 +4935,7 @@ As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm --podvm-tier=syscall
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -4949,6 +4949,8 @@ Landlock checks EXECUTE at `execve`, not at `mmap(PROT_EXEC)`, and the layer let
 
 Where podvm sees the exec (the interposer, the handler of the tier), an exec of the loader with a program argument takes the exec rule of that program. Where only Landlock holds (the namespace and chroot rungs), the manual names the limit.
 
+One pure file, `crates/podvm-interpose/src/exec/ldso.rs`, which `podvm-dispatch` includes as it is: `is_loader` knows the loader by the name of its resolved file (`ld-*.so*`, `ld.so*`, `ld64.so*`), so each link and other name counts; `each_program` gives each argument that glibc's or musl's loader can take as its program (a valued option skips its value; `--name=value`, `--` and an unknown `--name` count in each reading) and denies a name with no `/`, which glibc's loader searches as a library. The interposer (`exec::plan`) applies it to the kernel's arguments of the exec, also of a `#!` line whose interpreter is the loader: through podvm's handler each name resolves in the root, through the kernel on the host. The handler (`exec::check`) applies it to the payload's `argv`, each name resolved in the root. A refusal is `EACCES` and one line that names `--podvm-confine` and this entry.
+
 ## Decision
 
 Call C25 (`docs/decisions.md`, 2026-11-18): the help of `--podvm-confine` names the limit, and the entry goes from P1 to P2 for the enforcement where podvm sees the call.
@@ -4957,6 +4959,10 @@ Call C25 (`docs/decisions.md`, 2026-11-18): the help of `--podvm-confine` names 
 
 As uid 1000: `podvm run --rm --podvm-confine 'write=/tmp;exec=/usr/bin/sh,/usr/bin/cp' public.ecr.aws/ubuntu/ubuntu:24.04 sh -c 'cp /usr/bin/id /tmp/m; /lib64/ld-linux-x86-64.so.2 /tmp/m'` exits 126 on the userland rung and the syscall tier; the manual of `--podvm-confine` names what holds on the other rungs.
 
+## Done
+
+**Done (2026-11-20).** Measured as in the Prove with `mirror.gcr.io/library/ubuntu:24.04`, as uid 1000 under `scripts/dev/nouserns.c` (`mode=userland`): exit 126 with "Permission denied" on the loader family and on the syscall tier, also for `--library-path /tmp /tmp/m`, `./m` from `/tmp`, and the other name `/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2`; `ld.so /usr/bin/id` and `ld.so --version` run; the same through `run -d` + `exec` and `create` + `start`. The table tests pass as root and as uid 1000: `the_program_of_the_loader_is_each_argument_that_a_loader_can_run` and `an_exec_of_the_loader_takes_the_exec_rule_of_its_program` (the interposer), `an_exec_of_the_loader_takes_the_exec_rule_of_its_program` (`podvm-dispatch`). The help of `--podvm-confine` and `docs/limits.md` name where the rule holds on each rung and tier. Not in this entry: on the userland rung podvm does not check the first program of a run against `exec=` (`podvm run ... /sc/m` runs a program of a `read=` volume, and so does `ld.so /sc/m`; the namespace rung answers 126), found here and the same in `0.2.0-beta.36`.
+
 # T-1985: A payload under `--podvm-confine` changes the mode and the times of a file that no rule names
 
 **Source:** OT-03 of the fourth outside pass of 2026-11-18 (the gate of beta.35, T-1989)
@@ -4964,7 +4970,7 @@ As uid 1000: `podvm run --rm --podvm-confine 'write=/tmp;exec=/usr/bin/sh,/usr/b
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -4978,6 +4984,8 @@ Landlock governs no change of mode, owner or times (no access right for them up 
 
 Where podvm sees the call (the interposer, the handler of the tier), `chmod`, `chown`, `utimensat` and their kin of a path that no `write=` rule names give EACCES. The seccomp filter of the layer cannot judge a path; on the namespace and chroot rungs the manual names the limit and the advice of a `:ro` volume.
 
+podvm writes the host path of each rule with write in `PODVM_WRITE_HOST` (`podvm_supervise::table::set_write_table`, through the exec table code of `pod-confine`) for a family of the userland rung: a foreground run, `exec`, and the launcher of `run -d` and `start`; a caller's own value never reaches the payload. The interposer judges each entry point of the family (`chmod`, `fchmod`, `fchmodat`, `lchmod`, the `chown` family, `utime`, `utimes`, `lutimes`, `utimensat`, `futimens`, `futimes`, `futimesat`, a null path or an empty one with `AT_EMPTY_PATH`) on the file that the kernel would change: the path opens `O_PATH`, the last link followed or not as the call does, and the link of the descriptor names it. The handler (`podvm-dispatch`, `meta::gate`) does the same for each system call of the family and keeps its own table across each exec. A refusal is `EACCES` and one line that names `--podvm-confine` and this entry.
+
 ## Decision
 
 Call C25 (`docs/decisions.md`, 2026-11-18): the help of `--podvm-confine` names the limit, and the entry goes from P1 to P2 for the enforcement where podvm sees the call.
@@ -4985,6 +4993,10 @@ Call C25 (`docs/decisions.md`, 2026-11-18): the help of `--podvm-confine` names 
 ## Prove
 
 As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm --podvm-confine 'read=/sc;write=/tmp' -v H:/no -v S:/sc public.ecr.aws/ubuntu/ubuntu:24.04 sh -c 'chmod 666 /no/s'` exits 1 with "Permission denied", and the mode of `H/s` stays 600.
+
+## Done
+
+**Done (2026-11-20).** Measured as in the Prove with `mirror.gcr.io/library/ubuntu:24.04` (`mode=userland`): exit 1 with "Permission denied" on the loader family and on the syscall tier, and the mode of `H/s` stays 600 and its mtime stays; `cp -p`, `chmod`, `touch` and `tar -xp` in `/tmp` run; `chmod` of a link in `/tmp` to `/no/s` is refused; the same through `run -d` + `exec` and `create` + `start`. The table tests pass as root and as uid 1000: `a_change_of_mode_owner_or_times_takes_the_write_table` (the interposer: 18 entry points; `podvm-dispatch`: 14 system calls) and `the_write_table_holds_each_rule_with_write` (`podvm-supervise`). The cost where the run has the layer (an estimate, one run of 200000 calls of `chmod` from perl): about 2.5 microseconds for each call on the loader family and 1.9 on the syscall tier. A raw system call of a dynamic program of the loader family passes the interposer; the namespace and chroot rungs keep the advice of a `:ro` volume (the help and `docs/limits.md`).
 
 # T-1986: On the userland rung, `dnf` of Fedora 42 cannot write its state under `/root`
 

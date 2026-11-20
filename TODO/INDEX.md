@@ -646,8 +646,8 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1981](enter.md) | P1 | S | none | enter | done | On the userland rung, a program whose PT_INTERP lies past the first 64 KiB is refused (Fedora 42) |
 | [T-1982](enter.md) | P1 | S | none | enter | done | `run -d` with `--podvm-confine` on the syscall tier cannot start its payload |
 | [T-1983](enter.md) | P1 | M | none | enter | done | On the syscall tier, `--podvm-confine exec=` is not enforced |
-| [T-1984](enter.md) | P2 | M | none | enter | open | `--podvm-confine exec=` is bypassed through the dynamic loader |
-| [T-1985](enter.md) | P2 | M | none | enter | open | A payload under `--podvm-confine` changes the mode and the times of a file that no rule names |
+| [T-1984](enter.md) | P2 | M | none | enter | done | `--podvm-confine exec=` is bypassed through the dynamic loader |
+| [T-1985](enter.md) | P2 | M | none | enter | done | A payload under `--podvm-confine` changes the mode and the times of a file that no rule names |
 | [T-1986](enter.md) | P1 | S | none | enter | done | On the userland rung, `dnf` of Fedora 42 cannot write its state under `/root` |
 | [T-1987](enter.md) | P1 | S | none | enter | done | On AlmaLinux 9, `ls -l` dies with SIGSEGV in the interposer's `lgetxattr` |
 | [T-1988](enter.md) | P1 | S | none | enter | done | On the syscall tier, a volume whose guest path is not in the image cannot be stat-ed |
@@ -678,7 +678,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-609 entries: 25 open, 36 partial, 6 blocked, 542 done.
+609 entries: 23 open, 36 partial, 6 blocked, 544 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -689,9 +689,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 17 | 0 | 248 | 268 |
-| P2 | 16 | 15 | 5 | 177 | 213 |
+| P2 | 14 | 15 | 5 | 179 | 213 |
 | P3 | 6 | 4 | 1 | 42 | 53 |
-| **All** | 25 | 36 | 6 | 542 | 609 |
+| **All** | 23 | 36 | 6 | 544 | 609 |
 
 ## Work order
 

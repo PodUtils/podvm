@@ -167,6 +167,32 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   `/etc/resolv.conf`, `/etc/hosts` and `/etc/services` with raw system
   calls on the host path. Where the spec lets the payload read the guest
   path, the layer also gives read on the host file.
+- Two limits of Landlock under the confine layer (T-1984, T-1985, call
+  C25): Landlock checks the program that `execve` names, not one that the
+  dynamic loader runs (`ld.so PROGRAM`), and it governs no change of mode,
+  owner or times (`chmod`, `chown`, `utimes`). Where podvm sees the call,
+  it answers `EACCES` itself: an exec of the loader (each name and link
+  of the file `ld-*.so*`, `ld.so*`, `ld64.so*`) takes the `exec=` rule of
+  each argument that the loader can take as its program, and a program
+  name with no `/` is denied, as glibc's loader searches such a name as a
+  library; a change of mode, owner or times of a file (the target of a
+  link, a descriptor) needs a `write=` path. Where each rule holds:
+
+  | Rung or tier | `exec=` through the loader | Mode, owner, times |
+  | --- | --- | --- |
+  | namespace and chroot rungs | no (Landlock only) | no: give the volume `:ro` |
+  | loader family of the userland rung | the interposer; a raw system call passes | the interposer; a raw system call passes |
+  | native-static rung | the handler | the handler |
+  | syscall tier | the handler | the handler |
+  | emulate tier | - | - |
+
+  The interposer and the handler are not a boundary (T-1657). The cost,
+  only where the run has the layer: a change of mode, owner or times
+  opens its path with `O_PATH` and reads one link, about 2.5 microseconds
+  for each call on the loader family and 1.9 on the syscall tier (an
+  estimate: one run of 200000 calls of `chmod` from perl on the cloud
+  host, 2026-11-20); an exec of the loader resolves each argument that
+  it can run.
 
 Forced FUSE mode enters through a rung-complete read-only server; its live
 entry arm and the permitted-tmpfs entry arm prove automatically where a

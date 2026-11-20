@@ -279,6 +279,8 @@ mod rewrite;
 pub use rewrite::*;
 mod readonly;
 pub use readonly::*;
+mod meta; // TODO/enter.md T-1985
+pub use meta::*;
 mod links;
 pub use links::{follows, resolve_links};
 mod literal;

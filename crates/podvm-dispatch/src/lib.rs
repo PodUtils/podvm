@@ -39,6 +39,13 @@ mod pool;
 mod procself;
 #[cfg(target_arch = "x86_64")]
 mod ro; // TODO/enter.md T-1901
+
+// TODO/enter.md T-1984: the program of an exec of the dynamic loader, the
+// interposer's own file, pure over bytes.
+#[path = "../../podvm-interpose/src/exec/ldso.rs"]
+mod ldso;
+
+mod meta; // TODO/enter.md T-1985
 #[cfg(target_arch = "x86_64")]
 mod signals;
 #[cfg(target_arch = "x86_64")]

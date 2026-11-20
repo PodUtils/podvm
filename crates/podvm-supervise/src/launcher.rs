@@ -168,6 +168,8 @@ fn enter_in_launcher(
     // where the payload is entered. The fallback line joins the container
     // log: the launcher's stderr is /dev/null.
     let child = if container.userland_exec.is_empty() {
+        // TODO/enter.md T-1985: the write table is of the userland rung.
+        crate::table::set_write_table(&mut plan.env, None)?;
         let findings = podvm_probe::run();
         let selection = podvm_probe::select::Selection::choose(&findings);
         podvm_enter::spawn_selected(&root, &plan, selection.rung, log).map_err(|e| e.to_string())?
@@ -186,6 +188,7 @@ fn enter_in_launcher(
             .iter()
             .find_map(|a| a.strip_prefix("--podvm-dispatch-emu="));
         plan.confine = container.of.hardening.confine_host_spec(&maps, emu)?;
+        crate::table::set_write_table(&mut plan.env, plan.confine.as_ref())?;
         podvm_enter::spawn_userland(
             &root,
             &plan,
