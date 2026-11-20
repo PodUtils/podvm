@@ -499,6 +499,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #603 | COORD-207: pod-enter adds the RUNPATH directories of a program to the library path of the loader family (to podcrates) | open | T-2003 |
 | #604 | COORD-208: a pinned fetch of a static tool (gVisor's runsc) for a project that needs it at run time (to podcrates) | open | T-2009 |
 | #605 | COORD-209: --podvm-init=image now holds on a foreground run with no tier, on --podvm-tier=runsc and on --podvm-tier=machine (to podrunner) | open | T-2002, T-2007 |
+| #606 | COORD-210: podvm took podcrates v0.78.1 (and v0.77.0) in 3272e3d (to podcrates) | open | T-1955 |
 
 ## Messages whose title does not start with COORD-NNN
 
