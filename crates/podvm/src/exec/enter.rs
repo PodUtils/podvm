@@ -144,18 +144,27 @@ pub(super) fn enter(
     // where chroot is denied the loader and memfd families drive, with
     // T-0505's fresh-entry contract unchanged (separate banners, separate
     // records). A refusal names the blocking call.
-    let userland = match crate::lifecycle::syscall::exec_entry(
-        &container.env,
-        &maps,
-        &o.command,
-        &working_dir,
-        &mut env,
-        support_native,
-        &findings,
-        o.unsafe_host_paths,
-    ) {
-        Ok(u) => u,
-        Err(code) => return code,
+    // PodUtils/podrunner#326: a running container of the namespace rung is
+    // entered by a join of its namespaces (below, T-1765, T-1910), where
+    // its volumes are binds already. The probe of the host decides nothing
+    // there: on a host whose probe denies chroot, the decision gave the
+    // entry with no chroot, which refused each volume of the container.
+    let userland = if joins_the_run(state, &container.rung, container.pid) {
+        None
+    } else {
+        match crate::lifecycle::syscall::exec_entry(
+            &container.env,
+            &maps,
+            &o.command,
+            &working_dir,
+            &mut env,
+            support_native,
+            &findings,
+            o.unsafe_host_paths,
+        ) {
+            Ok(u) => u,
+            Err(code) => return code,
+        }
     };
     if let Err(code) =
         crate::lifecycle::volume::refuse_unserved("exec", &volumes, userland.as_ref(), None)
@@ -433,7 +442,7 @@ pub(super) fn enter(
             // rung, `exec` joins the payload's mount namespace and sees
             // its `/tmp` and `/proc`; `pod-enter` names a refused join and
             // enters a namespace of its own.
-            let joined = (state == State::Running && container.rung == "namespace")
+            let joined = joins_the_run(state, &container.rung, container.pid)
                 .then_some(container.pid)
                 .flatten()
                 .and_then(|p| crate::userns::joined_pidfd().or_else(|| super::ns::pidfd_open(p)));
@@ -460,3 +469,13 @@ pub(super) fn enter(
 }
 
 pub(crate) use super::ns::join_mounts;
+
+/// True where `exec` enters the container by a join of its namespaces: a
+/// running container of the namespace rung with a pid (PodUtils/podrunner#326).
+pub(crate) fn joins_the_run(
+    state: podvm_supervise::table::State,
+    rung: &str,
+    pid: Option<i64>,
+) -> bool {
+    state == podvm_supervise::table::State::Running && rung == "namespace" && pid.is_some()
+}

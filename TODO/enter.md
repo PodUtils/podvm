@@ -5484,3 +5484,36 @@ Partial (2026-11-20). Experiment 468 and its transcript. Three changes, each mea
 3. `PODVM_RUNSC_ARGS` gives more flags of `runsc` for a measure (`runsc::extra_args`). One run each: `--overlay2=root:memory` 8.0 s, `--directfs=false` 8.3 s, `--host-settings=ignore` 7.9 s, `--app-huge-pages=false` 8.0 s, against 8.0 s to 9.3 s with the flags of the tier; `--platform=ptrace` 11.1 s with a first output at 4.8 s; `--file-access=shared` is refused by runsc with the overlay of the root. No flag gains more than the difference between two runs, so the flags of the tier stay.
 
 Remaining, in order: (1) the runsc tier: its 0.9 s over the namespace rung before the first output (read `--boot-times-log`; the copy of each file whose owner changes into the overlay), and its memory; (2) T-2008, measured: the restore of a saved guest takes 2 s; (3) the settings of the guest under TCG (`mitigations=off`, `tb-size`), not measured; (4) a run with no spare tree copies the tree: the overlay root of podcrates@T-486 for the namespace rung; (5) the runs on `kvm.yml`.
+
+# T-2012: `exec` into a `run -d` container of the namespace rung refuses its volumes where the probe of the host denies chroot
+
+**Source:** PodUtils/podrunner#326 (COORD-113 of podrunner, podrunner@T-532), on `0.2.0-beta.36`
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+podrunner runs each step of a `container:` job as `podvm exec -w ... CONTAINER sh -c ...` in a `run -d -v SRC:/__w` container. On podrunner's host, as a user with no root on the namespace rung, the first `exec` exits 125: "the volume ...:/__w needs the namespace rung; the entry with no chroot has no mount namespace of its own".
+
+## Premise
+
+`exec` into a running container of the namespace rung joins its user and PID namespaces (T-1910) and its mount namespace (T-1765), where each volume is a bind already, and `refuse_unserved` accepts a volume in a joined mount namespace (T-1920). But the entry decision of `exec` (`lifecycle::syscall::exec_entry`) read the cached probe of `run`, which is a probe of the host: where it denies chroot to the user, it gave the entry with no chroot (the userland family), whose plan refuses each volume. On the cloud host the probe allows chroot in a user namespace, so the case did not show there.
+
+## Approach
+
+`exec::enter::joins_the_run`: a running container of the namespace rung with a pid is entered by the join of its namespaces, with no entry decision of the probe.
+
+## Decision
+
+-
+
+## Prove
+
+The unit test `exec_joins_only_a_running_container_of_the_namespace_rung`; as uid 1000 on the cloud host, `exec -w /w` into `run -d -v DIR:/w public.ecr.aws/docker/library/alpine:3.20 sleep 300` of the namespace rung reads and writes the volume. podrunner measures the case of its host (a probe that denies chroot) with the next beta.
+
+## Done
+
+**Done (2026-11-20).** `exec::enter::joins_the_run` (a running container, the rung `namespace`, a pid) skips the entry decision of the probe, and the join branch takes the same test. The unit test `exec_joins_only_a_running_container_of_the_namespace_rung` holds the table (running, exited and created; namespace, chroot, userland and syscall; with and without a pid). As uid 1000 on the cloud host: `run -d --name j3 -v DIR:/w alpine:3.20 sleep 300` enters the namespace rung, and `exec -w /w j3 sh -c 'cat f; echo x > g; ls'` prints the file, writes `g`, and the host sees `g`. The host of podrunner (a probe that denies chroot to the user) is not on hand here: podrunner's test `a_container_job_runs_through_the_hooks_of_a_podvm_unit` measures it with the next beta.

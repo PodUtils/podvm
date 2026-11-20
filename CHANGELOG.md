@@ -8,6 +8,10 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- `exec` into a `run -d` container of the namespace rung enters by the
+  join of its namespaces, where its volumes are, also where the probe of
+  the host denies chroot to the user; before, it took the entry with no
+  chroot and refused each volume (T-2012, PodUtils/podrunner#326).
 - `run --podvm-init=image` of an image whose Entrypoint is its init
   (`/sbin/init`, as podrunner's hosted snapshot declares) runs the command
   beside the init; before, the instance ran `/sbin/init CMD` as a second

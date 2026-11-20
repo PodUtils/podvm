@@ -159,3 +159,26 @@ fn the_banner_says_what_inspect_reports() {
     assert!(d.contains(crate::images::EXEC_SHARES), "{d}");
     assert!(d.contains("T-0505"), "{d}");
 }
+
+/// PodUtils/podrunner#326: only a running container of the namespace rung
+/// with a pid is entered by the join of its namespaces; each other one
+/// takes the entry decision of the probe.
+#[test]
+fn exec_joins_only_a_running_container_of_the_namespace_rung() {
+    use podvm_supervise::table::State;
+    for (state, rung, pid, want) in [
+        (State::Running, "namespace", Some(7), true),
+        (State::Running, "namespace", None, false),
+        (State::Exited, "namespace", Some(7), false),
+        (State::Created, "namespace", None, false),
+        (State::Running, "chroot", Some(7), false),
+        (State::Running, "userland", Some(7), false),
+        (State::Running, "syscall", Some(7), false),
+    ] {
+        assert_eq!(
+            super::enter::joins_the_run(state, rung, pid),
+            want,
+            "{state:?} {rung} {pid:?}"
+        );
+    }
+}
