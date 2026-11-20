@@ -6419,7 +6419,7 @@ Partial (2026-11-19): OP-02 is fixed. On the syscall tier a `-v` of one file is 
 **Milestone:** none
 **Priority:** P1
 **Effort:** S
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -6440,6 +6440,10 @@ Partial (2026-11-19): OP-02 is fixed. On the syscall tier a `-v` of one file is 
 ## Prove
 
 As uid 1000: `exec -t NAME tty` prints a `/dev/pts/N` path and exits 0 on the namespace rung and the loader family; `exec -it` of a shell takes input; a table test holds the refusal where no pty opens.
+
+## Done
+
+**Done (2026-11-20).** `exec -t` opens a pty of the host's `/dev/ptmx` as `run -t` does, and gives its slave to the command as descriptors 0, 1 and 2 on each entry of `exec`: the chroot, the namespace rung, the join of a running container of the namespace rung, and the userland families (`crates/podvm/src/exec/tty.rs`, with the relay of `crates/podvm/src/run/pty.rs`). The pty takes stdin only with `-i`, as in `run`, and its interrupt key goes to the command. `exec -t` refuses by name, with 125, where `/dev/ptmx` is unusable (T-0503), and into a guest of the machine tier or an instance of the incus tier, whose exec channel carries no terminal. A container with the init of the image keeps the pty of its init (T-2002). The unit test `exec_t_gives_a_pty_or_refuses_by_name` holds the rule for each target. As uid 1000 with `alpine:3.20`, before (`d9b152f`) and after: `exec -t tt tty` of a container of the namespace rung, in a pty and with stdin `/dev/null`, gave `not a tty` and 1, and now gives `/dev/pts/1` and `/dev/pts/0` and 0; `exec -it tt sh` takes input (`echo hi-from-input` prints, `exit 3` gives 3); on the loader family (the fixture of experiment 356, `deny-chroot` with `/dev/ptmx` usable) `exec -t cl tty` and `exec -t IMAGE tty` gave `not a tty` and 1, and now give `/dev/pts/0` and 0; with `/dev/pts` hidden, `exec -t` refuses with the line of T-0503 and 125. On the chroot rung `test -t 0` passes and `tty` finds no name, as `run -t` on that rung (no `/proc`, T-1758).
 
 # T-2044: The faults of the sixth outside pass (2026-11-20, the gate of the next beta)
 

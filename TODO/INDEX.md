@@ -684,12 +684,12 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2040](enter.md) | P1 | M | none | enter | open | On the userland rung, a payload writes a `:ro` volume through its host path |
 | [T-2041](machine.md) | P1 | M | none | machine | open | On the machine tier, a SIGTERM, SIGINT or SIGHUP to a foreground run ends podvm and does not reach the payload |
 | [T-2042](machine.md) | P1 | M | none | machine | open | After `run -d --podvm-tier=machine`, `inspect`, `kill`, `wait` and the filters of `ps` do not find the container |
-| [T-2043](cli.md) | P1 | S | none | cli | open | `exec -t` gives the command no terminal and does not refuse |
+| [T-2043](cli.md) | P1 | S | none | cli | done | `exec -t` gives the command no terminal and does not refuse |
 | [T-2044](cli.md) | P2 | M | none | cli | open | The faults of the sixth outside pass (2026-11-20, the gate of the next beta) |
 
 ## Counts
 
-620 entries: 28 open, 38 partial, 5 blocked, 549 done.
+620 entries: 27 open, 38 partial, 5 blocked, 550 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -699,10 +699,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 7 | 18 | 0 | 249 | 274 |
+| P1 | 6 | 18 | 0 | 250 | 274 |
 | P2 | 15 | 15 | 4 | 183 | 217 |
 | P3 | 6 | 5 | 1 | 42 | 54 |
-| **All** | 28 | 38 | 5 | 549 | 620 |
+| **All** | 27 | 38 | 5 | 550 | 620 |
 
 ## Work order
 

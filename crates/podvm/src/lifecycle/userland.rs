@@ -139,19 +139,9 @@ pub struct UserlandOutcome {
 /// refuses where the fixups changed what the decision read, rather than
 /// entering something unjudged). Messages name the calling verb. The
 /// payload and the working directory resolve through `userland.maps`.
-pub fn enter_userland(
-    verb: &str,
-    root: &podvm_enter::RootDir,
-    plan: &podvm_enter::Plan,
-    userland: &Userland,
-    err: &mut dyn Write,
-) -> UserlandOutcome {
-    enter_userland_with(verb, root, plan, userland, err, &mut |_, _| {})
-}
-
-/// [`enter_userland`], with `on_spawn` called with the pid of the payload
-/// after the spawn and before the wait (TODO/supervise.md T-1786: the
-/// hold of a foreground run), on each family.
+/// `on_spawn` is called with the pid of the payload after the spawn and
+/// before the wait, on each family: the hold of a foreground run
+/// (TODO/supervise.md T-1786) and the interrupt key of `-t` (T-2043).
 pub fn enter_userland_with(
     verb: &str,
     root: &podvm_enter::RootDir,

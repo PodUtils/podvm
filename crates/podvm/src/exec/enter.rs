@@ -327,10 +327,12 @@ pub(super) fn enter(
     ) {
         return code;
     }
-    if o.tty && !podvm_probe::probes::ptmx_usable(&findings) {
-        let _ = writeln!(err, "{TTY_REFUSAL}");
-        return podvm_enter::EXIT_RUNTIME_ERROR;
-    }
+    // T-2043: a pty as `run -t` gives, or a refusal by name (T-0503).
+    let term = match super::tty::open(o.tty, podvm_probe::probes::ptmx_usable(&findings), &mut err)
+    {
+        Ok(t) => t,
+        Err(c) => return c,
+    };
     // ⭐ T-0412, and `exec` runs them for the same reason it completes the
     // rootfs at all: a fresh chroot re-entry is a fresh payload, and a keyring
     // or a CA index a previous one destroyed is still destroyed.
@@ -389,13 +391,18 @@ pub(super) fn enter(
     };
     use std::os::fd::AsRawFd;
     let memo_host = memo.as_raw_fd() as i64;
+    let mut pass = vec![(podvm_supervise::table::MEMO_CHILD_FD, memo_host)];
+    pass.extend(
+        term.as_ref()
+            .map(super::tty::Term::pass)
+            .into_iter()
+            .flatten(),
+    );
     let mut plan = Plan {
         argv: o.command.clone(),
         env,
         working_dir,
-        fds: Fds {
-            pass: vec![(podvm_supervise::table::MEMO_CHILD_FD, memo_host)],
-        },
+        fds: Fds { pass },
         // ⚠ Empty: the banner was printed above, before the steps.
         banner: String::new(),
         path_dirs,
@@ -431,9 +438,17 @@ pub(super) fn enter(
     // userland families through the one shared drive, the chroot sequence
     // as before. The container's memo is the container's own, so nothing
     // ephemeral is removed on any path out.
-    match &userland {
+    let relay = super::tty::start(term, o.interactive);
+    let code = match &userland {
         Some(u) => {
-            let outcome = crate::lifecycle::enter_userland("exec", &root, &plan, u, &mut err);
+            let outcome = crate::lifecycle::enter_userland_with(
+                "exec",
+                &root,
+                &plan,
+                u,
+                &mut err,
+                &mut |p, _| super::tty::on_spawn(p),
+            );
             drop(memo);
             outcome.code
         }
@@ -446,16 +461,20 @@ pub(super) fn enter(
                 .then_some(container.pid)
                 .flatten()
                 .and_then(|p| crate::userns::joined_pidfd().or_else(|| super::ns::pidfd_open(p)));
+            let wait = |c: podvm_enter::Child, err: &mut dyn Write| {
+                super::tty::on_spawn(c.pid); // T-2043: the interrupt key
+                c.wait_forwarding(err)
+            };
             let r = match joined {
                 Some(fd) => {
                     super::ns::join_uts(&fd); // TODO/enter.md T-1908
                     let r =
                         podvm_enter::spawn_joined(&root, &plan, fd.as_raw_fd() as i64, &mut err)
-                            .and_then(|c| c.wait_forwarding(&mut err));
+                            .and_then(|c| wait(c, &mut err));
                     drop(fd);
                     r
                 }
-                None => podvm_enter::run(&root, &plan, &mut err),
+                None => podvm_enter::spawn(&root, &plan, &mut err).and_then(|c| wait(c, &mut err)),
             };
             match r {
                 Ok(c) => c,
@@ -465,17 +484,9 @@ pub(super) fn enter(
                 }
             }
         }
-    }
+    };
+    super::tty::finish(relay, &mut err);
+    code
 }
 
-pub(crate) use super::ns::join_mounts;
-
-/// True where `exec` enters the container by a join of its namespaces: a
-/// running container of the namespace rung with a pid (PodUtils/podrunner#326).
-pub(crate) fn joins_the_run(
-    state: podvm_supervise::table::State,
-    rung: &str,
-    pid: Option<i64>,
-) -> bool {
-    state == podvm_supervise::table::State::Running && rung == "namespace" && pid.is_some()
-}
+pub(crate) use super::ns::{join_mounts, joins_the_run};

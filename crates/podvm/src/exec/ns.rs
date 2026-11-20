@@ -49,3 +49,13 @@ pub(crate) fn join_mounts(pid: Option<i64>) -> bool {
     // SAFETY: a pidfd and a namespace type; podvm cp runs on one thread.
     unsafe { setns(fd.as_raw_fd(), CLONE_NEWNS) == 0 }
 }
+
+/// True where `exec` enters the container by a join of its namespaces: a
+/// running container of the namespace rung with a pid (PodUtils/podrunner#326).
+pub(crate) fn joins_the_run(
+    state: podvm_supervise::table::State,
+    rung: &str,
+    pid: Option<i64>,
+) -> bool {
+    state == podvm_supervise::table::State::Running && rung == "namespace" && pid.is_some()
+}

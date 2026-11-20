@@ -29,7 +29,8 @@ pub const EXEC_USAGE: &str = "\
 usage: podvm exec [options] <image> <command> [arg...]
 
   -i, --interactive
-                   accepted and a no-op: stdin is always passed
+                   with -t, the pty takes stdin; with no -t a no-op: stdin
+                   is always passed
   -e, --env K=V    set an environment variable. Repeatable; a later one wins
   --env-file PATH  read KEY=VALUE lines from PATH, as in run: a secret then
                    stays out of the argv of podvm. Repeatable
@@ -59,8 +60,10 @@ usage: podvm exec [options] <image> <command> [arg...]
   -q, --quiet      as in run: force the banner off (TODO/cli.md T-1416)
   --verbose        as in run: print the banner; long-only, because -v is
                    docker's --volume (TODO/cli.md T-1416)
-  -t, --tty        refused: REFUSED BY NAME where /dev/ptmx is unusable, rather
-                   than silently degraded (TODO/enter.md T-0503)
+  -t, --tty        give the command a pty as its 0, 1 and 2, as run -t does
+                   (TODO/cli.md T-2043). REFUSED BY NAME where /dev/ptmx is
+                   unusable, and in a guest of the machine or incus tier,
+                   rather than silently degraded (TODO/enter.md T-0503)
   --podvm-tier T  `exec NAME` enters a running guest of `run -d
                    --podvm-tier=machine` (TODO/machine.md T-1750);
                    machine with no such guest, and emulate, are
@@ -109,6 +112,8 @@ struct Opts {
     workdir: Option<String>,
     platform: Option<String>,
     tty: bool,
+    /// `-i`: with `-t`, stdin goes to the pty (T-2043), as in `run`.
+    interactive: bool,
     image: Option<String>,
     command: Vec<String>,
     /// `--user`, resolved against the re-entered rootfs like `run` does.
@@ -144,6 +149,7 @@ fn parse(args: &[String]) -> std::result::Result<Opts, i32> {
         workdir: None,
         platform: None,
         tty: false,
+        interactive: false,
         image: None,
         command: Vec::new(),
         user: None,
@@ -204,10 +210,10 @@ fn parse(args: &[String]) -> std::result::Result<Opts, i32> {
             "-t" | "--tty" => o.tty = true,
             "-q" | "--quiet" => o.ask.quiet = true,
             "--verbose" => o.ask.verbose = true,
-            "-i" | "--interactive" => {
-                // ⚠ Accepted and a no-op, as in `run`: podvm does not detach
-                // stdin, so it is already interactive when the caller's is.
-            }
+            // ⚠ With no `-t` a no-op, as in `run`: podvm does not detach
+            // stdin, so it is already interactive when the caller's is.
+            // With `-t` the pty takes stdin only with `-i` (T-2043).
+            "-i" | "--interactive" => o.interactive = true,
             "-e" | "--env" => expecting = Some("-e"),
             "--env-file" => expecting = Some("--env-file"),
             "--env-file0" => expecting = Some("--env-file0"),
@@ -308,6 +314,7 @@ fn parse(args: &[String]) -> std::result::Result<Opts, i32> {
 pub(crate) mod enter;
 mod init; // TODO/enter.md T-2002
 pub(crate) mod ns;
+pub(crate) mod tty;
 use enter::*;
 
 mod command;
@@ -335,4 +342,30 @@ pub(crate) fn in_bind(env: &[String], dir: &str) -> bool {
         let g = b.guest.trim_end_matches('/');
         dir == g || dir.strip_prefix(g).is_some_and(|r| r.starts_with('/'))
     })
+}
+
+/// PodUtils/podvm#489: `exec --platform P NAME` of a container refuses a
+/// platform that is not the one of the container's image, as the image path
+/// refuses one that the store does not hold. Before, the flag was accepted
+/// and ignored.
+pub(crate) fn container_platform(
+    store: &podvm_image::Store,
+    target: &str,
+    want: &podvm_image::platform::Platform,
+) -> Result<(), i32> {
+    let Ok(c) = podvm_supervise::get(store, target) else {
+        return Ok(());
+    };
+    let Ok(r) = store.find_one(&c.image) else {
+        return Ok(());
+    };
+    if r.os == want.os && r.architecture == want.arch {
+        return Ok(());
+    }
+    eprintln!(
+        "podvm exec: the container {target} runs {} for {}/{}, and {want} was asked for; \
+         exec enters the container's own platform, so drop --platform or name an image",
+        c.image, r.os, r.architecture
+    );
+    Err(podvm_image::error::EXIT_RUNTIME_ERROR)
 }

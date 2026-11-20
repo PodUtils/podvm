@@ -23,6 +23,14 @@ pub fn exec(args: &[String]) -> i32 {
     }
     // TODO/machine.md T-1750: exec into a detached guest of the machine tier.
     if let Some(r) = o.image.as_deref().and_then(crate::windows::machine::find) {
+        if let Some(text) = o
+            .tty
+            .then(|| tty::refusal(tty::Target::Machine, true))
+            .flatten()
+        {
+            eprintln!("{text}"); // T-2043: no terminal on the exec channel
+            return podvm_enter::EXIT_RUNTIME_ERROR;
+        }
         return crate::machine::guest::exec::exec_machine(
             &r,
             &o.command,
@@ -53,6 +61,14 @@ pub fn exec(args: &[String]) -> i32 {
     }
     // TODO/machine.md T-1722: exec in an instance of the incus tier.
     if tier == crate::tier::Tier::Incus {
+        if let Some(text) = o
+            .tty
+            .then(|| tty::refusal(tty::Target::Incus, true))
+            .flatten()
+        {
+            eprintln!("{text}"); // T-2043
+            return podvm_enter::EXIT_RUNTIME_ERROR;
+        }
         let name = o.image.clone().unwrap_or_default();
         return crate::incus::verbs::exec(&name, &o.command, &o.env, o.workdir.as_deref());
     }
@@ -351,14 +367,13 @@ pub fn exec(args: &[String]) -> i32 {
     ) {
         return code;
     }
-    if o.tty {
-        // ⛔ T-0503, and the same shared predicate `enter` asks above: `Ok`
-        // and nothing else, because a skip is not a pass.
-        if !podvm_probe::probes::ptmx_usable(&findings) {
-            let _ = writeln!(err, "{TTY_REFUSAL}");
-            return podvm_enter::EXIT_RUNTIME_ERROR;
-        }
-    }
+    // ⛔ T-0503, and the same shared predicate `enter` asks: `Ok` and
+    // nothing else, because a skip is not a pass. T-2043: a pty, or a
+    // refusal by name.
+    let term = match tty::open(o.tty, podvm_probe::probes::ptmx_usable(&findings), &mut err) {
+        Ok(t) => t,
+        Err(c) => return c,
+    };
     // ⭐ T-0412's steps, on the image path as on the container one.
     // ⭐ T-0710: steps share the ephemeral memo, opened once for the steps and
     // again for the payload below.
@@ -390,13 +405,13 @@ pub fn exec(args: &[String]) -> i32 {
     };
     use std::os::fd::AsRawFd;
     let memo_host = memo.as_raw_fd() as i64;
+    let mut pass = vec![(podvm_supervise::table::MEMO_CHILD_FD, memo_host)];
+    pass.extend(term.as_ref().map(tty::Term::pass).into_iter().flatten());
     let mut plan = Plan {
         argv,
         env,
         working_dir,
-        fds: Fds {
-            pass: vec![(podvm_supervise::table::MEMO_CHILD_FD, memo_host)],
-        },
+        fds: Fds { pass },
         // ⚠ Empty: the banner was printed above, before the steps.
         banner: String::new(),
         path_dirs,
@@ -437,9 +452,18 @@ pub fn exec(args: &[String]) -> i32 {
     // the userland families through the one shared drive, the chroot
     // sequence as before. The ephemeral memo is removed on every path
     // out, as before.
+    let relay = tty::start(term, o.interactive);
     let code = match &userland {
-        Some(u) => crate::lifecycle::enter_userland("exec", &root, &plan, u, &mut err).code,
-        None => match podvm_enter::run(&root, &plan, &mut err) {
+        Some(u) => {
+            crate::lifecycle::enter_userland_with("exec", &root, &plan, u, &mut err, &mut |p, _| {
+                tty::on_spawn(p)
+            })
+            .code
+        }
+        None => match podvm_enter::spawn(&root, &plan, &mut err).and_then(|c| {
+            tty::on_spawn(c.pid);
+            c.wait_forwarding(&mut err)
+        }) {
             Ok(c) => c,
             Err(e) => {
                 let _ = writeln!(err, "podvm exec: {e}");
@@ -447,33 +471,8 @@ pub fn exec(args: &[String]) -> i32 {
             }
         },
     };
+    tty::finish(relay, &mut err);
     drop(memo);
     let _ = std::fs::remove_file(&memo_host_path);
     code
-}
-
-/// PodUtils/podvm#489: `exec --platform P NAME` of a container refuses a
-/// platform that is not the one of the container's image, as the image path
-/// refuses one that the store does not hold. Before, the flag was accepted
-/// and ignored.
-fn container_platform(
-    store: &podvm_image::Store,
-    target: &str,
-    want: &podvm_image::platform::Platform,
-) -> Result<(), i32> {
-    let Ok(c) = podvm_supervise::get(store, target) else {
-        return Ok(());
-    };
-    let Ok(r) = store.find_one(&c.image) else {
-        return Ok(());
-    };
-    if r.os == want.os && r.architecture == want.arch {
-        return Ok(());
-    }
-    eprintln!(
-        "podvm exec: the container {target} runs {} for {}/{}, and {want} was asked for; \
-         exec enters the container's own platform, so drop --platform or name an image",
-        c.image, r.os, r.architecture
-    );
-    Err(podvm_image::error::EXIT_RUNTIME_ERROR)
 }
