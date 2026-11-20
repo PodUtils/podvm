@@ -515,7 +515,7 @@
 623 issue closed
 624 issue open
 625 issue closed
-626 issue open
+626 issue closed
 627 issue open
 628 issue open
 629 issue open
