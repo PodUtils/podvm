@@ -63,9 +63,21 @@ impl Namespaces {
             .map(Namespaces)
     }
 
-    /// A command that joins before its `execve`, then takes `ids` and the
-    /// working directory `cwd` of the image.
-    fn command(&self, program: &str, ids: Option<(u32, u32)>, cwd: &str) -> Command {
+    /// A command that joins before its `execve`, then takes `ids` with the
+    /// supplementary `groups`, and the working directory `cwd` of the image.
+    fn command(
+        &self,
+        program: &str,
+        ids: Option<(u32, u32)>,
+        groups: &[u32],
+        cwd: &str,
+    ) -> Command {
+        // The list of setgroups: the primary group first, as login does.
+        let list: Vec<u32> = ids
+            .iter()
+            .map(|(_, gid)| *gid)
+            .chain(groups.iter().copied())
+            .collect();
         let fds: Vec<i32> = self.0.iter().map(|f| f.as_raw_fd()).collect();
         // An image with no working directory runs its command in `/`.
         let cwd = if cwd.is_empty() { "/" } else { cwd };
@@ -86,7 +98,7 @@ impl Namespaces {
                 }
                 match ids {
                     Some((uid, gid)) => {
-                        check(setgroups(1, &gid))?;
+                        check(setgroups(list.len(), list.as_ptr()))?;
                         check(setresgid(gid, gid, gid))?;
                         check(setresuid(uid, uid, uid))?;
                     }
@@ -146,7 +158,7 @@ pub fn wait_boot(ns: &Namespaces, ended: &mut dyn FnMut() -> Option<i32>) -> Res
                 "the init of the image ended during its boot with status {code}"
             ));
         }
-        let mut c = ns.command("systemctl", None, "/");
+        let mut c = ns.command("systemctl", None, &[], "/");
         c.arg("is-system-running");
         if wait {
             c.arg("--wait");
@@ -199,7 +211,7 @@ pub fn run_command(ns: &Namespaces, spec: &super::boot::Spec) -> i32 {
         eprintln!("podvm: --podvm-init=image: no command");
         return 125;
     };
-    let mut c = ns.command(program, spec.ids, &spec.cwd);
+    let mut c = ns.command(program, spec.ids, &spec.groups, &spec.cwd);
     c.args(&spec.argv[1..]).env_clear();
     let mut has_path = false;
     for (k, v) in std::env::vars_os() {

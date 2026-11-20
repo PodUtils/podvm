@@ -459,9 +459,9 @@ C26). Experiment 465 measures each line below as uid 1000.
   flags of the tier; a flag that breaks the tier is the caller's.
   Experiment 468 has the times of each route.
 - `run -d`, `create` and `exec` with the init hold on the incus tier only
-  (T-1993). On the namespace rung, the command gets the primary group of
-  `--user` and no supplementary group, and `tty` in a command of `-t`
-  names no device.
+  (T-1993). On the namespace rung, the command of `--user NAME` gets the
+  primary group of the user and each group of `/etc/group` of the image
+  that lists the name; `tty` in a command of `-t` names no device.
 
 ## Network lab
 

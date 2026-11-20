@@ -59,6 +59,7 @@ fn the_arguments_of_the_supervisor_come_back_as_they_went() {
         Path::new("/sys/fs/cgroup/d/podvm-init-7"),
         "/work",
         Some((33, 34)),
+        &[4, 27, 100000],
         &binds,
         &v(&["sh", "-c", "exit 7"]),
     );
@@ -71,13 +72,64 @@ fn the_arguments_of_the_supervisor_come_back_as_they_went() {
     );
     assert_eq!(spec.cwd, "/work");
     assert_eq!(spec.ids, Some((33, 34)));
+    assert_eq!(spec.groups, vec![4, 27, 100000]);
     assert_eq!(spec.argv, v(&["sh", "-c", "exit 7"]));
     let tmp = spec.tmp.unwrap();
     assert_eq!(tmp.len(), 1);
     assert!(tmp[0].read_only && tmp[0].guest == "/tmp/t" && tmp[0].host == "/srv/t");
-    // Root keeps its ids: no --ids.
-    let root = host_args("/r", Path::new("/c"), "/", Some((0, 0)), &[], &v(&["true"]));
-    assert!(!root.contains(&"--ids".to_string()));
+    // Root keeps its ids: no --ids, and no group list without them.
+    let root = host_args(
+        "/r",
+        Path::new("/c"),
+        "/",
+        Some((0, 0)),
+        &[4],
+        &[],
+        &v(&["true"]),
+    );
+    assert!(!root.contains(&"--ids".to_string()) && !root.contains(&"--groups".to_string()));
+}
+
+/// TODO/enter.md T-2002: the command of `--user NAME` gets the groups
+/// that the image gives the user, and only those.
+#[test]
+fn the_groups_of_a_user_come_from_the_files_of_the_image() {
+    let passwd = "root:x:0:0:root:/root:/bin/sh\n\
+                  # a comment:x:33:33::/:/bin/sh\n\
+                  http:x:33:33::/srv/http:/usr/bin/nologin\n\
+                  www:x:33:33:the same ids::\n\
+                  alias:x:33:99:another primary group::\n\
+                  broken:x:notanumber:33::\n\
+                  short\n";
+    let group = "root:x:0:root\n\
+                 http:x:33:\n\
+                 adm:x:4:syslog,http\n\
+                 video:x:44: http ,other\n\
+                 web:x:120:www\n\
+                 again:x:4:http\n\
+                 alias-only:x:99:alias\n\
+                 primary-listed:x:33:http\n\
+                 nomembers:x:50\n\
+                 badgid:x:x:http\n\
+                 #commented:x:60:http\n\
+                 :x:61:http\n\
+                 prefix:x:70:httpd,xhttp\n";
+    for (ids, want) in [
+        ((33, 33), vec![4, 44, 120]),
+        // `--user http:99`: the names with the ids 33 and 99 are `alias` only.
+        ((33, 99), vec![]),
+        ((0, 0), vec![]),
+        // A uid that the image does not name.
+        ((1234, 1234), vec![]),
+    ] {
+        assert_eq!(groups_of(passwd, group, ids), want, "{ids:?}");
+    }
+    for (p, g) in [("", group), (passwd, ""), ("\u{0}:::", "\u{fffd}:::::")] {
+        assert_eq!(groups_of(p, g, (33, 33)), Vec::<u32>::new());
+    }
+    // More groups than a command gets: the list is cut, not refused.
+    let many: String = (1000..2000).map(|g| format!("g{g}:x:{g}:http\n")).collect();
+    assert_eq!(groups_of(passwd, &many, (33, 33)).len(), 256);
 }
 
 #[test]
@@ -85,6 +137,9 @@ fn a_wrong_argument_of_the_supervisor_is_named() {
     for (args, word) in [
         (v(&["--root", "/r"]), "no command"),
         (v(&["--ids", "x", "--", "true"]), "UID:GID"),
+        (v(&["--groups", "4,x", "--", "true"]), "GID,GID"),
+        (v(&["--groups", "", "--", "true"]), "GID,GID"),
+        (v(&["--groups", "-1", "--", "true"]), "GID,GID"),
         (
             v(&["--hold", "/f", "--", "true"]),
             "--hold takes no command",

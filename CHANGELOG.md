@@ -8,6 +8,11 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- The command of `run --podvm-init=image --user NAME` on the namespace
+  rung gets the supplementary groups that `/etc/group` of the image gives
+  the user (T-2002); before, it had the primary group only. On the machine
+  tier, an argument of the run that holds `"$@"` (`sh -c 'exec "$@"'`)
+  reaches the command as it is.
 - A guest under TCG takes a translation cache of 512 MiB in place of
   QEMU's 1 GiB (T-2010): the peak memory of a run with MariaDB and
   PostgreSQL under systemd goes from 3,670 MiB to about 3,300 MiB on the

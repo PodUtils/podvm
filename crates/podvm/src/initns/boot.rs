@@ -77,6 +77,8 @@ pub struct Spec {
     pub cwd: String,
     /// The ids of the command, where they are not 0.
     pub ids: Option<(u32, u32)>,
+    /// The supplementary groups of the command, with `ids`.
+    pub groups: Vec<u32>,
     /// A tmpfs on `/tmp` with these binds.
     pub tmp: Option<Vec<mounts::Bind>>,
     /// The console of the init goes to stderr as it comes.
