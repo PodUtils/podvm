@@ -631,7 +631,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1966](machine.md) | P2 | M | none | machine | done | The incus tier cannot run a container engine in an instance |
 | [T-1967](machine.md) | P1 | S | none | machine | done | The machine tier has no limit of processes in a guest |
 | [T-1968](machine.md) | P2 | L | none | machine | open | No tier gives a sized writable disk to a unit |
-| [T-1969](supervise.md) | P1 | M | none | supervise | partial | The run report holds no OOM fact of a unit |
+| [T-1969](supervise.md) | P1 | M | none | supervise | done | The run report holds no OOM fact of a unit |
 | [T-1970](cli.md) | P1 | M | none | cli | partial | The outside pass of 2026-11-18: three P1 and seven P2 faults on the path of a unit |
 | [T-1971](cli.md) | P1 | S | none | cli | done | `--env-file` cannot hold a value with a newline |
 | [T-1972](enter.md) | P1 | L | none | enter | partial | `--podvm-volume-base` holds on the namespace rung only, and job containers of podrunner run on the userland and supervise rungs |
@@ -676,7 +676,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-607 entries: 25 open, 38 partial, 6 blocked, 538 done.
+607 entries: 25 open, 37 partial, 6 blocked, 539 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -686,10 +686,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 19 | 0 | 244 | 266 |
+| P1 | 3 | 18 | 0 | 245 | 266 |
 | P2 | 16 | 15 | 5 | 177 | 213 |
 | P3 | 6 | 4 | 1 | 42 | 53 |
-| **All** | 25 | 38 | 6 | 538 | 607 |
+| **All** | 25 | 37 | 6 | 539 | 607 |
 
 ## Work order
 

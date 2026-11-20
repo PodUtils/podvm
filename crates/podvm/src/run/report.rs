@@ -275,6 +275,12 @@ pub fn take_guest() -> Option<Guest> {
 
 /// The PATH that the parser noted, once. A refusal before the parser read
 /// the flag has none, and writes no report.
+/// True where the parser noted `--report`: a tier then reads the facts that
+/// cost a request (the OOM kills of an incus instance, T-1969).
+pub(crate) fn wanted() -> bool {
+    PATH.with(|s| s.borrow().is_some())
+}
+
 pub fn take_path() -> Option<PathBuf> {
     PATH.with(|s| s.borrow_mut().take())
 }

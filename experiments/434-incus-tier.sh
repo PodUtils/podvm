@@ -75,8 +75,9 @@
 #      `systemctl is-system-running` gives running or degraded, with its log;
 #      `systemctl start` of a unit of the image works; `exec` reaches the
 #      same systemd; the instance stops when its command ends, and
-#      `inspect` gives its exit code; the flag off the incus tier refuses
-#      by name (125).
+#      `inspect` gives its exit code; the flag off the incus tier takes
+#      the next route and names it on stderr (call C26, T-2002), where it
+#      refused before.
 #  20. The hosted snapshot (T-1996, PodUtils/podrunner#316 ask 1): with
 #      `--podvm-init=image` an instance maps at least 231,072 ids, has
 #      `/dev/fuse`, and writes a machine-id of its own: two instances of
@@ -92,6 +93,12 @@
 #      security.capability (cap_net_raw+ep) as a PAX record; a user that is
 #      not root cannot set it on the tree, the sidecar names it, and the
 #      root of an instance of the incus tier has it.
+#  23. The OOM kills in the run report (T-1969, PodUtils/podrunner#296
+#      ask 6): `run --rm --memory 32m --report R` of a command that holds
+#      200 MB ends with 137, and R has `oom_kills` 1 or more; the report
+#      of `true` has `oom_kills` 0 or no such field (incusd's metrics name
+#      no sample yet for an instance that lived for less than their cache:
+#      the field is optional, never a false count).
 #
 # Exit: 0 every clause matched, 1 a clause disagreed, 2 the lane could not
 # run (not root, no user namespaces, no package).
@@ -463,7 +470,7 @@ c19 "^  stopped  STOPPED$" "the instance did not stop when its command ended"
 c19 "^  logs     state (running|degraded) pid1 systemd " "the command did not run after the boot of systemd as PID 1"
 c19 "^  logs     .*unit started " "systemctl start of a unit of the image did not work"
 c19 "^  exitcode 7$" "inspect did not give the exit code of the command"
-c19 "^  native   rc 125: .*--podvm-init=image needs --podvm-tier=incus" "the flag off the incus tier did not refuse by name"
+c19 "^  native   rc 0: .*the run takes the .* (tier|rung)" "the flag off the incus tier did not name the route that it took (call C26)"
 
 # ---- clause 20 ----------------------------------------------------------
 echo ""; echo "== 20. the hosted snapshot: ids, /dev/fuse, a machine-id of each" >>"$REPORT"
@@ -581,6 +588,20 @@ cat "$WORK/c22.txt" >>"$REPORT"
 c22() { grep -Eq "$1" "$WORK/c22.txt" || { note "22: $2"; fail=1; }; }
 c22 "^  run -d   cap434$" "run -d of the image with a capability did not start"
 c22 "^  cap      0100000[23]00200000" "the root of the instance has no cap_net_raw on /usr/bin/capfile"
+
+# ---- clause 23 ----------------------------------------------------------
+echo ""; echo "== 23. the OOM kills in the run report" >>"$REPORT"
+{
+P run --rm --podvm-tier=incus --memory 32m --report "$B/r23.json" "$OCI" sh -c 'head -c 200000000 /dev/zero | tail' </dev/null >/dev/null 2>"$WORK/c23.err"; echo "  oom      rc $?"
+echo "  report   $(grep -o '"oom_kills": *[0-9]*' "$B/r23.json" 2>/dev/null || echo none)"
+P run --rm --podvm-tier=incus --report "$B/r23b.json" "$OCI" true </dev/null >/dev/null 2>&1; echo "  true     rc $?"
+echo "  report   $(grep -o '"oom_kills": *[0-9]*' "$B/r23b.json" 2>/dev/null || echo none)"
+} >"$WORK/c23.txt" 2>&1
+cat "$WORK/c23.txt" >>"$REPORT"
+c23() { grep -Eq "$1" "$WORK/c23.txt" || { note "23: $2"; fail=1; }; }
+c23 "^  oom      rc 137$" "a command over --memory did not end with 137"
+c23 '^  report   "oom_kills": *[1-9]' "the report of an OOM kill has no oom_kills of 1 or more"
+c23 '^  report   ("oom_kills": *0|none)$' "the report of true has oom_kills above 0"
 
 # ---- clause 9 -----------------------------------------------------------
 left_i=$(RI list --format csv -c n 2>&1 | grep -c .)

@@ -387,6 +387,14 @@ async fn run_in(c: &Client, job: &Job<'_>, image: &str, inst: &str) -> i32 {
         Ok(o) => o,
         Err(e) => return fail(e.to_string()),
     };
+    // TODO/supervise.md T-1969: the OOM kills of the instance go to the run
+    // report, read before the instance goes. A metrics endpoint that fails
+    // or names no sample leaves the optional field out, never a zero.
+    if crate::run::report::wanted()
+        && let Ok(Some(n)) = c.oom_kills(inst).await
+    {
+        crate::run::cgroup::set_guest_oom_kills(n);
+    }
     let _ = std::io::stdout().write_all(&out.stdout);
     let _ = std::io::stdout().flush();
     let _ = std::io::stderr().write_all(&out.stderr);

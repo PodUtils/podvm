@@ -281,7 +281,7 @@ pub use parse::*;
 
 mod foreground;
 /// `run --report PATH` (TODO/cli.md T-1695).
-mod report;
+pub(crate) mod report;
 pub use foreground::*;
 
 mod prepare;
