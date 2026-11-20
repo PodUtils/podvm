@@ -624,6 +624,10 @@ man = json.loads(blobs["blobs/" + mdesc["digest"].replace(":", "/")])
 cfg = json.loads(blobs["blobs/" + man["config"]["digest"].replace(":", "/")])
 cfg.setdefault("config", {})["Entrypoint"] = ["/sbin/init"]
 cfg["config"]["Cmd"] = None
+blobs.pop("blobs/" + mdesc["digest"].replace(":", "/"))
+blobs.pop("blobs/" + man["config"]["digest"].replace(":", "/"))
+for extra in idx["manifests"][1:]:
+    blobs.pop("blobs/" + extra["digest"].replace(":", "/"), None)
 def put(b):
     d = "sha256:" + hashlib.sha256(b).hexdigest()
     blobs["blobs/" + d.replace(":", "/")] = b
