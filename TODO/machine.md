@@ -5763,7 +5763,7 @@ Boot the init of the image once for each digest and each guest shape, save the s
 **Milestone:** none
 **Priority:** P1
 **Effort:** S
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -5787,4 +5787,4 @@ The unit tests `the_entrypoint_of_the_image_is_the_init_with_podvm_init_image` a
 
 ## Done
 
-Partial (2026-11-20). The change and its unit tests; experiment 434 clause 24 runs.
+**Done (2026-11-20).** `run::entrypoints` gives no Entrypoint of the image with `--podvm-init=image` (an explicit `--entrypoint` stays the caller's), which `run::prepare` and `run::machine` share, so each route of the init takes it; `run::nothing_to_run` names the init where no command is left; `incus::systemd::failed_units` adds `; failed units: a, b` (`systemctl --failed`) to the line of a boot that does not come up. The unit tests `the_entrypoint_of_the_image_is_the_init_with_podvm_init_image` and `the_failed_units_give_one_line` pass. Experiment 434 (all clauses hold) clause 24 on the cloud host: the image of clause 19 saved with `Entrypoint ["/sbin/init"]` and no Cmd; `run -d --podvm-tier=incus --podvm-init=image` of it with `sh -c 'echo "started $(cat /proc/1/comm)"; exit 3'` gives the name, the instance stops, `logs` gives `started systemd` and `inspect` gives 3.

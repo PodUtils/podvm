@@ -1,5 +1,5 @@
 == conditions
-date              2026-11-20T02:55:08Z
+date              2026-11-20T03:22:02Z
 host kernel       Linux 6.18.44-fc-v726
 cgroup            tmpfs
 incus package     6.0.0-1ubuntu0.3
@@ -9,15 +9,15 @@ runs              5
 == 1. a run
   stdout  hello
   exit    0
-  ms      1172 (with the import)
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-4e667600156e9208-v3 imported now (TODO/machine.md T-1718)
+  ms      1256 (with the import)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-a6c79f7e87f29117-v3 imported now (TODO/machine.md T-1718)
 
 == 2. the exit code
   exit    7
 
 == 3. stdout and stderr
   stdout  out
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-4e667600156e9208-v3 from incus (TODO/machine.md T-1718)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-a6c79f7e87f29117-v3 from incus (TODO/machine.md T-1718)
   stderr  err
 
 == 4. stdin
@@ -30,11 +30,11 @@ runs              5
   PID 1                 /.podvm/podvm guest-hold 
   owner of /etc/passwd  0:0
   owner of /etc/shadow  0:42
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-4e667600156e9208-v3 from incus (TODO/machine.md T-1718)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-a6c79f7e87f29117-v3 from incus (TODO/machine.md T-1718)
 
 == 7. the cached image
-  run true ms  1036 (median of 5)
-  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-4e667600156e9208-v3 from incus (TODO/machine.md T-1718)
+  run true ms  1022 (median of 5)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-c64c687cbea93001-a6c79f7e87f29117-v3 from incus (TODO/machine.md T-1718)
 
 == 8. a name that is no instance
   exec exit    125
@@ -104,7 +104,7 @@ runs              5
   left     0
   native   podvm run: --storage-opt size= sizes the root disk of an instance of the incus tier (--podvm-tier=incus); this tier has no root disk to size (TODO/machine.md T-1964, T-1968)  rc 125
 == 18. the CPU time and the peak memory in inspect
-  usage    1.127 61698048 0
+  usage    0.954 61366272 0
 == 19. --podvm-init=image: systemd as PID 1
   run -d   sd434
   exec     running
@@ -116,17 +116,17 @@ runs              5
 == 20. the hosted snapshot: ids, /dev/fuse, a machine-id of each
   run -d   sna434
   run -d   snb434
-  logs sna434 ids 231072 fuse open mid 9e31a941f6b74d7a903c09ade20944ec 
-  logs snb434 ids 231072 fuse open mid a22158beb49a48e5a7f0ab18ea73bb90 
-  machine-ids 9e31a941f6b74d7a903c09ade20944ec a22158beb49a48e5a7f0ab18ea73bb90
+  logs sna434 ids 231072 fuse open mid 26180bfd041f4fc1b0ebcaa356ea07e2 
+  logs snb434 ids 231072 fuse open mid 4e798a14fb394b7d8771f737efa31757 
+  machine-ids 26180bfd041f4fc1b0ebcaa356ea07e2 4e798a14fb394b7d8771f737efa31757
 == 21. a large import: the growth of the disk use
   pull     rc 0
   extract  rc 0
-  run      rc 0 podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-98d673f18a1aac43-4e667600156e9208-v3 imported now (TODO/machine.md T-1718)
+  run      rc 0 podvm run: incus tier: incusd 6.0.0 at /srv/podvm434/state/lib/unix.socket, image podvm-98d673f18a1aac43-a6c79f7e87f29117-v3 imported now (TODO/machine.md T-1718)
   tree     850228783
-  base     3142084048
-  peak     5156288456
-  growth   2014204408
+  base     3402322828
+  peak     4870061834
+  growth   1467739006
   left     0 files in store/incus
 == 22. the capabilities of a file in the root of an instance
   save     rc 0
@@ -140,6 +140,14 @@ runs              5
   report   "oom_kills": 1
   true     rc 0
   report   none
+== 24. an image whose Entrypoint is its init
+  save     rc 0
+  build    rc 0
+  load     Loaded image: localhost/entry434:1
+  run -d   en434
+  stopped  STOPPED
+  exitcode 3
+  logs     started systemd 
 
 == 9. nothing stays
   instances in incus              0
