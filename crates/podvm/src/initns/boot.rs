@@ -85,6 +85,11 @@ pub struct Spec {
     /// read-only): the init gets SIGKILL at the end, with no wait for the
     /// stop of its units (TODO/enter.md T-2010).
     pub discard: bool,
+    /// Boot the init, write its state to this file, and stay with it: the
+    /// command comes later, by `attach` (TODO/machine.md T-2008).
+    pub hold: Option<PathBuf>,
+    /// Run the command in the init of this state file, which `hold` made.
+    pub attach: Option<PathBuf>,
     pub argv: Vec<String>,
 }
 
@@ -219,8 +224,8 @@ fn tail_text(tail: &Arc<Mutex<Vec<u8>>>) -> String {
     lines[from..].join("\n")
 }
 
-/// True where the init ended; its status then.
-fn ended(pid: i32) -> Option<i32> {
+/// True where the child `pid` ended; its status then.
+pub(super) fn ended(pid: i32) -> Option<i32> {
     let mut st = 0;
     // SAFETY: st lives for the call.
     (unsafe { waitpid(pid, &mut st, WNOHANG) } == pid).then_some(st)
@@ -230,7 +235,7 @@ fn ended(pid: i32) -> Option<i32> {
 /// `discard`, SIGKILL at once.
 fn stop(pid: i32, systemd: bool, discard: bool) {
     // SAFETY: kill takes two integers.
-    unsafe { kill(pid, if systemd { SIGRTMIN_4 } else { SIGTERM }) };
+    unsafe { kill(pid, stop_signal(systemd)) };
     let end = Instant::now() + if discard { Duration::ZERO } else { STOP_BOUND };
     while Instant::now() < end {
         if ended(pid).is_some() {
@@ -246,22 +251,37 @@ fn stop(pid: i32, systemd: bool, discard: bool) {
     }
 }
 
-/// Run the whole of `guest-init`: the exit code of the command, or 125
-/// with one line that says what happened.
-pub fn supervise(spec: &Spec) -> i32 {
-    let fail = |why: String| {
-        eprintln!("podvm: --podvm-init=image: {why} (TODO/enter.md T-2002)");
-        REFUSED
-    };
+/// An init of the image after its boot.
+pub(super) struct Booted {
+    /// The pid of the init, in the PID namespace of the supervisor.
+    pub init: i32,
+    pub ns: join::Namespaces,
+    /// True where the init is systemd with a state to ask for.
+    pub systemd: bool,
+    /// True where the init has a cgroup namespace of its own.
+    pub cgroup: bool,
+    /// One descriptor of the slave of the console, open until the end.
+    _held: Option<std::fs::File>,
+}
+
+/// One line for a failure before the command, and its exit code.
+pub(super) fn refuse(why: &str) -> i32 {
+    eprintln!("podvm: --podvm-init=image: {why} (TODO/enter.md T-2002)");
+    REFUSED
+}
+
+/// Start the init of the image and wait for its boot. An error is the
+/// line of the failure; no init stays then.
+pub(super) fn start(spec: &Spec) -> Result<Booted, String> {
     let leaves = match spec.cgroup.as_deref().map(cgroup::make) {
         None => None,
         Some(Ok(l)) => Some(l),
-        Some(Err(e)) => return fail(format!("the cgroups of the run: {e}")),
+        Some(Err(e)) => return Err(format!("the cgroups of the run: {e}")),
     };
     if let Some(l) = &leaves
         && let Err(e) = cgroup::enter(&l.supervisor)
     {
-        return fail(format!(
+        return Err(format!(
             "the move into the cgroup {}: {e}",
             l.supervisor.display()
         ));
@@ -275,7 +295,7 @@ pub fn supervise(spec: &Spec) -> i32 {
     // One descriptor of the slave stays open here. systemd closes its own,
     // and a pty with no open slave is gone: each open of /dev/console then
     // gave EIO, and PID 1 waited 1 s at each line of its status.
-    let _held = slave.as_ref().and_then(|s| {
+    let held = slave.as_ref().and_then(|s| {
         use std::os::unix::fs::OpenOptionsExt;
         const O_NOCTTY: i32 = 0o400;
         std::fs::OpenOptions::new()
@@ -288,14 +308,14 @@ pub fn supervise(spec: &Spec) -> i32 {
     let mut ends = [-1i32; 2];
     // SAFETY: ends has room for two descriptors.
     if unsafe { pipe2(ends.as_mut_ptr(), O_CLOEXEC) } != 0 {
-        return fail(format!("pipe2: {}", std::io::Error::last_os_error()));
+        return Err(format!("pipe2: {}", std::io::Error::last_os_error()));
     }
     // SAFETY: two descriptors that pipe2 made, each owned once.
     let (ready_r, ready_w) =
         unsafe { (OwnedFd::from_raw_fd(ends[0]), OwnedFd::from_raw_fd(ends[1])) };
     // SAFETY: the PID namespace of each later child of this thread.
     if unsafe { unshare(CLONE_NEWPID) } != 0 {
-        return fail(format!(
+        return Err(format!(
             "a PID namespace: {}",
             std::io::Error::last_os_error()
         ));
@@ -304,7 +324,7 @@ pub fn supervise(spec: &Spec) -> i32 {
     // with `_exit`, and it writes to no stream that the reader can hold.
     let init = unsafe { fork() };
     if init < 0 {
-        return fail(format!("fork: {}", std::io::Error::last_os_error()));
+        return Err(format!("fork: {}", std::io::Error::last_os_error()));
     }
     if init == 0 {
         drop(ready_r);
@@ -323,32 +343,90 @@ pub fn supervise(spec: &Spec) -> i32 {
         let mut st = 0;
         // SAFETY: st lives for the call.
         unsafe { waitpid(init, &mut st, 0) };
-        return fail(why);
+        return Err(why);
     }
     let ns = match join::Namespaces::of(init, leaves.is_some()) {
         Ok(ns) => ns,
         Err(e) => {
             stop(init, false, true);
-            return fail(format!("the namespaces of the init: {e}"));
+            return Err(format!("the namespaces of the init: {e}"));
         }
     };
     let booted = join::wait_boot(&ns, &mut || ended(init).map(code_of));
-    let systemd = match booted {
-        Ok(systemd) => systemd,
+    match booted {
+        Ok(systemd) => Ok(Booted {
+            init,
+            ns,
+            systemd,
+            cgroup: leaves.is_some(),
+            _held: held,
+        }),
         Err(e) => {
             stop(init, false, true);
             let console = tail_text(&tail);
-            return fail(if console.is_empty() {
+            Err(if console.is_empty() {
                 e
             } else {
                 format!("{e}; the last lines of its console:\n{console}")
-            });
+            })
         }
+    }
+}
+
+/// Run the whole of `guest-init`: the exit code of the command, or 125
+/// with one line that says what happened.
+pub fn supervise(spec: &Spec) -> i32 {
+    let b = match start(spec) {
+        Ok(b) => b,
+        Err(why) => return refuse(&why),
     };
-    let code = join::run_command(&ns, spec);
-    stop(init, systemd, spec.discard);
+    let code = join::run_command(&b.ns, spec);
+    stop(b.init, b.systemd, spec.discard);
     code
 }
+
+/// Wait until the init `pid` ends, with no bound: the supervisor of a held
+/// init (TODO/machine.md T-2008).
+pub(super) fn wait_end(pid: i32) {
+    let mut st = 0;
+    // SAFETY: st lives for each call.
+    while unsafe { waitpid(pid, &mut st, 0) } != pid {
+        if std::io::Error::last_os_error().raw_os_error() != Some(4) {
+            break;
+        }
+    }
+}
+
+/// A new process of this program, as `fork` gives it: 0 in the child.
+pub(super) fn fork_here() -> i32 {
+    // SAFETY: the caller has one thread.
+    unsafe { fork() }
+}
+
+/// End this process at once, with no handler of the runtime.
+pub(super) fn exit_now(code: i32) -> ! {
+    // SAFETY: the end of the process.
+    unsafe { _exit(code) }
+}
+
+/// Send `sig` to `pid`; false where no such process is there.
+pub(super) fn signal(pid: i32, sig: i32) -> bool {
+    // SAFETY: kill takes two integers.
+    unsafe { kill(pid, sig) == 0 }
+}
+
+/// The signal that asks the init for its stop: the power off of systemd,
+/// else SIGTERM.
+pub(super) fn stop_signal(systemd: bool) -> i32 {
+    if systemd {
+        SIGRTMIN_4
+    } else {
+        SIGTERM
+    }
+}
+
+pub(super) const KILL: i32 = SIGKILL;
+pub(super) const BOUND_OF_STOP: Duration = STOP_BOUND;
 
 #[cfg(test)]
 mod tests {

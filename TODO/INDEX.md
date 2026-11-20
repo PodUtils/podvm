@@ -670,15 +670,16 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2005](enter.md) | P2 | L | none | enter | blocked | An init of the image with no guest on a host that delegates no cgroup: a cgroup2 stand-in, or User-Mode Linux |
 | [T-2006](supervise.md) | P1 | S | none | supervise | done | A SIGKILL of podvm leaves the processes of a foreground run in its PID namespace |
 | [T-2007](enter.md) | P1 | M | none | enter | partial | The init of the image as PID 1 of a gVisor sandbox: the runsc tier, for a host with a user namespace and no delegated cgroup |
-| [T-2008](machine.md) | P3 | L | none | machine | open | The machine tier boots systemd at each run: a saved state of the guest for each digest |
+| [T-2008](machine.md) | P3 | L | none | machine | partial | The machine tier boots systemd at each run: a saved state of the guest for each digest |
 | [T-2009](enter.md) | P2 | M | none | enter | blocked | podvm fetches no runsc: the gVisor route of an init is there only where the host has one |
 | [T-2010](enter.md) | P1 | L | none | enter | partial | Each route of `--podvm-init=image` as fast as it can be: a measured baseline, then each gain |
 | [T-2011](machine.md) | P1 | S | none | machine | done | `run -d --podvm-init=image` of an image whose Entrypoint is its init runs `/sbin/init CMD` and not the command |
 | [T-2012](enter.md) | P1 | S | none | enter | done | `exec` into a `run -d` container of the namespace rung refuses its volumes where the probe of the host denies chroot |
+| [T-2016](machine.md) | P2 | M | none | machine | open | QEMU before 10.0.4 can end on SIGSEGV in the boot of a guest with more than one vCPU under TCG |
 
 ## Counts
 
-609 entries: 23 open, 36 partial, 6 blocked, 544 done.
+610 entries: 23 open, 37 partial, 6 blocked, 544 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -689,9 +690,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 17 | 0 | 248 | 268 |
-| P2 | 14 | 15 | 5 | 179 | 213 |
-| P3 | 6 | 4 | 1 | 42 | 53 |
-| **All** | 23 | 36 | 6 | 544 | 609 |
+| P2 | 15 | 15 | 5 | 179 | 214 |
+| P3 | 5 | 5 | 1 | 42 | 53 |
+| **All** | 23 | 37 | 6 | 544 | 610 |
 
 ## Work order
 

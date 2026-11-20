@@ -12,6 +12,14 @@ They describe their recorded revision, not the current build.
   join of its namespaces, where its volumes are, also where the probe of
   the host denies chroot to the user; before, it took the entry with no
   chroot and refused each volume (T-2012, PodUtils/podrunner#326).
+- The machine tier saves the state of a guest that booted the init of an
+  image (`--podvm-init=image`), and each later run of the image and guest
+  shape starts from that state (T-2008): under TCG on the cloud host the
+  first output of a run with MariaDB and PostgreSQL under systemd comes
+  after 1.3 s to 1.6 s, against 19 s to 20 s for a boot. A state that is
+  missing, stale or does not load gives a boot. `PODVM_MACHINE_STATE=0`
+  turns the save off; [the limits](docs/limits.md#the-init-of-an-image)
+  name what each run of one state shares.
 - `run --podvm-init=image` of an image whose Entrypoint is its init
   (`/sbin/init`, as podrunner's hosted snapshot declares) runs the command
   beside the init; before, the instance ran `/sbin/init CMD` as a second

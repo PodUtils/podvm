@@ -1,11 +1,11 @@
-date      2026-11-19T16:36:02Z
+date      2026-11-20T07:48:00Z
 podvm     podvm 0.2.0-beta.36
 user      ubuntu (uid 1000)
-kernel    6.18.44-fc-v653
+kernel    6.18.44-fc-v726
 kvm       no (a guest runs under TCG)
 subuid    ubuntu:100000:65536
 cgroup    /sys/fs/cgroup/unified/; delegated: /sys/fs/cgroup/unified/podvm-465 (a stand-in that root made)
-clause 1  rc 7 in 22 s
+clause 1  rc 7 in 20 s
     CHECK pid1 systemd
     CHECK state running
     CHECK uid_map  0 1000 1 1 100000 65536 
@@ -16,7 +16,7 @@ clause 1  rc 7 in 22 s
     CHECK stop inactive
     CHECK failed-units 
     VERDICT pass
-clause 2  rc 7 in 43 s
+clause 2  rc 7 in 46 s
     CHECK pid1 systemd
     CHECK state running
     CHECK uid_map  0 0 4294967295 
@@ -28,7 +28,7 @@ clause 2  rc 7 in 43 s
     CHECK failed-units 
     VERDICT pass
     stderr: podvm run: --podvm-init=image: the host delegates no cgroup2 subtree to the caller (none: /sys/fs/cgroup is not cgroup2 (f_type 0x1021994; cgroup v1 or a hybrid); no user bus of systemd answers), and systemd as PID 1 needs one; no runsc tier: PODVM_RUNSC=/none
-clause 3  rc 7 in 39 s
+clause 3  rc 7 in 15 s
     CHECK pid1 systemd
     CHECK state running
     CHECK uid_map  0 0 4294967295 
@@ -40,18 +40,19 @@ clause 3  rc 7 in 39 s
     CHECK failed-units 
     VERDICT pass
     stderr: podvm run: --podvm-init=image: the namespace rung boots an init of the image for a foreground run of a caller that is not uid 0, with PODVM_USERNS not 0; no runsc tier: PODVM_RUNSC=/nonexistent/runsc names no file; the run takes the machine tier, where the ini
+clause 3  the guest came from a saved state: 1 state file, 15 s
 clause 4  rc 127 (the userland rung with no init: mode=userland)
-    pid1=process_api self=1381 uid=1000
+    pid1=process_api self=4043 uid=1000
     stderr: podvm: interpose: setresuid failed with errno 1 (EPERM); the payload keeps uid 1000, and podvm does not change it (TODO/interpose.md T-0711)
     stderr: setpriv: setresuid failed: Operation not permitted
 clause 5  rc 125 (run -d --podvm-init=image)
 clause 5  rc 125 (run --podvm-tier=syscall --podvm-init=image)
 clause 6  processes that stay: none
 clause 6  cgroups that stay: none
-clause 7  a run with podvm's init: podvm was pid 1428; processes that stay: none
-clause 7  a run with the init of the image: podvm was pid 1555; processes that stay: none
+clause 7  a run with podvm's init: podvm was pid 4091; processes that stay: none
+clause 7  a run with the init of the image: podvm was pid 4221; processes that stay: none
 runsc     runsc version release-20261102.0
-clause 8  rc 7 in 12 s
+clause 8  rc 7 in 9 s
     CHECK pid1 systemd
     CHECK state running
     CHECK uid_map  0 0 4294967295 
@@ -77,6 +78,47 @@ clause 8  rc 7 in 11 s
     VERDICT pass
     stderr: podvm run: --podvm-init=image: the namespace rung boots an init of the image for a foreground run of a caller that is not uid 0, with PODVM_USERNS not 0; the run takes the runsc tier, where the init of the image is PID 1 of a gVisor sandbox (TODO/enter.md T-20
     stderr: podvm run: --podvm-init=image: /sbin/init of the image is PID 1 of the sandbox, with the cgroup2 tree and each uid of gVisor's kernel; the writes of the root go to an overlay that ends with the run (TODO/enter.md T-2007)
-clause 8  a SIGKILL of podvm on the runsc tier: podvm was pid 2335; processes that stay: none
+clause 8  a SIGKILL of podvm on the runsc tier: podvm was pid 4910; processes that stay: none
 clause 8  processes of gVisor that stay: none
+clause 9  a SIGKILL of podvm with a guest from a state: podvm was pid 5120; processes that stay: none
+clause 9  emulators that stay: none
+clause 9  rc 7 in 43 s
+    CHECK pid1 systemd
+    CHECK state running
+    CHECK uid_map  0 0 4294967295 
+    CHECK unit-mysql active=active mainpid-uid=961 file-owner=961 want=961
+    CHECK unit-postgres active=active mainpid-uid=962 file-owner=962 want=962
+    CHECK unit-www-data active=active mainpid-uid=33 file-owner=33 want=33
+    CHECK unit-nobody active=active mainpid-uid=65534 file-owner=65534 want=65534
+    CHECK stop inactive
+    CHECK failed-units 
+    VERDICT pass
+    stderr: podvm run: --podvm-init=image: the host delegates no cgroup2 subtree to the caller (none: /sys/fs/cgroup is not cgroup2 (f_type 0x1021994; cgroup v1 or a hybrid); no user bus of systemd answers), and systemd as PID 1 needs one; no runsc tier: PODVM_RUNSC=/none
+clause 9  rc 7 in 39 s
+    CHECK pid1 systemd
+    CHECK state running
+    CHECK uid_map  0 0 4294967295 
+    CHECK unit-mysql active=active mainpid-uid=961 file-owner=961 want=961
+    CHECK unit-postgres active=active mainpid-uid=962 file-owner=962 want=962
+    CHECK unit-www-data active=active mainpid-uid=33 file-owner=33 want=33
+    CHECK unit-nobody active=active mainpid-uid=65534 file-owner=65534 want=65534
+    CHECK stop inactive
+    CHECK failed-units 
+    VERDICT pass
+    stderr: podvm run: --podvm-init=image: the host delegates no cgroup2 subtree to the caller (none: /sys/fs/cgroup is not cgroup2 (f_type 0x1021994; cgroup v1 or a hybrid); no user bus of systemd answers), and systemd as PID 1 needs one; no runsc tier: PODVM_RUNSC=/none
+    stderr: podvm run: machine tier: the guest that podvm started from a saved state did not reach the command after 0.3 s (the emulator exited with code 1, before the guest reached the command; qemu: qemu-system-x86_64: load of migration failed: Input/output error; conso
+clause 9  markers of a failed state: 1; state files: 0
+clause 9  rc 7 in 38 s
+    CHECK pid1 systemd
+    CHECK state running
+    CHECK uid_map  0 0 4294967295 
+    CHECK unit-mysql active=active mainpid-uid=961 file-owner=961 want=961
+    CHECK unit-postgres active=active mainpid-uid=962 file-owner=962 want=962
+    CHECK unit-www-data active=active mainpid-uid=33 file-owner=33 want=33
+    CHECK unit-nobody active=active mainpid-uid=65534 file-owner=65534 want=65534
+    CHECK stop inactive
+    CHECK failed-units 
+    VERDICT pass
+    stderr: podvm run: --podvm-init=image: the host delegates no cgroup2 subtree to the caller (none: /sys/fs/cgroup is not cgroup2 (f_type 0x1021994; cgroup v1 or a hybrid); no user bus of systemd answers), and systemd as PID 1 needs one; no runsc tier: PODVM_RUNSC=/none
+clause 9  PODVM_MACHINE_STATE=maybe: rc 125
 THE INIT OF THE IMAGE RUNS

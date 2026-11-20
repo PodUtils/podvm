@@ -45,6 +45,16 @@ pub fn script(
     channel: Option<Chan>,
 ) -> String {
     let mut s = String::from("#!/bin/sh\n");
+    s.push_str(&setup());
+    s.push_str(&body(
+        nonce, argv, env, workdir, net, vols, tty, channel, false,
+    ));
+    s
+}
+
+/// The first lines of each init: the mounts of the guest and its modules.
+fn setup() -> String {
+    let mut s = String::new();
     s.push_str("mount -t proc proc /proc 2>/dev/null\n");
     s.push_str("mount -t sysfs sysfs /sys 2>/dev/null\n");
     s.push_str("mount -t devtmpfs devtmpfs /dev 2>/dev/null\n");
@@ -56,10 +66,84 @@ pub fn script(
         "[ -x /podvm/podvm ] && /podvm/podvm guest-net --load $([ -f {l} ] && cat {l})\n",
         l = super::archive::ENGINE_LIST
     ));
+    s
+}
+
+/// The state file of the held init of a guest whose state is saved
+/// (TODO/machine.md T-2008), and the file of the job of a run.
+pub const HOLD_FILE: &str = "/podvm/hold";
+pub const JOB_FILE: &str = "/podvm/job.sh";
+
+/// TODO/machine.md T-2008: the init of a guest whose state podvm saves. It
+/// has nothing of a run: after the mounts and the network it boots the init
+/// of the image (`guest-init --hold`), waits for the job of a run on the
+/// serial line (`guest-job`, [`super::job`]), and runs the script of the
+/// job ([`job`]). `nonce` is the one of the state, for the markers before
+/// the job. A job that the guest does not take ends the guest.
+pub fn template(nonce: &str, net: bool) -> String {
+    let mut s = String::from("#!/bin/sh\n");
+    s.push_str(&setup());
+    if net {
+        s.push_str("/podvm/podvm guest-net\n");
+    }
+    // The 9p modules load before the save, with no volume to mount: the
+    // driver takes each 9p device now, so a guest from the state changes
+    // no PCI device when it mounts a volume. QEMU before 10.0.4 can end on
+    // SIGSEGV when a guest of more than one vCPU changes the memory map
+    // ("system/physmem: fix use-after-free with dispatch"); in the guest
+    // that boots, podvm boots again, and after the command starts it can
+    // not.
+    s.push_str("/podvm/podvm guest-9p\n");
+    s.push_str(&format!(
+        "/podvm/podvm {} --hold {HOLD_FILE} --cgroup auto\nh=$?\n",
+        crate::initns::VERB
+    ));
+    s.push_str(&format!(
+        "/podvm/podvm guest-job {nonce} $h {JOB_FILE} || {{ sync; reboot -f 2>/dev/null; \
+         echo b > /proc/sysrq-trigger; }}\n"
+    ));
+    s.push_str(&format!(". {JOB_FILE}\n"));
+    s
+}
+
+/// TODO/machine.md T-2008: the script of one run for a guest of
+/// [`template`]: the lines of [`script`] after the mounts, with the
+/// volumes mounted in the mount namespace of the held init and the command
+/// run in that init. The network of the guest is up from the save.
+pub fn job(
+    nonce: &str,
+    argv: &[String],
+    env: &[String],
+    workdir: &str,
+    vols: &[super::vol::Vol],
+) -> String {
+    body(nonce, argv, env, workdir, false, vols, None, None, true)
+}
+
+/// The lines of an init for one run, after [`setup`]. `held` is the run
+/// of a guest with a held init (TODO/machine.md T-2008).
+#[allow(clippy::too_many_arguments)]
+fn body(
+    nonce: &str,
+    argv: &[String],
+    env: &[String],
+    workdir: &str,
+    net: bool,
+    vols: &[super::vol::Vol],
+    tty: Option<&str>,
+    channel: Option<Chan>,
+    held: bool,
+) -> String {
+    let mut s = String::new();
     if !vols.is_empty() {
         let args: Vec<String> = vols.iter().map(|v| sh_quote(&super::vol::arg(v))).collect();
+        let hold = if held {
+            format!("{} {HOLD_FILE} ", super::vol::HOLD_FLAG)
+        } else {
+            String::new()
+        };
         s.push_str(&format!(
-            "/podvm/podvm guest-9p {} 2>/podvm-9p.err || {{ echo PODVM-READY-{nonce}; \
+            "/podvm/podvm guest-9p {hold}{} 2>/podvm-9p.err || {{ echo PODVM-READY-{nonce}; \
              cat /podvm-9p.err; echo; echo PODVM-EXIT-{nonce} 125; sync; reboot -f; \
              echo b > /proc/sysrq-trigger; }}\n",
             args.join(" ")
@@ -144,7 +228,17 @@ pub fn script(
     s.push_str(&format!(
         "{ERR_PORT}\nif [ -c \"$E\" ]; then cat /podvm-err >\"$E\" & else cat /podvm-err >&2 & fi\ne=$!\n"
     ));
-    s.push_str("\"$@\" >/podvm-out 2>/podvm-err\nrc=$?\nwait $o $e\n");
+    let run = if held {
+        format!(
+            "/podvm/podvm {} --attach {HOLD_FILE} --cwd \"$PWD\" -- \"$@\"",
+            crate::initns::VERB
+        )
+    } else {
+        "\"$@\"".to_string()
+    };
+    s.push_str(&format!(
+        "{run} >/podvm-out 2>/podvm-err\nrc=$?\nwait $o $e\n"
+    ));
     s.push_str(&format!("{OOM}\necho; echo PODVM-EXIT-{nonce} $rc $o\n"));
     s.push_str("sync\nreboot -f 2>/dev/null\necho b > /proc/sysrq-trigger\n");
     s
@@ -255,7 +349,17 @@ pub fn with_image_init(script: String, init_image: bool) -> String {
         "/podvm/podvm {} --cgroup auto --cwd \"$PWD\" -- \"$@\"",
         crate::initns::VERB
     );
-    script.replace("\"$@\"", &run)
+    // The last `"$@"` is the one of the script. An argument or a variable
+    // of the run can hold the same four bytes (`sh -c 'exec "$@"'`), and
+    // it must stay as it is.
+    match script.rfind("\"$@\"") {
+        Some(at) => {
+            let mut s = script;
+            s.replace_range(at..at + 4, &run);
+            s
+        }
+        None => script,
+    }
 }
 
 /// PodUtils/podrunner#296 ask 4 (TODO/machine.md T-1967): `--pids-limit N`

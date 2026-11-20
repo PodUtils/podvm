@@ -85,6 +85,14 @@ fn a_wrong_argument_of_the_supervisor_is_named() {
     for (args, word) in [
         (v(&["--root", "/r"]), "no command"),
         (v(&["--ids", "x", "--", "true"]), "UID:GID"),
+        (
+            v(&["--hold", "/f", "--", "true"]),
+            "--hold takes no command",
+        ),
+        (
+            v(&["--hold", "/f", "--attach", "/f"]),
+            "--hold takes no command",
+        ),
         (v(&["--bind", "/etc:/x", "--", "true"]), "--bind"),
         (v(&["--what", "--", "true"]), "no argument"),
         (v(&["--cwd"]), "takes a value"),

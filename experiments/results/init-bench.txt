@@ -27,3 +27,54 @@ wait+rw                machine  run= 30.2s first= 18.7s mem= 3684MiB state=runni
 wait+discard           ns       run=  5.3s first=  2.4s mem=  247MiB state=running boot=2.266s unit=5ms mariadb=236ms postgres=2311ms sql=42,42 uid=100
 wait+discard           runsc    run=  7.4s first=  3.5s mem=  831MiB state=running boot=3.238s unit=28ms mariadb=314ms postgres=2561ms sql=42,42 uid=100
 wait+discard           machine  run= 28.8s first= 17.5s mem= 3630MiB state=running boot=7.107s unit=190ms mariadb=2261ms postgres=5363ms sql=42,42 uid=100
+# 2026-11-20T03:55:21Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label boot
+boot                   machine  run= 35.4s first= 20.2s mem= 3670MiB state=running boot=7.799s unit=202ms mariadb=2773ms postgres=5907ms sql=42,42 uid=100
+# 2026-11-20T03:55:59Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label boot-again
+boot-again             machine  run= 35.1s first= 20.3s mem= 3673MiB state=running boot=7.730s unit=202ms mariadb=2701ms postgres=5817ms sql=42,42 uid=100
+# 2026-11-20T03:56:38Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label state
+state                  mach-sav run= 36.9s first= 22.1s mem= 3687MiB state=running boot=7.612s unit=228ms mariadb=2861ms postgres=5651ms sql=42,42 uid=100
+state                  mach-lod run= 16.5s first=  1.3s mem= 2318MiB state=running boot=7.612s unit=217ms mariadb=3005ms postgres=5952ms sql=42,42 uid=100
+state                  mach-lod the state files: 1539 MiB; markers of a failed state: 0
+# 2026-11-20T03:58:04Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label state-again
+state-again            mach-lod run= 37.8s first= 23.0s mem= 3681MiB state=running boot=8.040s unit=213ms mariadb=2810ms postgres=5706ms sql=42,42 uid=100
+state-again            mach-lod the state files: 3087 MiB; markers of a failed state: 0
+# 2026-11-20T03:59:44Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label mitigations=off
+mitigations=off        machine  run= 34.7s first= 19.8s mem= 3676MiB state=running boot=7.903s unit=210ms mariadb=2702ms postgres=5590ms sql=42,42 uid=100
+# 2026-11-20T04:00:23Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label mitigations=off-again
+mitigations=off-again  machine  run= 34.1s first= 19.8s mem= 3661MiB state=running boot=7.712s unit=219ms mariadb=2749ms postgres=5633ms sql=42,42 uid=100
+# 2026-11-20T04:01:00Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label tb-size=2048
+tb-size=2048           machine  run= 34.5s first= 19.9s mem= 3690MiB state=running boot=7.746s unit=185ms mariadb=2691ms postgres=5939ms sql=42,42 uid=100
+# 2026-11-20T04:01:36Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label tb-size=2048-again
+tb-size=2048-again     machine  run= 35.9s first= 20.7s mem= 3674MiB state=running boot=8.763s unit=214ms mariadb=2833ms postgres=5911ms sql=42,42 uid=100
+# 2026-11-20T04:02:16Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label tb-size=256
+tb-size=256            machine  run= 34.4s first= 18.9s mem= 3049MiB state=running boot=7.455s unit=214ms mariadb=2795ms postgres=6041ms sql=42,42 uid=100
+# 2026-11-20T04:03:07Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label boot-third
+boot-third             machine  run= 33.0s first= 19.0s mem= 3673MiB state=running boot=7.233s unit=191ms mariadb=2652ms postgres=5505ms sql=42,42 uid=100
+# 2026-11-20T04:05:37Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label tb-size=256-again
+tb-size=256-again      machine  run= 35.7s first= 19.9s mem= 3020MiB state=running boot=7.823s unit=207ms mariadb=2917ms postgres=6267ms sql=42,42 uid=100
+# 2026-11-20T04:07:13Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label tb-size=512
+tb-size=512            machine  run= 34.1s first= 19.9s mem= 3313MiB state=running boot=7.661s unit=329ms mariadb=2612ms postgres=5664ms sql=42,42 uid=100
+# 2026-11-20T04:11:23Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label tb-size=512-again
+tb-size=512-again      machine  run= 34.7s first= 20.0s mem= 3281MiB state=running boot=7.858s unit=185ms mariadb=2740ms postgres=5628ms sql=42,42 uid=100
+# 2026-11-20T04:13:48Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label tb-size=512+state
+tb-size=512+state      mach-sav run= 36.3s first= 22.0s mem= 3275MiB state=running boot=7.295s unit=201ms mariadb=2650ms postgres=5653ms sql=42,42 uid=100
+tb-size=512+state      mach-lod run= 15.6s first=  1.3s mem= 2325MiB state=running boot=7.295s unit=225ms mariadb=2849ms postgres=5753ms sql=42,42 uid=100
+tb-size=512+state      mach-lod the state files: 1544 MiB; markers of a failed state: 0
+# 2026-11-20T07:36:00Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label t2008
+t2008                  machine  run= 51.3s first= 34.4s mem= 3302MiB state=running boot=8.162s unit=242ms mariadb=3643ms postgres=6245ms sql=42,42 uid=100
+t2008                  mach-sav run= 40.7s first= 24.3s mem= 3307MiB state=running boot=8.853s unit=201ms mariadb=3031ms postgres=6091ms sql=42,42 uid=100
+t2008                  mach-lod run= 18.3s first=  1.5s mem= 2320MiB state=running boot=8.853s unit=241ms mariadb=3313ms postgres=6436ms sql=42,42 uid=100
+t2008                  mach-lod the state files: 1541 MiB; markers of a failed state: 0
+# 2026-11-20T07:38:13Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label t2008-again
+t2008-again            machine  run= 39.5s first= 22.4s mem= 3286MiB state=running boot=8.419s unit=231ms mariadb=3282ms postgres=6346ms sql=42,42 uid=100
+t2008-again            mach-lod run= 17.9s first=  1.6s mem= 2330MiB state=running boot=8.853s unit=268ms mariadb=3303ms postgres=6394ms sql=42,42 uid=100
+t2008-again            mach-lod the state files: 1541 MiB; markers of a failed state: 0
+# 2026-11-20T07:40:14Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label t2008-pipe
+t2008-pipe             mach-sav run= 41.2s first= 24.6s mem= 3311MiB state=running boot=8.158s unit=381ms mariadb=3073ms postgres=6184ms sql=42,42 uid=100
+t2008-pipe             mach-lod run= 18.0s first=  2.4s mem= 2333MiB state=running boot=8.158s unit=227ms mariadb=3042ms postgres=6133ms sql=42,42 uid=100
+t2008-pipe             mach-lod the state files: 1542 MiB; markers of a failed state: 0
+# 2026-11-20T07:41:17Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label routes
+routes                 ns       run= 14.7s first= 11.4s mem=  237MiB state=running boot=7.726s unit=8ms mariadb=155ms postgres=2382ms sql=42,42 uid=100
+routes                 runsc    run= 11.2s first=  6.5s mem=  883MiB state=running boot=3.429s unit=36ms mariadb=416ms postgres=2771ms sql=42,42 uid=100
+# 2026-11-20T07:42:04Z podvm 0.2.0-beta.36, host 6.18.44-fc-v726, 4 CPUs, kvm no, label runsc-boot-times
+runsc-boot-times       runsc    run=  8.6s first=  3.9s mem=  866MiB state=running boot=3.474s unit=34ms mariadb=452ms postgres=2644ms sql=42,42 uid=100

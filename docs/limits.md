@@ -410,6 +410,40 @@ C26). Experiment 465 measures each line below as uid 1000.
   network is QEMU's user-mode network. Under TCG on the cloud host a run
   of `true` takes 24 s to 27 s with four vCPUs, and QEMU holds 2.6 GB of
   memory for an image of 584 MB; the namespace rung takes 3 s.
+- The machine tier saves the state of a guest that booted the init of an
+  image, and each later run of the image starts from that state
+  (T-2008). The first run boots a guest with nothing of a run in it,
+  saves its state in the store (`machine/state-DIGEST-KEY.vm`, as large as
+  the memory that the guest uses), and then gives the guest its command;
+  a later run loads the state and gives its command, its environment,
+  its volumes, the time of the host and a seed for the random pool of the
+  guest. A state is used only with the same image digest, podvm, QEMU
+  (its file and its version), CPU (under KVM also the kernel of the
+  host), guest kernel, memory, vCPUs and arguments of the emulator; each
+  other run saves a state of its own, and the store keeps the two that
+  were used last for an image. What the state does not serve boots as
+  before: `-t`, `run -d`, `--pids-limit`, `--podvm-engine`,
+  `--podvm-channel`, `--podvm-sealed`, `--network broker`, more than
+  four volumes, more than 64 KiB of stdin, an arm64 guest, and a kernel
+  of `PODVM_MACHINE_KERNEL`. Each run of one state has the machine-id,
+  the boot id, the monotonic clock and the service processes of the
+  save: a secret that a service made at its start (a session key, the
+  state of a random generator in its memory) is the same in each run.
+  With `--verbose` the console of the boot is not shown for such a run.
+  A state that does not load, or whose guest does not take the command,
+  gives a boot with one line on stderr, and podvm removes that state.
+  After three such failures in a row podvm tries no state of that shape
+  for a day (the marker `state-DIGEST-KEY.bad` holds the count and the
+  last reason; remove it to try again). podvm checks the length of a
+  state file, not its bytes. `PODVM_MACHINE_STATE=0` boots each guest;
+  `pipe` saves and loads through a pipe of `cat`, which podvm also takes
+  by itself where QEMU has no `file:` transport (before QEMU 8.2).
+  `rmi` removes no state and no base archive of an image. Measured under
+  TCG on the cloud host with MariaDB and PostgreSQL of Debian 12 under
+  systemd (experiment 468): the first output of the command comes 1.3 s to
+  1.6 s after the start of a run from a state, and 19 s to 20 s after the
+  start of a run that boots; the state is 1,539 MiB, the save takes 2 s,
+  and QEMU holds 2.3 GiB in place of 3.7 GiB. KVM is not measured.
 - The userland rung itself boots no init: its PID 1 is the PID 1 of the
   host, `setresuid` to another uid gives EPERM (T-0711), and the kernel
   gives a PID namespace only with a user namespace or CAP_SYS_ADMIN. Its

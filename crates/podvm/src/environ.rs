@@ -152,6 +152,15 @@ pub const USER: &[Group] = &[
                  exits 125 and boots nothing. For a Windows install, only tcg allows TCG.",
             ),
             v(
+                "PODVM_MACHINE_STATE",
+                "0, 1, pipe",
+                "Controls the saved state of a guest that boots the init of an image \
+                 (--podvm-init=image, T-2008). With no value or 1, the first run of an image \
+                 saves the state of its guest in the store, and each later run starts from it. \
+                 0 boots each guest. pipe saves and loads through a pipe of cat. Another value \
+                 exits 125.",
+            ),
+            v(
                 "PODVM_MACHINE_KERNEL",
                 "a file",
                 "Names a kernel for the guest in place of the pinned kernel. The first use is \

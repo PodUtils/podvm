@@ -32,6 +32,19 @@ pub fn drop_groups() {
     unsafe { setgroups(0, std::ptr::null()) };
 }
 
+/// Put each later child of this process into the PID namespace of the
+/// process `pid` (TODO/machine.md T-2008: the command of a held init, whose
+/// supervisor is another process).
+pub fn enter_pid_namespace(pid: i32) -> std::io::Result<()> {
+    const CLONE_NEWPID: i32 = 0x2000_0000;
+    let f = std::fs::File::open(format!("/proc/{pid}/ns/pid"))?;
+    // SAFETY: setns with an open descriptor of a PID namespace.
+    if unsafe { setns(f.as_raw_fd(), CLONE_NEWPID) } != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(())
+}
+
 /// The namespaces of the init, each as an open descriptor, in join order.
 pub struct Namespaces(Vec<OwnedFd>);
 

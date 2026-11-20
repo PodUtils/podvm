@@ -42,7 +42,10 @@
 #      run names the missing part and the machine tier, and the check exits
 #      7. Skipped where the cgroup of the script is delegated;
 #   3. the userland rung (`PODVM_USERNS=0` and a volume): the run names the
-#      machine tier, and the check exits 7;
+#      machine tier, and the check exits 7. Where clause 2 ran, this is the
+#      second run of the digest on the machine tier: its guest comes from
+#      the saved state (TODO/machine.md T-2008), and the run takes less
+#      than half of the time of clause 2, which booted;
 #   4. the userland rung with no init, for the record of why it has none:
 #      PID 1 is a process of the host, and `setresuid` to another uid fails;
 #   5. `run -d --podvm-init=image` and `--podvm-tier=syscall
@@ -56,7 +59,14 @@
 #      names the runsc tier, and the check exits 7, from the namespace rung
 #      and with `PODVM_USERNS=0`; a SIGKILL of podvm leaves no process.
 #      Clauses 2 and 3 run with `PODVM_RUNSC` on a path with no file, so
-#      that they measure the guest. Skipped with no runsc.
+#      that they measure the guest. Skipped with no runsc;
+#   9. the saved state of a guest (TODO/machine.md T-2008): after a SIGKILL
+#      of podvm with a guest from a state, no emulator stays; a state file
+#      that is cut is not loaded, and the run saves a new one; a state that
+#      the emulator refuses gives a boot with the same result, one line,
+#      and a marker with the count 1 in place of the state;
+#      `PODVM_MACHINE_STATE=0` writes
+#      no state, and another value is refused with 125.
 
 set -u
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -202,9 +212,10 @@ run_check() { # the number of the clause, then the prefix of the command
 	"$@" timeout 900 "$P" run --rm --podvm-init=image -v "$WORK/fx:/fx" "$IMG" sh /fx/check.sh \
 		>"$T.$n.out" 2>"$T.$n.err"
 	rc=$?
-	say "clause $n  rc $rc in $(($(date +%s) - start)) s"
+	took=$(($(date +%s) - start))
+	say "clause $n  rc $rc in $took s"
 	keep "$T.$n.out"
-	grep 'podvm run: --podvm-init=image' "$T.$n.err" | cut -c1-260 | sed 's/^/    stderr: /' | tee -a "$OUT"
+	grep -E 'podvm run: (--podvm-init=image|machine tier: the guest that podvm)' "$T.$n.err" | cut -c1-260 | sed 's/^/    stderr: /' | tee -a "$OUT"
 	return $rc
 }
 
@@ -229,15 +240,30 @@ if delegated "$OWN"; then
 else
 	run_check 2 as env PODVM_RUNSC=/nonexistent/runsc
 	rc=$?
+	first=$took
 	[ "$rc" -eq 7 ] || { bad "clause 2: the check gave $rc, not 7"; keep "$T.2.err"; }
 	grep -q 'takes the machine tier' "$T.2.err" || bad "clause 2: the run names no machine tier"
 fi
 
-# Clause 3: the userland rung: the machine tier.
+# Clause 3: the userland rung: the machine tier. It is the second run of
+# the digest on that tier: the guest comes from the state that the first
+# one saved (TODO/machine.md T-2008).
+first=${first:-0}
+states() { find "$WORK/store/machine" -maxdepth 1 -name "state-*.$1" 2>/dev/null | wc -l; }
+before=$(states vm)
 run_check 3 as env PODVM_USERNS=0 PODVM_RUNSC=/nonexistent/runsc
 rc=$?
 [ "$rc" -eq 7 ] || { bad "clause 3: the check gave $rc, not 7"; keep "$T.3.err"; }
 grep -q 'takes the machine tier' "$T.3.err" || bad "clause 3: the run names no machine tier"
+if [ "$before" -ge 1 ]; then
+	say "clause 3  the guest came from a saved state: $before state file, $took s"
+	grep -q 'podvm boots a guest with no state' "$T.3.err" && bad "clause 3: the saved state did not serve the run"
+	# The time of a run depends on the load of the host (13 s and 16 s for
+	# the same build): the bound is half of the run that booted.
+	[ "$first" -eq 0 ] || [ "$took" -lt $((first / 2)) ] || bad "clause 3: the second run of the digest took $took s, not under half of the $first s of the first"
+else
+	say "clause 3  no saved state before the run (clause 2 did not run, or its save failed)"
+fi
 
 # Clause 4: the userland rung with no init.
 as env PODVM_USERNS=0 timeout 300 "$P" run --rm --verbose -v "$WORK/fx:/fx" "$IMG" sh -c \
@@ -330,6 +356,54 @@ if [ -n "$RUNSC" ] && [ -x "$RUNSC" ] && ! delegated "$OWN"; then
 	[ -z "$left" ] || bad "clause 8: a process of gVisor stays"
 else
 	say "clause 8  skipped: no runsc, or the cgroup of this shell is delegated"
+fi
+
+# Clause 9: the saved state of a guest (TODO/machine.md T-2008). A state
+# that is cut does not load: the run boots a guest, gives the same result,
+# and says so in one line; the state is gone, and a marker holds the
+# reason. With PODVM_MACHINE_STATE=0 no state is read or written. After a
+# SIGKILL of podvm with a guest from a state, no emulator stays.
+ST=$(find "$WORK/store/machine" -maxdepth 1 -name 'state-*.vm' 2>/dev/null | head -1)
+if [ -n "$ST" ]; then
+	KC=9
+	killed "a SIGKILL of podvm with a guest from a state" as env PODVM_RUNSC=/nonexistent/runsc timeout 120 "$P" run --rm --podvm-init=image "$IMG" sleep 465465
+	left=$(ps -u "$WHO" -o pid=,stat=,args= 2>/dev/null | grep -E 'qemu-system' | grep -v ' Z' || true)
+	say "clause 9  emulators that stay: ${left:-none}"
+	[ -z "$left" ] || bad "clause 9: an emulator stays"
+	size=$(stat -c %s "$ST")
+	truncate -s $((size / 2)) "$ST"
+	# The record names the old length: the cut file is no state, and the run saves a new one.
+	run_check 9 as env PODVM_RUNSC=/nonexistent/runsc
+	rc=$?
+	[ "$rc" -eq 7 ] || { bad "clause 9: after a cut state the check gave $rc, not 7"; keep "$T.9.err"; }
+	[ "$(stat -c %s "$ST" 2>/dev/null || echo 0)" -ne $((size / 2)) ] || bad "clause 9: the cut state stays"
+	# The same cut with a record that names the new length: the emulator refuses the load.
+	ST=$(find "$WORK/store/machine" -maxdepth 1 -name 'state-*.vm' 2>/dev/null | head -1)
+	if [ -n "$ST" ]; then
+		size=$(stat -c %s "$ST")
+		truncate -s $((size / 2)) "$ST"
+		sed -i "s/\"bytes\":$size/\"bytes\":$((size / 2))/" "${ST%.vm}.json"
+		run_check 9 as env PODVM_RUNSC=/nonexistent/runsc
+		rc=$?
+		[ "$rc" -eq 7 ] || { bad "clause 9: after a state that does not load the check gave $rc, not 7"; keep "$T.9.err"; }
+		grep -q 'podvm boots a guest with no state' "$T.9.err" || { bad "clause 9: the run names no boot after the failed load"; keep "$T.9.err"; }
+		say "clause 9  markers of a failed state: $(states bad); state files: $(states vm)"
+		[ "$(states bad)" -eq 1 ] && [ "$(states vm)" -eq 0 ] || bad "clause 9: the failed state stays, or it has no marker"
+		[ "$(head -1 "${ST%.vm}.bad" 2>/dev/null)" = 1 ] || bad "clause 9: the marker does not count one failure"
+	else
+		bad "clause 9: the run after a cut state saved no new state"
+	fi
+	find "$WORK/store/machine" -maxdepth 1 -name 'state-*' -exec rm -f {} +
+	run_check 9 as env PODVM_MACHINE_STATE=0 PODVM_RUNSC=/nonexistent/runsc
+	rc=$?
+	[ "$rc" -eq 7 ] || { bad "clause 9: with PODVM_MACHINE_STATE=0 the check gave $rc, not 7"; keep "$T.9.err"; }
+	[ "$(states vm)" -eq 0 ] || bad "clause 9: PODVM_MACHINE_STATE=0 saved a state"
+	as env PODVM_MACHINE_STATE=maybe PODVM_RUNSC=/nonexistent/runsc timeout 300 "$P" run --rm --podvm-init=image "$IMG" true >/dev/null 2>"$T.9v.err"
+	rc=$?
+	say "clause 9  PODVM_MACHINE_STATE=maybe: rc $rc"
+	{ [ "$rc" -eq 125 ] && grep -q 'the values are 0, 1 and pipe' "$T.9v.err"; } || { bad "clause 9: a wrong value of the variable"; keep "$T.9v.err"; }
+else
+	say "clause 9  skipped: the runs of the machine tier saved no state"
 fi
 
 # The base of the killed run is empty; the next run removes it when it is

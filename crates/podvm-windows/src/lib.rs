@@ -27,8 +27,8 @@ use std::time::Duration;
 
 pub use pod_guest::{
     accel_for, agent, argv, convert_argv, emulator, fat16, fetch, outcome, overlay_argv, plan, qmp,
-    scratch_of, stop, timeout_of, Accel, Ceiling, Code, Fat16, Outcome, Plan, Request, Result,
-    Stop, Timeout,
+    scratch_of, stop, timeout_of, warm, Accel, Ceiling, Code, Fat16, Outcome, Plan, Request,
+    Result, Stop, Timeout,
 };
 
 /// The prefix every per-run directory carries, used both to create one and

@@ -24,12 +24,16 @@ pub(crate) mod engine;
 pub(crate) mod exec; // TODO/machine.md T-1750
 pub(crate) mod init;
 mod input;
+pub(crate) mod job; // TODO/machine.md T-2008
 pub(crate) mod kernel;
 pub(crate) mod kernel_arm64; // TODO/machine.md T-1890
+mod line;
 mod mem; // TODO/machine.md T-1922
 pub(crate) mod net;
+mod rundir; // TODO/machine.md T-1906
 pub(crate) mod sealed;
 pub(crate) mod squashfs;
+pub(crate) mod state; // TODO/machine.md T-2008
 pub(crate) mod stderr;
 pub(crate) mod tty;
 pub(crate) mod vol;
@@ -46,6 +50,8 @@ pub use archive::run_archive;
 use archive::tools;
 use drive::drive;
 pub use input::{read_stdin, MAX_STDIN};
+pub use line::notice;
+use line::{no_nic, with_cpus};
 
 /// The version of the base archive format; a change of [`cpio`] bumps it,
 /// so an old cached archive is not reused. 2 keeps the hard links; 3 the
@@ -302,6 +308,28 @@ pub fn boot(r: &Request) -> i32 {
                 .to_string(),
         );
     }
+    // TODO/machine.md T-2008: the run from a saved state of the guest, or
+    // with the save of one; else the boot below.
+    if init_image {
+        let pinned = !assets.volume_modules.is_empty() && !assets.modules.is_empty();
+        let all: Vec<(String, PathBuf)> = assets
+            .modules
+            .iter()
+            .chain(&assets.volume_modules)
+            .map(|(n, p)| (n.to_string(), p.clone()))
+            .collect();
+        let ctx = state::Ctx {
+            accel,
+            qemu: &qemu,
+            kernel: &kernel,
+            base: &base,
+            modules: &all,
+            pinned_kernel: pinned,
+        };
+        if let state::Outcome::Done(code) = state::run(r, &ctx) {
+            return code;
+        }
+    }
     let size = tty::size()
         .map(|(rows, cols)| format!("{rows}x{cols}"))
         .unwrap_or_default();
@@ -309,7 +337,7 @@ pub fn boot(r: &Request) -> i32 {
         Ok(n) => n,
         Err(e) => return fail(e),
     };
-    drive::sweep(&r.store_root.join("machine")); // TODO/machine.md T-1906
+    rundir::sweep(&r.store_root.join("machine")); // TODO/machine.md T-1906
     let dir =
         r.store_root
             .join("machine")
@@ -413,12 +441,8 @@ pub fn boot(r: &Request) -> i32 {
     arch::adapt(&mut argv, r.arch);
     argv.extend(r.keeper.iter().flat_map(exec::keeper_args));
     arch::err_port(&mut argv, r.arch);
-    if r.net_none
-        && let Some(nic) = argv
-            .iter_mut()
-            .find(|a| a.starts_with("user,model=virtio-net-pci"))
-    {
-        *nic = "none".to_string();
+    if r.net_none {
+        no_nic(&mut argv);
     }
     if let Some(port) = r.broker {
         let (h, p) = crate::broker::GUEST_FORWARD;
@@ -436,18 +460,12 @@ pub fn boot(r: &Request) -> i32 {
             );
         }
     }
-    // TODO/cli.md T-1654 (`limits.cpus`). With `acpi=off` the kernel reads
-    // the MP table, which names one CPU, so a guest of more CPUs keeps ACPI
-    // (measured on 2026-11-11: `nproc` 1 with `acpi=off`, 2 without it).
-    if let Some(n) = r.cpus.filter(|n| *n > 1) {
-        if let Some(i) = argv.iter().position(|a| a == "-smp") {
-            argv[i + 1] = n.to_string();
-        }
-        if let Some(m) = argv.iter_mut().find(|a| *a == "pc,acpi=off") {
-            *m = "pc".to_string();
-        }
-    }
-    let code = drive(r, &qemu, &argv, &nonce, &dir, &sock);
+    with_cpus(&mut argv, r.cpus);
+    let code = match drive(r, &qemu, &argv, &nonce, &dir, &sock, None) {
+        state::Driven::Code(code) => code,
+        // Only the guest of a state ends so, and this guest is none.
+        state::Driven::Cold(why) => fail(why),
+    };
     let _ = std::fs::remove_file(&sock);
     let _ = std::fs::remove_file(tty::socket_path(&sock));
     if let Some(d) = channel::socket_path(&sock).parent() {
@@ -455,31 +473,6 @@ pub fn boot(r: &Request) -> i32 {
     }
     let _ = std::fs::remove_dir_all(&dir);
     code
-}
-
-/// The notice of the machine tier, or `None` where the banner is off
-/// (TODO/cli.md T-1824: `-q`, and the default, keep stderr silent).
-pub fn notice(r: &Request, accel: Accel, cached: bool) -> Option<String> {
-    if !r.loud {
-        return None;
-    }
-    Some(format!(
-        "podvm {}: machine tier: a guest under {} ({}), base archive {} (TODO/machine.md T-1656)",
-        r.verb,
-        match accel {
-            Accel::Kvm => "KVM",
-            Accel::Tcg => "TCG",
-        },
-        match accel {
-            Accel::Kvm => "hardware virtualization",
-            Accel::Tcg => "the emulator process is the boundary, not hardware isolation",
-        },
-        if cached {
-            "from the cache"
-        } else {
-            "built now"
-        }
-    ))
 }
 
 #[cfg(test)]

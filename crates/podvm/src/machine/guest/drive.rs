@@ -8,9 +8,13 @@ use std::time::{Duration, Instant};
 
 use podvm_image::error::EXIT_RUNTIME_ERROR;
 
-use super::{init, stderr, tty, Request, DEFAULT_TIMEOUT};
+use super::state::{Driven, Mode, Warm};
+use super::{init, job, stderr, tty, Request, DEFAULT_TIMEOUT};
 
-/// Spawn the emulator and read its console to the exit marker.
+/// Spawn the emulator and read its console to the exit marker. `warm` is
+/// the guest of a saved state (TODO/machine.md T-2008): the drive saves
+/// the state or not, gives the job, and ends with [`Driven::Cold`] where
+/// the guest does not reach the command.
 pub(super) fn drive(
     r: &Request,
     qemu: &Path,
@@ -18,14 +22,19 @@ pub(super) fn drive(
     nonce: &str,
     dir: &Path,
     sock: &Path,
-) -> i32 {
+    mut warm: Option<&mut Warm>,
+) -> Driven {
     use std::os::unix::process::CommandExt;
     let errlog = dir.join("qemu.err");
     let mut cmd = Command::new(qemu);
     crate::machine::die_with_podvm(&mut cmd); // T-1884
     let mut child = match cmd
         .args(argv)
-        .stdin(Stdio::null())
+        .stdin(if warm.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stdout(Stdio::piped())
         .stderr(
             std::fs::File::create(&errlog)
@@ -38,9 +47,22 @@ pub(super) fn drive(
         Ok(c) => c,
         Err(e) => {
             eprintln!("podvm {}: machine tier: {}: {e}", r.verb, qemu.display());
-            return EXIT_RUNTIME_ERROR;
+            return Driven::Code(EXIT_RUNTIME_ERROR);
         }
     };
+    // TODO/machine.md T-2008: a guest that comes from a state waits for
+    // its job already; a guest that boots now gets it after the save.
+    let mut job_in = child.stdin.take();
+    let mut sent = None;
+    let mut loaded = false;
+    if let Some(w) = warm.as_deref_mut()
+        && let Mode::Load { qmp } = &w.mode
+    {
+        loaded = true;
+        sent = super::state::send_job(job_in.take(), w.frame.take(), Some(qmp.clone()));
+    }
+    // Why the guest of a state did not reach the command.
+    let mut cold: Option<String> = None;
     let pid = child.id() as i32;
     // TODO/machine.md T-1750: the keeper of `run -d` records the emulator.
     if let Some(k) = &r.keeper {
@@ -92,12 +114,61 @@ pub(super) fn drive(
     let mut blanks = 0usize;
     let mut code: Option<i32> = None;
     let stdout = std::io::stdout();
+    // A guest from a state gives its ready marker in seconds, or never.
+    let ready_by = loaded.then(|| started + super::state::READY_BOUND);
     loop {
-        let left = deadline.saturating_duration_since(Instant::now());
+        let bound = match ready_by {
+            Some(b) if !ready => b.min(deadline),
+            _ => deadline,
+        };
+        let left = bound.saturating_duration_since(Instant::now());
         match rx.recv_timeout(left.max(Duration::from_millis(1))) {
             Ok(line) => match console.line(&line) {
                 init::Line::Before => {
                     let l = line.trim_end_matches('\r').trim();
+                    if let Some(w) = warm.as_deref_mut() {
+                        if let Some(why) = l.strip_prefix(&format!("{}{} ", job::BAD, w.nonce)) {
+                            cold = Some(format!("the guest did not take the job: {why}"));
+                            break;
+                        }
+                        if let Some(boot) = l.strip_prefix(&format!("{}{} ", job::HELD, w.nonce)) {
+                            // The guest waits for its job. Where the init of
+                            // the image is up, its state is saved first.
+                            if let (
+                                Mode::Save {
+                                    qmp,
+                                    files,
+                                    fingerprint,
+                                    mem_mib,
+                                    transport,
+                                    unique,
+                                },
+                                "up",
+                            ) = (&w.mode, boot)
+                            {
+                                let (saved, runs) = super::state::save(
+                                    qmp,
+                                    files,
+                                    fingerprint,
+                                    *mem_mib,
+                                    *transport,
+                                    unique,
+                                );
+                                w.saved = Some(saved);
+                                if !runs {
+                                    cold = Some(
+                                        "the guest did not go on after the save of its state"
+                                            .to_string(),
+                                    );
+                                    break;
+                                }
+                            }
+                            if sent.is_none() {
+                                sent = super::state::send_job(job_in.take(), w.frame.take(), None);
+                            }
+                            continue;
+                        }
+                    }
                     if !l.is_empty() {
                         if boot.len() == BOOT_LINES {
                             boot.pop_front();
@@ -136,11 +207,47 @@ pub(super) fn drive(
                 console_closed = true;
                 break;
             }
-            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => break,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
         }
-        if Instant::now() >= deadline {
+        let now = Instant::now();
+        if now >= deadline {
             break;
         }
+        if !ready && ready_by.is_some_and(|b| now >= b) {
+            cold = Some(format!(
+                "no ready marker {} s after the load",
+                super::state::READY_BOUND.as_secs()
+            ));
+            break;
+        }
+    }
+    // TODO/machine.md T-2008: an emulator of a state that ended before the
+    // guest started the command (a state that does not load) is no failure
+    // of the run: the caller boots a guest.
+    if warm.is_some() && cold.is_none() && console_closed && !ready {
+        let status = wait_bounded(&mut child, Duration::from_secs(2));
+        let log = std::fs::read_to_string(dir.join("qemu.err")).unwrap_or_default();
+        // The notice of the socket of stderr is no error of the emulator.
+        let said = log
+            .lines()
+            .rfind(|l| !l.contains("info: QEMU waiting for connection"));
+        cold = Some(format!(
+            "{}; qemu: {}; console: {}",
+            ended_how(status, false),
+            said.unwrap_or("no line"),
+            boot.back().map_or("no line", String::as_str)
+        ));
+    }
+    if cold.is_some() {
+        // SAFETY: a plain system call on the process group of the emulator.
+        unsafe { kill(-pid, 9) };
+        let _ = child.wait();
+        gone.store(true, std::sync::atomic::Ordering::Release);
+        let _ = errs.join();
+        if let Some(s) = sent {
+            let _ = s.join();
+        }
+        return Driven::Cold(cold.unwrap_or_default());
     }
     // The guest resets after the marker and the emulator exits; a guest
     // that does not, and each child of the emulator, goes with SIGKILL.
@@ -174,7 +281,12 @@ pub(super) fn drive(
     if let Some(t) = term {
         let _ = t.join();
     }
-    match code {
+    // The emulator ended: the writer of the job has ended too.
+    if let Some(s) = sent {
+        let _ = s.join();
+    }
+    drop(job_in);
+    Driven::Code(match code {
         Some(c) => c,
         // TODO/machine.md T-1809: the contract of `--timeout` of the other
         // rungs: the payload is killed at the bound, and the run exits 137.
@@ -234,7 +346,7 @@ pub(super) fn drive(
             }
             EXIT_RUNTIME_ERROR
         }
-    }
+    })
 }
 
 unsafe extern "C" {
@@ -299,54 +411,6 @@ fn ended_how(status: Option<std::process::ExitStatus>, ready: bool) -> String {
         "before the guest reached the command"
     };
     format!("{how}, {stage}")
-}
-
-/// TODO/machine.md T-1906: remove each `run-PID-*` directory under `dir`
-/// whose PID is not a running process: a podvm that was killed never
-/// reached the removal at the end of its boot. A live PID keeps its
-/// directory, also where the kernel gave the PID to another process.
-pub(super) fn sweep(dir: &Path) {
-    let Ok(rd) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for e in rd.flatten() {
-        let name = e.file_name();
-        let Some(pid) = name
-            .to_str()
-            .and_then(|n| n.strip_prefix("run-"))
-            .and_then(|r| r.split('-').next())
-            .and_then(|p| p.parse::<u32>().ok())
-        else {
-            continue;
-        };
-        if pid != std::process::id() && !Path::new("/proc").join(pid.to_string()).exists() {
-            let _ = std::fs::remove_dir_all(e.path());
-        }
-    }
-}
-
-#[cfg(test)]
-mod sweep_tests {
-    use super::*;
-
-    #[test]
-    fn machine_run_dirs_of_a_dead_pid_go() {
-        let d = std::env::temp_dir().join(format!("podvm-t1906-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&d);
-        // A PID above the kernel's limit runs nothing.
-        let dead = d.join("run-4194999-abcdef01");
-        let live = d.join(format!("run-{}-abcdef02", std::process::id()));
-        let other = d.join("base-1.cpio");
-        for p in [&dead, &live] {
-            std::fs::create_dir_all(p).unwrap();
-        }
-        std::fs::write(&other, b"x").unwrap();
-        sweep(&d);
-        assert!(!dead.exists(), "the directory of a dead PID stays");
-        assert!(live.exists(), "the directory of a live PID went");
-        assert!(other.exists(), "a file that is no run directory went");
-        let _ = std::fs::remove_dir_all(&d);
-    }
 }
 
 #[cfg(test)]

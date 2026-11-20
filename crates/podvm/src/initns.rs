@@ -24,6 +24,7 @@ use std::sync::OnceLock;
 
 pub mod boot;
 pub mod cgroup;
+pub mod hold;
 pub mod join;
 pub mod mounts;
 pub mod sandbox;
@@ -291,6 +292,8 @@ pub fn parse(args: &[String]) -> Result<boot::Spec, String> {
                     .ok_or(format!("--bind takes /tmp/GUEST:/HOST[:ro], not {v:?}"))?;
                 s.tmp.get_or_insert_with(Vec::new).push(b);
             }
+            "--hold" => s.hold = Some(PathBuf::from(value()?)),
+            "--attach" => s.attach = Some(PathBuf::from(value()?)),
             "--verbose" => s.verbose = true,
             "--discard" => s.discard = true,
             "--" => {
@@ -300,7 +303,10 @@ pub fn parse(args: &[String]) -> Result<boot::Spec, String> {
             other => return Err(format!("{other:?} is no argument of {VERB}")),
         }
     }
-    if s.argv.is_empty() {
+    if s.hold.is_some() && (s.attach.is_some() || !s.argv.is_empty()) {
+        return Err("--hold takes no command and no --attach".to_string());
+    }
+    if s.argv.is_empty() && s.hold.is_none() {
         return Err("no command after --".to_string());
     }
     Ok(s)
@@ -316,7 +322,11 @@ pub fn main(args: &[String]) -> i32 {
         Ok(mut spec) => {
             spec.verbose |= std::env::var(LOG_VAR).is_ok_and(|v| v == "1");
             spec.discard |= std::env::var(DISCARD_VAR).is_ok_and(|v| v == "1");
-            boot::supervise(&spec)
+            match (spec.hold.clone(), spec.attach.clone()) {
+                (Some(file), _) => hold::hold(&spec, &file),
+                (None, Some(file)) => hold::attach(&spec, &file),
+                (None, None) => boot::supervise(&spec),
+            }
         }
         Err(e) => {
             eprintln!("podvm {VERB}: {e}");

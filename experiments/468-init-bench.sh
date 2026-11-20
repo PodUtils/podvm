@@ -20,7 +20,11 @@
 #   runsc   release 20261102, by its SHA-512
 #
 # One row for each route, each from one run (ROUTES selects: `ns`, `runsc`,
-# `machine`; PODVM_468_EXTRA gives more flags of `podvm run`,
+# `machine`, `machine-save`, `machine-load`; `machine` boots its guest with
+# no saved state, `machine-save` removes each state of the store and makes
+# the run that boots and saves one, and `machine-load` is a run from that
+# state (TODO/machine.md T-2008); PODVM_468_EXTRA gives more flags of
+# `podvm run`,
 # PODVM_468_ENV more variables, PODVM_468_VOLMODE=:ro makes the one volume
 # read-only, and PODVM_468_LABEL names the row):
 #   run       the wall time of `podvm run`, from its start to its exit
@@ -197,7 +201,17 @@ EOF
 		rmdir "$STANDIN" 2>/dev/null
 		;;
 	runsc) one runsc as env PODVM_RUNSC="$RUNSC" ${PODVM_468_ENV:-} ;;
-	machine) one machine as env PODVM_RUNSC=/nonexistent/runsc ${PODVM_468_ENV:-} ;;
+	machine) one machine as env PODVM_RUNSC=/nonexistent/runsc PODVM_MACHINE_STATE=0 ${PODVM_468_ENV:-} ;;
+	machine-save)
+		find "$WORK/store/machine" -maxdepth 1 -name 'state-*' -exec rm -f {} + 2>/dev/null
+		one mach-sav as env PODVM_RUNSC=/nonexistent/runsc ${PODVM_468_ENV:-}
+		;;
+	machine-load)
+		one mach-lod as env PODVM_RUNSC=/nonexistent/runsc ${PODVM_468_ENV:-}
+		st=$(find "$WORK/store/machine" -maxdepth 1 -name 'state-*.vm' -exec stat -c %s {} + 2>/dev/null | awk '{s+=$1} END{print int(s/1048576)}')
+		bad=$(find "$WORK/store/machine" -maxdepth 1 -name 'state-*.bad' 2>/dev/null | wc -l)
+		say "$(printf '%-22s %-8s the state files: %s MiB; markers of a failed state: %s' "$LABEL" mach-lod "${st:-0}" "$bad")"
+		;;
 	esac
 done
 sleep 2

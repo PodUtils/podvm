@@ -5734,7 +5734,7 @@ Partial (2026-11-19): podcrates `v0.76.0` (podcrates@T-957) is taken (`16f2395`)
 **Milestone:** none
 **Priority:** P3
 **Effort:** L
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -5750,11 +5750,35 @@ Boot the init of the image once for each digest and each guest shape, save the s
 
 ## Decision
 
--
+Calls of the session of 2026-11-20 (a change of one belongs to the owner): (1) the save is automatic, in the first run of an image and a guest shape; `PODVM_MACHINE_STATE=0` turns it off. (2) The job of a run goes to the guest on the serial line as one frame of text with a length and a SHA-256, not on a second device: the saved guest needs no device for it. (3) A state is one file for each fingerprint, and the store keeps the two that were used last for an image. (4) The guest of a state has four 9p devices; a run with more volumes boots. (5) A failure before the command gives a boot, and three failures in a row hold the state for one day. (6) The guest stops for the save (`stop`, `migrate`, `cont`), as `pod_guest::warm::save` does, and the load waits for `running` on QMP before it gives the job.
 
 ## Prove
 
-`sh experiments/465-init-image.sh`, clause 3, on the cloud host as uid 1000 with `ghcr.io/pkgforge-dev/archlinux:latest`: the second run of the same digest gives exit 7, and its time is under 15 s under TCG.
+`sh experiments/465-init-image.sh`, clause 3, on the cloud host as uid 1000 with `ghcr.io/pkgforge-dev/archlinux:latest`: the second run of the same digest comes from the saved state and gives exit 7, and its time is less than half of the time of the first run (clause 3 against clause 2); clause 9 passes.
+
+## Done
+
+Partial (2026-11-20). `machine/guest/state.rs` (what a state serves, the fingerprint, the files, the plan, the save, the sweep), `machine/guest/job.rs` (the frame of a job and the verb `guest-job`), `initns/hold.rs` (`guest-init --hold` and `--attach`), `machine/guest/init.rs` (`template`, `job`), `machine/guest/drive.rs` (the save at the marker of the held guest, the job, the fall back), `guest-9p --hold`. From podcrates: `pod_guest::qmp::Monitor`, `pod_guest::warm::qemu_version` and `host_cpu`, `pod_supervise::lock::Lock`, `pod_hostprobe::space`. The unit tests of `machine::guest::state`, `machine::guest::job` and `initns::hold` pass (14 tests, each a table of a class: what a state serves, each part of the fingerprint, a sidecar, the plan for each kind of file, the sweep, a save against a stand-in of the monitor that works, refuses `file:`, fails, writes no byte, leaves, or does not continue, the wait for a loaded guest, a frame that is not whole).
+
+Measured on the cloud host of the session as uid 1000 (4 CPUs, 15 GB, no `/dev/kvm`, kernel 6.18.44, QEMU 8.2.2 of Ubuntu 24.04, TCG, four vCPUs):
+
+* Experiment 465 (`experiments/results/init-image.txt`, "THE INIT OF THE IMAGE RUNS"): clause 2, the run that boots and saves, gives exit 7 in 46 s; clause 3, the second run of the digest, gives exit 7 in 15 s from the saved state. Two more runs of the experiment in this session gave 43 s and 13 s, and 53 s and 16 s while another session compiled: the check of clause 3 takes about 10 s in the guest under TCG, so the Prove names the half of the first run and no count of seconds. Clause 9: after a SIGKILL of podvm no emulator stays; a state file that is cut is not loaded, and the run saves a new one; a state that QEMU refuses ("load of migration failed: Input/output error", 0.4 s after the start) gives a boot with exit 7, one line, no state file and a marker with the count 1; `PODVM_MACHINE_STATE=0` writes no state; another value gives 125.
+* Experiment 468 (`experiments/results/init-bench.txt`), Debian 12 with MariaDB 10.11 and PostgreSQL 15 under systemd 252, one run for each row:
+
+| the run | the whole run | the first output | the peak memory | the rows |
+| --- | --- | --- | --- | --- |
+| a boot, with no state | 33.0 s to 35.4 s | 19.0 s to 20.3 s | 3,670 MiB | `boot`, `boot-again`, `boot-third` |
+| the run that boots and saves | 36.3 s to 40.7 s | 22.0 s to 24.3 s | 3,275 MiB to 3,687 MiB | `state`, `tb-size=512+state`, `t2008` |
+| a run from the state | 15.6 s to 18.3 s | 1.3 s to 1.6 s | 2,318 MiB to 2,330 MiB | `state`, `tb-size=512+state`, `t2008`, `t2008-again` |
+| a run from the state through a pipe (`PODVM_MACHINE_STATE=pipe`) | 18.0 s | 2.4 s | 2,333 MiB | `t2008-pipe` |
+
+  The command of the bench takes about 15 s in the guest (the restarts of the two databases). The save writes 1,539 MiB in 2.1 s. A run of `echo` from the state takes 3.9 s and 4.0 s (by hand). The rows `t2008` are from the committed build; the rows before them are from a build with two more variables for the measures of T-2010. The host was busy during the rows `t2008` (its boot with no state took 39.5 s and 51.3 s there).
+* By hand, a run from the state: the clock of the guest is the one of the host; 8 bytes of `/dev/urandom` differ in each run; the boot id and the machine-id are the same in each run; a 9p volume is read and written; a TCP connection to the host through the user-mode network answers; `-e`, `-w`, the exit code, stderr and 3 bytes of stdin hold. `--user` is refused on the machine tier as before (T-1808).
+
+Faults that the runs found, each fixed: (1) a job that podvm wrote before the end of the load never came: the serial port of QEMU takes bytes before the load and the load drops them; podvm now waits for `running` on QMP, and each frame has a lead of 64 newlines. (2) QEMU that refused a state closed the pipe of the job, and SIGPIPE ended podvm with 141 before its boot of a guest; the writer thread blocks SIGPIPE. (3) QEMU 8.2.2 ended on SIGSEGV in the first seconds of a boot (T-2016); the guest that podvm boots to save its state boots again then, and the 9p modules load before the save, so that a guest from a state changes no PCI device. (4) The change time of podvm's binary in the fingerprint saved a second state for the same program, as experiment 468 copies the binary for each of its runs; the line holds the SHA-256 of the binary now (9 ms for 8.7 MB). (5) `init::with_image_init` replaced each `"$@"` of the script, also in an argument or a variable of the run (`sh -c 'exec "$@"'`): only the last one is the script's (T-2002).
+
+Remaining: (1) a run under KVM (`kvm.yml`): the save and the load with `-cpu host`, and the clock of the guest after a load; the cloud host has TCG only. (2) What a state does not serve boots as before: `-t`, `run -d`, `--pids-limit`, `--podvm-engine`, `--podvm-channel`, `--podvm-sealed`, `--network broker`, more than four volumes, more than 64 KiB of stdin, an arm64 guest, a kernel of `PODVM_MACHINE_KERNEL`, and each run with no `--podvm-init=image`. (3) `rmi` and `system prune` remove no state and no base archive of an image. (4) The pinned static QEMU 9.2.0 of the store is not measured (the host has QEMU 8.2.2); the pipe transport is measured with QEMU 8.2.2 by the variable, and the fall back of a QEMU before 8.2 from `file:` to the pipe by a stand-in of the monitor only. (5) podvm checks the length of a state file, not its bytes. (6) podcrates: `pod_guest::warm::save` and `restore` take a `Plan` of the UEFI flavour; podvm's `state::save` and `state::running` are a second form of them for a machine line of its own, and an ask for a form with no `Plan` is not written yet (rule 2a).
+
 
 # T-2011: `run -d --podvm-init=image` of an image whose Entrypoint is its init runs `/sbin/init CMD` and not the command
 
@@ -5788,3 +5812,33 @@ The unit tests `the_entrypoint_of_the_image_is_the_init_with_podvm_init_image` a
 ## Done
 
 **Done (2026-11-20).** `run::entrypoints` gives no Entrypoint of the image with `--podvm-init=image` (an explicit `--entrypoint` stays the caller's), which `run::prepare` and `run::machine` share, so each route of the init takes it; `run::nothing_to_run` names the init where no command is left; `incus::systemd::failed_units` adds `; failed units: a, b` (`systemctl --failed`) to the line of a boot that does not come up. The unit tests `the_entrypoint_of_the_image_is_the_init_with_podvm_init_image` and `the_failed_units_give_one_line` pass. Experiment 434 (all clauses hold) clause 24 on the cloud host: the image of clause 19 saved with `Entrypoint ["/sbin/init"]` and no Cmd; `run -d --podvm-tier=incus --podvm-init=image` of it with `sh -c 'echo "started $(cat /proc/1/comm)"; exit 3'` gives the name, the instance stops, `logs` gives `started systemd` and `inspect` gives 3.
+
+# T-2016: QEMU before 10.0.4 can end on SIGSEGV in the boot of a guest with more than one vCPU under TCG
+
+**Source:** the measures of T-2008 (2026-11-20); qemu-devel, "system/physmem: fix use-after-free with dispatch" (2025-07, lists.nongnu.org/archive/html/qemu-devel/2025-07/msg06358.html)
+**Category:** machine
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+A guest that boots an init of the image gets the CPUs of the host, at most four (call C26), and under TCG each vCPU is a thread (`-accel tcg,thread=multi`). QEMU 8.2.2 of Ubuntu 24.04 ended on SIGSEGV 2 s to 5 s after its start in 6 of about 245 starts of such a guest on the cloud host, while other processes kept its 4 CPUs busy; one more start ended with the exit code 0 after 2.7 s (a reset of the guest with no line). The kernel log of the host names `address_space_translate_for_iotlb` and the function after `qemu_ram_set_migratable` of `system/physmem.c`. podvm then gives 125 ("the guest ended before it gave the exit code of the payload"), and the run is lost. Only the guest that podvm boots to save its state boots again (T-2008).
+
+## Premise
+
+The fault is in QEMU: "system/physmem: fix use-after-free with dispatch" says "A use-after-free bug was reported when booting a Linux kernel during the pci setup phase. It's quite hard to reproduce (needs smp, and favored by having several pci devices with BAR ...)". The fix is in QEMU 10.1 and in the stable 10.0.4. The pinned static QEMU of the store is 9.2.0 (T-1875), before the fix; it is not measured. Experiment 469 is the tracked form of the measure: N starts of the emulator line of the machine tier for 7 s each, with busy shells beside them. Measured by hand with the same line and the initrd of a run, with four busy shells: 2 of 42 starts ended on SIGSEGV with four 9p devices and a monitor, 0 of 60 with four 9p devices and no monitor, and 0 of 90 with one 9p device (one of them ended with the exit code 0); and 2 of about 20 runs of podvm that booted a guest to save its state, both while another session compiled. The counts are too small to tell which part of the line matters. The first run of experiment 469 (`experiments/results/tcg-smp-start.txt`): 2 of 30 starts ended on SIGSEGV, 3.6 s and 4.8 s after the start.
+
+## Approach
+
+In this order: (1) measure the pinned QEMU 9.2.0 and a QEMU with the fix (10.0.4 or later) with experiment 469, each with 200 starts or more; (2) where the fix holds, pin a static QEMU with it, and prefer the store copy to a QEMU of the host that is older than the fix, with one line that says so; (3) until then, a boot whose emulator ended on a signal before the ready marker boots one more time, as the guest of a state does. Ask podcrates first for (2): `pod-guest` holds the pin of QEMU. A guest of one vCPU has no such fault and boots systemd in 37 s in place of 12 s (T-2002): that is the other choice, and it changes call C26.
+
+## Decision
+
+-
+
+## Prove
+
+`sh experiments/469-tcg-smp-start.sh` with `PODVM_469_N=200` on the cloud host, for the QEMU that podvm takes: 0 starts end early; and a run of `--podvm-init=image` whose emulator ends on a signal before the ready marker gives the exit code of its command.
+

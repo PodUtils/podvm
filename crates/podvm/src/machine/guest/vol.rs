@@ -113,12 +113,51 @@ fn mount_one(v: &Vol) -> Result<(), String> {
     Ok(())
 }
 
+/// `guest-9p --hold FILE TAG=PATH...` (TODO/machine.md T-2008): the mounts
+/// go into the mount namespace of the held init of `FILE`, which booted
+/// before the volumes of the run were known.
+pub const HOLD_FLAG: &str = "--hold";
+
+unsafe extern "C" {
+    fn setns(fd: i32, nstype: i32) -> i32;
+}
+
+/// Join the mount namespace of the held init. `Ok(false)` where its boot
+/// failed: no mount has a place then, and the run names the failure.
+fn join_held(file: &str) -> Result<bool, String> {
+    use std::os::fd::AsRawFd;
+    const CLONE_NEWNS: i32 = 0x0002_0000;
+    let pid = match crate::initns::hold::Held::read(std::path::Path::new(file))? {
+        crate::initns::hold::Held::Up { pid, .. } => pid,
+        crate::initns::hold::Held::Failed(_) => return Ok(false),
+    };
+    let ns = format!("/proc/{pid}/ns/mnt");
+    let f = std::fs::File::open(&ns).map_err(|e| format!("{ns}: {e}"))?;
+    // SAFETY: setns with an open descriptor; this process has one thread.
+    if unsafe { setns(f.as_raw_fd(), CLONE_NEWNS) } != 0 {
+        return Err(format!("{ns}: {}", std::io::Error::last_os_error()));
+    }
+    std::env::set_current_dir("/").map_err(|e| format!("the root of the held init: {e}"))?;
+    Ok(true)
+}
+
 /// The subcommand. Exit 0 where each volume is mounted, 1 otherwise.
 pub fn main(args: &[String]) -> i32 {
     let mut failed = Vec::new();
     for m in MODULES {
         if let Err(e) = super::net::load(m) {
             failed.push(e);
+        }
+    }
+    let (held, args) = match args {
+        [flag, file, rest @ ..] if flag == HOLD_FLAG => (Some(file), rest),
+        _ => (None, args),
+    };
+    if let (true, Some(file)) = (failed.is_empty(), held) {
+        match join_held(file) {
+            Ok(true) => {}
+            Ok(false) => return 0,
+            Err(e) => failed.push(format!("the mount namespace of the held init: {e}")),
         }
     }
     if failed.is_empty() {

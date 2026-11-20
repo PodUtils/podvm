@@ -111,7 +111,14 @@ gVisor sandbox (`crates/podvm/src/runsc/init.rs`, T-2007): the bundle
 starts `guest-init --pid1`, which gives the files their owners and
 becomes the init, and the command runs by `runsc exec`. `initns::route`
 takes the namespace rung, then the runsc tier, then the machine tier
-(call C26). On the incus tier, `run -d` and `create` with the flag leave
+(call C26). On the machine tier podvm saves the state of the guest
+after the boot of the init (`crates/podvm/src/machine/guest/state.rs`,
+T-2008): the guest of a state boots the init with `guest-init --hold`,
+waits for the job of a run on its serial line (`guest-job`,
+`machine/guest/job.rs`), and runs the command with `guest-init --attach`
+(`initns/hold.rs`). A later run of the same image and guest shape starts
+QEMU with `-incoming` and that state; a state that is missing, stale or
+does not load gives a boot. On the incus tier, `run -d` and `create` with the flag leave
 `lxc.init.cmd` out, so that `/sbin/init` of the image is PID 1 of the
 instance; podvm waits for `systemctl is-system-running` and runs the
 command by the exec API (`crates/podvm/src/incus/systemd.rs`, T-1993). The

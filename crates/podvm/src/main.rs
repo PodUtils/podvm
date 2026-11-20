@@ -128,6 +128,7 @@ fn main() -> std::process::ExitCode {
         Some("guest-hold") => exit(incus::hold(rest)),              // an incus init, T-1718
         Some(initns::VERB) => exit(initns::main(rest)),             // an init of the image, T-2002
         Some("guest-9p") => exit(machine::guest::vol::main(rest)),  // in a guest, T-1723
+        Some("guest-job") => exit(machine::guest::job::guest_main(rest)), // in a guest, T-2008
         Some("guest-tty") => exit(machine::guest::tty::guest_main(rest)), // in a guest, T-1723
         Some("tree-prefill") => exit(run::spare::main(rest)),       // TODO/image.md T-1781
         Some("windows") => exit(windows::windows(rest)),
