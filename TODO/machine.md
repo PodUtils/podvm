@@ -5975,7 +5975,7 @@ Reproduce under TCG as a user with no root, with an emulator that answers late: 
 
 ## Decision
 
-(1) The fix stays in podvm on podcrates `v0.79.0`. podcrates@0ac7745 (the ask of COORD-217) gives `Monitor::ask_within` and `Monitor::late`, which read a late answer on the same connection, but no tag holds it yet, and its `Monitor::connect` still calls a `connect` with no bound. An ask for podcrates: a bound for that `connect`. (2) A monitor that does not come back within the bound of the save takes no second migration through the pipe: the run then says why, and boots a guest with no state.
+(1) The fix stays in podvm on podcrates `v0.79.0`. podcrates@0ac7745 (the ask of COORD-217) gives `Monitor::ask_within` and `Monitor::late`, which read a late answer on the same connection, but no tag holds it yet, and its `Monitor::connect` still calls a `connect` with no bound. An ask for podcrates: a bound for that `connect` (#633, COORD-222). (2) A monitor that does not come back within the bound of the save takes no second migration through the pipe: the run then says why, and boots a guest with no state.
 
 ## Prove
 
@@ -5995,4 +5995,4 @@ Experiment 465 (`experiments/465-init-image.sh`): each run of clause 9 takes the
 
 Experiment 465 with the fix, as root for that user (`PODVM_465_USER`), under TCG, with the stand-in of a delegated cgroup2 directory on the hybrid hierarchy of the host: "THE INIT OF THE IMAGE RUNS" in 327 s (`experiments/results/init-image.txt`). Clause 2 gives 7 in 34 s and saves one state; clause 3 gives 7 in 11 s from that state. In clause 9 each run has the `uid_map` of the guest (`0 0 4294967295`): the run that saves, 39 s; the cut state, 33 s; the failed load, 29 s, one line and one marker; `PODVM_MACHINE_STATE=0`, 32 s; `maybe`, 125. No emulator stays. A first run of the experiment with a build with no interposer object failed only clause 4: the userland rung declines a payload with a volume when podvm has no interposer.
 
-Remaining: (1) the run of `kvm.yml` job `init` of the Prove: the late answer under KVM is the case that the stall stands in for. (2) A SIGTERM that comes during a save waits for the end of the save (at most about 7 minutes with each bound, an estimate from the bounds); the drive reads the signal after it. (3) The ask for podcrates of the Decision, and the take of `Monitor::ask_within` when podcrates tags it.
+Remaining: (1) the run of `kvm.yml` job `init` of the Prove: the late answer under KVM is the case that the stall stands in for. (2) A SIGTERM that comes during a save waits for the end of the save (at most about 7 minutes with each bound, an estimate from the bounds); the drive reads the signal after it. (3) The ask for podcrates of the Decision (#633), and the take of `Monitor::ask_within` when podcrates tags it.

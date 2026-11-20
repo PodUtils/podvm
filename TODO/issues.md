@@ -520,11 +520,13 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #624 | COORD-218: pod-supervise's end_tree waits on one pidfd at a time; a tree with the init of a PID namespace waits the whole TREE_KILL_MS (to podcrates) | open | T-2018 |
 | #625 | [gh action] requested | closed (on 55a3dce: gate 44749181258, arm 44749187795, secrets, issue-sync passed; kvm 44749207855 init failed: the save under KVM, fixed in aae49a5, and experiment 465 on a host with a user manager, fixed in 9cec096) | the gate, arm, secrets, issue-sync and kvm.yml init runs of 289b9d1 (T-2002, T-2008, T-2017) |
 | #626 | [gh action] requested | closed (on efe22d2: gate 44786689680 and arm 44786695255 passed; kvm 44786700578 init: experiments 468 and 469 passed, the save under KVM works; experiment 465 failed: clause 2 hung 900 s on the route ns to machine for uid 1001, and the runs of clause 9 took the namespace rung) | the gate, arm and kvm.yml init runs of 9cec096 (T-2008, T-2040) |
-| #627 | [gh action] requested | open | the beta gate of c20f245, the release commit of 0.2.0-beta.37: gate, workloads, the nightly trial, arm and kvm.yml init (T-1949) |
+| #627 | [gh action] requested | closed (on bf0608c: gate 44792957207, workloads 44792962555 and arm 44792973988 passed; the nightly trial 44792968495 failed on the licence text of asn1-rs-impl 0.2.0, fixed in 3924ccd; kvm 44792979845 ran the code with the hang of the save, cancelled; again in #632) | the beta gate of c20f245, the release commit of 0.2.0-beta.37: gate, workloads, the nightly trial, arm and kvm.yml init (T-1949) |
 | #628 | [gh action] requested | closed (on 3924ccd: gate 44797433321 and the nightly trial 44797438827 passed) | the gate and the nightly trial of 3924ccd, after the nightly trial 44792968495 failed on the licence text of asn1-rs-impl 0.2.0 (T-1949) |
 | #629 | COORD-219: the memory of a microvm guest for an image of N unpacked bytes (to podrunner) | open | T-1922, T-1994, T-2047 |
 | #630 | COORD-220: logs streams the log and takes --limit-bytes N (to podrunner) | open | T-2046 |
 | #631 | COORD-221: a streamed read of a log in pod-supervise, and a ranged read of a file in pod-incus (to podcrates) | open | T-2046 |
+| #632 | [gh action] requested | open | the beta gate of 7324fe0: gate, workloads, the nightly trial, arm and kvm.yml init, after the fix of the hang of the save (T-1949, T-2046, T-2048) |
+| #633 | COORD-222: pod-guest's Monitor::connect has no bound; QEMU queues one client (to podcrates) | open | T-2048 |
 
 ## Messages whose title does not start with COORD-NNN
 
