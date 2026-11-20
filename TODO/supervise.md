@@ -2105,3 +2105,33 @@ pid 1 sets `PR_SET_PDEATHSIG` to SIGKILL at its start, and clears it when pid 2 
 ## Done
 
 **Done (2026-11-19).** `userns/sigrelay.rs::die_with_outer`, called twice in `userns::enter_if`. Measured as uid 1000 on the cloud host: before the change a SIGKILL of the outer process left three processes of a run with podvm's init, and with `--podvm-init=image` also the supervisor, systemd and its services; after it none stays in both cases (experiment 465, clause 7), a run that ends by itself still removes its `--rm` tree (the reaper stays), and the tree of a killed run stays for `podvm rm`, as after each SIGKILL. The empty cgroups of a killed run with the init of the image go at the next such run, when they are older than 600 s (`initns/cgroup.rs::sweep`).
+
+
+# T-2018: The launcher waits for one process of the tree at a time, and the init of a PID namespace waits for the reap of a process that the launcher holds
+
+**Source:** the work of T-2002 (2026-11-20); `pod_supervise::launcher::tree::end_tree` of podcrates `v0.79.0`
+**Category:** supervise
+**Milestone:** none
+**Priority:** P3
+**Effort:** S
+**Status:** open
+
+## Problem
+
+At the end of a payload the launcher sends SIGKILL to each descendant, then waits on the pidfd of each one in turn, up to 5 s (`TREE_KILL_MS`), and reaps its children only at the start of the next round. A payload that is the parent of the init of a PID namespace and of a second process of that namespace (the first form of the supervisor of T-2002) then stays for 5 s: the kernel lets the init of a PID namespace end only when each process of the namespace is reaped (`zap_pid_ns_processes`), the second process went to the launcher (the subreaper) as a zombie, and the launcher waited on the pidfd of the init. `rm -f` took 5 s and kept the record with "1 process(es) of its tree stayed after SIGKILL" in some runs (a race between the first reap of the launcher and the end of the init).
+
+## Premise
+
+Measured on the cloud host as uid 1000 (2026-11-20): `run -d --podvm-init=image IMAGE sh -c 'while :; do sleep 1; done'`, `stop`, `start`, `rm -f` with the first form of the supervisor: `rm -f` took 5.0 s and printed the line. podvm no longer has the case: its supervisor is PID 1 of a PID namespace of its own (T-2002), and five `rm -f` in a row take less than 1 s each (experiment 465, clause 10). Each other payload with a process of a PID namespace whose parent is outside it meets the same wait.
+
+## Approach
+
+Ask podcrates (rule 2a: the launcher is `pod-supervise`): in `end_tree`, wait on each pidfd of the tree in one `ppoll`, and reap the children that ended after each wake, so that no zombie of the tree waits for the bound.
+
+## Decision
+
+-
+
+## Prove
+
+A test of `pod-supervise`: a payload that opens a PID namespace, starts its init and one more child in it, and ends on SIGKILL: the end of the tree takes less than 1 s, and the count of the processes that stayed is 0.

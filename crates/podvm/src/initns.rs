@@ -24,11 +24,17 @@ use std::sync::OnceLock;
 
 pub mod boot;
 pub mod cgroup;
+pub mod detach;
+pub mod enter;
+pub mod groups;
 pub mod hold;
 pub mod join;
 pub mod mounts;
+pub mod pty;
 pub mod sandbox;
 pub mod scope;
+pub mod stays;
+pub use groups::image_groups;
 
 /// The init of an image, as incus and each container manager start it.
 pub const INIT: &str = "/sbin/init";
@@ -41,6 +47,9 @@ pub const LOG_VAR: &str = "PODVM_INIT_LOG";
 /// The variable of a run whose tree and volumes keep nothing (`--rm`, and
 /// each volume read-only): the init ends with SIGKILL (T-2010).
 pub const DISCARD_VAR: &str = "PODVM_INIT_DISCARD";
+/// The variable of a run with `-t`: the command gets a pty of the devpts
+/// of the init, so that its terminal has a name in the image.
+pub const TTY_VAR: &str = "PODVM_INIT_TTY";
 
 /// True where [`decide`] found each part of the namespace rung.
 static EARLY: AtomicBool = AtomicBool::new(false);
@@ -73,8 +82,8 @@ pub struct Host {
 pub fn refusal(h: &Host) -> Option<String> {
     if !h.userns {
         return Some(
-            "the namespace rung boots an init of the image for a foreground run of a \
-             caller that is not uid 0, with PODVM_USERNS not 0"
+            "the namespace rung boots an init of the image for a caller that is not uid 0, \
+             with PODVM_USERNS not 0"
                 .to_string(),
         );
     }
@@ -104,19 +113,12 @@ pub fn decide(argv: &[String], uid: u32) -> bool {
     let var = std::env::var(crate::userns::VAR).ok();
     let userns = crate::userns::wanted(argv, uid, var.as_deref());
     let range = crate::userns::range_available();
-    let mut cgroup = cgroup::delegated();
     // TODO/enter.md T-2004: where the rest holds, the user manager of
     // systemd can give the missing subtree.
-    if let (true, true, Err(first)) = (userns, range, &cgroup) {
-        cgroup = match scope::ask() {
-            Ok(()) => cgroup::delegated(),
-            Err(why) => Err(format!("{first}; {why}")),
-        };
-    }
     let host = Host {
         userns,
         range,
-        cgroup,
+        cgroup: detach::delegated(userns && range),
     };
     match refusal(&host) {
         Some(why) => {
@@ -201,15 +203,14 @@ pub fn route(verb: &str, mut o: crate::run::Opts) -> crate::run::Opts {
 /// The mark of an init of the image in the environment of a run, and its
 /// console on stderr under `--verbose`. A value of the caller is removed
 /// first: only the flag sets the mark.
-pub fn mark_env(env: &mut Vec<String>, init_image: bool, verbose: bool, discard: bool) {
+pub fn mark_env(env: &mut Vec<String>, init_image: bool, verbose: bool, discard: bool, tty: bool) {
     env.retain(|e| !e.starts_with("PODVM_INIT"));
     if init_image {
         env.push(MARK.to_string());
-        if verbose {
-            env.push(format!("{LOG_VAR}=1"));
-        }
-        if discard {
-            env.push(format!("{DISCARD_VAR}=1"));
+        for (on, var) in [(verbose, LOG_VAR), (discard, DISCARD_VAR), (tty, TTY_VAR)] {
+            if on {
+                env.push(format!("{var}=1"));
+            }
         }
     }
 }
@@ -223,62 +224,6 @@ pub fn discards(rm: bool, volumes: &[podvm_enter::userland::Volume], ro: &[Strin
 /// True where the prepared foreground run boots the init here.
 pub fn takes(env: &[String]) -> bool {
     native() && env.iter().any(|e| e == MARK)
-}
-
-/// The most bytes of `/etc/passwd` or `/etc/group` of an image that podvm
-/// reads for the groups of a user.
-const MAX_ACCOUNTS: u64 = 4 << 20;
-/// The most supplementary groups that a command gets.
-const MAX_GROUPS: usize = 256;
-
-/// TODO/enter.md T-2002: the supplementary groups that the image gives
-/// the user of `ids`, as `login` and docker read them: each group of
-/// `group` (the text of `/etc/group`) that lists, as a member, a name of
-/// `passwd` with the uid and the primary gid of `ids`. A user whose `--user`
-/// names another group than its primary one gets none, as in docker. The
-/// primary group is not in the list. A line that is not a record is not
-/// read.
-pub fn groups_of(passwd: &str, group: &str, ids: (u32, u32)) -> Vec<u32> {
-    let id = |f: Option<&str>| f.and_then(|x| x.trim().parse::<u32>().ok());
-    let names: Vec<&str> = passwd
-        .lines()
-        .filter_map(|l| {
-            let mut f = l.split(':');
-            let name = f.next().filter(|n| !n.is_empty() && !n.starts_with('#'))?;
-            f.next()?;
-            (id(f.next()) == Some(ids.0) && id(f.next()) == Some(ids.1)).then_some(name)
-        })
-        .collect();
-    let mut out: Vec<u32> = group
-        .lines()
-        .filter_map(|l| {
-            let mut f = l.split(':');
-            f.next().filter(|n| !n.is_empty() && !n.starts_with('#'))?;
-            f.next()?;
-            let gid = id(f.next())?;
-            let members = f.next()?;
-            (gid != ids.1 && members.split(',').any(|m| names.contains(&m.trim()))).then_some(gid)
-        })
-        .collect();
-    out.sort_unstable();
-    out.dedup();
-    out.truncate(MAX_GROUPS);
-    out
-}
-
-/// [`groups_of`] for the tree `rootfs`. A file that is missing, too large
-/// or not text gives the groups that its readable part names, or none: the
-/// command then runs with its primary group.
-fn image_groups(rootfs: &str, ids: (u32, u32)) -> Vec<u32> {
-    use std::io::Read;
-    let read = |name: &str| {
-        let mut bytes = Vec::new();
-        if let Ok(f) = std::fs::File::open(Path::new(rootfs).join(name)) {
-            let _ = f.take(MAX_ACCOUNTS).read_to_end(&mut bytes);
-        }
-        String::from_utf8_lossy(&bytes).into_owned()
-    };
-    groups_of(&read("etc/passwd"), &read("etc/group"), ids)
 }
 
 /// The arguments of the supervisor for a run on the namespace rung.
@@ -361,6 +306,8 @@ pub fn parse(args: &[String]) -> Result<boot::Spec, String> {
                     .ok_or(format!("--bind takes /tmp/GUEST:/HOST[:ro], not {v:?}"))?;
                 s.tmp.get_or_insert_with(Vec::new).push(b);
             }
+            "--state" => s.state = Some(PathBuf::from(value()?)),
+            "--tty" => s.tty = true,
             "--hold" => s.hold = Some(PathBuf::from(value()?)),
             "--attach" => s.attach = Some(PathBuf::from(value()?)),
             "--verbose" => s.verbose = true,
@@ -391,6 +338,7 @@ pub fn main(args: &[String]) -> i32 {
         Ok(mut spec) => {
             spec.verbose |= std::env::var(LOG_VAR).is_ok_and(|v| v == "1");
             spec.discard |= std::env::var(DISCARD_VAR).is_ok_and(|v| v == "1");
+            spec.tty |= std::env::var(TTY_VAR).is_ok_and(|v| v == "1");
             match (spec.hold.clone(), spec.attach.clone()) {
                 (Some(file), _) => hold::hold(&spec, &file),
                 (None, Some(file)) => hold::attach(&spec, &file),

@@ -679,6 +679,8 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2014](enter.md) | P2 | S | none | enter | done | On the userland rung, `--podvm-confine read=/` does not cover a volume |
 | [T-2015](enter.md) | P2 | M | none | enter | done | On the syscall tier, the interpreter of a `#!` script that the payload starts is not checked against `exec=` |
 | [T-2016](machine.md) | P2 | M | none | machine | partial | QEMU before 10.0.4 can end on SIGSEGV in the boot of a guest with more than one vCPU under TCG |
+| [T-2017](enter.md) | P1 | M | none | enter | partial | A run with the init of the image on the namespace rung dropped `--podvm-confine`, `--ulimit`, no-new-privileges and `--device` with no line |
+| [T-2018](supervise.md) | P3 | S | none | supervise | open | The launcher waits for one process of the tree at a time, and the init of a PID namespace waits for the reap of a process that the launcher holds |
 | [T-2040](enter.md) | P1 | M | none | enter | open | On the userland rung, a payload writes a `:ro` volume through its host path |
 | [T-2041](machine.md) | P1 | M | none | machine | open | On the machine tier, a SIGTERM, SIGINT or SIGHUP to a foreground run ends podvm and does not reach the payload |
 | [T-2042](machine.md) | P1 | M | none | machine | open | After `run -d --podvm-tier=machine`, `inspect`, `kill`, `wait` and the filters of `ps` do not find the container |
@@ -687,7 +689,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-618 entries: 27 open, 37 partial, 5 blocked, 549 done.
+620 entries: 28 open, 38 partial, 5 blocked, 549 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -697,10 +699,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 7 | 17 | 0 | 249 | 273 |
+| P1 | 7 | 18 | 0 | 249 | 274 |
 | P2 | 15 | 15 | 4 | 183 | 217 |
-| P3 | 5 | 5 | 1 | 42 | 53 |
-| **All** | 27 | 37 | 5 | 549 | 618 |
+| P3 | 6 | 5 | 1 | 42 | 54 |
+| **All** | 28 | 38 | 5 | 549 | 620 |
 
 ## Work order
 

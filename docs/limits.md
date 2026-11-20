@@ -391,6 +391,41 @@ C26). Experiment 465 measures each line below as uid 1000.
   bus, podvm asks it for a scope with `Delegate=yes` (`busctl` of the
   host, T-2004, experiment 466); the init of the image then gets no
   controller of cgroup2.
+- `run -d` and `create` with no tier take the namespace rung only, for a
+  caller that is not uid 0 (T-2002, experiment 465, clause 10). The
+  supervisor of the init is PID 1 of a PID namespace of its own, under a
+  child of the launcher in a user namespace with the range; `run -d`
+  returns when the boot is complete, and a boot
+  that fails ends it with 125 and the line of the failure, with no record
+  left. `exec` joins the namespaces of the init: it sees the units and
+  the bus, runs as the user of `-u` with the groups of the image, and
+  with `-t` gets a pty of the init. `stop` gives the command SIGTERM;
+  when the command ends, the init gets its power off (SIGRTMIN+4, 10 s),
+  and the end of the supervisor ends each process of the PID namespace.
+  `start` and `restart` boot the init again, from a cgroup that the
+  caller can write. Where the host lacks a part, the verb refuses by
+  name: no other route keeps an init for a container that stays, except
+  `--podvm-tier=incus`. A `-v` at or under `/tmp` lands on the tmpfs
+  that the init gets on `/tmp`. An `exec` with no `-t` has the
+  descriptors of the caller, and a terminal among them has no name in
+  the image. A command of `exec` runs in the cgroup of the run where
+  the host lets the caller move a process there, else in the cgroup of
+  the caller. A `rm -f`, a `kill` or the bound of `stop` ends the
+  supervisor with SIGKILL, and each process of the run with it; the init
+  then gets no power off.
+- A run with the init on the namespace rung, in the foreground or as a
+  container that stays, refuses `--podvm-confine`, `--ulimit`,
+  `--security-opt no-new-privileges` and `--device` by name with 125
+  (T-2017): the supervisor of the init starts the init and the command
+  with no entry of pod-enter, and before 2026-11-20 it dropped each of
+  them with no line. The runsc tier and the machine tier are not measured
+  for these flags.
+- With `-t`, the command of a run with the init on the namespace rung
+  gets a pty of the devpts instance of the init, as the leader of a
+  session of its own: `tty` names `/dev/pts/N`, and job control works.
+  podvm relays the terminal of the run to that pty, with its window size
+  (looked at each 250 ms). In a guest of the machine tier the terminal
+  is `/dev/hvc0`, as with podvm's init.
 - The init is PID 1 of a PID namespace, not of the host. It has a mount,
   a cgroup, an IPC and a UTS namespace of its own and the network of the
   host. `/sys` is read-only, `/dev` is a tmpfs with the nodes `null`,

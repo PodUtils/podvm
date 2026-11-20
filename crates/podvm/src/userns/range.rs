@@ -213,14 +213,22 @@ pub fn cp_in_range(s: &podvm_image::Store, a: &str, b: &str, args: &[String]) ->
     )
 }
 
+/// Open a user namespace with the subordinate range for this process, and
+/// no other namespace: the caller is 0 in it and holds each id of the
+/// range. True where the maps hold the range.
+///
+/// ⛔ With one thread only (`unshare(CLONE_NEWUSER)`).
+pub fn enter_alone() -> bool {
+    // SAFETY: getuid and getgid cannot fail.
+    let (uid, gid) = unsafe { (super::getuid(), super::getgid()) };
+    host_plan().is_some_and(|p| super::with_range(&p, uid, gid, super::CLONE_NEWUSER))
+        && super::owners::TOP.load(std::sync::atomic::Ordering::Relaxed) > 0
+}
+
 /// [`AGAIN_ARG`], first in `main` with one thread: the namespace with the
 /// range, then the verb. With no range, podvm refuses (125).
 fn serve_again(argv: &[String]) {
-    // SAFETY: getuid and getgid cannot fail.
-    let (uid, gid) = unsafe { (super::getuid(), super::getgid()) };
-    let entered = host_plan()
-        .is_some_and(|p| super::with_range(&p, uid, gid, super::CLONE_NEWUSER))
-        && super::owners::TOP.load(std::sync::atomic::Ordering::Relaxed) > 0;
+    let entered = enter_alone();
     let verb = argv.get(2).map(String::as_str).unwrap_or("");
     if !entered {
         eprintln!("podvm {verb}: the user namespace with the subordinate range did not open");

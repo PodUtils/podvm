@@ -252,7 +252,10 @@ fn a_save_leaves_a_whole_state_or_nothing() {
         let (saved, runs) = save(&sock, &f, "print", 3072, first, "u1");
         let seen = server.join().unwrap();
         assert_eq!(saved.is_ok(), want_ok, "{saved:?}");
-        assert_eq!(runs, want_runs);
+        assert_eq!(runs.is_ok(), want_runs, "{runs:?}");
+        if let Err(why) = &runs {
+            assert!(why.contains("cont"), "the request is not named: {why}");
+        }
         if peer != Peer::Leaves {
             assert_eq!(seen.first().map(String::as_str), Some("qmp_capabilities"));
             assert!(
@@ -268,7 +271,16 @@ fn a_save_leaves_a_whole_state_or_nothing() {
                 let meta = valid(&f, "print").expect("the record of the new state");
                 assert_eq!((meta.mem_mib, meta.transport), (3072, transport));
             }
-            Err(e) => assert!(e.contains(error), "{error:?} is not in {e:?}"),
+            Err(e) => {
+                assert!(e.contains(error), "{error:?} is not in {e:?}");
+                // Each failed migration names its transport, and the second
+                // path after the first one.
+                assert!(e.contains("through file"), "no transport in {e:?}");
+                if peer == Peer::Fails {
+                    assert!(e.contains("then through pipe"), "{e:?}");
+                    assert!(e.contains("MiB written"), "no size in {e:?}");
+                }
+            }
         }
         let partial: Vec<_> = std::fs::read_dir(d.join("machine"))
             .unwrap()
@@ -400,4 +412,66 @@ fn the_script_of_the_guest_and_the_job_of_a_run_are_two_texts() {
     assert!(plain.contains("set -- 'sh' '-c' 'exec \"$@\"; /podvm/podvm guest-9p x' 'sh' 'true'\n"));
     assert!(plain.contains("export A='the \"$@\" of a variable'\n"));
     assert!(plain.contains("--cgroup auto --cwd \"$PWD\" -- \"$@\" >/podvm-out"));
+}
+
+/// TODO/machine.md T-2008: a failure of the save names its cause. A
+/// request with no answer within the bound of the monitor is not a refusal
+/// and not an end of the connection: the line says what the emulator does
+/// then. A failed migration gives the text of the emulator, and each
+/// reason for which the emulator blocks a migration (a CPU feature of
+/// `-cpu host` under KVM).
+#[test]
+fn a_failure_of_the_save_names_the_request_and_the_reason() {
+    use pod_core::{Class, Failure, Stage};
+    for (class, text, want, not) in [
+        (
+            Class::Timeout,
+            "qmp read: Resource temporarily unavailable (os error 11)",
+            "gave no answer to query-migrate",
+            "query-migrate: qmp",
+        ),
+        (
+            Class::Protocol,
+            "qmp refused x: {\"error\": {\"desc\": \"no\"}}",
+            "query-migrate: qmp refused",
+            "gave no answer",
+        ),
+        (
+            Class::Unavailable,
+            "qmp closed the connection",
+            "query-migrate: qmp closed",
+            "gave no answer",
+        ),
+    ] {
+        let line = super::save::asked("query-migrate", &Failure::new(Stage::Host, class, text));
+        assert!(line.contains(want), "{want:?} is not in {line:?}");
+        assert!(!line.contains(not), "{not:?} is in {line:?}");
+        assert!(
+            line.contains(text),
+            "the text of the monitor is not in {line:?}"
+        );
+    }
+    for (line, status, want) in [
+        (
+            r#"{"return":{"status":"failed","error-desc":"Unable to write to file: No space left on device"}}"#,
+            "failed",
+            "No space left on device",
+        ),
+        (
+            r#"{"return":{"status":"failed","blocked-reasons":["State blocked by non-migratable CPU device (invtsc flag)","9p is mounted"]}}"#,
+            "failed",
+            "the emulator blocks a migration: State blocked by non-migratable CPU device (invtsc flag); 9p is mounted",
+        ),
+        (
+            r#"{"return":{"status":"failed"}}"#,
+            "failed",
+            "the emulator gave no reason",
+        ),
+        (r#"{"return":{"status":"active","ram":{"transferred":1}}}"#, "active", ""),
+        ("no json", "", "the emulator gave no reason"),
+    ] {
+        let (got, why) = super::save::migration(line);
+        assert_eq!(got, status, "{line}");
+        assert!(why.contains(want), "{want:?} is not in {why:?}");
+    }
 }

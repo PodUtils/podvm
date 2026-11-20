@@ -36,7 +36,7 @@ unsafe extern "C" {
 /// before, pid 1, pid 2 and the payload stayed. `on` is false from the
 /// moment pid 2 ended: the outer process then exits first by design, and
 /// pid 1 stays as the reaper of the helpers (T-1781).
-pub(in crate::userns) fn die_with_outer(on: bool) {
+pub fn die_with_outer(on: bool) {
     const PR_SET_PDEATHSIG: i32 = 1;
     const SIGKILL: u64 = 9;
     // SAFETY: prctl with integers. The kernel delivers a SIGKILL of an
@@ -86,6 +86,15 @@ pub(in crate::userns) fn relay_signals() {
             }
         }
     }
+}
+
+/// TODO/enter.md T-2002: wait for the child `child` of this process and
+/// relay each shutdown signal to it: its exit code, or 128 and the signal.
+/// The parent of the supervisor of a detached init of the image.
+pub fn wait_relaying(child: i32) -> i32 {
+    super::CHILD.store(child, std::sync::atomic::Ordering::Relaxed);
+    relay_signals();
+    super::wait_for(child)
 }
 
 /// TODO/cli.md T-2001 OP-05: the outer process relays each signal that

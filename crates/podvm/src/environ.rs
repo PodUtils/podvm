@@ -319,6 +319,7 @@ pub const INTERNAL: &[&str] = &[
     "PODVM_INIT",
     "PODVM_INIT_DISCARD",
     "PODVM_INIT_LOG",
+    "PODVM_INIT_TTY",
     "PODVM_LIB_PATH",
     "PODVM_MACHINE_KEEPER",
     "PODVM_MAPS",

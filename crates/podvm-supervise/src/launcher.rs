@@ -32,6 +32,8 @@ struct Kept {
     _held: podvm_image::store::Lock,
     _root: RootDir,
     _child: podvm_enter::Child,
+    // TODO/enter.md T-2002: last, after the end of each process of the run.
+    _init: Option<Box<dyn std::any::Any>>,
 }
 
 /// TODO/cli.md T-1825: `pod_supervise` drops `Payload::keep` after it
@@ -52,6 +54,44 @@ impl Drop for Finish {
             let _ = crate::report::finish(&self.report, &c);
         }
     }
+}
+
+/// TODO/enter.md T-2002: what the entry of a container with the init of
+/// its image (`--podvm-init=image` on the namespace rung) gets.
+pub struct InitJob<'a> {
+    pub container: &'a Container,
+    /// The descriptors of the payload, as [`Launch::pass`] gives them.
+    pub pass: &'a [(i64, i64)],
+    /// The file of the state of the init, beside the record.
+    pub state: std::path::PathBuf,
+}
+
+/// What the entry of [`InitJob`] started.
+pub struct InitStarted {
+    /// The pid of the supervisor of the init, a child of the launcher.
+    pub pid: i64,
+    /// What the launcher drops after the end of the run (the cgroups).
+    pub keep: Box<dyn std::any::Any>,
+}
+
+/// The entry of [`InitJob`]: the binary sets it at its start. It starts the
+/// supervisor of the init as a child of the launcher, and waits until the
+/// boot of the init is complete; an `Err` is the line of the failure, with
+/// no process left.
+pub static INIT_ENTRY: std::sync::OnceLock<InitEntry> = std::sync::OnceLock::new();
+
+/// The type of [`INIT_ENTRY`].
+pub type InitEntry = fn(&InitJob<'_>) -> Result<InitStarted, String>;
+
+/// The mark of a container whose PID 1 is the init of its image.
+pub const INIT_MARK: &str = "PODVM_INIT=image";
+/// The name of the state file of such a container, in its directory.
+pub const INIT_STATE: &str = "init.state";
+
+/// True where the record asks for the init of the image on the namespace
+/// rung: the launcher then starts no payload of pod-enter.
+pub fn init_of_image(container: &Container) -> bool {
+    container.rung == "namespace" && container.env.iter().any(|e| e == INIT_MARK)
 }
 
 /// podvm's entry for `pod_supervise::start`: it runs in the launcher, and
@@ -167,7 +207,21 @@ fn enter_in_launcher(
     // `spawn_userland`; else T-1339: the rung the probe selects, decided
     // where the payload is entered. The fallback line joins the container
     // log: the launcher's stderr is /dev/null.
-    let child = if container.userland_exec.is_empty() {
+    let mut init = None;
+    let child = if init_of_image(container) {
+        // TODO/enter.md T-2002: the init of the image is PID 1 of a PID
+        // namespace, and the command of the record joins it after the boot.
+        let entry = INIT_ENTRY
+            .get()
+            .ok_or("this program has no entry for the init of an image (TODO/enter.md T-2002)")?;
+        let started = entry(&InitJob {
+            container,
+            pass: &plan.fds.pass,
+            state: table::dir(store, &container.id).join(INIT_STATE),
+        })?;
+        init = Some(started.keep);
+        podvm_enter::Child::of(started.pid)
+    } else if container.userland_exec.is_empty() {
         // TODO/enter.md T-1985: the write table is of the userland rung.
         crate::table::set_write_table(&mut plan.env, None)?;
         let findings = podvm_probe::run();
@@ -216,6 +270,7 @@ fn enter_in_launcher(
             _held: held,
             _root: root,
             _child: child,
+            _init: init,
         }),
     })
 }

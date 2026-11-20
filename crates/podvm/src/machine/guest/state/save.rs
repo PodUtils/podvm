@@ -14,50 +14,129 @@ use super::{Transport, READY_BOUND, SAVE_BOUND};
 pub struct Saved {
     pub bytes: u64,
     pub took: Duration,
+    /// The longest time that the monitor took for one answer during the
+    /// migration. The emulator answers no request while it holds its lock
+    /// for the last part of the state; the monitor of `pod-guest` waits
+    /// 5 s for an answer.
+    pub longest: Duration,
 }
 
-/// The status of a migration in a response of `query-migrate`.
+/// The status of a migration in a response of `query-migrate`, and why it
+/// failed: the text of the emulator, and each reason for which it blocks a
+/// migration (`blocked-reasons`: a device or a CPU feature of `-cpu host`
+/// that has no state to save).
 pub(super) fn migration(line: &str) -> (String, String) {
     let v: serde_json::Value = serde_json::from_str(line).unwrap_or_default();
     let r = &v["return"];
-    (
-        r["status"].as_str().unwrap_or_default().to_string(),
-        r["error-desc"].as_str().unwrap_or_default().to_string(),
-    )
+    let mut why = r["error-desc"].as_str().unwrap_or_default().to_string();
+    let blocked: Vec<&str> = r["blocked-reasons"]
+        .as_array()
+        .map(|a| a.iter().filter_map(|x| x.as_str()).collect())
+        .unwrap_or_default();
+    if !blocked.is_empty() {
+        why.push_str(&format!(
+            "; the emulator blocks a migration: {}",
+            blocked.join("; ")
+        ));
+    }
+    if why.is_empty() {
+        why.push_str("the emulator gave no reason");
+    }
+    (r["status"].as_str().unwrap_or_default().to_string(), why)
 }
 
-/// One `migrate` of the guest to `part`, to its end.
-pub(super) fn migrate(m: &mut Monitor, transport: Transport, part: &str) -> Result<(), String> {
+/// True for a request that the monitor did not answer within its bound for
+/// one read: no refusal, and no end of the connection.
+fn no_answer(e: &pod_core::Failure) -> bool {
+    e.class == pod_core::Class::Timeout
+}
+
+/// What one failed request of the monitor means for a line of stderr: the
+/// request, and for a missing answer what the emulator does then.
+pub(super) fn asked(what: &str, e: &pod_core::Failure) -> String {
+    if no_answer(e) {
+        format!(
+            "the monitor of the emulator gave no answer to {what} within its bound ({e}): the \
+             emulator holds its lock (it writes the last part of the state to a slow disk), or \
+             it hangs"
+        )
+    } else {
+        format!("{what}: {e}")
+    }
+}
+
+/// The size of the partial file of a save and the free bytes of its file
+/// system, for a line of a failure: a full disk and a slow disk show here.
+fn disk(part: &str) -> String {
+    let mib = |b: u64| b.div_ceil(1 << 20);
+    let wrote = std::fs::metadata(part).map_or("no file".to_string(), |m| {
+        format!("{} MiB written", mib(m.len()))
+    });
+    let dir = Path::new(part).parent().unwrap_or(Path::new("/"));
+    let free = podvm_image::space::read(&dir.to_string_lossy())
+        .map_or("free space not read".to_string(), |h| {
+            format!("{} MiB free", mib(h.free.bytes))
+        });
+    format!("{wrote}, {free} in {}", dir.display())
+}
+
+/// One `migrate` of the guest to `part`, to its end: the longest time of
+/// one answer of the monitor. An error names the transport, the request
+/// that failed, the status before it, the time, and the disk.
+pub(super) fn migrate(
+    m: &mut Monitor,
+    transport: Transport,
+    part: &str,
+) -> Result<Duration, String> {
     let uri = transport.save_uri(part);
+    let via = transport.word();
     let body = serde_json::json!({"execute": "migrate", "arguments": {"uri": uri}}).to_string();
-    m.ask(&body).map_err(|e| e.to_string())?;
-    let end = Instant::now() + SAVE_BOUND;
+    m.ask(&body)
+        .map_err(|e| format!("through {via}: {}", asked("migrate", &e)))?;
+    let started = Instant::now();
+    let end = started + SAVE_BOUND;
+    let mut longest = Duration::ZERO;
+    let mut before = "none".to_string();
     loop {
-        let line = m
-            .ask("{\"execute\":\"query-migrate\"}")
-            .map_err(|e| e.to_string())?;
+        let at = Instant::now();
+        let line = m.ask("{\"execute\":\"query-migrate\"}").map_err(|e| {
+            format!(
+                "through {via}: {} {:.1} s after the start of the migration (status {before:?} \
+                 before; {})",
+                asked("query-migrate", &e),
+                started.elapsed().as_secs_f64(),
+                disk(part)
+            )
+        })?;
+        longest = longest.max(at.elapsed());
         let (status, why) = migration(&line);
         match status.as_str() {
-            "completed" => return Ok(()),
+            "completed" => return Ok(longest),
             "failed" | "cancelled" => {
-                return Err(format!("the migration is {status}: {why}"));
+                return Err(format!(
+                    "through {via}: the migration is {status} after {:.1} s: {why} ({})",
+                    started.elapsed().as_secs_f64(),
+                    disk(part)
+                ));
             }
             _ if Instant::now() >= end => {
                 let _ = m.ask("{\"execute\":\"migrate_cancel\"}");
                 return Err(format!(
-                    "the migration did not end in {} s (status {status:?})",
-                    SAVE_BOUND.as_secs()
+                    "through {via}: the migration did not end in {} s (status {status:?}; {})",
+                    SAVE_BOUND.as_secs(),
+                    disk(part)
                 ));
             }
             _ => std::thread::sleep(Duration::from_millis(25)),
         }
+        before = status;
     }
 }
 
 /// Save the state of the guest behind the QMP socket `qmp` into the files
 /// of `f`, and let the guest go on. `unique` names the partial files of
-/// this run. The second value is false where the guest does not run after
-/// the save: the caller then boots another one.
+/// this run. The second value is the reason where the guest does not run
+/// after the save: the caller then boots another one.
 pub fn save(
     qmp: &Path,
     f: &Files,
@@ -65,12 +144,19 @@ pub fn save(
     mem_mib: u64,
     first: Transport,
     unique: &str,
-) -> (Result<Saved, String>, bool) {
+) -> (Result<Saved, String>, Result<(), String>) {
     let started = Instant::now();
     let mut m = match Monitor::connect(qmp, Duration::from_secs(10)) {
         Ok(m) => m,
         // Nothing was asked of the emulator: its guest runs as before.
-        Err(e) => return (Err(e.to_string()), true),
+        Err(e) => {
+            let why = format!(
+                "the monitor of the emulator ({}): {}",
+                qmp.display(),
+                asked("the connection", &e)
+            );
+            return (Err(why), Ok(()));
+        }
     };
     let part = f.state.with_extension(format!("vm.part-{unique}"));
     let meta_part = f.meta.with_extension(format!("json.part-{unique}"));
@@ -80,8 +166,13 @@ pub fn save(
     let _ = m.ask("{\"execute\":\"migrate-set-parameters\",\"arguments\":{\"max-bandwidth\":0}}");
     // The guest stops for the save, as `pod_guest::warm::save` does: the
     // state is the one of this moment, and no page changes under the copy.
+    let cont = |m: &mut Monitor| {
+        m.ask("{\"execute\":\"cont\"}")
+            .map(drop)
+            .map_err(|e| asked("cont", &e))
+    };
     if let Err(e) = m.ask("{\"execute\":\"stop\"}") {
-        return (Err(e.to_string()), m.ask("{\"execute\":\"cont\"}").is_ok());
+        return (Err(asked("stop", &e)), cont(&mut m));
     }
     let mut transport = first;
     let mut done = migrate(&mut m, transport, &path);
@@ -91,15 +182,15 @@ pub fn save(
         transport = Transport::Pipe;
         let second = migrate(&mut m, transport, &path);
         done = match (second, done) {
-            (Ok(()), _) => Ok(()),
-            (Err(pipe), Err(file)) => Err(format!("{file}; through a pipe: {pipe}")),
-            (Err(pipe), Ok(())) => Err(pipe),
+            (Ok(t), _) => Ok(t),
+            (Err(pipe), Err(file)) => Err(format!("{file}; then {pipe}")),
+            (Err(pipe), Ok(_)) => Err(pipe),
         };
     }
     // A guest after a migration is paused; a guest whose migration failed
     // runs or is paused. `cont` is right for each.
-    let runs = m.ask("{\"execute\":\"cont\"}").is_ok();
-    let stored = done.and_then(|()| {
+    let runs = cont(&mut m);
+    let stored = done.and_then(|longest| {
         let io = |p: &Path, e: std::io::Error| format!("{}: {e}", p.display());
         let file = std::fs::File::open(&part).map_err(|e| io(&part, e))?;
         // The bytes are on the disk before the file gets its name: a state
@@ -107,7 +198,11 @@ pub fn save(
         file.sync_all().map_err(|e| io(&part, e))?;
         let bytes = file.metadata().map_err(|e| io(&part, e))?.len();
         if bytes == 0 {
-            return Err(format!("{}: the emulator wrote no byte", part.display()));
+            return Err(format!(
+                "{}: the emulator wrote no byte through {}",
+                part.display(),
+                transport.word()
+            ));
         }
         let meta = Meta {
             fingerprint: fingerprint.to_string(),
@@ -130,6 +225,7 @@ pub fn save(
         Ok(Saved {
             bytes,
             took: started.elapsed(),
+            longest,
         })
     });
     if stored.is_err() {

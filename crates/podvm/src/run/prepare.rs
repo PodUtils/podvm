@@ -13,9 +13,10 @@ pub(crate) fn prepare(
     verb: &str,
 ) -> std::result::Result<crate::lifecycle::Prepared, i32> {
     let mut o = crate::initns::route(verb, parse(verb, args)?); // T-2002
-                                                                // ⭐ TODO/machine.md T-1302. The tier is decided before anything is
-                                                                // fetched: a machine-tier refusal names the legs, and there is nothing
-                                                                // to pull for a tier that cannot run.
+    crate::initns::stays::check(verb, &o)?; // T-2002: an init that stays
+                                            // ⭐ TODO/machine.md T-1302. The tier is decided before anything is
+                                            // fetched: a machine-tier refusal names the legs, and there is nothing
+                                            // to pull for a tier that cannot run.
     let tier = crate::tier::resolve(o.tier);
     let guest = matches!(
         tier,
@@ -367,6 +368,7 @@ pub(crate) fn prepare(
         dropped_preload.as_deref(),
         &userland_note,
     );
+    crate::initns::stays::check_rung(verb, &o, entered.word())?; // T-2002
     banner.push_str(&store_note(store));
     banner.push_str(&tree.fill.line());
     // ⭐ M5. The completion layer runs HERE: after the rootfs exists and the

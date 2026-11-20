@@ -117,8 +117,7 @@ pub struct Want<'a> {
 /// process. An error names the step that no init can start without.
 pub fn build(w: &Want) -> Result<(), String> {
     let step = |what: &str, e: std::io::Error| format!("{what}: {e}");
-    mnt("", Path::new("/"), "", MS_REC | MS_PRIVATE, "")
-        .map_err(|e| step("the mounts of / as private", e))?;
+    private().map_err(|e| step("the mounts of / as private", e))?;
     let stage = stage(w.root).map_err(|e| step("the bind of the root on itself", e))?;
     let at = |p: &str| stage.join(p);
     for d in ["proc", "sys", "dev", "run", "tmp"] {
@@ -164,6 +163,19 @@ pub fn build(w: &Want) -> Result<(), String> {
     }
     machine_id(&at("etc/machine-id"));
     enter(&stage).map_err(|e| step("the change of the root", e))
+}
+
+/// Each mount of this mount namespace as private: no later mount reaches
+/// the namespace that this one came from.
+pub fn private() -> std::io::Result<()> {
+    mnt("", Path::new("/"), "", MS_REC | MS_PRIVATE, "")
+}
+
+/// A `/proc` of the PID namespace of this process on `/proc`, in a mount
+/// namespace of its own: the pids of its children then name them there.
+pub fn own_proc() -> std::io::Result<()> {
+    let flags = MS_NOSUID | MS_NODEV | MS_NOEXEC;
+    mnt("proc", Path::new("/proc"), "proc", flags, "")
 }
 
 /// The directory that becomes `/`: a mount point in each case.

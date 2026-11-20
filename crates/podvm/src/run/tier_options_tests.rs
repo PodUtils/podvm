@@ -151,7 +151,8 @@ fn where_the_init_of_the_image_holds() {
     for (verb, flags, holds) in [
         ("run", &[][..], true),
         ("run", &["--podvm-tier=machine"][..], true),
-        ("run", &["-d"][..], false),
+        // T-2002: a container that stays takes the namespace rung.
+        ("run", &["-d"][..], true),
         ("run", &["-d", "--podvm-tier=machine"][..], false),
         ("run", &["-d", "--podvm-tier=incus"][..], true),
         ("run", &["--podvm-tier=incus"][..], false),
@@ -159,7 +160,9 @@ fn where_the_init_of_the_image_holds() {
         ("run", &["--podvm-tier=emulate"][..], false),
         ("run", &["--podvm-tier=runsc"][..], true),
         ("run", &["-d", "--podvm-tier=runsc"][..], false),
-        ("create", &[][..], false),
+        ("create", &[][..], true),
+        ("create", &["--podvm-tier=machine"][..], false),
+        ("create", &["--podvm-tier=runsc"][..], false),
         ("create", &["--podvm-tier=incus"][..], true),
     ] {
         for init in [&["--podvm-init=image"][..], &["--podvm-init", "image"][..]] {

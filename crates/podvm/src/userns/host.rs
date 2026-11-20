@@ -173,6 +173,18 @@ pub fn bind_volumes(
     if !active() {
         return Ok(());
     }
+    bind_onto(rootfs, volumes, ro, base)
+}
+
+/// [`bind_volumes`] for a process that owns its mount namespace in a user
+/// namespace of its own: pid 2 of a foreground run, and the supervisor of
+/// a detached init of the image (TODO/enter.md T-2002).
+pub fn bind_onto(
+    rootfs: &std::path::Path,
+    volumes: &[podvm_enter::userland::Volume],
+    ro: &[String],
+    base: Option<&str>,
+) -> Result<(), String> {
     for v in volumes {
         // PodUtils/podrunner#277: a source under `--podvm-volume-base`
         // opens under it with no symbolic link; the bind takes that

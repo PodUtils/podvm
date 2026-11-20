@@ -82,7 +82,7 @@ impl Held {
 
 /// Write the state under a name of its own, then give it the name `file`:
 /// a reader finds the whole text or no file.
-fn write(file: &Path, held: &Held) -> std::io::Result<()> {
+pub(super) fn write(file: &Path, held: &Held) -> std::io::Result<()> {
     let part = file.with_extension("part");
     std::fs::write(&part, held.text())?;
     std::fs::rename(&part, file)
@@ -174,7 +174,7 @@ pub fn attach(spec: &Spec, file: &Path) -> i32 {
         Ok(ns) => ns,
         Err(e) => return boot::refuse(&format!("the namespaces of the held init {pid}: {e}")),
     };
-    let code = join::run_command(&ns, spec);
+    let code = join::run_command(&ns, spec, pid, None);
     stop(pid, systemd, spec.discard);
     code
 }

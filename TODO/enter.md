@@ -5256,6 +5256,23 @@ Remaining:
 
 Partial (2026-11-20, the second part). The command of `--user NAME` on the namespace rung gets the supplementary groups that the image gives the user (`initns::groups_of`, from `/etc/passwd` and `/etc/group` of the tree, 4 MiB of each at most; `--groups` of `guest-init`; `setgroups` with the primary group first): each group that lists, as a member, a name with the uid and the primary gid of the command. The unit test `the_groups_of_a_user_come_from_the_files_of_the_image` is the table (two names with one uid, a group that names the primary one, a member with spaces, a line that is no record, a name that is a prefix of another, more groups than 256). Measured on the cloud host as uid 1000 with the image of experiment 468 (Debian 12), from a cgroup2 directory that root gave: `-u postgres ... id` gives `uid=102(postgres) gid=104(postgres) groups=104(postgres),103(ssl-cert)` (`ssl-cert:x:103:postgres` in the image), also for `-u postgres:postgres`; `-u postgres:daemon` gives `groups=1(daemon)`, and a command of root `groups=0(root)`. A fault of the guest route is fixed with T-2008: `init::with_image_init` replaced each `"$@"` of the script of the guest, also in an argument or a variable of the run (`sh -c 'exec "$@"'`); only the last one is the script's now (the test `the_script_of_the_guest_and_the_job_of_a_run_are_two_texts`). Of remaining 2: `guest-init --hold` and `--attach` (T-2008, `initns/hold.rs`) are the two halves that `run -d` and `exec` on the namespace rung need; they are not wired to those verbs. Remaining 2 and 3 are open.
 
+Partial (2026-11-20, the third part). Remaining 2 and 3 are done for a caller that is not uid 0. `run -d`, `create`, `start`, `restart`, `stop`, `rm -f` and `exec` hold with the init of the image on the namespace rung (`initns/detach.rs`, `initns/enter.rs`, `initns/stays.rs`, `exec/init.rs`, and the entry `INIT_ENTRY` of the launcher of `podvm-supervise`). The launcher starts `podvm guest-init --detached` with the environment and the stdio of the record. That process opens a user namespace with the subordinate range and a PID namespace, and waits; its child, PID 1 of that namespace, is the supervisor of the foreground run (`boot::supervise`): it gives the tree the owners of the image one time, binds the volumes, boots the init as PID 1 of a second PID namespace, writes the state of the init beside the record (`init.state`, with the pid that the caller has for the init), runs the command, and ends the init. The launcher waits for that state, so `run -d` returns when the boot is complete, and a boot that fails gives its line and 125 with no record, no tree and no cgroup left. `exec` starts again in the user namespace of the run (T-1910), reads the state, checks that the init of the file is the init of this run (the parent of its supervisor is the process of the record, before and after the open of the namespaces), and runs the command in the namespaces of the init, with the environment of the container, `-e`, `-w`, `-u` (with the groups of the image) and `-t`. With `-t`, the command of `run` and of `exec` gets a pty of the devpts instance of the init, as the leader of a session of its own (`initns/pty.rs`): the master opens through `/proc/INIT/root/dev/pts/ptmx`, and a relay process copies the terminal of podvm to it, with the end of input and the window size. The unit tests: `the_supervisor_of_a_detached_run_gets_the_record`, `only_the_namespace_rung_keeps_the_init_of_a_container_that_stays`, `the_pid_of_the_caller_is_read_from_the_fdinfo_of_a_pidfd`, `the_parent_of_a_process_is_read_after_its_name`, `the_end_of_input_ends_a_read_of_the_terminal`, `only_a_record_of_the_namespace_rung_with_the_mark_boots_the_init`, and the table `where_the_init_of_the_image_holds`.
+
+Measured on the cloud host as uid 1000 (experiment 465 with clauses 10 to 12, `experiments/results/init-image.txt`, "THE INIT OF THE IMAGE RUNS", three runs of the whole experiment on this day; the stand-in of a delegated cgroup2 directory as in clause 1):
+
+* Clause 10: `run -d --podvm-init=image` returns after 5 s with the extraction (1.7 s with a spare tree, by hand); `exec systemctl is-system-running` gives `running`; the check of the experiment exits 7 through `exec` (the four units run as their users); `exec -u 65534 -e A=b -w /etc` gives `65534 b /etc`; `exec -t tty` gives `/dev/pts/0`; one `exec` of `true` takes 10 ms (20 in a row, by hand). `stop` takes 1 s: the command gets SIGTERM (its trap writes a file, and the record has its exit code 5), and the init its power off (the ExecStop of a unit writes a file). `start` boots the init again, and `rm -f` of the running container takes less than 1 s, five times in a row. After each step no process and no cgroup with a process stays. From a cgroup that is not delegated, `run -d` and `start` refuse with 125 and the missing part (clause 5).
+* Clause 11: `run -t` gives `tty` the name `/dev/pts/0` and the command a controlling terminal (before: "No such device"); a shell that reads two lines from the pipe of `-it` runs them and exits 4.
+* By hand: `--hostname` names the UTS namespace of a detached run; a `:ro` volume under `/tmp` is read-only; a boot that fails (`mirror.gcr.io/library/debian:12` has no `/sbin/init`) ends `run -d` with its line and 125; a SIGKILL of the launcher leaves no process (the empty cgroup base stays for the sweep).
+
+Faults that the runs found, each fixed:
+
+1. A SIGTERM of a foreground run ended the supervisor and not the command. The thread that reads the console of the init did not block the signals that the waiter forwards (the rule of `run/wall.rs`), so it took the signal with the default action: the command got SIGKILL with the PID namespace, the init got no power off, and the 143 of the entry above was the end of the supervisor. Measured with a command that exits 5 in a trap of TERM: 143 and no file of the trap with the build of `3296b17`; 5 and the file now (`boot::drain`).
+2. `rm -f` of a detached run took 5 s and kept the record in some runs ("1 process of its tree stayed after SIGKILL"). The init of a PID namespace ends only when each process of its namespace is reaped. The command is a child of the supervisor, which is outside that namespace; after the SIGKILL of the supervisor the command went to the launcher, which waits for one process of the tree at a time (`pod_supervise::launcher::tree::end_tree`). The supervisor is now PID 1 of a PID namespace of its own: the kernel reaps each child of a PID 1 that ends (T-2018 asks podcrates for the launcher).
+3. With `-t`, the pty of podvm made a second echo, and an end of input that came before the supervisor was ready became a NUL byte (a pending end of input of a terminal in line mode reads as `\0` after a change to raw mode). The pty of podvm is raw from its start for such a run (`run/pty.rs::carry_only`), and the relay gives the pty of the init the end of input (`machine::guest::tty::end_of_input`, one rule for the three relays).
+4. A run with the init dropped `--podvm-confine`, `--ulimit`, `--security-opt no-new-privileges` and `--device` with no line: T-2017.
+
+Remaining: (1) as before: `kvm.yml` with a real delegated subtree (clause 10 runs there with clause 1). (2) A caller that is uid 0 of the host gets no namespace rung: a foreground run takes the next route, and `run -d` refuses by name. (3) An `exec` with no `-t` has the descriptors of the caller: a terminal among them has no name in the image. (4) A command of `exec` runs in the cgroup of the run only where the host lets the caller move a process there. (5) The relay of `-t` looks at the window size each 250 ms. (6) A `-t` of a guest of the machine tier keeps `/dev/hvc0` (measured: `tty` gives `/dev/hvc0` there). (7) `run -d` on the runsc tier and on the machine tier with the init stay refused by name. (8) The numbers 5 to 7 of the first list.
+
 # T-2003: On the userland rung, a program with a library in a directory of its RUNPATH does not load (`systemctl`)
 
 **Source:** the measure of T-2002 (2026-11-19); the research bundle of the owner (2026-11-19, `run/libpath.rs` of a branch that is not in this tree); COORD-207 (#603) asks podcrates
@@ -5666,3 +5683,36 @@ A host path under the host side of a volume takes the rules of that volume: its 
 ## Prove
 
 As uid 1000 under `scripts/dev/nouserns.c` with `mirror.gcr.io/library/alpine:3.20` and `-v H:/cfg:ro`: `sh -c 'echo X > H/f'` fails with EROFS and `H/f` is unchanged, on the loader family; a table test of the interposer holds the class (a host path of a `:ro` volume: open, create, unlink, rename, chmod, utimes; a host path of the rootfs and of a library directory still passes); experiment of OQ-11: ELOOP.
+
+# T-2017: A run with the init of the image on the namespace rung dropped `--podvm-confine`, `--ulimit`, no-new-privileges and `--device` with no line
+
+**Source:** the work of T-2002 (2026-11-20)
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+`run --podvm-init=image` on the namespace rung starts the init and the command from the supervisor `guest-init`, with no entry of pod-enter. The plan of the run holds the confine layer, the limits of `--ulimit`, the no-new-privileges bit and the devices, and pod-enter applies them; the supervisor read none of them. A caller that asked for a limit got a run with no limit and no line.
+
+## Premise
+
+Measured on the cloud host as uid 1000 with `ghcr.io/pkgforge-dev/archlinux:latest`, from a delegated cgroup2 directory, with the build of `3296b17`: with `--podvm-confine 'read=/usr,/etc,/proc,/dev,/lib,/lib64,/bin,/sbin'` a `touch /var/x` works (podvm's init: "Permission denied"); with `--ulimit nofile=123`, `ulimit -n` gives 1024 (podvm's init: 123); with `--security-opt no-new-privileges`, `NoNewPrivs` is 0; with `--device /dev/null:/dev/xnull`, the node is not there. `--read-only`, `--hostname`, `-e`, `-w`, `-u` and the volumes hold. `--memory`, `--cpus` and `--pids-limit` are refused on this host before (no delegated cgroup at `/sys/fs/cgroup`).
+
+## Approach
+
+First the safe state: a refusal by name of each flag that the route drops (`initns::stays::unserved`), for a foreground run and for a container that stays. Then each flag for real, in the supervisor: the limits before the init starts (each process of the container gets them, as with docker), the no-new-privileges bit and the confine layer of `pod-confine` for the command and for each `exec`, a device as a bind on the `/dev` of the init. A table test holds each flag of `run` against each route of the init (the namespace rung, the runsc tier, the machine tier): served, or refused by name.
+
+## Decision
+
+-
+
+## Prove
+
+Experiment 465, clause 12: `run --podvm-confine read=/usr --podvm-init=image` and `run --ulimit nofile=64 --podvm-init=image` from the delegated directory give 125 and a line with the flag; then, for each flag that is served, the measure of the Premise with the result of podvm's init.
+
+## Done
+
+Partial (2026-11-20). `initns::stays::check` refuses `--podvm-confine`, `--ulimit`, `--security-opt no-new-privileges` and `--device` with 125 and the name of the flag, for each run with `--podvm-init=image` and no tier (the namespace rung, in the foreground and with `-d` or `create`); the unit test `a_limit_that_the_init_route_drops_is_named` is the table. Experiment 465, clause 12, passes on the cloud host as uid 1000. Remaining: (1) apply each of the four flags in the supervisor; (2) `--memory`, `--cpus` and `--pids-limit` with the init on a host with cgroup2 at `/sys/fs/cgroup` are not measured; (3) the runsc tier and the machine tier are not measured for these flags; (4) the table test of each flag of `run` against each route.

@@ -306,6 +306,7 @@ fn parse(args: &[String]) -> std::result::Result<Opts, i32> {
 }
 
 pub(crate) mod enter;
+mod init; // TODO/enter.md T-2002
 pub(crate) mod ns;
 use enter::*;
 

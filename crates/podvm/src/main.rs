@@ -64,7 +64,8 @@ fn main() -> std::process::ExitCode {
     names::start(); // T-1652 (the native-static rung) and SIGPIPE (T-1769)
     let argv: Vec<String> = names::store::take(names::argv()); // T-1913, #505
     userns::enter_if(&argv); // T-1909: before any thread
-                             // TODO/net.md T-1665: one connection of a guest, relayed to the broker.
+    initns::detach::start(&argv); // T-2002: the supervisor of a detached init
+                                  // TODO/net.md T-1665: one connection of a guest, relayed to the broker.
     if argv.get(1).map(String::as_str) == Some(broker::RELAY_ARG) {
         return exit(broker::relay(argv.get(2).map_or("", String::as_str)));
     }
