@@ -675,10 +675,13 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2010](enter.md) | P1 | L | none | enter | partial | Each route of `--podvm-init=image` as fast as it can be: a measured baseline, then each gain |
 | [T-2011](machine.md) | P1 | S | none | machine | done | `run -d --podvm-init=image` of an image whose Entrypoint is its init runs `/sbin/init CMD` and not the command |
 | [T-2012](enter.md) | P1 | S | none | enter | done | `exec` into a `run -d` container of the namespace rung refuses its volumes where the probe of the host denies chroot |
+| [T-2013](enter.md) | P1 | S | none | enter | done | On the userland rung, `--podvm-confine exec=` does not hold for the first program of a run |
+| [T-2014](enter.md) | P2 | S | none | enter | open | On the userland rung, `--podvm-confine read=/` does not cover a volume |
+| [T-2015](enter.md) | P2 | M | none | enter | open | On the syscall tier, the interpreter of a `#!` script that the payload starts is not checked against `exec=` |
 
 ## Counts
 
-609 entries: 23 open, 36 partial, 6 blocked, 544 done.
+612 entries: 25 open, 36 partial, 6 blocked, 545 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -688,10 +691,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 17 | 0 | 248 | 268 |
-| P2 | 14 | 15 | 5 | 179 | 213 |
+| P1 | 3 | 17 | 0 | 249 | 269 |
+| P2 | 16 | 15 | 5 | 179 | 215 |
 | P3 | 6 | 4 | 1 | 42 | 53 |
-| **All** | 23 | 36 | 6 | 544 | 609 |
+| **All** | 25 | 36 | 6 | 545 | 612 |
 
 ## Work order
 

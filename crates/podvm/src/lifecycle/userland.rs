@@ -164,6 +164,15 @@ pub fn enter_userland_with(
         code,
         entered: false,
     };
+    // TODO/enter.md T-2013: `exec=` for the first program (and the
+    // interpreter of a `#!` script), as the kernel holds it on the
+    // namespace rung, before each family and the syscall tier.
+    if let Err(e) =
+        podvm_enter::confine::check_first(plan, &userland.maps, &[&plan.argv, &userland.guest_argv])
+    {
+        let _ = writeln!(err, "podvm {verb}: {e} (TODO/enter.md T-2013)");
+        return failed(e.exit_code());
+    }
     if let Some(exe) = &userland.dispatch_exe {
         return super::native::enter(verb, root, plan, userland, exe, err, on_spawn);
     }

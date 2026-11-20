@@ -8,6 +8,14 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- `--podvm-confine exec=` holds for the first program of a run on the
+  userland rung and the syscall tier, also through the dynamic loader and
+  for the interpreter of a `#!` script: a program out of `exec=` exits 126
+  with one line, as on the namespace rung (T-2013). Before, the first
+  program ran.
+- `--podvm-confine` on the userland rung refuses an exec of the dynamic
+  loader of a program out of `exec=`, and a change of mode, owner or times
+  of a file out of `write=` (T-1984, T-1985).
 - `exec` into a `run -d` container of the namespace rung enters by the
   join of its namespaces, where its volumes are, also where the probe of
   the host denies chroot to the user; before, it took the entry with no

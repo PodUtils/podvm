@@ -5529,3 +5529,95 @@ The unit test `exec_joins_only_a_running_container_of_the_namespace_rung`; as ui
 ## Done
 
 **Done (2026-11-20).** `exec::enter::joins_the_run` (a running container, the rung `namespace`, a pid) skips the entry decision of the probe, and the join branch takes the same test. The unit test `exec_joins_only_a_running_container_of_the_namespace_rung` holds the table (running, exited and created; namespace, chroot, userland and syscall; with and without a pid). As uid 1000 on the cloud host: `run -d --name j3 -v DIR:/w alpine:3.20 sleep 300` enters the namespace rung, and `exec -w /w j3 sh -c 'cat f; echo x > g; ls'` prints the file, writes `g`, and the host sees `g`. The host of podrunner (a probe that denies chroot to the user) is not on hand here: podrunner's test `a_container_job_runs_through_the_hooks_of_a_podvm_unit` measures it with the next beta.
+
+# T-2013: On the userland rung, `--podvm-confine exec=` does not hold for the first program of a run
+
+**Source:** the work of T-1984 (2026-11-20): found as uid 1000 with user namespaces denied, also in `0.2.0-beta.36`
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+`podvm run --podvm-confine 'read=/sc;write=/tmp;exec=/usr/bin/sh' -v S:/sc IMAGE /sc/m` runs `/sc/m` on the loader family and on the syscall tier, and `/lib64/ld-linux-x86-64.so.2 /sc/m` runs it too; the namespace rung answers 126. Landlock judges an `execve`, and on the userland rung podvm starts the first program through the loader or a handler, with no `execve` of the program; pod-enter's `check_exec`, which the caller runs before `spawn_userland`, was never called (call C25 reads "no documented feature fails").
+
+## Premise
+
+pod-enter gives `check_exec(plan, host_program)` for a caller of `spawn_userland`; podvm's table resolves a guest path to its host path (`podvm_enter::confine::host_resolved`); T-1984's `ldso.rs` gives each program that a loader can run.
+
+## Approach
+
+`podvm_enter::confine::check_first`, before each family and the syscall tier (`lifecycle::enter_userland_with`) and in the launcher of `run -d` and `start`: the caller's command and the argv of the kernel (the interpreter of a `#!` script), each resolved through the table, then the loader rule.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm --podvm-confine 'read=/sc;write=/tmp;exec=/usr/bin/sh' -v S:/sc mirror.gcr.io/library/ubuntu:24.04 /sc/m` exits 126 with one line on the loader family and on the syscall tier, also through `/lib64/ld-linux-x86-64.so.2 /sc/m`, and `/usr/bin/sh -c true` exits 0.
+
+## Done
+
+**Done (2026-11-20).** `podvm_enter::confine::check_first` (podvm's crate; `check_exec` of pod-enter is re-exported) resolves each program through the table of the run (`PATH` for a name with no `/`, the working directory for a relative name) and answers `CannotInvoke` (126) with one line that names the guest program; where the program is a dynamic loader it takes `ldso::each_program`, the file of T-1984, and a program of the loader with no `/` is a refusal. `lifecycle::enter_userland_with` calls it with the caller's command and the argv of the kernel before each family and the syscall tier, and the launcher of `run -d` and `start` with the command of the record. The unit test `the_first_program_takes_the_rule_of_exec` holds the table (a path, `PATH`, a relative name, the loader with and without options, `--version`, a program that does not resolve, the interpreter of a script, no confinement). As uid 1000 under `nouserns` with `mirror.gcr.io/library/ubuntu:24.04`: `/sc/m` and `/lib64/ld-linux-x86-64.so.2 /sc/m` exit 126 with "--podvm-confine allows no exec of it" on the loader family and on the syscall tier, `/usr/bin/sh -c true` exits 0; `run -d` of `/sc/m` exits 125 with the same line and keeps no record. A forced `PODVM_MODE=memfd` (a rung for a diagnosis, `ladder.rs`) does not call it.
+
+# T-2014: On the userland rung, `--podvm-confine read=/` does not cover a volume
+
+**Source:** the work of T-1984 (2026-11-20), also in `0.2.0-beta.36`
+**Category:** enter
+**Milestone:** none
+**Priority:** P2
+**Effort:** S
+**Status:** open
+
+## Problem
+
+With `--podvm-confine 'read=/'` and `-v S:/sc`, a read of `/sc/f` gives "Permission denied" on the userland rung; the namespace rung reads it. The host spec maps the guest `/` to the tree of the image only.
+
+## Premise
+
+`podvm_enter::confine::host_spec` maps each guest rule through the table; a rule whose guest path holds the guest path of a volume names the tree only.
+
+## Approach
+
+A rule on a guest path that holds a volume adds the same access on the host path of each volume under it.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 under `scripts/dev/nouserns.c`: `podvm run --rm --podvm-confine 'read=/' -v S:/sc mirror.gcr.io/library/ubuntu:24.04 cat /sc/f` prints the file, on the loader family and on the syscall tier; a table test of `host_spec` holds the rule.
+
+
+# T-2015: On the syscall tier, the interpreter of a `#!` script that the payload starts is not checked against `exec=`
+
+**Source:** the work of T-1984 (2026-11-20)
+**Category:** enter
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+The handler of the syscall tier checks the script of an `execve` against the table of `exec=`, not its interpreter, nor a loader on its `#!` line: the handler reads no `#!` line, as it allocates nothing. The first program of a run is checked (T-2013).
+
+## Premise
+
+The interposer of the loader family checks the interpreter of a `#!` line (T-1984); the handler of `podvm-dispatch` has no reader of that line.
+
+## Approach
+
+A reader of the `#!` line into a fixed buffer of the handler, with no allocation, then the rule of the interpreter and of `ldso::each_program`.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 under `scripts/dev/nouserns.c` on the syscall tier with `exec=/usr/bin/sh` and a script `#!/sc/m` in a writable path: the payload's exec of the script exits 126; a table test of the reader of the `#!` line.
