@@ -451,6 +451,7 @@ pub const TABLE: &[Row] = &[
     Row { verb: "logs", flag: Some("-h, --help"), status: Native, note: "prints this verb's usage and exits 0" },
     Row { verb: "logs", flag: Some("-f, --follow"), status: Native, note: "follows the container's log file with a bounded poll and exits after the container ends" },
     Row { verb: "logs", flag: Some("--tail"), status: Native, note: "prints the last N lines of the captured file (`--tail N` or `--tail=N`, 0 prints nothing), then follows where `-f` is given instead of replaying the whole file (TODO/cli.md T-1337)" },
+    Row { verb: "logs", flag: Some("--limit-bytes"), status: Native, note: "writes the first N bytes of the log and exits 0 (N from 1 to 9223372036854775807; 0, a sign, a letter or a larger N is refused). The log streams through one buffer of 64 KiB. With --tail, the first N bytes of the tail; with -f, the follow ends at N bytes. On --podvm-tier=incus the API gives the file whole: podvm holds it in memory, 64 MiB at most (TODO/cli.md T-2046)" },
     Row { verb: "wait", flag: Some("-h, --help"), status: Native, note: "prints this verb's usage and exits 0" },
     Row { verb: "start", flag: Some("--podvm-tier"), status: Native, note: "podvm's own: incus acts on the instances of podvm in incus (the label user.podvm), never on another instance. With no flag, tier = incus in $store/config routes a name that is an instance of podvm in incus (TODO/machine.md T-1722)" },
     Row { verb: "start", flag: Some("-h, --help"), status: Native, note: "prints this verb's usage and exits 0" },

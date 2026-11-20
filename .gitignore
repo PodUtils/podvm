@@ -33,7 +33,9 @@ scratch/
 
 # -- logs --------------------------------------------------------------------
 *.log
-logs/
+# Anchored: an unanchored `logs/` hid the source modules
+# `crates/podvm/src/{incus,lifecycle}/logs/` (T-2046, 2026-11-20).
+/logs/
 
 # experiments/results/ is EVIDENCE, and a log there is the evidence itself.
 # The two rules above are unanchored. Measured on 2026-09-11, they excluded 83

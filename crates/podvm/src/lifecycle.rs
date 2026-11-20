@@ -440,6 +440,8 @@ pub fn ps(args: &[String]) -> i32 {
 
 mod logs_stop;
 pub use logs_stop::*;
+mod logs; // TODO/cli.md T-2046
+pub use logs::*;
 
 mod cp_image;
 mod wait_rm_cp;

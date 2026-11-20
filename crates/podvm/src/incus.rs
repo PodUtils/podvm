@@ -5,6 +5,7 @@
 pub(crate) mod config;
 pub(crate) mod image;
 pub(crate) mod inspect;
+pub(crate) mod logs; // TODO/cli.md T-2046
 pub(crate) mod net;
 pub(crate) mod run;
 pub(crate) mod systemd;
@@ -33,7 +34,8 @@ pub fn intercept(verb: Option<&str>, rest: &[String]) -> Option<i32> {
     }
     let a = verbs::wants(rest)?;
     match verb? {
-        v @ ("ps" | "start" | "stop" | "rm" | "logs") => Some(verbs::dispatch(v, &a)),
+        v @ ("ps" | "start" | "stop" | "rm") => Some(verbs::dispatch(v, &a)),
+        "logs" => Some(logs::logs(&a)),
         "inspect" => Some(inspect::inspect(&a)),
         _ => None,
     }

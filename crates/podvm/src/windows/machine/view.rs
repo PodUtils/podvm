@@ -36,30 +36,51 @@ pub(crate) fn screenshot(args: &[String]) -> i32 {
     }
 }
 
-/// `podvm logs [-f] NAME` of a machine: the serial line of the guest; with
-/// `follow`, the new bytes while the machine runs.
-pub(crate) fn logs(name: &str, follow: bool) -> i32 {
-    use std::io::{Read, Seek, Write};
+/// `podvm logs [-f] [--tail N] [--limit-bytes N] NAME` of a machine: the
+/// serial line of the guest; with `-f`, the new bytes while the machine
+/// runs. One buffer of 64 KiB, as the log of a container (TODO/cli.md
+/// T-2046).
+pub(crate) fn logs(name: &str, o: &crate::lifecycle::LogsArgs) -> i32 {
+    use podvm_supervise::stream::{self, Fault};
     let root = machines::root();
     let path = machines::dir_in(&root, name).join("serial.log");
     let mut out = std::io::stdout().lock();
-    let mut at = 0u64;
-    loop {
-        if let Ok(mut f) = std::fs::File::open(&path)
-            && f.seek(std::io::SeekFrom::Start(at)).is_ok()
-        {
-            let mut buf = Vec::new();
-            if f.read_to_end(&mut buf).is_ok() && !buf.is_empty() {
-                at += buf.len() as u64;
-                if out.write_all(&buf).and_then(|()| out.flush()).is_err() {
-                    return 0;
-                }
-            }
+    // A serial log that is not there yet, or that does not open, is an
+    // empty log: the machine writes it when the guest starts.
+    let open = || match stream::open(&path) {
+        Ok(Some(f)) => {
+            let len = f.metadata().map_or(0, |m| m.len());
+            Some((f, len))
         }
-        if !follow || !machines::read(&root, name).is_some_and(|r| r.running()) {
+        _ => None,
+    };
+    let (mut at, mut written) = (0u64, 0u64);
+    if let Some((mut f, len)) = open() {
+        match crate::lifecycle::copy_log(&mut f, len, o, &mut out) {
+            Ok(n) => (at, written) = (len, n),
+            Err(c) => return c,
+        }
+    }
+    loop {
+        if o.limit.is_some_and(|l| written >= l)
+            || !o.follow
+            || !machines::read(&root, name).is_some_and(|r| r.running())
+        {
             return 0;
         }
         std::thread::sleep(Duration::from_millis(250));
+        let Some((mut f, len)) = open() else {
+            continue;
+        };
+        let left = o.limit.map(|l| l - written);
+        match stream::copy_range(&mut f, at, len, left, &mut out) {
+            Ok(n) => (at, written) = (at + n, written + n),
+            Err(Fault::Write(e)) => return crate::names::stdout::failed(&e),
+            Err(Fault::Read(e)) => {
+                eprintln!("podvm logs: {name}: reading {}: {e}", path.display());
+                return EXIT_RUNTIME_ERROR;
+            }
+        }
     }
 }
 

@@ -104,6 +104,11 @@
 #      ["/sbin/init"]` as podrunner's hosted snapshot declares; `run -d
 #      --podvm-init=image` of it runs the command beside the init with no
 #      such prefix: its line is in `logs` and its exit code in `inspect`.
+#  25. `logs --limit-bytes N` (T-2046, PodUtils/podrunner#333), on the
+#      running instance of clause 12: `--limit-bytes 4` gives the first 4
+#      bytes of its log and exit 0; with `-f` the follow of the instance,
+#      which never ends, ends at 3 bytes with exit 0; `--limit-bytes 0` is
+#      refused by name with 125.
 #
 # Exit: 0 every clause matched, 1 a clause disagreed, 2 the lane could not
 # run (not root, no user namespaces, no package).
@@ -277,6 +282,10 @@ echo "  ps       $(I ps 2>&1 | grep web434 | tr -s ' ')"
 x=$(P exec --podvm-tier=incus web434 sh -c 'echo in-exec; exit 5' 2>&1); rc=$?
 echo "  exec     $x exit=$rc"
 echo "  logs     $(I logs web434 2>&1)"
+echo "  limit    $(I logs --limit-bytes 4 web434 2>&1; echo " exit=$?")"
+echo "  limit -f $(timeout 60 runuser -u "$U" -- env PODVM_STORE="$B/store" HOME="$B" INCUS_DIR="$B/state/lib" "$B/podvm" logs -f --limit-bytes 3 --podvm-tier=incus web434 2>&1; echo " exit=$?")"
+x=$(I logs --limit-bytes 0 web434 2>&1); rc=$?
+echo "  limit 0  exit=$rc $x"
 echo "  stop     $(I stop web434 2>&1)"
 echo "  ps -a    $(I ps -a 2>&1 | grep web434 | tr -s ' ')"
 echo "  start    $(I start web434 2>&1)"
@@ -308,6 +317,10 @@ c12 "^  ps -a    made434 Stopped" "create did not make a Stopped instance"
 c12 "^  ps -a    brief434 Stopped" "a command that ended did not stop its instance"
 c12 "^  logs     brief$" "logs of the ended command"
 c12 "^  ps -a    0 of 434$" "an instance of clause 12 stayed"
+c25() { grep -q "$1" "$WORK/c12.txt" || { note "25: $2"; fail=1; }; }
+c25 "^  limit    star exit=0$" "logs --limit-bytes 4 did not give 4 bytes and 0"
+c25 "^  limit -f sta exit=0$" "logs -f --limit-bytes 3 did not end at 3 bytes with 0"
+c25 "^  limit 0  exit=125 .*--limit-bytes takes a byte count" "--limit-bytes 0 was not refused by name with 125"
 
 # ---- clause 13 ----------------------------------------------------------
 # T-1722: `tier = incus` in the store's configuration selects the tier with

@@ -6473,3 +6473,36 @@ Work each by its class: OQ-06 with the fields of `inspect` (T-2001 OP-06), OQ-07
 ## Prove
 
 `sh scripts/dev/checks.sh` passes with a test of the class of each fixed finding; each other finding is a line in "Known gaps" of the release.
+
+# T-2046: `logs` loads the whole log into memory and has no bound of bytes
+
+**Source:** PodUtils/podrunner#333 (COORD-115 of podrunner)
+**Category:** cli
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+podrunner reads the log of a unit at the end of each job with `podvm logs CONTAINER` and `podvm logs --podvm-tier=incus NAME`, and a job sets the size of that log. `logs` reads the whole log into memory before it writes (`pod_supervise::logs` gives one `Vec`; `--tail` and `-f --tail` read the whole log too), so a log of 200 MB costs 200 MB of the host's memory before podrunner can stop the read. `logs` has no flag that stops after N bytes.
+
+## Premise
+
+The log of a container is one file (`$store/containers/ID/log`); a read with a seek and one buffer gives each byte in order. The API of incus gives a file whole (`GET /1.0/instances/NAME/files?path=`), and `pod-incus` reads that answer whole, 64 MiB at most (`Settings::max_body`).
+
+## Approach
+
+`logs` streams the log from its start to stdout through one buffer of 64 KiB, finds the start of `--tail N` from the end in pieces of the same size, and takes `--limit-bytes N`: stop after the first N bytes and exit 0. One parser of a whole number with a range reads `--tail` and `--limit-bytes`. The incus path takes `--limit-bytes` and `-f` with it; its memory bound is the one of `pod-incus`, and the help names it. Ask podcrates for the stream in `pod-supervise` and for a ranged read of a file in `pod-incus`.
+
+## Decision
+
+`--limit-bytes` composes with `--tail` (the first N bytes of the tail) and with `-f` (the follow ends at N bytes, or at the end of the container). `--since`, `--until`, `-t` and `--details` have no row in the parity table, so `logs` refuses them by name with 125. N is from 1 to 9223372036854775807 (the largest `off_t`); 0, a sign, a letter and a larger N are refused by name with 125.
+
+## Prove
+
+As uid 1000: a container whose log is 200 MB; the peak RSS of `podvm logs` under `/usr/bin/time -v` before and after; `--limit-bytes 1000` gives exactly 1000 bytes and exit 0. A table-driven test of the parse and of the combinations. Clause 25 of experiment 434 on the incus tier.
+
+## Done
+
+**Done (2026-11-20).** `logs` streams the log from its start to stdout through one buffer of 64 KiB (`crates/podvm-supervise/src/stream.rs`: `copy_range`, and `tail_start`, which finds the start of the last N lines from the end in pieces of the same size), on each path: a container, `-f` (the first read, then `pod_supervise::follow_from` from its end), `--tail` and `-f --tail`, and the serial log of a detached machine, which ignored `--tail` before. `--limit-bytes N` stops after the first N bytes with exit 0; with `--tail` it gives the first N bytes of the tail, and with `-f` the follow ends at N bytes (a writer that refuses each write past the bound ends `follow_from` at once) or at the end of the container. `--since`, `--until`, `-t` and `--details` have no row in the parity table and are refused by name with 125. One parser of a whole number with a range (`lifecycle::logs::whole`) reads `--tail` (0 to 2^64-1) and `--limit-bytes` (1 to 9223372036854775807); 0, a sign, a letter, an empty value and a larger N are refused by name with 125. On `--podvm-tier=incus` the verb takes the same parser, `-f` and `--limit-bytes` (`crates/podvm/src/incus/logs.rs`) and refuses `--tail` as before; the API of incus gives the file whole and `pod-incus` reads it whole, 64 MiB at most, so podvm holds the log in memory and refuses a larger one, and the help, the parity row, `docs/limits.md` and `docs/incus.md` say so. A write to a closed stdout ends with SIGPIPE (T-1769), and where SIGPIPE is ignored with exit 125 and one line (T-1816), never a panic. The unit tests `the_values_of_logs_are_parsed_by_one_rule`, `limit_bytes_composes_with_each_flag_of_logs`, `the_copy_of_a_log_is_the_slice_of_the_whole_read` and `the_help_states_the_bounds` hold the parse, the combinations and the copy; `the_tail_from_the_end_is_the_tail_of_the_whole_read` holds `tail_start` to `pod_supervise::tail_offset` for each text, count and size of piece; `the_log_of_an_instance_stops_at_the_limit` holds the incus path against a stand-in of the API. As uid 1000 with `mirror.gcr.io/library/alpine:3.20`, a container whose log is 200,000,000 bytes: `podvm logs` of `bf0608c` has a peak RSS of 200,160 KiB, and now 4,952 KiB with the same 200,000,000 bytes on stdout; `--tail 1` of the same log (no line end) 4,952 KiB; `--limit-bytes 1000` gives 1000 bytes and exit 0; `-f --limit-bytes 20` of a container that runs 30 s more ends after 0.3 s with 20 bytes and 0. Clause 25 of experiment 434 (`PODVM_434_MIRROR=1`) passes: `--limit-bytes 4` of a running instance gives `star` and 0, `-f --limit-bytes 3` ends with `sta` and 0, and `--limit-bytes 0` is refused by name with 125. The ask to podcrates: the stream of `stream.rs` in `pod-supervise` (`logs`, `follow_tail` and `append_from` read whole), and a ranged or streamed read of a file in `pod-incus`; the lead writes it as a COORD issue.

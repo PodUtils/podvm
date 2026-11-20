@@ -16,7 +16,7 @@
 
 use std::io::Write;
 
-use pod_incus::{Client, Exec, FileContent, FileWrite, NewInstance, Payload, Settings, Source};
+use pod_incus::{Client, Exec, FileWrite, NewInstance, Payload, Settings, Source};
 use podvm_image::error::EXIT_RUNTIME_ERROR;
 
 use super::run::{job_devices, socket_path, Job};
@@ -202,7 +202,8 @@ pub(super) async fn detached(c: &Client, job: &Job<'_>, image: &str, d: &Detach)
     0
 }
 
-/// `ps`, `start`, `stop`, `rm` and `logs` with `--podvm-tier=incus`.
+/// `ps`, `start`, `stop` and `rm` with `--podvm-tier=incus`; `logs` is
+/// [`super::logs`].
 pub fn dispatch(verb: &str, args: &[String]) -> i32 {
     let flags: Vec<&str> = args
         .iter()
@@ -217,7 +218,6 @@ pub fn dispatch(verb: &str, args: &[String]) -> i32 {
     let known: &[&str] = match verb {
         "ps" => &["-a", "--all"],
         "rm" => &["-f", "--force"],
-        "logs" => &["-f", "--follow"],
         _ => &[],
     };
     if let Some(f) = flags.iter().find(|f| !known.contains(f)) {
@@ -232,8 +232,6 @@ pub fn dispatch(verb: &str, args: &[String]) -> i32 {
     }
     let all = flags.iter().any(|f| *f == "-a" || *f == "--all");
     let force = flags.iter().any(|f| *f == "-f" || *f == "--force");
-    // `-f` of `logs` is `--follow`; `-f` of `rm` is `--force`.
-    let follow = verb == "logs" && flags.iter().any(|f| *f == "-f" || *f == "--follow");
     block_on(verb, async move {
         let c = match connect().await {
             Ok((c, _)) => c,
@@ -247,12 +245,7 @@ pub fn dispatch(verb: &str, args: &[String]) -> i32 {
         }
         let mut code = 0;
         for n in &names {
-            let r = if follow {
-                follow_log(&c, n).await
-            } else {
-                one(&c, verb, n, force).await
-            };
-            if let Err(e) = r {
+            if let Err(e) = one(&c, verb, n, force).await {
                 eprintln!("podvm {verb}: {n}: {e}");
                 code = 1;
             }
@@ -390,55 +383,11 @@ pub(super) async fn one(c: &Client, verb: &str, name: &str, force: bool) -> Resu
                 .await
                 .map_err(|e| format!("the instance is {}: {e}", i.status))?;
         }
-        "logs" => {
-            let f = c
-                .get_file(name, super::LOG)
-                .await
-                .map_err(|e| e.to_string())?;
-            if let FileContent::Bytes(b) = f.content {
-                let _ = std::io::stdout().write_all(&b);
-            }
-            return Ok(());
-        }
         "start" | "stop" => {}
         _ => return Err(format!("{verb} is not a verb of the incus tier")),
     }
-    if verb != "logs" {
-        println!("{name}");
-    }
+    println!("{name}");
     Ok(())
-}
-
-/// `logs -f`: the log of the instance as it grows, until the instance
-/// stops; then the rest of it.
-async fn follow_log(c: &Client, name: &str) -> Result<(), String> {
-    let i = c.instance(name).await.map_err(|e| e.to_string())?;
-    if !ours(&i) {
-        return Err("not an instance of podvm (no user.podvm label)".into());
-    }
-    let mut seen = 0usize;
-    loop {
-        let running = c
-            .instance(name)
-            .await
-            .map(|i| i.status == "Running")
-            .map_err(|e| e.to_string())?;
-        // The file can be missing before the command writes its first line.
-        if let Ok(f) = c.get_file(name, super::LOG).await
-            && let FileContent::Bytes(b) = f.content
-            && b.len() > seen
-        {
-            let mut out = std::io::stdout().lock();
-            let _ = out.write_all(&b[seen..]);
-            let _ = out.flush();
-            seen = b.len();
-        }
-        if !running {
-            return Ok(());
-        }
-        // The follow is the only task of this current-thread runtime.
-        std::thread::sleep(std::time::Duration::from_millis(500));
-    }
 }
 
 /// `exec --podvm-tier=incus NAME CMD...`: the command in the instance, its

@@ -25,6 +25,7 @@
 
 pub mod launcher;
 pub mod report; // TODO/cli.md T-1825
+pub mod stream; // TODO/cli.md T-2046
 pub mod table;
 
 use podvm_image::Store;

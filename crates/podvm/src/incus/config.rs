@@ -62,7 +62,7 @@ fn first_name(verb: &str, args: &[String]) -> Option<String> {
             "--env-file",
         ],
         "inspect" => &["-f", "--format"],
-        "logs" => &["--tail"],
+        "logs" => &["--tail", "--limit-bytes"],
         _ => &[],
     };
     let mut it = args.iter();

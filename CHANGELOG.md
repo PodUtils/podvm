@@ -8,6 +8,8 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- `logs` writes the log through one buffer of 64 KiB, not a copy of the whole log in memory, and `logs --limit-bytes N` stops after the first N bytes with exit 0, also with `--tail`, `-f` and `--podvm-tier=incus` (T-2046, PodUtils/podrunner#333).
+
 ## 0.2.0-beta.37 (2026-11-20)
 
 ### Known gaps: what the checks of 0.2.0-beta.37 prove, and what stays open, 2026-11-20
