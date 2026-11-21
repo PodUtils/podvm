@@ -688,14 +688,14 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2044](cli.md) | P2 | M | none | cli | open | The faults of the sixth outside pass (2026-11-20, the gate of the next beta) |
 | [T-2045](enter.md) | P1 | M | none | enter | done | On the userland rung, a link to the host path of the rootfs with `..` reads host files |
 | [T-2046](cli.md) | P1 | S | none | cli | done | `logs` loads the whole log into memory and has no bound of bytes |
-| [T-2047](machine.md) | P2 | M | none | machine | open | The memory that a guest of the machine tier needs for an initrd of N bytes, as a curve |
+| [T-2047](machine.md) | P2 | M | none | machine | partial | The memory that a guest of the machine tier needs for an initrd of N bytes, as a curve |
 | [T-2048](machine.md) | P1 | M | none | machine | partial | The save of the state of a guest hangs the run with no line when the monitor of the emulator answers late |
 | [T-2050](deps.md) | P2 | L | none | deps | partial | Take podcrates `v0.80.0`: the write table, `pod-beneath`, the loader rule, five `#!` levels, the signals, the saved state of a line, the static QEMU 11.0.0 |
 | [T-2051](machine.md) | P2 | M | none | machine | blocked | The save and the load of the Linux guest of the machine tier keep their own code beside `pod_guest::warm::line` |
 
 ## Counts
 
-626 entries: 24 open, 40 partial, 6 blocked, 556 done.
+626 entries: 23 open, 41 partial, 6 blocked, 556 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -706,9 +706,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 19 | 0 | 255 | 277 |
-| P2 | 16 | 16 | 5 | 183 | 220 |
+| P2 | 15 | 17 | 5 | 183 | 220 |
 | P3 | 5 | 5 | 1 | 43 | 54 |
-| **All** | 24 | 40 | 6 | 556 | 626 |
+| **All** | 23 | 41 | 6 | 556 | 626 |
 
 ## Work order
 

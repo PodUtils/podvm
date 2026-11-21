@@ -5932,7 +5932,7 @@ As uid 1000 under TCG: after `run -d --name m --podvm-tier=machine IMAGE sleep 6
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -5953,6 +5953,10 @@ An experiment of `kvm.yml`: images of about 256, 512, 1024 and 2048 MiB of incom
 ## Prove
 
 The experiment's run on `kvm.yml` gives the smallest memory for each size; `mem.rs` takes the rule that holds each point, and its test holds each point of the table.
+
+## Done
+
+Partial (2026-11-21). Experiment 470 (`experiments/470-machine-mem.sh`, job `mem` of `kvm.yml`) builds each image from the one layer of alpine 3.20 (`podvm save`, no docker) and a file of random bytes, and finds the smallest `--podvm-mem` in steps of 256 MiB; it fails where podvm's estimate is below a point. A first point, under TCG on the cloud host (QEMU 8.2.2): an initrd of 263 MiB does not boot at 768 MiB and boots at 1024 MiB; the estimate is 1536 MiB (`experiments/results/machine-mem.txt`). Remaining: the run of the job `mem` under KVM for 256, 512, 1024 and 2048 MiB, the rule of `mem.rs` from the points, and the answer to #629.
 
 # T-2048: The save of the state of a guest hangs the run with no line when the monitor of the emulator answers late
 

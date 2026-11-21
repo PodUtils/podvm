@@ -1,0 +1,11 @@
+date      2026-11-21T02:04:38Z
+podvm     podvm 0.2.0-beta.37
+qemu      QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+host      6.18.44-fc-v726, 4 CPUs, 16087 MiB, accel tcg
+size   initrd    no boot at     boots at       estimate   runs
+    256 MiB  mem  1536 MiB  rc 0
+    256 MiB  mem   256 MiB  rc 125
+    256 MiB  mem   768 MiB  rc 125
+    256 MiB  mem  1024 MiB  rc 0
+256    263 MiB   768 MiB        1024 MiB       1536 MiB   4
+EACH POINT HOLDS
