@@ -300,15 +300,14 @@ pub(crate) fn dos_base(verb: &str) -> Result<PathBuf, i32> {
     Ok(base)
 }
 
-/// Write `bytes` to `path` through a file beside it and a rename, so that no
-/// reader sees half a base.
+/// Write `bytes` to `path` with its directory, so that no reader sees half
+/// a base (`pod_core::files::Replace`, TODO/deps.md T-2066).
 fn write_new(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    if let Some(d) = path.parent() {
-        std::fs::create_dir_all(d)?;
-    }
-    let tmp = path.with_extension(format!("{}.part", std::process::id()));
-    std::fs::write(&tmp, bytes)?;
-    std::fs::rename(&tmp, path)
+    use pod_core::files::{Mode, Replace};
+    Replace::new(Mode::Exact(0o644))
+        .make_dir(true)
+        .write(path, bytes)
+        .map(drop)
 }
 
 /// The bytes of the member `name` of the zip `zip`, which must have `size`

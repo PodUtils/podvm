@@ -109,11 +109,11 @@ pub fn cached(path: Option<std::path::PathBuf>) -> impl FnMut(&str) -> Answer {
         }
         let a = probe(host);
         let next = record(&text, host, &a, now());
-        // Write beside, then rename: a reader never sees half a file.
-        let tmp = path.with_extension(format!("tmp{}", std::process::id()));
-        if std::fs::write(&tmp, next).is_ok() && std::fs::rename(&tmp, path).is_err() {
-            let _ = std::fs::remove_file(&tmp);
-        }
+        // The one atomic replace of a file (TODO/deps.md T-2066): a reader
+        // never sees half a file, and a failed write leaves no file beside
+        // it. A cache that is not written costs a probe at the next run.
+        let _ =
+            pod_core::files::replace(path, next.as_bytes(), pod_core::files::Mode::Exact(0o644));
         a
     }
 }

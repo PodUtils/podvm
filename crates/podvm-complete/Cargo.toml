@@ -13,6 +13,7 @@ repository.workspace = true
 # `pod-hostprobe`, so the space message names `$PODVM_STORE`.
 [dependencies]
 pod-rootfs = { git = "https://github.com/PodUtils/podcrates", tag = "v0.81.0" }
+pod-core = { git = "https://github.com/PodUtils/podcrates", tag = "v0.81.0", default-features = false }
 podvm-probe = { path = "../podvm-probe" }
 podvm-image = { path = "../podvm-image" }
 serde_json.workspace = true

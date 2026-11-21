@@ -272,13 +272,12 @@ pub fn read(root: &Path, name: &str) -> Option<Record> {
     Record::from_json(&std::fs::read_to_string(dir_in(root, name).join(RECORD)).ok()?)
 }
 
-/// Write the record under `root`, through a file beside it and a rename,
-/// so that a reader never sees half a record.
+/// Write the record under `root`, so that a reader never sees half a
+/// record (`pod_core::files::replace`, TODO/deps.md T-2066).
 pub fn write(root: &Path, r: &Record) -> std::io::Result<()> {
-    let dir = dir_in(root, &r.name);
-    let tmp = dir.join(format!("{RECORD}.tmp"));
-    std::fs::write(&tmp, r.to_json())?;
-    std::fs::rename(tmp, dir.join(RECORD))
+    use pod_core::files::{replace, Mode};
+    let path = dir_in(root, &r.name).join(RECORD);
+    replace(&path, r.to_json().as_bytes(), Mode::Exact(0o644)).map(drop)
 }
 
 /// Each machine under `root`, by name.

@@ -195,23 +195,15 @@ impl Report {
         j
     }
 
-    /// Write the document to `path`: a file beside it, then a rename.
+    /// Write the document to `path`: the one atomic replace of a file
+    /// (`pod_core::files::replace`, TODO/deps.md T-2066). Its error names
+    /// the step and the path.
     pub fn write(&self, path: &Path) -> Result<(), String> {
-        let text = serde_json::to_string_pretty(&self.json()).map_err(|e| e.to_string())?;
-        let dir = path
-            .parent()
-            .filter(|d| !d.as_os_str().is_empty())
-            .unwrap_or(Path::new("."));
-        let name = path
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_default();
-        let tmp = dir.join(format!(".{name}.{}.tmp", std::process::id()));
-        std::fs::write(&tmp, text + "\n").map_err(|e| format!("{}: {e}", tmp.display()))?;
-        std::fs::rename(&tmp, path).map_err(|e| {
-            let _ = std::fs::remove_file(&tmp);
-            format!("{}: {e}", path.display())
-        })
+        use pod_core::files::{replace, Mode};
+        let text = serde_json::to_string_pretty(&self.json()).map_err(|e| e.to_string())? + "\n";
+        replace(path, text.as_bytes(), Mode::Exact(0o644))
+            .map(drop)
+            .map_err(|e| e.to_string())
     }
 }
 
