@@ -6605,3 +6605,36 @@ One table: `podvm-probe/src/exit.rs` (`CASES`, and the code of the manual's `GLO
 ## Done
 
 **Done (2026-11-21).** The refusals after the parse exit 1: `rmi` of an image that a container uses, the gate of `cp` (`the copy is refused`, and a link in the path), and `load` and `import` through one function (`images/save_load.rs`: `archive_exit`, a refused archive or a file of the caller that does not read gives 1, a failure of the store 125). `podvm_enter::ExitCode::exit_code` gives 126 where `pod-enter` reports "not found" with E2BIG in its text (a stand-in until podcrates takes E2BIG; the lead writes the COORD issue). `CASES` names both. As uid 1000 with `alpine:3.20`, before (`3fa36a6`) and after: `run --env-file` with a value of 1 MB gave 127, and now gives 126; `rmi` of an image that a container uses, `load -i /etc/shadow`, `import` of a `.gz` and `cp c:/../../etc/shadow x` gave 125, and now give 1.
+
+# T-2063: The sixth outside pass, OQ-12: a SIGKILL of podvm leaves `staging/memo-*.tmp`
+
+**Source:** the sixth outside pass (T-2044), OQ-12 (P3)
+**Category:** cli
+**Milestone:** none
+**Priority:** P3
+**Effort:** S
+**Status:** done
+
+## Problem
+
+A SIGKILL of podvm leaves `store/staging/memo-<pid>-<n>.tmp`, and `rm -f` and `container prune` do not remove it.
+
+## Premise
+
+The memo of a foreground run is a file of `staging/` that the run removes when it ends. The sweep of `staging/` took only `*.partial`. A pid is not a proof of an owner across PID namespaces, so the pid in the name cannot decide.
+
+## Approach
+
+A run takes an exclusive `flock` on its memo when it makes the name (`interpose::ephemeral_memo_path`), close-on-exec, until the process ends, however it ends. `Store::sweep_staging` removes a `memo-*.tmp` that it can lock, and that is 10 s old (a file between its creation and its lock is young); `container prune` removes one that no lock holds at once.
+
+## Decision
+
+-
+
+## Prove
+
+`the_sweep_removes_the_memo_of_a_dead_run_and_only_that`: one table of lock, age and name. As uid 1000: `kill -9` of a foreground `run`, then `container prune`: no `memo-*.tmp` stays.
+
+## Done
+
+**Done (2026-11-21).** `Store::sweep_staging` and `sweep_staging_aged` (`podvm-image/src/store/blobs.rs`) take `memo-*.tmp` by the lock, and each `podvm` command that opens the store sweeps with an age of 10 s; `container prune` sweeps with none. A live run holds the lock (`interpose::hold_memo`), a payload does not (close-on-exec). The table test holds the rule for a locked file, a young file, a name that is not a memo, and a `.partial`.

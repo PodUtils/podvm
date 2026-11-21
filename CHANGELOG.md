@@ -24,6 +24,7 @@ They describe their recorded revision, not the current build.
 - `inspect --format` gives each field its docker type: `{{json .Config.Env}}` is a list, `{{.Config.Cmd}}` prints `[python3]`, `{{json .Labels}}` is a map, and `Pid`, `ExitCode` and the counts of `End` are numbers. Plain `inspect` and `--format` read one model of the fields. A container has docker's `Config` (T-2060, OQ-06).
 - `run -t` sets `TERM=xterm` where neither the image nor `-e` sets `TERM`. `exec` into a container that exited or died is refused with exit 1. `logs --tail all` is the whole log. `-v H:G:z` and `:Z` are accepted and do nothing. `start -a`, `cp NAME:PATH -` and the `HOSTNAME` of a run with no `--hostname` are named as known differences (T-2061, OQ-09).
 - An E2BIG of `execve` exits 126. `rmi` of a referenced image, a refused `cp`, and a `load` or `import` that refuses its archive exit 1, as the manual says (T-2062, OQ-10).
+- A foreground run holds a lock on its memo. A SIGKILL of podvm no longer leaves `store/staging/memo-*.tmp`: the next command that opens the store, and `container prune`, remove the memo of a run that has ended (T-2063, OQ-12).
 
 ## 0.2.0-beta.37 (2026-11-21)
 

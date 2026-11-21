@@ -79,7 +79,7 @@ impl Store {
             if !meta.is_file() {
                 continue;
             }
-            let young = !super::blobs::abandoned_by_age(&e.path());
+            let young = !super::blobs::abandoned_by_age(&e.path(), super::blobs::STAGING_AGE);
             if remove && young {
                 found.young += 1;
                 continue;

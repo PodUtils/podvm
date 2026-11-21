@@ -39,6 +39,12 @@ impl Store {
     /// [`crate::contain`], because a sweep is an unlink and every unlink this
     /// crate performs is gated the same way.
     pub fn sweep_staging(&self) -> Vec<PathBuf> {
+        self.sweep_staging_aged(MEMO_AGE)
+    }
+
+    /// [`Store::sweep_staging`] with the age of an unlocked memo of a run:
+    /// `container prune` asks for none (TODO/cli.md T-2063).
+    pub fn sweep_staging_aged(&self, memo_age: std::time::Duration) -> Vec<PathBuf> {
         let dir = self.root.join(STAGING);
         let Ok(entries) = std::fs::read_dir(&dir) else {
             return Vec::new();
@@ -46,7 +52,9 @@ impl Store {
         let mut swept = Vec::new();
         for e in entries.flatten() {
             let path = e.path();
-            if path.extension().and_then(|x| x.to_str()) != Some("partial") {
+            // TODO/cli.md T-2063 (OQ-12): the memo of a foreground run too.
+            let memo = is_memo(&path);
+            if !memo && path.extension().and_then(|x| x.to_str()) != Some("partial") {
                 continue;
             }
             let Ok(resolved) = contain::within(&self.root, &path) else {
@@ -58,7 +66,7 @@ impl Store {
             // launcher lost the end of a run (`Dead`, no exit code), or `run`
             // failed with "containers.json: No such file or directory". A
             // young file is a write in progress, locked or not.
-            if !abandoned_by_age(&resolved) {
+            if !abandoned_by_age(&resolved, if memo { memo_age } else { STAGING_AGE }) {
                 continue;
             }
             // ⭐ The lock test: a live writer holds this file, so a lock this
@@ -268,11 +276,25 @@ impl Store {
 /// The age after which an unlocked staging file is abandoned.
 pub const STAGING_AGE: std::time::Duration = std::time::Duration::from_secs(600);
 
-/// True where the file at `p` was last written [`STAGING_AGE`] or more ago.
-pub(super) fn abandoned_by_age(p: &Path) -> bool {
+/// The age after which an unlocked memo of a run is abandoned. A run locks
+/// its memo when it makes it (`interpose::ephemeral_memo_path`), so this only
+/// covers the moment between the file and its lock.
+pub const MEMO_AGE: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// The name of the memo of a foreground run: `memo-<pid>-<nanos>.tmp`. The
+/// pid is no proof of an owner (it is not unique across PID namespaces); the
+/// lock on the file is.
+pub fn is_memo(p: &Path) -> bool {
+    p.file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.starts_with("memo-") && n.ends_with(".tmp"))
+}
+
+/// True where the file at `p` was last written `limit` or more ago.
+pub(super) fn abandoned_by_age(p: &Path, limit: std::time::Duration) -> bool {
     std::fs::metadata(p)
         .and_then(|m| m.modified())
         .ok()
         .and_then(|t| t.elapsed().ok())
-        .is_some_and(|age| age >= STAGING_AGE)
+        .is_some_and(|age| age >= limit)
 }

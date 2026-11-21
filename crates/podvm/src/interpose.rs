@@ -329,10 +329,28 @@ pub fn ephemeral_memo_path(store: &podvm_image::Store) -> std::path::PathBuf {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    store
+    let path = store
         .root()
         .join("staging")
-        .join(format!("memo-{}-{nanos}.tmp", std::process::id()))
+        .join(format!("memo-{}-{nanos}.tmp", std::process::id()));
+    hold_memo(&path);
+    path
+}
+
+/// TODO/cli.md T-2063 (OQ-12): the run holds a lock on its memo until it
+/// ends, however it ends (`flock` goes with the process, also for SIGKILL).
+/// `Store::sweep_staging` removes a memo that it can lock, so a memo of a
+/// dead run does not stay. The lock is the proof of an owner, not the pid:
+/// a pid is not unique across PID namespaces. The lock is close-on-exec, so
+/// the payload does not hold it. A lock that cannot be taken leaves the old
+/// behaviour: the file stays where it is until a sweep finds it unlocked
+/// and 10 s old.
+fn hold_memo(path: &std::path::Path) {
+    static HELD: std::sync::Mutex<Vec<podvm_image::store::Lock>> =
+        std::sync::Mutex::new(Vec::new());
+    if let Ok(Some(lock)) = podvm_image::store::Lock::try_exclusive(path) {
+        HELD.lock().unwrap_or_else(|e| e.into_inner()).push(lock);
+    }
 }
 
 /// The `LD_PRELOAD` value with podvm's object first.

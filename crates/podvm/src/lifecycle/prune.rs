@@ -81,6 +81,9 @@ pub fn prune(args: &[String]) -> i32 {
         Ok(s) => s,
         Err(c) => return c,
     };
+    // TODO/cli.md T-2063 (OQ-12): the memo of a run that a SIGKILL ended
+    // stays in `staging/`. A memo that no lock holds belongs to no run.
+    let _ = s.sweep_staging_aged(std::time::Duration::ZERO);
     let all = match podvm_supervise::list(&s, true) {
         Ok(l) => l,
         Err(e) => return fail(VERB, e),

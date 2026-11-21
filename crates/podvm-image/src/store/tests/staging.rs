@@ -391,3 +391,46 @@ fn a_stray_goes_only_where_no_writer_is_alive_and_it_is_old() {
         let _ = std::fs::remove_dir_all(s.root());
     }
 }
+
+/// TODO/cli.md T-2063 (OQ-12): the memo of a run that a SIGKILL ended stays
+/// in `staging/`. The sweep removes a memo that no lock holds and that is
+/// not young; a locked one is a live run, and a young one may be a file
+/// between its creation and its lock. The pid in the name decides nothing
+/// (it is not unique across PID namespaces). One table, one rule.
+#[test]
+fn the_sweep_removes_the_memo_of_a_dead_run_and_only_that() {
+    use std::time::Duration;
+    let _serialised = STORE_TESTS.lock().unwrap_or_else(|e| e.into_inner());
+    let s = scratch("sweep-memo");
+    let staging = s.root().join("staging");
+    // (name, locked by a live run, backdated, swept with the age of 10 s, swept with none)
+    let rows: [(&str, bool, bool, bool, bool); 6] = [
+        ("memo-1-1.tmp", false, true, true, true),
+        ("memo-2-2.tmp", true, true, false, false),
+        ("memo-3-3.tmp", false, false, false, true),
+        ("memo-4-4.tmp.keep", false, true, false, false),
+        ("note-5-5.tmp", false, true, false, false),
+        ("memo-6-6.partial", false, true, true, true),
+    ];
+    for (name, locked, old, by_age, at_once) in rows.iter() {
+        for (round, want) in [(0, *by_age), (1, *at_once)] {
+            let path = staging.join(name.replacen('-', &format!("-r{round}-"), 1));
+            std::fs::write(&path, b"").unwrap();
+            if *old {
+                backdate(&path);
+            }
+            let held = locked.then(|| crate::store::Lock::try_exclusive(&path).unwrap().unwrap());
+            let age = if round == 0 {
+                crate::store::blobs::MEMO_AGE
+            } else {
+                Duration::ZERO
+            };
+            let swept = s.sweep_staging_aged(age).contains(&path);
+            assert_eq!(swept, want, "{name} round {round}");
+            assert_eq!(path.exists(), !want, "{name} round {round}");
+            drop(held);
+            let _ = std::fs::remove_file(&path);
+        }
+    }
+    let _ = std::fs::remove_dir_all(s.root());
+}
