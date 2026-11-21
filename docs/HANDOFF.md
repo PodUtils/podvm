@@ -1,10 +1,10 @@
 # Handoff
 
-The state on 2026-11-20, 09:40 (UTC), during a session. `main` is at the
-commit that changes this file. `0.2.0-beta.36` is the last release. After
-it, `main` carries podcrates `v0.79.0` and the work of the sessions of
-2026-11-19 and 2026-11-20 (below). A fresh session with no memory reads
-this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
+The state on 2026-11-21, 02:00 (UTC), at the end of a session. `main` is
+at the commit that changes this file. `0.2.0-beta.37` is the last release
+(2026-11-21, release run 44846783317 on `c92ac65`, podcrates `v0.79.0`).
+After it, `main` carries podcrates `v0.80.0` (T-2050). A fresh session with
+no memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
 `docs/decisions.md`. Remove this file when each step below is done.
 
 ## The rulings of this day
@@ -21,8 +21,8 @@ this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
 
 ## Where things are
 
-* podcrates is taken at `v0.74.0` (`ef56d16`, COORD-201, #597, closed;
-  `v0.73.0` in `20313a0`). A podvm session can not write on
+* podcrates is taken at `v0.80.0` (`a5e4936` to `4dc5744`, COORD-223,
+  #635; CI green in #637). A podvm session can not write on
   PodUtils/podcrates issues (its GitHub access reaches podvm only): each
   take is a COORD issue of this repository.
 * Each release publishes `ghcr.io/podutils/podvm:TAG` by the job `image`
@@ -224,28 +224,54 @@ this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
   (`crates/podvm/src/environ.rs`); a test fails on a `PODVM_*` name with
   no row.
 
+## This session (2026-11-20, from 18:00 UTC, to 2026-11-21)
+
+* Released `0.2.0-beta.37` (#634). Its gate: #627 (the nightly trial failed
+  on the licence text of asn1-rs-impl 0.2.0: `vendor/licence-texts/`,
+  `3924ccd`), #628, #632 (all green on `7324fe0`). COORD-224 (#636) names
+  the tag to podrunner.
+* T-2048 (partial): the save of a machine guest hung with no line. It
+  opened a new QMP connection while the old one was open; QEMU queues one
+  client (listen backlog 1), and the third `connect()` waited with no
+  bound, past SIGTERM. Fixed in `867f79e`; KVM proof in `kvm.yml` 44808044333
+  (a run from the saved state 3.4 s against 12.2 s). Experiment 468 now
+  fails on a row with no bench line (`7324fe0`): before, its hung rows
+  passed the step. COORD-222 (#633) asks podcrates for a bounded
+  `Monitor::connect`.
+* T-2046 (done, podrunner#333): `logs` streams through one buffer of 64 KiB
+  and takes `--limit-bytes N` (COORD-220, #630). The two test modules under
+  `crates/podvm/src/{incus,lifecycle}/logs/` were hidden by an unanchored
+  `logs/` of `.gitignore` (now `/logs/`). COORD-221 (#631) asks podcrates for
+  a streamed log read and a ranged incus file read.
+* podrunner#334 answered (COORD-219, #629): the one measured point says
+  the memory of a guest is about 3 times the initrd and 512 MiB, so podrunner's
+  "half of the memory" bound is too loose. T-2047 (open) measures the curve.
+* podcrates `v0.80.0` taken (T-2050 partial, T-2051 blocked: `warm::line`
+  waits for #633). Five `#!` levels; `pty.rs` no longer calls
+  `rt_sigprocmask` by the x86_64 number on each arch. #611, #613, #618 and
+  #624 closed. T-2018 done.
+* Not confirmed: experiment 434 clause 23 (the `oom_kills` of an OOM run)
+  failed once in the T-2046 agent's run, likely a timing of the metrics of
+  incusd. Run it again before it is called a fault.
+
 ## Next steps, in order
 
 1. Start the session (`AGENTS.md`, section 8), with the watcher.
-2. Read #617: close it with the run ids, or work a red run first.
-3. podrunner first: watch #583, #585, #592, #593, #596, #599, #605, #609
-   and #612.
-4. Take the next tag of podcrates: `pod-beneath` (#611: three copies of
-   podvm go; its README names each take), `pod_confine::loader`,
-   `Spec::table`, `Names::write_table` (a new field of `NAMES`:
-   `write_table: "PODVM_WRITE_HOST"`), `check_exec_argv` and
-   `check_exec_guest` (#613: podvm's `ldso.rs` and `check_first` go).
-5. The next beta: it carries each item above and the work of 2026-11-19
-   (T-1996 to T-2010). Its gate needs a new outside pass
-   (`docs/maintenance.md`, "Releases"), `workloads.yml` and the nightly
-   trial.
-6. T-2016 (one more boot where the emulator ends on a signal before its
-   ready marker), the T-2008 remainders (KVM: #617's job `init`; the runs
-   that boot as before; `rmi` and `prune` of a state), T-2002 and T-2007
-   (`run -d`, `exec`, the pty), T-2014, T-2015.
-7. [The hard problems](history/hard-problems-2026-11-20.md): the ranked
-   top ten. Then T-1964 (a pool with a quota), T-1968, and the work order
-   of `TODO/PROGRESS.md`.
+2. podrunner first: watch #583, #585, #592, #593, #596, #599, #605, #609,
+   #612, #629, #630 and #636.
+3. podcrates: watch #602, #604, #631, #633 and #635. When a tag has the
+   bounded `Monitor::connect` of #633, take `pod_guest::warm::line`
+   (T-2051) and hold it against `state/tests_monitor.rs`.
+4. T-2050 remainders: the integration tests as uid 1000; a machine run
+   with the store's static QEMU 11.0.0 (`kvm.yml` takes the runner's QEMU).
+5. T-2048 remainders: a SIGTERM during a save waits for the save (at most
+   about 7 minutes, an estimate).
+6. T-2047: the memory curve of a guest (`kvm.yml`), then answer #629.
+7. Experiment 434 clause 23, once more (above).
+8. T-2044 P2 and P3 findings (OQ-05 to OQ-13), T-2016, T-2002, T-2014,
+   T-2015, then [the hard problems](history/hard-problems-2026-11-20.md)
+   and the work order of `TODO/PROGRESS.md`.
+9. The binary is 8,960,152 bytes; the ceiling of call C24 is 9,000,000.
 
 ## Rules learned
 
@@ -288,3 +314,13 @@ this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
   --workspace` before a push.
 * A thread of a foreground run blocks `pod_enter::WAIT_FORWARDED`: a
   thread that leaves a signal unblocked takes it with the default action.
+* A step of an experiment that only prints a bench line can pass while its
+  run hangs: give each experiment an exit code that fails on a missing row.
+* A test stand-in of QEMU's monitor must act as QEMU does: one client, a
+  listen backlog of 1, the late answer on the same connection.
+* A `.gitignore` rule with no leading `/` matches a source directory of
+  the same name: check `git check-ignore -v` when a new module "is not
+  found" in CI or after a cherry-pick.
+* `release.yml` checks for a green gate run on its own commit: a request
+  runs the gate, waits for it (`gh run watch --exit-status`), then
+  dispatches the release, in one block.
