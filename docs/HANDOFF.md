@@ -1,11 +1,14 @@
 # Handoff
 
-The state on 2026-11-21, 02:00 (UTC), at the end of a session. `main` is
+The state on 2026-11-21, 08:30 (UTC), at the end of a session. `main` is
 at the commit that changes this file. `0.2.0-beta.37` is the last release
 (2026-11-21, release run 44846783317 on `c92ac65`, podcrates `v0.79.0`).
-After it, `main` carries podcrates `v0.80.0` (T-2050). A fresh session with
-no memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
-`docs/decisions.md`. Remove this file when each step below is done.
+After it, `main` carries podcrates `v0.80.0` (T-2050), the CLI fixes of
+the sixth outside pass (T-2060 to T-2064) and the memory rule of T-2047.
+Two branches of work wait on origin (below, "WIP branches"). A fresh
+session with no memory reads this file first, then `AGENTS.md`,
+`TODO/PROGRESS.md` and `docs/decisions.md`. Remove this file when each
+step below is done.
 
 ## The rulings of this day
 
@@ -243,9 +246,23 @@ no memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
   `crates/podvm/src/{incus,lifecycle}/logs/` were hidden by an unanchored
   `logs/` of `.gitignore` (now `/logs/`). COORD-221 (#631) asks podcrates for
   a streamed log read and a ranged incus file read.
-* podrunner#334 answered (COORD-219, #629): the one measured point says
-  the memory of a guest is about 3.25 times the initrd and 512 MiB (T-2047, experiment 470 under KVM), so podrunner's
-  "half of the memory" bound is too loose. T-2047 (open) measures the curve.
+* T-2047 (done): experiment 470 (`kvm.yml` job `mem`) measured the memory
+  of a guest for an initrd of 263 to 2055 MiB under KVM (run 44854125431):
+  about 3.25 times the initrd at 2 GiB. `mem.rs` takes 13/4 of the initrd
+  and 512 MiB. podrunner closed #334 (COORD-219, #629).
+* T-2060 to T-2064 (done, the sixth outside pass, OQ-06, 09, 10, 12, 13):
+  typed `inspect` JSON, exit codes (refusals after the parse are 1, E2BIG
+  126), `exec` into an exited container refused, `TERM=xterm` with `-t`,
+  the memo flock, texts. Gate 44862250138 green after three integration
+  tests took the new behaviour. COORD-226 (#640) tells podrunner;
+  COORD-225 (#639) asks podcrates for E2BIG in pod-enter.
+* T-2065 (blocked): podrunner#339, a PAX record `SCHILY.acl.access` with a
+  newline refuses a layer in `pod-extract`; COORD-227 (#643) to podcrates
+  (in work for its next tag), COORD-228 (#644) to podrunner.
+* Experiment 465 clause 11: `-t` sets `TERM=xterm`, and the image's bash
+  writes the escapes of bracketed paste; the check now strips them (the
+  last commit of the session). Clause 9 fails on this cloud host only
+  because its QEMU 8.2.2 crashes under TCG with four vCPUs (T-2016).
 * podcrates `v0.80.0` taken (T-2050 partial, T-2051 blocked: `warm::line`
   waits for #633). Five `#!` levels; `pty.rs` no longer calls
   `rt_sigprocmask` by the x86_64 number on each arch. #611, #613, #618 and
@@ -254,24 +271,55 @@ no memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
   failed once in the T-2046 agent's run, likely a timing of the metrics of
   incusd. Run it again before it is called a fault.
 
+## WIP branches (pushed by the owner's word "save them to a wip branch")
+
+* The entries of a branch (2052 to 2055, 2066) are in the `TODO/` files of
+  that branch; the index of `main` has them after the merge.
+* `wip/podcrates-081` (`1b98db4`, 5 commits on `ac02435`): the take of
+  podcrates `v0.81.0` (PodUtils/podcrates#254): entry 2066 partial, T-2051 done
+  (`pod_guest::warm::line` with the bounded `Monitor::connect`), T-2046
+  (`pod_supervise::stream`, the incus log in pieces with no 64 MiB bound),
+  the static QEMU 11.1.3, `pod_core::files::replace`. `checks.sh`, 1,111
+  tests and the aarch64 check pass. NOT merged: the binary is 9,005,240
+  bytes, over the ceiling of call C24 (9,000,000). Its 465 run failed clause
+  11 only (fixed on `main` since). Left: the load wait `save::running`
+  stays podvm's (the crate needs the emulator's `Child`).
+* `wip/oq-run` (`57463ac`, rebased on `ac02435`): OQ-05 (entry 2052, Ctrl-C of
+  `-it` reaches the payload's process group), OQ-07 (entry 2053, one isolation
+  table `podvm_probe::isolation` for the banner, `--strict`, `inspect` and
+  the manual), OQ-11 (entry 2055, the manual was wrong; tests added) done;
+  OQ-08 (entry 2054) partial (process titles and an empty environment through
+  `PR_SET_MM_MAP`; the image lock is not handed to the payload). The last
+  commit is a `WIP:` size cut to 8,997,080 bytes: fold it into the four
+  before it. `cargo test --workspace --no-fail-fast` stopped after 66
+  suites with no failure. A COORD ask is in its entry 2054 text: pod-enter's
+  PID-namespace init and join relay set a title, an empty environment and
+  `PR_SET_DUMPABLE` 0.
+* The two branches together are far over the ceiling. First decide the
+  size: a call C29 that raises the ceiling with its delta (the release
+  profile is already `opt-level = "z"`, LTO, one codegen unit, stripped),
+  or cuts. Then merge one branch at a time, run
+  `cargo test --workspace --no-fail-fast`, and request gate, arm and
+  `kvm.yml` (`init`) for each.
+
 ## Next steps, in order
 
 1. Start the session (`AGENTS.md`, section 8), with the watcher.
-2. podrunner first: watch #583, #585, #592, #593, #596, #599, #605, #609,
-   #612, #629, #630 and #636.
-3. podcrates: watch #602, #604, #631, #633 and #635. When a tag has the
-   bounded `Monitor::connect` of #633, take `pod_guest::warm::line`
-   (T-2051) and hold it against `state/tests_monitor.rs`.
-4. T-2050 remainders: the integration tests as uid 1000; a machine run
-   with the store's static QEMU 11.0.0 (`kvm.yml` takes the runner's QEMU).
-5. T-2048 remainders: a SIGTERM during a save waits for the save (at most
+2. podrunner first: watch #583, #585, #593, #596, #599, #605, #636, #640
+   and #644; podrunner#339 waits for #643.
+3. The size call, then `wip/podcrates-081` (close #631 and #633 with its
+   take; write the COORD of the take), then `wip/oq-run` (write the COORD
+   of entry 2054; amend T-2044 with OQ-05 to OQ-13).
+4. podcrates: watch #602, #604, #639 and #643; take the tag that has #639
+   and #643, then answer #644 with the version.
+5. T-2050 remainders: the integration tests as uid 1000; a machine run
+   with the store's static QEMU.
+6. T-2048 remainder: a SIGTERM during a save waits for the save (at most
    about 7 minutes, an estimate).
-6. T-2047: the memory curve of a guest (`kvm.yml`), then answer #629.
 7. Experiment 434 clause 23, once more (above).
-8. T-2044 P2 and P3 findings (OQ-05 to OQ-13), T-2016, T-2002, T-2014,
-   T-2015, then [the hard problems](history/hard-problems-2026-11-20.md)
-   and the work order of `TODO/PROGRESS.md`.
-9. The binary is 8,960,152 bytes; the ceiling of call C24 is 9,000,000.
+8. T-2016, T-2002, T-2014, T-2015, then
+   [the hard problems](history/hard-problems-2026-11-20.md) and the work
+   order of `TODO/PROGRESS.md`.
 
 ## Rules learned
 
