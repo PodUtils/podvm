@@ -324,3 +324,9 @@ no memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
 * `release.yml` checks for a green gate run on its own commit: a request
   runs the gate, waits for it (`gh run watch --exit-status`), then
   dispatches the release, in one block.
+* `scripts/dev/checks.sh` does not run the integration tests of
+  `crates/podvm/tests/`; the gate does (`cargo test --workspace`, which
+  stops at the first test binary that fails). Before a push that changes
+  a behaviour, run `cargo test --workspace --no-fail-fast` with the
+  interposer objects built (gate 44859009048: three tests held the old
+  exit codes and texts).

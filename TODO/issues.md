@@ -534,7 +534,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #638 | [gh action] requested | closed (kvm 44854125431 job mem on 8de9873 passed: the curve of T-2047) | the job mem of kvm.yml (experiment 470) on 8de9873: the memory of a guest for an initrd of N bytes (T-2047) |
 | #639 | COORD-225: pod-enter reads E2BIG at execve as "not found" (127); it is "found, not invocable" (126) (to podcrates) | open | T-2062 |
 | #640 | COORD-226: on podvm's main, for the next release: typed inspect JSON, exit codes, exec into an exited container, the memory rule (to podrunner) | open | T-2047, T-2060, T-2061, T-2062, T-2064 |
-| #641 | [gh action] requested | open | the gate, arm and workloads runs of cb8bbf4, after the fixes of the sixth outside pass for the CLI (T-2047, T-2060 to T-2064) |
+| #641 | [gh action] requested | closed (on cb8bbf4: arm 44859012273 and workloads 44859015855 passed; gate 44859009048 failed on three integration tests that held the behaviour before T-2060 to T-2062, changed in the next commit) | the gate, arm and workloads runs of cb8bbf4, after the fixes of the sixth outside pass for the CLI (T-2047, T-2060 to T-2064) |
 
 ## Messages whose title does not start with COORD-NNN
 

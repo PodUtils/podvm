@@ -125,7 +125,8 @@ fn label_reaches_inspect() {
     let (store, id) = labelled("inspect");
     let (rc, out, err) = podvm(&store, &["inspect", "--format", "{{.Labels}}", &id]);
     assert_eq!(rc, 0, "inspect: {err}");
-    assert_eq!(out.trim(), "job=7,tier=x");
+    // docker's text form of a map (T-2060, the sixth outside pass, OQ-06).
+    assert_eq!(out.trim(), "map[job:7 tier:x]");
     let (rc, _, err) = podvm(&store, &["create", "--label", "=v", "lab/one:1", "/hello"]);
     assert_eq!(rc, 125, "a label with no key is a flag error: {err}");
     assert!(err.contains("--label takes KEY=VALUE"), "{err}");

@@ -1,6 +1,8 @@
-//! TODO/cli.md T-1830: a `--tmpfs` directory ends with its run. An
-//! `exec` into the container after the run sees the tree of the image at
-//! that path, not a removed directory.
+//! TODO/cli.md T-1830: a `--tmpfs` directory ends with its run. Since
+//! T-2061 (the sixth outside pass, OQ-09) an `exec` into the container
+//! after the run is refused, as docker refuses it: exit 1 and one line
+//! that names the state, and no file of the tmpfs or of the tree reaches
+//! the caller.
 //!
 //! The image is the host's `cat` and `tee` with the loader and libc of the
 //! host, imported from a tar (as `volumes_default_rung.rs`), and a file
@@ -115,13 +117,15 @@ fn tmpfs_exec_after_the_run_sees_the_tree_of_the_image() {
         b"run\n",
     );
     assert!(r.status.success(), "run: {}", text(&r.stderr));
-    // The file of the tree, which the tmpfs hid during the run.
-    let e = podvm(&store, &["exec", "tx", "cat", "/tmp/keep"], b"");
-    assert_eq!(e.status.code(), Some(0), "exec: {}", text(&e.stderr));
-    assert_eq!(text(&e.stdout), "tree\n");
-    // The file of the run went with its tmpfs.
-    let g = podvm(&store, &["exec", "tx", "cat", "/tmp/x"], b"");
-    assert_eq!(g.status.code(), Some(1), "exec: {}", text(&g.stderr));
+    // An exec after the run is refused, for a file of the tree and for a
+    // file of the run.
+    for path in ["/tmp/keep", "/tmp/x"] {
+        let e = podvm(&store, &["exec", "tx", "cat", path], b"");
+        let err = text(&e.stderr);
+        assert_eq!(e.status.code(), Some(1), "exec {path}: {err}");
+        assert!(err.contains("is not running"), "exec {path}: {err}");
+        assert_eq!(text(&e.stdout), "", "exec {path}");
+    }
     let _ = podvm(&store, &["rm", "-f", "tx"], b"");
     let _ = std::fs::remove_dir_all(&dir);
 }

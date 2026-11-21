@@ -94,7 +94,8 @@ fn cp_onto_a_directory_keeps_modes_and_names_a_refused_copy() {
     ] {
         let o = podvm(&base, args);
         let err = String::from_utf8_lossy(&o.stderr);
-        assert_eq!(o.status.code(), Some(125), "{args:?}: {err}");
+        // A refusal after the parse exits 1 (T-2062, OQ-10).
+        assert_eq!(o.status.code(), Some(1), "{args:?}: {err}");
         assert!(err.contains("copy"), "{args:?}: {err}");
         assert!(!err.contains("delete"), "{args:?}: {err}");
     }
