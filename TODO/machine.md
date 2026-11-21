@@ -5932,7 +5932,7 @@ As uid 1000 under TCG: after `run -d --name m --podvm-tier=machine IMAGE sleep 6
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -5956,7 +5956,7 @@ The experiment's run on `kvm.yml` gives the smallest memory for each size; `mem.
 
 ## Done
 
-Partial (2026-11-21). Experiment 470 (`experiments/470-machine-mem.sh`, job `mem` of `kvm.yml`) builds each image from the one layer of alpine 3.20 (`podvm save`, no docker) and a file of random bytes, and finds the smallest `--podvm-mem` in steps of 256 MiB; it fails where podvm's estimate is below a point. A first point, under TCG on the cloud host (QEMU 8.2.2): an initrd of 263 MiB does not boot at 768 MiB and boots at 1024 MiB; the estimate is 1536 MiB (`experiments/results/machine-mem.txt`). Remaining: the run of the job `mem` under KVM for 256, 512, 1024 and 2048 MiB, the rule of `mem.rs` from the points, and the answer to #629.
+**Done (2026-11-21).** Experiment 470 (`experiments/470-machine-mem.sh`, job `mem` of `kvm.yml`) builds each image from the one layer of alpine 3.20 (`podvm save`, no docker) and a file of random bytes, and finds the smallest `--podvm-mem` in steps of 256 MiB; it fails where podvm's estimate is below a point. Under KVM (`kvm.yml` run 44854125431 on `8de9873`, QEMU 10.2.1): an initrd of 263, 519, 1031 and 2055 MiB does not boot at 768, 1536, 3072 and 6400 MiB and boots at 1024, 1792, 3328 and 6656 MiB (`experiments/results/machine-mem.txt`); under TCG on the cloud host the 263 MiB point is the same. The need grows faster than three times the initrd (3.25 times the growth from 1031 to 2055 MiB), and the rule of three times and 512 MiB was one step over the 2055 MiB point. `mem.rs` now takes 13/4 of the initrd and 512 MiB, rounded up to 256 MiB, and the unit test `the_estimate_holds_each_measured_point` holds each of the five points (with the 1416 MiB point of experiment 463). The answer to PodUtils/podrunner#334 is #629 (COORD-219), amended with the curve.
 
 # T-2048: The save of the state of a guest hangs the run with no line when the monitor of the emulator answers late
 

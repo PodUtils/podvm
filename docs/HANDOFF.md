@@ -244,7 +244,7 @@ no memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
   `logs/` of `.gitignore` (now `/logs/`). COORD-221 (#631) asks podcrates for
   a streamed log read and a ranged incus file read.
 * podrunner#334 answered (COORD-219, #629): the one measured point says
-  the memory of a guest is about 3 times the initrd and 512 MiB, so podrunner's
+  the memory of a guest is about 3.25 times the initrd and 512 MiB (T-2047, experiment 470 under KVM), so podrunner's
   "half of the memory" bound is too loose. T-2047 (open) measures the curve.
 * podcrates `v0.80.0` taken (T-2050 partial, T-2051 blocked: `warm::line`
   waits for #633). Five `#!` levels; `pty.rs` no longer calls

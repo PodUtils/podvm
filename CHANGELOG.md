@@ -8,6 +8,10 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- On the machine tier, podvm sizes the memory of a guest with no
+  `--podvm-mem` from 13/4 of its initrd and 512 MiB, not three times and
+  512 MiB: under KVM an initrd of 2055 MiB needs 6656 MiB, one step under
+  the old estimate (T-2047, experiment 470, `kvm.yml` run 44854125431).
 - podvm takes podcrates `v0.80.0` (PodUtils/podcrates#250). `pod-enter` writes the write table of the confine layer (`PODVM_WRITE_HOST`) for the entry with no chroot, and each entry removes a value of the caller (podcrates@T-999). The payload of each entry starts with an empty signal mask (podcrates@T-1010).
 - podvm no longer writes the write table of the confine layer itself: `pod-enter` writes it from the spec of the plan (`podvm_supervise::table::set_write_table` is gone; T-2050).
 - The open of a volume under `--podvm-volume-base` is the crate `pod-beneath` of podcrates on each route (the namespace rung, the syscall tier and the interposer of the loader family), in place of three copies of podvm; each open tries `EAGAIN` again (T-2050, #611).

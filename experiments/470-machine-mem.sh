@@ -1,8 +1,8 @@
 #!/bin/sh
 # Question: what is the smallest memory with which a guest of the machine
 # tier boots an image whose initrd is N bytes, for N of about 256, 512,
-# 1024 and 2048 MiB? Is podvm's estimate (three times the initrd and
-# 512 MiB, `crates/podvm/src/machine/guest/mem.rs`) at or above each point?
+# 1024 and 2048 MiB? Is podvm's estimate (13/4 of the initrd and 512 MiB,
+# `crates/podvm/src/machine/guest/mem.rs`) at or above each point?
 #
 # TODO/machine.md T-2047 (PodUtils/podrunner#334, COORD-219 #629). The rule
 # of T-1922 comes from one image: an initrd of 1416 MiB resets the guest at
@@ -107,7 +107,7 @@ for n in $SIZES; do
 	rm -f "$WORK/img.tar"
 	runs=0
 	# The estimate of mem.rs, rounded up to a step: the high bound.
-	est=$(up $((3 * n + 512)))
+	est=$(up $((n / 4 * 13 + 512)))
 	hi=$((est + STEP))
 	if ! boot "$hi"; then
 		bad "size $n: no boot at the high bound $hi MiB: $(tail -1 "$WORK/err" | cut -c1-200)"
@@ -128,7 +128,7 @@ for n in $SIZES; do
 	if [ -n "$bytes" ]; then
 		initrd="$((bytes / 1048576)) MiB"
 		# podvm's estimate from the bytes of the initrd, as mem.rs computes it.
-		est=$(((3 * bytes + 512 * 1048576 + STEP * 1048576 - 1) / (STEP * 1048576) * STEP))
+		est=$(((bytes / 4 * 13 + 512 * 1048576 + STEP * 1048576 - 1) / (STEP * 1048576) * STEP))
 	else
 		bad "size $n: no initrd in the store, so the estimate is from the size asked"
 	fi
