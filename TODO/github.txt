@@ -531,6 +531,6 @@
 639 issue open
 640 issue open
 641 issue closed
-642 issue open
+642 issue closed
 643 issue open
 644 issue open
