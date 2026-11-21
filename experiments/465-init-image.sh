@@ -573,8 +573,12 @@ if [ -n "$DELEG" ]; then
 	case "$t" in "/dev/pts/"*" pts/"*) ;; *) bad "clause 11: -t gives the command no pty of the init"; keep "$T.11.err" ;; esac
 	printf 'echo typed-$((40+2))\nexit 4\n' | ind timeout 300 "$P" run --rm -it --podvm-init=image "$IMG" sh >"$T.11.out" 2>"$T.11.err"
 	rc=$?
-	say "clause 11  rc $rc (a shell that reads two lines from the pipe of -it); typed-42: $(tr -d '\r' <"$T.11.out" | grep -c '^typed-42$')"
-	{ [ "$rc" -eq 4 ] && tr -d '\r' <"$T.11.out" | grep -q '^typed-42$'; } || { bad "clause 11: the input of -it"; keep "$T.11.err"; }
+	# `run -t` sets TERM=xterm (T-2061), as docker does: the bash of the
+	# image then writes the escapes of bracketed paste (ESC [ ? 2004 l)
+	# before the output of each command. The check reads the text only.
+	plain() { tr -d '\r' <"$1" | sed 's/\x1b\[[0-9;?]*[A-Za-z]//g'; }
+	say "clause 11  rc $rc (a shell that reads two lines from the pipe of -it); typed-42: $(plain "$T.11.out" | grep -c '^typed-42$')"
+	{ [ "$rc" -eq 4 ] && plain "$T.11.out" | grep -q '^typed-42$'; } || { bad "clause 11: the input of -it"; keep "$T.11.err"; }
 	stays 11
 else
 	say "clause 11  skipped: no delegated cgroup2 directory"
