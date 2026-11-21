@@ -521,5 +521,5 @@
 629 issue open
 630 issue open
 631 issue open
-632 issue open
+632 issue closed
 633 issue open

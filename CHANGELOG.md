@@ -8,28 +8,11 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
-- `logs` writes the log through one buffer of 64 KiB, not a copy of the whole log in memory, and `logs --limit-bytes N` stops after the first N bytes with exit 0, also with `--tail`, `-f` and `--podvm-tier=incus` (T-2046, PodUtils/podrunner#333).
+## 0.2.0-beta.37 (2026-11-21)
 
-### Fixed: the save of the state of a machine guest that hung, 2026-11-20
+### Known gaps: what the checks of 0.2.0-beta.37 prove, and what stays open, 2026-11-21
 
-Record: T-2048.
-Deployed: no; it waits for the next beta.
-
-- On the machine tier, a run of `--podvm-init=image` that saves the state of
-  its guest no longer hangs with no line when the monitor of the emulator
-  answers late (under KVM, while QEMU writes the last part of the state).
-  podvm opened a second connection to the monitor while the first one was
-  open; QEMU takes one client at a time, and the third connection waited
-  with no bound, also past a SIGTERM. podvm now closes the first connection,
-  and each connection has a bound: the save holds, or one line says why and
-  the run boots a guest with no state (T-2048, `kvm.yml` run 44786700578).
-  Experiment 465, clause 9, now runs each check on the machine tier.
-
-## 0.2.0-beta.37 (2026-11-20)
-
-### Known gaps: what the checks of 0.2.0-beta.37 prove, and what stays open, 2026-11-20
-
-Record: T-1949, T-2002, T-2008, T-2016, T-2044.
+Record: T-1949, T-2002, T-2008, T-2016, T-2044, T-2046, T-2048.
 Deployed: version 0.2.0-beta.37.
 
 What the checks of this beta prove: the gate, `arm.yml`, the integration
@@ -57,10 +40,13 @@ Each open fault that a user can meet:
   of `cp` with `..` give 125 where the manual says 1 (T-2044, OQ-10).
 - A SIGKILL of podvm leaves a file `store/staging/memo-*.tmp`, and some
   texts of the manual and of messages are wrong (T-2044, OQ-12, OQ-13).
-- The save of the state of a guest under KVM failed in 1 of 2 runs of a
-  hosted runner before the fix of this beta (a new connection to the
-  monitor); the fix holds in a unit test, and `kvm.yml` measures it
-  (T-2008).
+- The saved state of a guest under KVM holds on a hosted runner (`kvm.yml`
+  run 44808044333: the run that saves took 19.5 s, the run from the state
+  3.4 s, the first byte of its command after 0.6 s). A SIGTERM that comes
+  during a save waits for the end of the save: at most about 7 minutes, an
+  estimate from the bounds (T-2048).
+- `logs --podvm-tier=incus` holds the log in memory, 64 MiB at most (a
+  larger log is refused), and refuses `--tail` (T-2046).
 - The pinned static QEMU 9.2.0 is older than the upstream fix of a crash of
   a guest with more than one vCPU under TCG; podvm boots once more after
   such a crash (T-2016).
@@ -71,9 +57,19 @@ Each open fault that a user can meet:
 
 ### Fixed: the faults of the sixth outside pass, the confine layer, the signals of a run, 2026-11-20
 
-Record: T-1984, T-2001, T-2002, T-2006, T-2011, T-2012, T-2013, T-2014, T-2015, T-2016, T-2040, T-2041, T-2042, T-2043, T-2045.
+Record: T-1984, T-2001, T-2002, T-2006, T-2011, T-2012, T-2013, T-2014, T-2015, T-2016, T-2040, T-2041, T-2042, T-2043, T-2045, T-2048.
 Deployed: version 0.2.0-beta.37.
 
+- On the machine tier, a run of `--podvm-init=image` that saves the state of
+  its guest no longer hangs with no line when the monitor of the emulator
+  answers late (under KVM, while QEMU writes the last part of the state).
+  podvm opened a second connection to the monitor while the first one was
+  open; QEMU takes one client at a time, and the third connection waited
+  with no bound, also past a SIGTERM. podvm now closes the first connection,
+  and each connection has a bound: the save holds, or one line says why and
+  the run boots a guest with no state (T-2048, `kvm.yml` runs 44786700578
+  and 44808044333). Experiments 465 (clause 9) and 468 now fail where a run
+  of the machine tier does not run there or gives no line.
 - On the userland rung (the loader family), a path that names the host
   path of the rootfs (`PODVM_MAPS` gives it) resolves its links from the
   rootfs, and `..` stops there. Before, a link to `ROOTFS/../../etc`, or
@@ -153,9 +149,14 @@ Deployed: version 0.2.0-beta.37.
 
 ### Added: systemd as PID 1 on each route, the saved state of a guest, the volume base on the loader family, 2026-11-20
 
-Record: T-1969, T-1972, T-1984, T-1985, T-1996, T-1997, T-1999, T-2002, T-2004, T-2007, T-2008, T-2010.
+Record: T-1969, T-1972, T-1984, T-1985, T-1996, T-1997, T-1999, T-2002, T-2004, T-2007, T-2008, T-2010, T-2046.
 Deployed: version 0.2.0-beta.37.
 
+- `logs` writes the log through one buffer of 64 KiB, not a copy of the
+  whole log in memory (a log of 200 MB: 4,952 KiB of peak memory, before
+  200,160 KiB), and `logs --limit-bytes N` stops after the first N bytes
+  with exit 0, also with `--tail`, `-f` and `--podvm-tier=incus` (T-2046,
+  PodUtils/podrunner#333).
 - The command of `run --podvm-init=image --user NAME` on the namespace
   rung gets the supplementary groups that `/etc/group` of the image gives
   the user (T-2002); before, it had the primary group only. On the machine

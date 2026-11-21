@@ -525,7 +525,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #629 | COORD-219: the memory of a microvm guest for an image of N unpacked bytes (to podrunner) | open | T-1922, T-1994, T-2047 |
 | #630 | COORD-220: logs streams the log and takes --limit-bytes N (to podrunner) | open | T-2046 |
 | #631 | COORD-221: a streamed read of a log in pod-supervise, and a ranged read of a file in pod-incus (to podcrates) | open | T-2046 |
-| #632 | [gh action] requested | open | the beta gate of 7324fe0: gate, workloads, the nightly trial, arm and kvm.yml init, after the fix of the hang of the save (T-1949, T-2046, T-2048) |
+| #632 | [gh action] requested | closed (on 7324fe0: gate 44808019999, workloads 44808026072, the nightly trial 44808031605, arm 44808038480 and kvm 44808044333 init passed; the save under KVM holds) | the beta gate of 7324fe0: gate, workloads, the nightly trial, arm and kvm.yml init, after the fix of the hang of the save (T-1949, T-2046, T-2048) |
 | #633 | COORD-222: pod-guest's Monitor::connect has no bound; QEMU queues one client (to podcrates) | open | T-2048 |
 
 ## Messages whose title does not start with COORD-NNN
