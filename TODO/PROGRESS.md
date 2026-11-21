@@ -9,9 +9,15 @@ start.
 
 624 entries: 25 open, 39 partial, 5 blocked, 555 done.
 
-The state on 2026-11-19 (`docs/HANDOFF.md` has the detail):
+The state on 2026-11-21 (`docs/HANDOFF.md` has the detail):
 
-* The newest release is `v0.2.0-beta.36` (2026-11-19, release run
+* The newest release is `v0.2.0-beta.37` (2026-11-21, release run
+  44846783317 on `c92ac65`): systemd as PID 1 on each route with
+  `--podvm-init=image` (T-2002), the saved state of a machine guest
+  (T-2008, T-2048), the faults of the sixth outside pass (T-2040 to
+  T-2045), `logs` streams and takes `--limit-bytes` (T-2046), podcrates
+  `v0.79.0`. Before it:
+* `v0.2.0-beta.36` (2026-11-19, release run
   44466195422 on `94045a3`): systemd as PID 1 on the incus tier (T-1993),
   Go on the userland rung (T-1995), `apt-get install -u 0` on the userland
   rung (T-2000), the retry of `openat2` (T-1990), the image on ghcr.io

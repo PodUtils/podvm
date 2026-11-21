@@ -527,6 +527,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #631 | COORD-221: a streamed read of a log in pod-supervise, and a ranged read of a file in pod-incus (to podcrates) | open | T-2046 |
 | #632 | [gh action] requested | closed (on 7324fe0: gate 44808019999, workloads 44808026072, the nightly trial 44808031605, arm 44808038480 and kvm 44808044333 init passed; the save under KVM holds) | the beta gate of 7324fe0: gate, workloads, the nightly trial, arm and kvm.yml init, after the fix of the hang of the save (T-1949, T-2046, T-2048) |
 | #633 | COORD-222: pod-guest's Monitor::connect has no bound; QEMU queues one client (to podcrates) | open | T-2048 |
+| #634 | [gh action] requested | closed (gate 44845403636 on c92ac65 passed; release 44846783317 published v0.2.0-beta.37, the nightly 44846830226 on the tag passed) | the release of 0.2.0-beta.37 on c92ac65 (T-1949) |
 
 ## Messages whose title does not start with COORD-NNN
 
