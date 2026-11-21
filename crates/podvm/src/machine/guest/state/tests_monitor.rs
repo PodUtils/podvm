@@ -215,7 +215,9 @@ fn a_save_leaves_a_whole_state_or_nothing() {
             false,
             false,
             Transport::File,
-            "no connection within",
+            // podcrates `v0.81.0`: a connect to the full queue fails at
+            // once, and the bound of `Monitor::connect` names the queue.
+            "the queue of the QMP socket",
         ),
     ] {
         let d = scratch("save");

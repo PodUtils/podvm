@@ -178,18 +178,20 @@ fn each_host_that_podvm_names_is_in_pod_services() {
     );
 }
 
-/// T-1013 of podcrates (PodUtils/podvm#618): the store copy of QEMU is the
-/// service `hermeticbuild-qemu`, on `github.com`. Each archive of
+/// T-1013 and T-1014 of podcrates (PodUtils/podvm#618): the store copy of
+/// QEMU is the service `static-pkgs-qemu`, on `github.com`. Each archive of
 /// `podvm_windows::tools` is an endpoint of it, with the size and the
 /// sha256 of its facts, and each program in it has the member, the size and
 /// the sha256 of its facts: the pins of podvm and of podcrates are one.
 #[test]
 fn the_store_copy_of_qemu_holds_the_facts_of_pod_services() {
     use podvm_windows::tools;
-    let q = pod_services::get("hermeticbuild-qemu").expect("the service of the static QEMU");
+    let q = pod_services::get("static-pkgs-qemu").expect("the service of the static QEMU");
     assert_eq!(q.text("version"), Some(tools::QEMU_VERSION));
     assert_eq!(q.text("release"), Some(tools::RELEASE));
-    assert!(pod_services::get("pkgforge-qemu").is_none());
+    for gone in ["pkgforge-qemu", "hermeticbuild-qemu"] {
+        assert!(pod_services::get(gone).is_none(), "{gone}");
+    }
     let mut endpoints = 0;
     for e in q.endpoints() {
         let name = e.name();
