@@ -199,8 +199,8 @@ pub const INSPECT_FIELDS: &[&str] = &[
 /// against the same rootfs: it shares the filesystem tree and NOTHING else, not
 /// the process table, not `/proc`, not signals, not the original's environment.
 /// A caller reads these rather than assuming.
-pub const EXEC_MODE: &str = "fresh-chroot";
-pub const EXEC_SHARES: &str = "filesystem";
+pub const EXEC_MODE: &str = podvm_probe::isolation::FRESH;
+pub const EXEC_SHARES: &str = podvm_probe::isolation::SHARES;
 
 /// The IMAGE ID of a record: the first twelve hex digits of its config
 /// digest, the id of `images`, `inspect` and `system df` (TODO/image.md

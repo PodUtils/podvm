@@ -49,6 +49,11 @@ pub struct Ask {
     /// re-derived: a flag that took a value is one argument here and two on the
     /// command line, and re-splitting is a second parser.
     pub seen_flags: Vec<String>,
+    /// TODO/cli.md T-2053 (OQ-07): the entry mounts a `/proc` in the root
+    /// (`isolation::Part::Proc`), so a link of `etc/mtab` into `/proc`
+    /// stays (`pod_rootfs`, PodUtils/podvm#557). Set by the entry, not by
+    /// a flag.
+    pub entry_mounts_proc: bool,
 }
 
 /// `<store>/config`, and the one key T-0804 defines.
@@ -136,6 +141,7 @@ pub fn prepare(
             .ok()
             .filter(|r| r.is_dir())
             .map(|r| r.join(REACH_CACHE)),
+        entry_mounts_proc: ask.entry_mounts_proc,
         ..podvm_complete::Options::default()
     };
     let report = match podvm_complete::complete(rootfs, &opts) {

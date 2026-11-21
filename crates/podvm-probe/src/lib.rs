@@ -20,6 +20,7 @@
 
 pub mod exit;
 pub mod inside;
+pub mod isolation; // TODO/cli.md T-2053
 pub mod json;
 pub mod nongoals;
 pub mod report;

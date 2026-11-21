@@ -271,7 +271,12 @@ pub(super) fn enter(
     if let Some(note) = crate::names::alias_note() {
         banner.push_str(&note);
     }
-    banner.push_str(&degradation());
+    // TODO/cli.md T-2053: a join of the running run shares its namespaces.
+    if super::ns::joins_the_run(state, &container.rung, container.pid) {
+        banner.push_str(&super::joined_line(crate::lifecycle::opened_of(&container)));
+    } else {
+        banner.push_str(&degradation());
+    }
     banner.push_str(&interpose_note);
     // ⭐ TODO/enter.md T-0501. The re-entry serves the container's
     // mappings, so it names them like the entry did.

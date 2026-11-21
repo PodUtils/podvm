@@ -6704,3 +6704,36 @@ In a pty, as root and as uid 1000 with a subordinate range, on the namespace run
 ## Done
 
 **Done (2026-11-21).** `crates/podvm/src/run/pty/keys.rs` (new) gives the targets of a key: the payload and its descendants (`pod_supervise::launcher::tree::descendants`) in the process group of the payload, less each process whose program is podvm's (`/proc/PID/exe` against `/proc/self/exe`), else the payload alone; `run/pty.rs` reads `VINTR` and `VQUIT` of the pty (`keys_of`) and sends their signals to those targets. The procfs is the first of `/proc` and, for `exec` into a running container, the `/proc` of its root (`exec::tty::proc_of`) whose `self` link names the pid that `getpid` gives: after the join of the PID namespace of a run (T-1910), the `/proc` of podvm names the pids of the host. Measured on the cloud host with `mirror.gcr.io/library/alpine:3.20` and a `^C` (0x03) 3 s after the start, in a pty (`script` of Python): before (the binary of `main` at `3fa36a6`), `run -it` gave `got-INT` after 6.2 s (uid 1000) and 6.0 s (root), and `exec -it` into a `run -d` container after 5.2 s and 5.0 s; after, 3.4 s, 3.1 s, 2.0 s and 2.0 s, each with exit 9, and with no trap `the payload died on SIGINT: exit 130` after 3.2 s; `-t` with no `-i` gave the trap at once before and after. The unit tests `a_key_signals_the_group_of_the_payload_in_its_tree` (six shapes of a tree), `the_group_is_read_after_the_last_parenthesis`, `the_procfs_of_this_process_is_the_one_whose_self_is_its_pid`, `the_tree_of_a_live_process_names_its_child` and `the_keys_of_a_fresh_pty_are_intr_and_quit` hold the rule. The parity row of `run -t` names the keys, and no longer says that `tty` finds no name on the namespace rung: the rung mounts a `/proc`, and `tty` prints `/dev/pts/N` as root and as uid 1000.
+
+# T-2053: The banner, `--strict` and `inspect` of the namespace rung deny the PID namespace and the `/proc` that the run has
+
+**Source:** the sixth outside pass ([T-2044](cli.md)), OQ-07 (P2); PodUtils/podvm#557 (the mtab of `--strict`, T-1953)
+**Category:** cli
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** done
+
+## Problem
+
+On the namespace rung, `run --verbose` says "this mode does NOT provide: user, pid or network isolation, or a /proc filesystem" and "no /proc is mounted in the payload root", and then "podvm opened a user, a PID and a UTS namespace for this run ... and the payload has its own /proc". `--strict` warns "/proc is not mounted in the root" (the mtab fixup). In the payload, `mount` lists `proc on /proc` and `ps` shows a private PID table. `inspect --format '{{.Exec.Mode}} | {{.Exec.Shares}}'` of a container gives `fresh-chroot | filesystem`, and `exec c1 ps` lists the processes of the container.
+
+## Premise
+
+Each text came from the name of the rung (`Rung::must_never_claim`, `Provides::of` of `pod-hostprobe`, the `/proc` sentence of `podvm_probe::report`, the constants `EXEC_MODE` and `EXEC_SHARES`), not from the run. What a run of the rung opens depends on the caller and the verb: podvm's user, PID and UTS namespace for a foreground run of uid 1000 (T-1909), pod-enter's user namespace and the PID namespace of `Plan::pid_namespace` for `run -d` (T-1930), a mount namespace only for uid 0; pod-enter mounts a `/proc` where the image has the directory. podvm never set `entry_mounts_proc` of the completion (`pod-rootfs`, #557).
+
+## Approach
+
+One table of the parts of an entry (user, pid, uts, net, mount, proc), and the facts of one entry, from which the banner, `--strict`, `inspect`, the line of `exec` and the manual read.
+
+## Decision
+
+2026-11-21, the session's call. The table is `podvm_probe::isolation` (`ROWS`, `Opened`, `of_entry`). The "does NOT provide" words of the namespace rung stay those of `pod_hostprobe::select::Rung::must_never_claim_with` (rule 2a): the table gives it the parts. The record keeps the words of the parts (`Hardening::opened`, optional, so an older record parses); a record of the rung with none reads as its mount namespace. `.Exec.Mode` of a container of the namespace rung is `join`, and `.Exec.Shares` is `filesystem` and each namespace that `exec` into the running container joins (the UTS namespace only with the user namespace: podvm's join of T-1910 takes it, pod-enter's does not). The other rungs keep `fresh-chroot | filesystem`.
+
+## Prove
+
+As root and as uid 1000 with `public.ecr.aws/docker/library/alpine:3.20`: `run --verbose` names the parts that the run opens and denies none of them; `run --strict` gives no mtab warning; `inspect` of a `run -d` container gives `join` and its namespaces; `podvm man` has the table. A table-driven test of each shape of an entry.
+
+## Done
+
+**Done (2026-11-21).** `crates/podvm-probe/src/isolation.rs` (new) holds the table and `of_entry` (the facts: podvm's user namespace, uid 0 of the host, `run -d` or `create`, `--hostname`, a `/proc` directory in the image); `podvm_probe::report::entry_banner_of` takes the `namespaces:` and `pids:` cells, the "does NOT provide" line, a line "this run opens: ..." and the `/proc` sentence from it; `run/acquire.rs` gives the facts of the run, sets `entry_mounts_proc` of the completion, and keeps the words in the record; `lifecycle/copy_tree.rs` gives `.Exec.Mode` and `.Exec.Shares`; `exec` into a running container of the rung says that it joins (`exec::joined_line`); `podvm man` has an ISOLATION section from the table; the parity row of `exec` no longer says "never an entry into a running container's namespaces". Measured on the cloud host with `mirror.gcr.io/library/alpine:3.20`. Before (`main` at `3fa36a6`), as uid 1000 and as root: `namespaces: mount-only`, `pids: host-shared`, "does NOT provide: user, pid or network isolation, or a /proc filesystem", "no /proc is mounted", the mtab warning of `--strict`, and `fresh-chroot | filesystem`. After, as uid 1000: `namespaces: user+pid+uts+mount`, `pids: private`, "does NOT provide: network isolation", no `/proc` sentence, no warning of `--strict`, and `join | filesystem+user+pid+mount` for a `run -d` container; as root: `namespaces: mount-only`, `pids: host-shared`, "does NOT provide: network isolation, or user isolation, or pid isolation", a line that the `/proc` of the payload lists the processes of the host, no mtab warning, and `join | filesystem+pid+mount`. The unit tests `each_statement_of_an_entry_reads_its_facts` (eight shapes: each cell, the words, the record, `.Exec.*` and the line), `the_manual_names_each_row_and_each_shape`, `an_unknown_word_of_a_record_is_left_out` and `the_namespace_banner_reads_what_the_entry_opened` hold the rule. Not changed: the reason of the built-in profile of Chromium (`profile/builtin.rs`) still says that the namespace rung mounts no `/proc`; the profile keeps the loader family for its other reasons.
