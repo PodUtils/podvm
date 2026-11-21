@@ -373,7 +373,7 @@ pub(super) fn copy_one(
                 Ok(_) => joined.clone(),
                 Err(e) => {
                     eprintln!("podvm cp: the copy is refused: {e}");
-                    return EXIT_RUNTIME_ERROR;
+                    return EXIT_CLI_ERROR; // TODO/cli.md T-2062: a refusal after the parse
                 }
             },
             None => {
@@ -386,7 +386,7 @@ pub(super) fn copy_one(
             Ok(p) => p,
             Err(e) => {
                 eprintln!("podvm cp: the copy is refused: {e}");
-                return EXIT_RUNTIME_ERROR;
+                return EXIT_CLI_ERROR; // TODO/cli.md T-2062: a refusal after the parse
             }
         }
     };
@@ -428,7 +428,7 @@ pub(super) fn copy_one(
     }
     if !out_of && let Err(msg) = clear_of_symlinks(root, &dst) {
         eprintln!("podvm cp: {msg}");
-        return EXIT_RUNTIME_ERROR;
+        return EXIT_CLI_ERROR; // T-2062
     }
     // ⚠ Stat the SOURCE side: a missing destination directory on the way
     // in must still read as a directory copy. (`src_is_link` above already

@@ -694,10 +694,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2051](machine.md) | P2 | M | none | machine | blocked | The save and the load of the Linux guest of the machine tier keep their own code beside `pod_guest::warm::line` |
 | [T-2060](cli.md) | P2 | S | none | cli | done | The sixth outside pass, OQ-06: `inspect --format` gives lists and maps as flat strings |
 | [T-2061](cli.md) | P2 | S | none | cli | done | The sixth outside pass, OQ-09: docker differences of `-t`, `exec`, `logs`, `-v` and the manual |
+| [T-2062](cli.md) | P2 | S | none | cli | done | The sixth outside pass, OQ-10: exit codes are not the documented ones |
 
 ## Counts
 
-628 entries: 23 open, 40 partial, 6 blocked, 559 done.
+629 entries: 23 open, 40 partial, 6 blocked, 560 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -708,9 +709,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 19 | 0 | 255 | 277 |
-| P2 | 15 | 16 | 5 | 186 | 222 |
+| P2 | 15 | 16 | 5 | 187 | 223 |
 | P3 | 5 | 5 | 1 | 43 | 54 |
-| **All** | 23 | 40 | 6 | 559 | 628 |
+| **All** | 23 | 40 | 6 | 560 | 629 |
 
 ## Work order
 

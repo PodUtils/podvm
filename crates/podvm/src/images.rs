@@ -344,6 +344,7 @@ pub(crate) fn default_login_server() -> &'static str {
         .expect("pod-services holds docker-hub-registry credential-key (TODO/deps.md T-1679)")
 }
 
+mod archive_exit; // TODO/cli.md T-2062
 mod list;
 pub use list::*;
 

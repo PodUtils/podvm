@@ -157,11 +157,11 @@ pub(super) fn copy_tree(
                 };
                 if let Err(e) = gate(own) {
                     eprintln!("podvm cp: the copy is refused: {e}");
-                    return EXIT_RUNTIME_ERROR;
+                    return EXIT_CLI_ERROR; // TODO/cli.md T-2062: a refusal after the parse
                 }
                 if let Err(msg) = clear_of_symlinks(dst_base, &dst_path) {
                     eprintln!("podvm cp: {msg}");
-                    return EXIT_RUNTIME_ERROR;
+                    return EXIT_CLI_ERROR; // T-2062
                 }
                 links.push((src_path, dst_path));
                 continue;
@@ -169,11 +169,11 @@ pub(super) fn copy_tree(
             let gated = if out_of { &src_path } else { &dst_path };
             if let Err(e) = gate(gated) {
                 eprintln!("podvm cp: the copy is refused: {e}");
-                return EXIT_RUNTIME_ERROR;
+                return EXIT_CLI_ERROR; // TODO/cli.md T-2062: a refusal after the parse
             }
             if let Err(msg) = clear_of_symlinks(dst_base, &dst_path) {
                 eprintln!("podvm cp: {msg}");
-                return EXIT_RUNTIME_ERROR;
+                return EXIT_CLI_ERROR; // T-2062
             }
             if kind.is_dir() {
                 modes.push((src_path.clone(), dst_path.clone()));

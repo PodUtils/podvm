@@ -1,5 +1,7 @@
 use super::*;
 
+use super::archive_exit::archive_exit;
+
 pub const SAVE_USAGE: &str = "\
 usage: podvm save [--output FILE] [--platform P] <image>
 
@@ -297,7 +299,7 @@ pub fn load(verb: &str, args: &[String]) -> i32 {
         }
         Err(e) => {
             eprintln!("podvm load: {e}");
-            e.exit_code() // TODO/image.md T-1842
+            archive_exit(&e, &src) // TODO/image.md T-1842, TODO/cli.md T-2062
         }
     };
     if let Some((path, file)) = spool {
@@ -333,7 +335,7 @@ pub fn import(verb: &str, args: &[String]) -> i32 {
         }
         Err(e) => {
             eprintln!("podvm import: {e}");
-            e.exit_code() // TODO/image.md T-1842: an invalid name is 1
+            archive_exit(&e, std::path::Path::new(&o.tar)) // T-1842, T-2062
         }
     }
 }

@@ -76,7 +76,9 @@ pub const CASES: &[(&str, i32, &str)] = &[
         EXIT_CLI_ERROR,
         "the verb refused after the flags parsed: an invalid reference, a template \
          no verb can answer, a name that resolves to nothing, a missing argument, \
-         or a verb neither podvm nor docker has",
+         an image that a container uses (rmi), an archive that load or import \
+         will not read, a copy that leaves its tree (cp), or a verb neither \
+         podvm nor docker has",
     ),
     (
         "runtime-error",
@@ -86,7 +88,9 @@ pub const CASES: &[(&str, i32, &str)] = &[
     (
         "cannot-invoke",
         EXIT_CANNOT_INVOKE,
-        "the command was found and could not be invoked",
+        "the command was found and could not be invoked: the kernel refused it \
+         (EACCES, ENOEXEC, EISDIR, EPERM, ETXTBSY) or its arguments and \
+         environment are too large (E2BIG)",
     ),
     ("not-found", EXIT_NOT_FOUND, "the command was not found"),
     (

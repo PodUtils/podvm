@@ -6572,3 +6572,36 @@ A table test for each rule: `a_tty_gets_term_xterm_unless_the_caller_set_one`, `
 ## Done
 
 **Done (2026-11-21).** `TERM=xterm` (`run/home.rs`: `tty_term`), the refusal of `exec` into an exited or dead container (`exec/ns.rs`: `not_running`, exit 1; a created container keeps the entry of T-0505), `--tail all` (`lifecycle/logs.rs`), and `:z`, `:Z` as no-ops (`lifecycle/volume.rs`). Left, and named as known differences in the parity table (so in `podvm man`): `start -a` and `cp NAME:PATH -`, which need an attach (the follow of `logs`, `wait` and the signals) and a tar writer that are not small; and the host name of a run with no `--hostname`, which is the host's, with no `HOSTNAME`, because a foreground run has no container id at the entry. Before (`3fa36a6`): `exec c1 echo into-exited` gave `into-exited` and 0; `--tail all` gave 125; `-v ...:rw,z` gave 125. After: 1 with the line "podvm exec: container c1 is not running (exited)" and the way to start it; the whole log; 0.
+
+# T-2062: The sixth outside pass, OQ-10: exit codes are not the documented ones
+
+**Source:** the sixth outside pass (T-2044), OQ-10 (P2)
+**Category:** cli
+**Milestone:** none
+**Priority:** P2
+**Effort:** S
+**Status:** done
+
+## Problem
+
+An E2BIG of `execve` (a 1 MB value of `--env-file`) exits 127, and the manual says that 126 is the command found and not invocable. The manual says that a refusal after the flags parsed exits 1, and `rmi` of a referenced image, `load` of a tampered or unreadable archive, `import` of a `.gz` and `cp CONTAINER:/../../etc/shadow` exit 125.
+
+## Premise
+
+`pod-enter` reads E2BIG as "not found" (`invocable_but_refused` names five errnos). Each refusal that exits 125 set `EXIT_RUNTIME_ERROR` by hand, beside the table of `podvm-probe::exit`.
+
+## Approach
+
+One table: `podvm-probe/src/exit.rs` (`CASES`, and the code of the manual's `GLOBAL`). `cannot-invoke` holds E2BIG, and `cli-error` names the refusals above. The code follows the table: `podvm_enter::ExitCode` gives 126 for an E2BIG; `rmi`, `cp` and the archive verbs give 1. A failure of the store stays 125. The ask for podcrates: `invocable_but_refused` takes E2BIG, and podvm then drops its read of the text.
+
+## Decision
+
+-
+
+## Prove
+
+`errors_map_to_dockers_codes` (E2BIG gives 126) and `a_refused_archive_exits_with_the_code_of_the_table`. As uid 1000: `run --env-file` with a value of 1 MB exits 126; `rmi` of a referenced image, `load -i /etc/shadow`, `import a.gz` and `cp c:/../../etc/shadow x` exit 1.
+
+## Done
+
+**Done (2026-11-21).** The refusals after the parse exit 1: `rmi` of an image that a container uses, the gate of `cp` (`the copy is refused`, and a link in the path), and `load` and `import` through one function (`images/save_load.rs`: `archive_exit`, a refused archive or a file of the caller that does not read gives 1, a failure of the store 125). `podvm_enter::ExitCode::exit_code` gives 126 where `pod-enter` reports "not found" with E2BIG in its text (a stand-in until podcrates takes E2BIG; the lead writes the COORD issue). `CASES` names both. As uid 1000 with `alpine:3.20`, before (`3fa36a6`) and after: `run --env-file` with a value of 1 MB gave 127, and now gives 126; `rmi` of an image that a container uses, `load -i /etc/shadow`, `import` of a `.gz` and `cp c:/../../etc/shadow x` gave 125, and now give 1.

@@ -299,7 +299,7 @@ pub fn rmi(verb: &str, args: &[String]) -> i32 {
                     "podvm rmi: {want} is referenced by container {} and was not removed",
                     referrers.join(", ")
                 );
-                code = EXIT_RUNTIME_ERROR;
+                code = EXIT_CLI_ERROR; // TODO/cli.md T-2062: docker's 1
                 continue;
             }
         }
