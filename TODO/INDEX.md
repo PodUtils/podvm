@@ -697,10 +697,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2062](cli.md) | P2 | S | none | cli | done | The sixth outside pass, OQ-10: exit codes are not the documented ones |
 | [T-2063](cli.md) | P3 | S | none | cli | done | The sixth outside pass, OQ-12: a SIGKILL of podvm leaves `staging/memo-*.tmp` |
 | [T-2064](cli.md) | P3 | S | none | cli | done | The sixth outside pass, OQ-13: texts of the manual and of messages |
+| [T-2065](image.md) | P1 | S | none | image | blocked | A layer whose PAX record `SCHILY.acl.access` holds a newline is refused whole |
 
 ## Counts
 
-631 entries: 23 open, 40 partial, 6 blocked, 562 done.
+632 entries: 23 open, 40 partial, 7 blocked, 562 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -710,10 +711,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 19 | 0 | 255 | 277 |
+| P1 | 3 | 19 | 1 | 255 | 278 |
 | P2 | 15 | 16 | 5 | 187 | 223 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 23 | 40 | 6 | 562 | 631 |
+| **All** | 23 | 40 | 7 | 562 | 632 |
 
 ## Work order
 

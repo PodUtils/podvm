@@ -4622,3 +4622,36 @@ Re-verify the line of `runsc.rs` that builds a container id from the pid.
 ## Prove
 
 `cargo test -p podvm-image` exits 0, with a test where two writers with the same pid build the base archive in one store; neither reads a truncated file, and the next use checks the digest.
+
+# T-2065: A layer whose PAX record `SCHILY.acl.access` holds a newline is refused whole
+
+**Source:** PodUtils/podrunner#339 (COORD-118 of podrunner); the ask to podcrates is #643 (COORD-227), the answer to podrunner #644 (COORD-228)
+**Category:** image
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** blocked
+
+## Problem
+
+podrunner's `hosted-boot.yml` run 44853306687 (podvm 0.2.0-beta.37): `run -d` of the hosted snapshot exits 125, "the PAX record "SCHILY.acl.access" has a newline byte, which the tar reader cuts. The layer is refused whole". GNU tar `--format=posix --acls` writes an ACL in its long text form, one entry on each line.
+
+## Premise
+
+`pod-extract` of podcrates (`src/pax.rs`, `split`) reads each PAX record by its length and keeps `SCHILY.xattr.*`, `path` and `linkpath`; each other key goes on to the `tar` reader, which cuts a value at a newline, so the crate refuses it. podvm has no copy of that code (AGENTS.md 2a).
+
+## Approach
+
+Take the tag; where the crate counts dropped ACLs, podvm says the count in one line of the pull or the run; answer #644 with the version.
+
+## Decision
+
+-
+
+## Prove
+
+A layer of GNU tar `--format=posix --xattrs --acls` with an extended ACL on a file extracts with the mode of each file, as uid 1000; the ACL is set, or the line names the count of dropped ACLs.
+
+## Blocker
+
+A tag of podcrates whose `pod-extract` does not pass a record that it does not use to the `tar` reader, and applies or counts the ACLs (#643).

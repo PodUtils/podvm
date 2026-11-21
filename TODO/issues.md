@@ -535,6 +535,9 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #639 | COORD-225: pod-enter reads E2BIG at execve as "not found" (127); it is "found, not invocable" (126) (to podcrates) | open | T-2062 |
 | #640 | COORD-226: on podvm's main, for the next release: typed inspect JSON, exit codes, exec into an exited container, the memory rule (to podrunner) | open | T-2047, T-2060, T-2061, T-2062, T-2064 |
 | #641 | [gh action] requested | closed (on cb8bbf4: arm 44859012273 and workloads 44859015855 passed; gate 44859009048 failed on three integration tests that held the behaviour before T-2060 to T-2062, changed in the next commit) | the gate, arm and workloads runs of cb8bbf4, after the fixes of the sixth outside pass for the CLI (T-2047, T-2060 to T-2064) |
+| #642 | [gh action] requested | open | the gate of 721ce66, the head that changes three integration tests to the behaviour of T-2060 to T-2062 |
+| #643 | COORD-227: pod-extract refuses a layer whose PAX record SCHILY.acl.access holds a newline (to podcrates) | open | T-2065 |
+| #644 | COORD-228: a PAX value with a newline (SCHILY.acl.access): the fix is in pod-extract of podcrates (to podrunner) | open | T-2065 |
 
 ## Messages whose title does not start with COORD-NNN
 
