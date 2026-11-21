@@ -449,7 +449,9 @@ if [ -n "${ST:-}" ]; then
 	if [ -s "$ST" ]; then
 		size=$(stat -c %s "$ST")
 		truncate -s $((size / 2)) "$ST"
-		sed -i "s/\"bytes\":$size/\"bytes\":$((size / 2))/" "${ST%.vm}.json"
+		# The record of pod_guest::warm::line (T-2051): a line `bytes N`.
+		sed -i "s/^bytes $size\$/bytes $((size / 2))/" "${ST%.vm}.record"
+		grep -qx "bytes $((size / 2))" "${ST%.vm}.record" || bad "clause 9: the record names no length of $((size / 2))"
 		run_check 9 m9
 		rc=$?
 		[ "$rc" -eq 7 ] || { bad "clause 9: after a state that does not load the check gave $rc, not 7"; keep "$T.9.err"; }

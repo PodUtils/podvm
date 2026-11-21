@@ -254,12 +254,21 @@ pub fn run(r: &Request, c: &Ctx) -> Outcome {
                 say(&format!("the guest boots: {}: {e}", initrd.display()));
                 return Outcome::Boot;
             }
+            // `plan` refused a path that is not UTF-8 or that has a comma.
+            let incoming = match meta.transport.load_uri(&files.state) {
+                Ok(uri) => uri,
+                Err(e) => {
+                    let _ = std::fs::remove_dir_all(&dir);
+                    say(&format!("the guest boots: {e}"));
+                    return Outcome::Boot;
+                }
+            };
             let paths = Paths {
                 initrd: &initrd,
                 err: &sock,
                 qmp: Some(&qmp),
                 slots,
-                incoming: Some(meta.transport.load_uri(&files.state.to_string_lossy())),
+                incoming: Some(incoming),
             };
             let argv = line(r, c.accel, meta.mem_mib << 20, c.kernel, &paths);
             let warm = Warm {
@@ -333,11 +342,10 @@ pub fn run(r: &Request, c: &Ctx) -> Outcome {
     let loaded = matches!(plan, Plan::Load(_));
     match (&warm.saved, loaded) {
         (Some(Ok(s)), _) => say(&format!(
-            "the state of the guest is saved: {} MiB in {:.1} s (the longest answer of the \
-             monitor: {} ms), {}",
+            "the state of the guest is saved: {} MiB in {:.1} s through {}, {}",
             s.bytes.div_ceil(1 << 20),
             s.took.as_secs_f64(),
-            s.longest.as_millis(),
+            s.transport.word(),
             files.state.display()
         )),
         // A save that failed is a fault of the store or of the emulator:

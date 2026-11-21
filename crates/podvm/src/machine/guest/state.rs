@@ -33,22 +33,26 @@
 //! has the machine-id, the boot id and the service processes of the save.
 
 use std::path::Path;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use podvm_windows::plan::Accel;
 
-use super::{arch, init, Request};
+use super::{arch, Request};
 
 mod run;
 mod save;
 mod store;
 
+#[cfg(test)]
+use super::init;
 pub use run::{run, send_job, Ctx, Driven, Mode, Outcome, Warm};
 pub use save::save;
 #[cfg(test)]
-use save::{running, save_within, Bounds};
+use save::{running, save_within};
 #[cfg(test)]
-use store::{files, mark_bad, marked_bad, plan, strikes, sweep, touch, valid, Files, Meta, Plan};
+use std::time::SystemTime;
+#[cfg(test)]
+use store::{files, mark_bad, marked_bad, plan, strikes, sweep, touch, valid, Files, Plan};
 
 /// `PODVM_MACHINE_STATE`: `0` boots each guest; `1` (the default) saves
 /// and loads; `pipe` saves and loads through a pipe of `cat`, which is the
@@ -73,49 +77,14 @@ const STRIKES: u32 = 3;
 pub const READY_BOUND: Duration = Duration::from_secs(60);
 /// The bound of one save.
 const SAVE_BOUND: Duration = Duration::from_secs(180);
-const SCHEMA: &str = "podvm-machine-state.v1";
+/// The layout of a state of podvm: the first input of its fingerprint.
+/// `v2` is the record of `pod_guest::warm::line` (T-2051); a state of `v1`
+/// has another fingerprint and so other files, which the sweep removes.
+const SCHEMA: &str = "podvm-machine-state.v2";
 
-/// How the state goes to its file and comes back.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Transport {
-    /// QEMU writes and reads the file (`file:`, QEMU 8.2 and later).
-    File,
-    /// QEMU writes to and reads from a pipe of `cat` (`exec:`).
-    Pipe,
-}
-
-impl Transport {
-    fn word(self) -> &'static str {
-        match self {
-            Transport::File => "file",
-            Transport::Pipe => "pipe",
-        }
-    }
-
-    fn of(word: &str) -> Option<Transport> {
-        match word {
-            "file" => Some(Transport::File),
-            "pipe" => Some(Transport::Pipe),
-            _ => None,
-        }
-    }
-
-    /// The URI of QEMU for a save into `path`.
-    fn save_uri(self, path: &str) -> String {
-        match self {
-            Transport::File => format!("file:{path}"),
-            Transport::Pipe => format!("exec:cat > {}", init::sh_quote(path)),
-        }
-    }
-
-    /// The URI of QEMU for a load from `path`.
-    fn load_uri(self, path: &str) -> String {
-        match self {
-            Transport::File => format!("file:{path}"),
-            Transport::Pipe => format!("exec:cat {}", init::sh_quote(path)),
-        }
-    }
-}
+/// How the state goes to its file and comes back: the transport of
+/// `pod_guest::warm::line` (T-2051).
+pub use podvm_windows::warm::line::Transport;
 
 /// What the variable asks for: no state, or the first transport to try.
 pub fn wanted(var: Option<&str>) -> Result<Option<Transport>, String> {
@@ -216,17 +185,6 @@ pub fn refusal(a: &Asks) -> Option<String> {
     None
 }
 
-/// The length and the change time of a file, as one word of a fingerprint.
-fn ident(p: &Path) -> Result<String, String> {
-    let m = std::fs::metadata(p).map_err(|e| format!("{}: {e}", p.display()))?;
-    let t = m
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-        .map_or(0, |d| d.as_nanos());
-    Ok(format!("{} {t}", m.len()))
-}
-
 /// What a state depends on.
 pub struct Shape<'a> {
     pub digest: &'a str,
@@ -241,62 +199,44 @@ pub struct Shape<'a> {
     pub script: &'a str,
 }
 
-/// The CPU of a state: `tcg`; under KVM the CPU of the host
-/// (`pod_guest::warm::host_cpu`) and the release of its kernel, as
-/// `-cpu host` gives the guest what both have.
-fn cpu(accel: Accel) -> String {
-    match accel {
-        Accel::Tcg => "tcg".to_string(),
-        Accel::Kvm => {
-            let info = std::fs::read_to_string("/proc/cpuinfo").unwrap_or_default();
-            let os = std::fs::read_to_string("/proc/sys/kernel/osrelease").unwrap_or_default();
-            format!("{} {}", podvm_windows::warm::host_cpu(&info), os.trim())
-        }
-    }
-}
-
-/// The text that a state is saved under and loaded by. An error where a
-/// part cannot be read: the run then boots.
+/// The text that a state is saved under and loaded by
+/// (`pod_guest::warm::line::Inputs`, T-2051). An error where a part cannot
+/// be read: the run then boots.
 pub fn fingerprint(s: &Shape) -> Result<String, String> {
-    let version = podvm_windows::warm::qemu_version(s.qemu).map_err(|e| e.to_string())?;
-    let mut t = format!("{SCHEMA}\n");
+    use podvm_windows::warm::line::Inputs;
+    let text = |e: pod_core::Failure| e.to_string();
     // podvm itself is in the guest of a state, and it reads the job of each
     // later run: the bytes of this program, not its change time. Measured
     // with experiment 468, which copies the binary for each of its runs: a
     // change time in this line saved a second state for the same program.
-    t.push_str(&format!(
-        "podvm {} sha256:{}\n",
-        env!("CARGO_PKG_VERSION"),
-        crate::assets::sha256_file(Path::new("/proc/self/exe"))?
-    ));
-    t.push_str(&format!(
-        "qemu {version} {} {}\n",
-        s.qemu.display(),
-        ident(s.qemu)?
-    ));
-    t.push_str(&format!("cpu {}\n", cpu(s.accel)));
+    let i = Inputs::new()
+        .with("layout", SCHEMA)
+        .with("podvm", env!("CARGO_PKG_VERSION"))
+        .digest("podvm-binary", Path::new("/proc/self/exe"))
+        .map_err(text)?
+        // The version of the emulator, and the CPU: under KVM `-cpu host`
+        // gives the guest what the CPU and the kernel of the host have.
+        .emulator(s.qemu, s.accel)
+        .map_err(text)?
+        .file("qemu-file", s.qemu)
+        .map_err(text)?;
     // The file of the pinned kernel has the head of its digest in its name.
     let kernel = std::fs::metadata(s.kernel)
         .map_err(|e| format!("{}: {e}", s.kernel.display()))?
         .len();
-    t.push_str(&format!("kernel {} {kernel}\n", s.kernel.display()));
-    t.push_str(&format!(
-        "image {} base-format {}\n",
-        s.digest,
-        super::BASE_FORMAT
-    ));
-    t.push_str(&match s.mem {
-        Some(m) => format!("mem {m}\n"),
-        None => "mem of-the-initrd\n".to_string(),
-    });
-    t.push_str(&format!(
-        "script {}\n",
-        super::kernel::sha256_hex(s.script.as_bytes())
-    ));
-    for a in s.line {
-        t.push_str(&format!("arg {a}\n"));
-    }
-    Ok(t)
+    let i = i
+        .with("kernel", format!("{} {kernel}", s.kernel.display()))
+        .with(
+            "image",
+            format!("{} base-format {}", s.digest, super::BASE_FORMAT),
+        )
+        .with(
+            "mem",
+            s.mem.map_or("of-the-initrd".to_string(), |m| m.to_string()),
+        )
+        .with("script", super::kernel::sha256_hex(s.script.as_bytes()))
+        .machine(s.line);
+    Ok(i.text())
 }
 
 #[cfg(test)]

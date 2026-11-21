@@ -184,9 +184,11 @@ fn each_part_of_the_shape_changes_the_fingerprint_and_the_files() {
         "the same shape gives the same text"
     );
     for want in [
-        "qemu QEMU emulator version 9.9.9 (test)",
-        "cpu tcg",
-        "mem of-the-initrd",
+        "layout \"podvm-machine-state.v2\"\n",
+        "qemu \"QEMU emulator version 9.9.9 (test)\"\n",
+        "cpu \"tcg\"\n",
+        "mem \"of-the-initrd\"\n",
+        "machine \"-m\"\nmachine \"0M\"\n",
     ] {
         assert!(base.contains(want), "{want:?} is not in {base}");
     }
@@ -267,50 +269,57 @@ fn each_part_of_the_shape_changes_the_fingerprint_and_the_files() {
     let _ = std::fs::remove_dir_all(&d);
 }
 
+/// The record of a state is the one of `pod_guest::warm::line`, with the
+/// memory of the guest as a note: a record with no valid memory size is
+/// no state (T-2051).
 #[test]
-fn a_sidecar_is_read_whole_or_not_at_all() {
-    let meta = Meta {
-        fingerprint: "a\nb\n".to_string(),
-        mem_mib: 3072,
-        bytes: 5,
-        transport: Transport::Pipe,
-    };
-    assert_eq!(Meta::parse(&meta.text()), Ok(meta.clone()));
-    let good: serde_json::Value = serde_json::from_str(&meta.text()).unwrap();
-    for (member, value, want) in [
-        (
-            "schema",
-            serde_json::json!("podvm-machine-state.v0"),
-            "schema",
-        ),
-        ("fingerprint", serde_json::json!(7), "no fingerprint"),
-        ("mem_mib", serde_json::json!(0), "no memory size"),
-        ("mem_mib", serde_json::json!(-4), "no memory size"),
-        ("mem_mib", serde_json::json!(1u64 << 40), "no memory size"),
-        ("bytes", serde_json::json!(0), "no length"),
-        ("bytes", serde_json::json!("5"), "no length"),
-        ("transport", serde_json::json!("tcp"), "no transport"),
+fn a_record_with_no_memory_size_is_no_state() {
+    use podvm_windows::warm::line::Record;
+    let d = scratch("record");
+    let f = files(&d, "sha256:aa", "print");
+    for (note, want) in [
+        (Some("3072"), Ok(3072)),
+        (Some("16777216"), Ok(16_777_216)),
+        (Some("0"), Err("no memory size")),
+        (Some("-4"), Err("no memory size")),
+        (Some("16777217"), Err("no memory size")),
+        (Some("many"), Err("no memory size")),
+        (None, Err("no memory size")),
     ] {
-        let mut v = good.clone();
-        v[member] = value;
-        let e = Meta::parse(&v.to_string()).unwrap_err();
-        assert!(e.contains(want), "{member}: {want:?} is not in {e:?}");
+        std::fs::write(&f.state, b"state").unwrap();
+        let r = Record {
+            transport: Transport::Pipe,
+            bytes: 5,
+            notes: note
+                .map(|n| vec![("mem_mib".to_string(), n.to_string())])
+                .unwrap_or_default(),
+            fingerprint: "print".to_string(),
+        };
+        std::fs::write(&f.meta, r.text()).unwrap();
+        match (valid(&f, "print"), want) {
+            (Ok(m), Ok(mib)) => {
+                assert_eq!((m.mem_mib, m.bytes, m.transport), (mib, 5, Transport::Pipe))
+            }
+            (Err(e), Err(text)) => assert!(e.contains(text), "{note:?}: {e}"),
+            (got, _) => panic!("{note:?}: {got:?}"),
+        }
     }
-    for text in ["", "{", "[]", "null", "\u{0}"] {
-        assert!(Meta::parse(text).is_err(), "{text:?} was read as a sidecar");
-    }
+    // A record of the layout before T-2051 (JSON) is no state.
+    std::fs::write(&f.meta, br#"{"schema":"podvm-machine-state.v1","bytes":5}"#).unwrap();
+    assert!(valid(&f, "print").is_err());
+    let _ = std::fs::remove_dir_all(&d);
 }
 
 /// Write a whole state of `print` into the files.
 pub(super) fn put(f: &Files, print: &str, bytes: &[u8]) {
     std::fs::write(&f.state, bytes).unwrap();
-    let meta = Meta {
-        fingerprint: print.to_string(),
-        mem_mib: 512,
-        bytes: bytes.len() as u64,
+    let record = podvm_windows::warm::line::Record {
         transport: Transport::File,
+        bytes: bytes.len() as u64,
+        notes: vec![("mem_mib".to_string(), "512".to_string())],
+        fingerprint: print.to_string(),
     };
-    std::fs::write(&f.meta, meta.text()).unwrap();
+    std::fs::write(&f.meta, record.text()).unwrap();
 }
 
 /// What a run does with the files of its fingerprint: it loads only a
@@ -318,7 +327,7 @@ pub(super) fn put(f: &Files, print: &str, bytes: &[u8]) {
 #[test]
 fn a_run_loads_only_a_whole_state_of_its_own_fingerprint() {
     let d = scratch("plan");
-    let print = "podvm-machine-state.v1\nqemu 1\n";
+    let print = "podvm-machine-state.v2\nqemu 1\n";
     let f = files(&d, "sha256:aa", print);
     let kind = |p: &Plan| match p {
         Plan::Load(_) => "load".to_string(),
@@ -331,7 +340,7 @@ fn a_run_loads_only_a_whole_state_of_its_own_fingerprint() {
     put(&f, print, b"state");
     assert_eq!(kind(&plan(&f, print, 1)), "load");
     // The record of another fingerprint under this name.
-    put(&f, "podvm-machine-state.v1\nqemu 2\n", b"state");
+    put(&f, "podvm-machine-state.v2\nqemu 2\n", b"state");
     assert_eq!(kind(&plan(&f, print, 1)), "save");
     let e = valid(&f, print).unwrap_err();
     assert!(e.contains("\"qemu 2\"") && e.contains("\"qemu 1\""), "{e}");
@@ -348,7 +357,7 @@ fn a_run_loads_only_a_whole_state_of_its_own_fingerprint() {
     put(&f, print, b"state");
     std::fs::remove_file(&f.meta).unwrap();
     assert_eq!(kind(&plan(&f, print, 1)), "save");
-    // A record that is no JSON.
+    // A record that does not parse.
     put(&f, print, b"state");
     std::fs::write(&f.meta, b"{").unwrap();
     assert_eq!(kind(&plan(&f, print, 1)), "save");
