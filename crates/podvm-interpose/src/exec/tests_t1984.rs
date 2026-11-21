@@ -22,11 +22,11 @@ fn the_program_of_the_loader_is_each_argument_that_a_loader_can_run() {
         (b"/usr/bin/ldd", false),
         // musl's install makes `ld-musl-ARCH.so.1` a link to its libc,
         // so the resolved file of the loader is the libc (podcrates'
-        // COORD-149); glibc's libc.so.6 runs no program, so its rule only
-        // adds a check.
+        // COORD-149); glibc's libc.so.6 runs no program
+        // (`pod_confine::loader`, podcrates `v0.80.0`).
         (b"/lib/libc.musl-x86_64.so.1", true),
         (b"/usr/lib/musl/lib/libc.so", true),
-        (b"/lib/x86_64-linux-gnu/libc.so.6", true),
+        (b"/lib/x86_64-linux-gnu/libc.so.6", false),
         (b"/lib/x86_64-linux-gnu/libcrypt.so.1", false),
     ];
     for (n, want) in names {

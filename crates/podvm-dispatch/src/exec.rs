@@ -68,7 +68,7 @@ fn loader_allowed(pp: &[u8], argv: i64) -> bool {
     if n <= 0 {
         return false;
     }
-    if !crate::ldso::is_loader(&h[..n as usize]) {
+    if !pod_confine::loader::is_loader(&h[..n as usize]) {
         return true;
     }
     let args = (1..)
@@ -83,7 +83,7 @@ fn loader_allowed(pp: &[u8], argv: i64) -> bool {
         // SAFETY: the payload gave each entry as a C string. One that does
         // not fit is empty, and an empty program is refused.
         .map(|p| unsafe { sys::cstr(p, PATH_MAX) }.unwrap_or(&[]));
-    crate::ldso::each_program(args, program_allowed)
+    pod_confine::loader::each_program(args, program_allowed)
 }
 
 /// Whether the exec table lets the loader run the program `c`, a name that

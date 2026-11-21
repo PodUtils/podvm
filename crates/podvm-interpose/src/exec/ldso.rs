@@ -1,36 +1,36 @@
-//! The program that a dynamic loader runs (TODO/enter.md T-1984).
+//! The program that a dynamic loader runs.
 //!
 //! Landlock checks `EXECUTE` on the file that `execve` names. The dynamic
 //! loader of an image (`ld-linux-x86-64.so.2`, `ld-musl-x86_64.so.1`) must
 //! be executable, and it runs the program of its first argument: it only
-//! reads and maps that program, so `ld.so /tmp/prog` ran a program that
-//! `exec=` of `--podvm-confine` denies. Where podvm sees the exec (the
-//! interposer of the loader family, the handler of the syscall tier), the
-//! exec of a loader takes the exec rule of each argument that the loader
-//! can take as its program.
+//! reads and maps that program, so `ld.so /tmp/prog` runs a program that
+//! `exec=` denies. Where a caller sees the exec (the entry with no chroot,
+//! an interposer, the handler of a syscall tier), the exec of a loader
+//! takes the exec rule of each argument that the loader can take as its
+//! program.
 //!
-//! Pure over bytes: no libc call, no allocation, no crate item. The
-//! interposer and `podvm-dispatch` include this file as it is.
+//! Pure over bytes: no call of the system, no allocation, no item of std
+//! and no other item of the crate. An object that takes no dependency (an
+//! interposer) keeps a copy of this file as it is.
 
-/// True where the base name of a resolved path names a dynamic loader:
+/// True where the base name of a path names a dynamic loader:
 /// `ld-linux-x86-64.so.2`, `ld-linux-aarch64.so.1`, `ld-2.28.so` (the file
-/// of an older glibc), `ld-musl-x86_64.so.1`, `ld64.so.2`, `ld.so.1`. The
-/// caller resolves each link first, so another name of the same file (a
-/// link, `/lib64/...` or `/usr/lib/...`) gives the name of the file.
-///
-/// musl's install makes `ld-musl-ARCH.so.1` a link to its libc
-/// (`libc.musl-ARCH.so.1`, `libc.so`), so a resolved name of a libc counts
-/// too; glibc's `libc.so.6` runs no program, so it only adds a check.
+/// of an older glibc), `ld-musl-x86_64.so.1`, `ld64.so.2`, `ld.so.1`, and
+/// musl's `libc.so` and `libc.musl-x86_64.so.1`: musl's `make install`
+/// makes `ld-musl-ARCH.so.1` a link to `libc.so`, which is the loader.
+/// glibc's `libc.so.6` runs no program. The caller asks for the path as
+/// given and for the path with each link resolved, so each name of the
+/// same file counts.
 pub fn is_loader(path: &[u8]) -> bool {
     let base = path.rsplit(|&b| b == b'/').next().unwrap_or(path);
     let named = base.starts_with(b"ld-") || base.starts_with(b"ld.") || base.starts_with(b"ld64.");
-    let libc = base.starts_with(b"libc.so") || base.starts_with(b"libc.musl-");
-    (named && base.windows(3).any(|w| w == b".so")) || libc
+    let musl = base == b"libc.so" || base.starts_with(b"libc.musl-");
+    musl || (named && base.windows(3).any(|w| w == b".so"))
 }
 
 /// The options of glibc's and musl's loaders that take the next argument
 /// as their value.
-const VALUED: [&[u8]; 7] = [
+pub const VALUED: [&[u8]; 7] = [
     b"--library-path",
     b"--inhibit-rpath",
     b"--audit",
@@ -41,15 +41,8 @@ const VALUED: [&[u8]; 7] = [
 ];
 
 /// The options of the loaders that take no value.
-const FLAGS: [&[u8]; 7] = [
-    b"--list",
-    b"--verify",
-    b"--inhibit-cache",
-    b"--list-tunables",
-    b"--list-diagnostics",
-    b"--help",
-    b"--version",
-];
+pub const FLAGS: [&[u8]; 7] =
+    [b"--list", b"--verify", b"--inhibit-cache", b"--list-tunables", b"--list-diagnostics", b"--help", b"--version"];
 
 /// Give `check` each argument that a loader can take as its program, from
 /// the arguments after its own name, and answer false at the first one
@@ -89,10 +82,8 @@ where
         if a == b"--" {
             return one(a) && it.next().is_none_or(&mut one);
         }
-        let valued = a.starts_with(b"--")
-            && a.iter()
-                .position(|&b| b == b'=')
-                .is_some_and(|eq| VALUED.contains(&&a[..eq]));
+        let valued =
+            a.starts_with(b"--") && a.iter().position(|&b| b == b'=').is_some_and(|eq| VALUED.contains(&&a[..eq]));
         if valued {
             if !one(a) {
                 return false;

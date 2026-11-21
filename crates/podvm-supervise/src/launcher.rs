@@ -243,7 +243,7 @@ fn enter_in_launcher(
         // spec (`NAMES.write_table`, podcrates `v0.80.0`).
         plan.confine = container.of.hardening.confine_host_spec(&maps, emu)?;
         // TODO/enter.md T-2013: `exec=` for the first program.
-        podvm_enter::confine::check_first(&plan, &maps, &[&plan.argv])
+        podvm_enter::check_exec_guest(&plan, &maps, &plan.argv)
             .map_err(|e| format!("{e} (TODO/enter.md T-2013)"))?;
         podvm_enter::spawn_userland(
             &root,

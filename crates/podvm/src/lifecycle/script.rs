@@ -22,8 +22,63 @@
 use super::*;
 
 /// How many `#!` levels one entry follows: the bound of the kernel
-/// (`BINPRM_MAX_RECURSION`) and of the exec family of the interposer.
-pub(super) const DEPTH: usize = 4;
+/// (`exec_binprm` of `fs/exec.c`: five rewrites, the sixth is `ELOOP`) and
+/// of the exec family of the interposer (`DEPTH` of its `parse.rs`). The
+/// test `each_count_of_hashbang_levels_is_the_kernels` holds both against
+/// the kernel of the host (TODO/deps.md T-2050).
+pub(super) const DEPTH: usize = 5;
+
+/// The pure parsers of the interposer, which the handler of the syscall
+/// tier includes too: their `DEPTH` is the bound of both.
+#[cfg(test)]
+#[allow(dead_code)]
+#[path = "../../../podvm-interpose/src/exec/parse.rs"]
+mod interpose_parse;
+
+/// TODO/deps.md T-2050 (podcrates' note of `v0.80.0`): the kernel runs a
+/// chain of five `#!` scripts and refuses a sixth with `ELOOP`. One rule for
+/// each counter of `#!` levels in podvm (the entry of podvm, and the
+/// interposer with the handler of the syscall tier): a chain of N scripts
+/// runs where the kernel of the host runs it.
+#[cfg(test)]
+#[test]
+fn each_count_of_hashbang_levels_is_the_kernels() {
+    use std::os::unix::fs::PermissionsExt;
+    let d = std::env::temp_dir().join(format!("podvm-hashbang-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&d);
+    std::fs::create_dir_all(&d).unwrap();
+    // s1 is a script of /bin/sh; s(N) is a script whose interpreter is
+    // s(N-1): a chain of N `#!` lines.
+    let mut kernel = Vec::new();
+    for n in 1..=DEPTH + 2 {
+        let line = match n {
+            1 => "#!/bin/sh\nexit 0\n".to_string(),
+            _ => format!("#!{}\n", d.join(format!("s{}", n - 1)).display()),
+        };
+        let p = d.join(format!("s{n}"));
+        std::fs::write(&p, line).unwrap();
+        std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let ran = match std::process::Command::new(&p).status() {
+            Ok(s) => s.success(),
+            Err(e) if e.raw_os_error() == Some(40) => false, // ELOOP
+            Err(e) => panic!("s{n}: {e}"),
+        };
+        kernel.push((n, ran));
+    }
+    let _ = std::fs::remove_dir_all(&d);
+    assert!(
+        kernel.iter().any(|&(_, ran)| !ran),
+        "the kernel ran each chain: {kernel:?}"
+    );
+    for (counter, depth) in [
+        ("lifecycle/script.rs", DEPTH),
+        ("podvm-interpose/src/exec/parse.rs", interpose_parse::DEPTH),
+    ] {
+        for &(n, ran) in &kernel {
+            assert_eq!(n <= depth, ran, "{counter}: a chain of {n} #! scripts");
+        }
+    }
+}
 
 /// The payload that the entry decides on, after the `#!` route.
 pub(super) struct Followed {

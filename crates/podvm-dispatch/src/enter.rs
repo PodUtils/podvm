@@ -71,9 +71,10 @@ fn read_head(fd: i64) -> [u8; 256] {
 type Resolved = (Vec<u8>, i64, [u8; 256], Vec<Vec<u8>>);
 
 /// The program to map and its argv: a script names its interpreter, up to
-/// four levels, as the kernel allows.
+/// [`crate::script::DEPTH`] levels, as the kernel allows: one more open
+/// than levels, for the program at the end of the chain.
 fn resolve(mut exe: Vec<u8>, mut argv: Vec<Vec<u8>>) -> Result<Resolved, String> {
-    for _ in 0..5 {
+    for _ in 0..=crate::script::DEPTH {
         let fd = open_in_root(&exe)?;
         let head = read_head(fd);
         let Some((interp, arg)) = elf::shebang(&head) else {

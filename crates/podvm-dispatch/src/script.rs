@@ -6,7 +6,7 @@
 //! kernel opens the interpreter of a `#!` line for execution, and Landlock
 //! checks it on the namespace rung; so the handler checks each interpreter
 //! of the chain, and, where the last one is a dynamic loader, each argument
-//! that the loader can take as its program ([`crate::ldso::each_program`]),
+//! that the loader can take as its program ([`pod_confine::loader::each_program`]),
 //! with the arguments that the kernel gives it.
 //!
 //! ⛔ No allocation: the heads of the chain are in one buffer of the pool.
@@ -16,8 +16,9 @@ use crate::path;
 use crate::sys::{self, nr, sc6, AT_FDCWD};
 
 /// The `#!` levels that the kernel follows before it answers ELOOP
-/// (`fs/exec.c`), as the interposer and `enter::resolve` count them.
-pub const DEPTH: usize = 4;
+/// (`fs/exec.c`), as the interposer and `enter::resolve` count them: the
+/// one number of the interposer's `parse.rs`.
+pub const DEPTH: usize = crate::parse::DEPTH;
 
 const X_OK: i64 = 1;
 
@@ -160,7 +161,7 @@ pub fn chain(rd: i64, file0: &[u8], argv: i64) -> i64 {
         }
         fd = next;
     }
-    if depth == 0 || !crate::ldso::is_loader(&last[..last_n]) {
+    if depth == 0 || !pod_confine::loader::is_loader(&last[..last_n]) {
         return 0;
     }
     let heads: &[u8] = &heads[..];
@@ -179,7 +180,7 @@ pub fn chain(rd: i64, file0: &[u8], argv: i64) -> i64 {
         // not fit is empty, and an empty program is refused.
         .map(|p| unsafe { sys::cstr(p, crate::state::PATH_MAX) }.unwrap_or(&[]));
     let args = front[..k].iter().copied().chain([file0]).chain(rest);
-    if crate::ldso::each_program(args, crate::exec::program_allowed) {
+    if pod_confine::loader::each_program(args, crate::exec::program_allowed) {
         return 0;
     }
     crate::meta::say(b"podvm: syscall tier: execve: --podvm-confine denies the exec of the program that the dynamic loader of the script would run (exec=, TODO/enter.md T-2015)\n");

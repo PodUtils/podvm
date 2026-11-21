@@ -40,11 +40,6 @@ mod procself;
 #[cfg(target_arch = "x86_64")]
 mod ro; // TODO/enter.md T-1901
 
-// TODO/enter.md T-1984: the program of an exec of the dynamic loader, the
-// interposer's own file, pure over bytes.
-#[cfg(target_arch = "x86_64")]
-#[path = "../../podvm-interpose/src/exec/ldso.rs"]
-mod ldso;
 // TODO/enter.md T-2015: the reader of a `#!` line, the interposer's own
 // pure file; the handler takes `shebang` and `HEAD` of it.
 #[cfg(target_arch = "x86_64")]

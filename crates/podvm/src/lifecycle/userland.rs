@@ -154,12 +154,16 @@ pub fn enter_userland_with(
         code,
         entered: false,
     };
-    // TODO/enter.md T-2013: `exec=` for the first program (and the
-    // interpreter of a `#!` script), as the kernel holds it on the
-    // namespace rung, before each family and the syscall tier.
-    if let Err(e) =
-        podvm_enter::confine::check_first(plan, &userland.maps, &[&plan.argv, &userland.guest_argv])
-    {
+    // TODO/enter.md T-2013: `exec=` for the first program, the interpreter
+    // of each `#!` line and the program of a dynamic loader, as the kernel
+    // holds it on the namespace rung, before each family and the syscall
+    // tier (`pod_enter::check_exec_guest`, podcrates `v0.80.0`). The argv
+    // of the family (for a script: the interpreter first) gets the same
+    // check.
+    let checked = [&plan.argv, &userland.guest_argv]
+        .into_iter()
+        .try_for_each(|argv| podvm_enter::check_exec_guest(plan, &userland.maps, argv));
+    if let Err(e) = checked {
         let _ = writeln!(err, "podvm {verb}: {e} (TODO/enter.md T-2013)");
         return failed(e.exit_code());
     }

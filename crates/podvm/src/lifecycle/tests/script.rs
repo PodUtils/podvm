@@ -112,7 +112,7 @@ fn a_script_whose_interpreter_is_not_in_the_image_refuses() {
     for (name, want) in [
         ("bash.sh", "does not resolve inside the image"),
         ("rel.sh", "relative path"),
-        ("loop.sh", "more than 4"),
+        ("loop.sh", "more than 5"),
     ] {
         let Err((code, note, routed)) = follow(&root, &words(&[name]), &path, "/") else {
             panic!("{name} was followed");

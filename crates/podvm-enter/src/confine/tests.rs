@@ -185,6 +185,12 @@ fn the_first_program_takes_the_rule_of_exec() {
     for f in ["bin/sh", "lib64/ld-linux-x86-64.so.2", "sc/m", "tmp/m"] {
         std::fs::write(root.join(f), b"x").unwrap();
     }
+    // `#!` scripts: one whose interpreter is outside `exec=`, one whose
+    // interpreter is the loader with a program outside it.
+    std::fs::write(root.join("bin/s-out"), b"#!/sc/m\n").unwrap();
+    std::fs::write(root.join("bin/s-in"), b"#!/bin/sh\n").unwrap();
+    let ld_line = b"#!/lib64/ld-linux-x86-64.so.2 /sc/m\n";
+    std::fs::write(root.join("bin/s-ld"), ld_line).unwrap();
     let maps = crate::userland::Maps::of_root(root.to_str().unwrap());
     let ask = parse("read=/sc;write=/tmp;exec=/bin/sh,/lib64").unwrap();
     let plan = pod_enter::Plan {
@@ -220,8 +226,14 @@ fn the_first_program_takes_the_rule_of_exec() {
         (v(&[ld, "--version"]), true),
         (v(&["/nowhere/x"]), true),
         (Vec::new(), true),
+        (v(&["/bin/s-in", "a"]), true),
+        (v(&["/bin/s-out"]), false),
+        (v(&["s-out"]), false),
+        (v(&["/bin/s-ld"]), false),
     ] {
-        let got = check_first(&plan, &maps, &[&argv]);
+        // podcrates `v0.80.0`: `pod_enter::check_exec_guest` in place of
+        // podvm's `check_first` (TODO/deps.md T-2050).
+        let got = pod_enter::check_exec_guest(&plan, &maps, &argv);
         assert_eq!(got.is_ok(), holds, "{argv:?}: {got:?}");
         if let Err(e) = got {
             assert!(
@@ -230,15 +242,12 @@ fn the_first_program_takes_the_rule_of_exec() {
             );
         }
     }
-    // The interpreter of a `#!` script: the argv of the kernel.
-    let kernel = v(&["/sc/m", "/bin/sh"]);
-    assert!(check_first(&plan, &maps, &[&v(&["/bin/sh"]), &kernel]).is_err());
     // No confinement: each program runs.
     let open = pod_enter::Plan {
         confine: None,
         ..plan
     };
-    assert!(check_first(&open, &maps, &[&v(&["/sc/m"])]).is_ok());
+    assert!(pod_enter::check_exec_guest(&open, &maps, &v(&["/sc/m"])).is_ok());
     let _ = std::fs::remove_dir_all(&root);
 }
 

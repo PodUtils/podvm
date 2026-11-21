@@ -190,3 +190,68 @@ fn the_reader_of_a_shebang_line_and_the_lead_of_a_chain() {
         assert_eq!(out[..k].to_vec(), want);
     }
 }
+
+/// The interposer's copy of `pod_confine::loader`, which it keeps as it is
+/// (the interposer takes no crate with std).
+#[rustfmt::skip]
+#[path = "../../podvm-interpose/src/exec/ldso.rs"]
+mod interpose_loader;
+
+/// TODO/deps.md T-2050 (podcrates `v0.80.0`, T-998 of podcrates): the copy
+/// of the interposer gives the answers of `pod_confine::loader`, which the
+/// handler of the syscall tier and `pod-enter` take: the names of a loader,
+/// and the programs that a check sees for each reading of the options.
+#[test]
+fn the_loader_rule_of_the_interposer_is_the_crates() {
+    use pod_confine::loader;
+    for name in [
+        &b"/lib64/ld-linux-x86-64.so.2"[..],
+        b"/lib/ld-musl-x86_64.so.1",
+        b"/lib/ld-2.28.so",
+        b"/lib64/ld64.so.2",
+        b"/usr/lib/ld.so.1",
+        b"/lib/libc.musl-x86_64.so.1",
+        b"/usr/lib/musl/lib/libc.so",
+        b"/lib/x86_64-linux-gnu/libc.so.6",
+        b"/usr/bin/ld",
+        b"/usr/bin/ldd",
+        b"ld.so",
+        b"",
+    ] {
+        let n = String::from_utf8_lossy(name);
+        assert_eq!(
+            interpose_loader::is_loader(name),
+            loader::is_loader(name),
+            "{n}"
+        );
+    }
+    assert_eq!(interpose_loader::VALUED, loader::VALUED);
+    assert_eq!(interpose_loader::FLAGS, loader::FLAGS);
+    let rows: [&[&str]; 12] = [
+        &["/tmp/p", "a"],
+        &["--library-path", "/tmp", "/tmp/p"],
+        &["--inhibit-cache", "--argv0", "x", "./p"],
+        &["--list", "/tmp/p"],
+        &["--library-path=/l", "/tmp/p"],
+        &["--help"],
+        &[],
+        &["--library-path", "/tmp", "p"],
+        &["--", "/tmp/p"],
+        &["--unknown", "/tmp/p"],
+        &["--argv0=x", "/tmp/p"],
+        &["-x"],
+    ];
+    for args in rows {
+        let bytes = || args.iter().map(|x| x.as_bytes());
+        let (mut seen_copy, mut seen_krate) = (Vec::new(), Vec::new());
+        let copy = interpose_loader::each_program(bytes(), |p| {
+            seen_copy.push(p.to_vec());
+            p != b"/tmp/p"
+        });
+        let krate = loader::each_program(bytes(), |p| {
+            seen_krate.push(p.to_vec());
+            p != b"/tmp/p"
+        });
+        assert_eq!((copy, seen_copy), (krate, seen_krate), "{args:?}");
+    }
+}

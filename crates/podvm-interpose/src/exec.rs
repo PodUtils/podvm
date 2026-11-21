@@ -34,7 +34,11 @@ mod descriptor;
 pub(crate) use descriptor::fd_path;
 pub mod head;
 pub(crate) mod launch;
-// TODO/enter.md T-1984: the program of an exec of the dynamic loader.
+// TODO/enter.md T-1984: the program of an exec of the dynamic loader:
+// `pod_confine::loader` of podcrates `v0.80.0`, kept as it is (the crate
+// takes std; this object takes no such dependency). Not formatted here: the
+// file keeps the style of podcrates, byte for byte (TODO/deps.md T-2050).
+#[rustfmt::skip]
 pub mod ldso;
 mod loader_rule;
 use loader_rule::{dispatches, loader_program_allowed};
@@ -60,8 +64,8 @@ const ELOOP: c_int = 40;
 const X_OK: c_int = 1;
 const O_RDONLY_CLOEXEC: c_int = 0o2_000_000;
 
-/// How many `#!` levels one exec follows. Linux stops at the same depth.
-const DEPTH: usize = 4;
+/// How many `#!` levels one exec follows: the kernel's ([`head::DEPTH`]).
+const DEPTH: usize = head::DEPTH;
 
 /// The search list where `PATH` is absent: musl's default, which holds
 /// glibc's.

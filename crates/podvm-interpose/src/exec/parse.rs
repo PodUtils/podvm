@@ -15,6 +15,15 @@ pub const HEAD: usize = 256;
 /// The size of one 64-bit program header.
 pub const PHENT: usize = 56;
 
+/// How many `#!` lines one exec follows: five, as the kernel. `exec_binprm`
+/// of `fs/exec.c` runs `search_binary_handler` while `depth <= 5`, and each
+/// `#!` line is one rewrite, so a chain of five scripts runs and a sixth
+/// `#!` line is `ELOOP` (its comment says four; the loop runs five). The
+/// interposer, the handler of the syscall tier (`podvm-dispatch`) and the
+/// entry of podvm (`lifecycle/script.rs`) take this one number, and a test
+/// of podvm holds it against the kernel of the host (TODO/deps.md T-2050).
+pub const DEPTH: usize = 5;
+
 /// `PT_INTERP`.
 const PT_INTERP: u32 = 3;
 
