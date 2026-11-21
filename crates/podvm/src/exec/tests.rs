@@ -182,3 +182,23 @@ fn exec_joins_only_a_running_container_of_the_namespace_rung() {
         );
     }
 }
+
+/// TODO/cli.md T-2061: `exec` into a container that ended is refused with
+/// the code of the table (1, as docker); a running or created one goes on.
+#[test]
+fn exec_into_a_container_that_ended_is_refused() {
+    use podvm_supervise::table::State;
+    for (state, refused) in [
+        (State::Running, false),
+        (State::Created, false),
+        (State::Exited, true),
+        (State::Dead, true),
+    ] {
+        let got = super::ns::not_running("c1", state);
+        assert_eq!(
+            got,
+            refused.then_some(podvm_image::error::EXIT_CLI_ERROR),
+            "{state:?}"
+        );
+    }
+}

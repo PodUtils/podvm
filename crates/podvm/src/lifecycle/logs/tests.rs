@@ -34,7 +34,7 @@ fn the_values_of_logs_are_parsed_by_one_rule() {
         ("--tail", "18446744073709551615", Some(u64::MAX)),
         ("--tail", "18446744073709551616", None),
         ("--tail", "-1", None),
-        ("--tail", "all", None),
+        ("--tail", "ALL", None),
         ("--tail", "", None),
     ];
     for &(flag, raw, want) in cases {
@@ -156,4 +156,19 @@ fn the_copy_of_a_log_is_the_slice_of_the_whole_read() {
         assert_eq!(n, want.len() as u64);
     }
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// TODO/cli.md T-2061: docker's `--tail all` is the whole log, as the
+/// default is, and a later `--tail N` or `all` wins, as in docker.
+#[test]
+fn tail_all_is_the_whole_log() {
+    for argv in [
+        v(&["--tail", "all", "c1"]),
+        v(&["--tail=all", "c1"]),
+        v(&["--tail", "5", "--tail", "all", "c1"]),
+    ] {
+        assert_eq!(parse_logs(&argv).unwrap().tail, None, "{argv:?}");
+    }
+    let last = parse_logs(&v(&["--tail", "all", "--tail", "5", "c1"])).unwrap();
+    assert_eq!(last.tail, Some(5));
 }

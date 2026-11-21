@@ -48,7 +48,13 @@ fn a_volume_spelling_podvm_cannot_serve_is_refused() {
         let e = parse(spec).unwrap_err();
         assert!(e.contains(want), "{spec}: {e}");
     };
-    refused(&format!("{h}:/data:z"), "has nothing to act on");
+    refused(&format!("{h}:/data:nocopy"), "has nothing to act on");
+    // TODO/cli.md T-2061: the SELinux labels are accepted and do nothing.
+    for opts in ["z", "Z", "rw,z", "ro,Z"] {
+        let (v, ro) = parse(&format!("{h}:/data:{opts}")).unwrap();
+        assert_eq!(v.guest, "/data", "{opts}");
+        assert_eq!(ro, opts.starts_with("ro"), "{opts}");
+    }
     refused("/data", "anonymous volume");
     refused("cache:/data", "named volume");
     refused(&format!("{h}:data"), "is not absolute");

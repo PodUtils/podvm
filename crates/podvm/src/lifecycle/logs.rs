@@ -11,7 +11,8 @@ usage: podvm logs [-f|--follow] [--tail N] [--limit-bytes N] [--podvm-tier incus
   through one buffer of 64 KiB: a large log does not fill the memory.
 
   -f, --follow     write what comes, until the container ends.
-  --tail N         the last N lines only (0: none); -f follows from there.
+  --tail N         the last N lines only (0: none; `all`: the whole log, the
+                   default); -f follows from there.
   --limit-bytes N  stop after the first N bytes and exit 0 (N from 1 to
                    9223372036854775807). With --tail: the first N bytes of
                    the tail. With -f: stop at N bytes or at the end.
@@ -63,6 +64,11 @@ pub fn parse_logs(args: &[String]) -> std::result::Result<LogsArgs, i32> {
     let mut want: Option<String> = None;
     let mut expecting: Option<&'static str> = None;
     let set = |o: &mut LogsArgs, flag: &str, raw: &str| -> Result<(), i32> {
+        // TODO/cli.md T-2061: docker's `--tail all` is the default, the whole log.
+        if flag == "--tail" && raw == "all" {
+            o.tail = None;
+            return Ok(());
+        }
         let n = value(flag, raw).map_err(|why| {
             eprintln!("podvm logs: {why}");
             EXIT_FLAG_ERROR

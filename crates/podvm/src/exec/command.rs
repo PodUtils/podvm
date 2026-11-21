@@ -103,6 +103,13 @@ pub fn exec(args: &[String]) -> i32 {
     // the same either way: a container's rootfs is a directory in the store and
     // so is an image's.
     if let Some((rootfs, state)) = crate::lifecycle::rootfs_of(&store, &image) {
+        // TODO/cli.md T-2061: docker refuses `exec` into a container that
+        // ended, and exits 1 (a refusal after the parse, the table of
+        // `podvm-probe::exit`). A container that was only created keeps the
+        // entry of T-0505.
+        if let Some(c) = super::ns::not_running(&image, state) {
+            return c;
+        }
         // TODO/probe.md T-1911: a tree of a subordinate id, not running.
         let running = state == podvm_supervise::table::State::Running;
         if let Some(c) = crate::userns::again_in_range("exec", running, args) {

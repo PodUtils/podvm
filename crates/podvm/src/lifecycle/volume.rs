@@ -32,7 +32,7 @@ use crate::lifecycle::Userland;
 /// (T-1643). A bare name is a named volume and a single path is an
 /// anonymous volume: both need a volume store, and podvm keeps none.
 /// `rw` is the default; `ro` makes the volume read-only through the layer
-/// of the interposer (TODO/cli.md T-1655); each other option is refused by
+/// of the interposer (TODO/cli.md T-1655); `z` and `Z` do nothing (T-2061); each other option is refused by
 /// name. The table checks of the pair run in `pod-enter`'s `Maps::new`
 /// (with `podvm_enter::NAMES`) and its table builders.
 ///
@@ -61,11 +61,15 @@ pub fn parse(spec: &str) -> Result<(Volume, bool), String> {
     for o in opts.split(',') {
         match o {
             "" | "rw" => {}
+            // TODO/cli.md T-2061: `z` and `Z` label a source for SELinux.
+            // podvm labels nothing, and docker too does nothing on a host
+            // with no SELinux, so the option is accepted as a no-op.
+            "z" | "Z" => {}
             "ro" => ro = true,
             other => {
                 return Err(format!(
                     "the option {other:?} has nothing to act on: a volume here is a \
-                     path rewrite, not a mount. podvm takes rw and ro (TODO/cli.md T-1655)"
+                     path rewrite, not a mount. podvm takes rw, ro, z and Z (TODO/cli.md T-1655, T-2061)"
                 ))
             }
         }

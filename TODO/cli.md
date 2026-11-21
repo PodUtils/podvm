@@ -6539,3 +6539,36 @@ Two table tests hold each field type against docker's: `the_fields_of_an_image_h
 ## Done
 
 **Done (2026-11-21).** The engine takes typed values (`format::render_typed`, `Typed`, `go_text`), and `render` and `render_with_documents` keep their text interface through it. `inspect` of an image builds one document, and `--format` reads its parts by their dotted names (`images/inspect.rs`: `inspect_doc`, `inspect_fields`); `config_flat` is gone. `inspect` of a container types its fields in `lifecycle/typed.rs`: `Pid`, `LauncherPid`, `ExitCode` and `End.*` are numbers (null where the record has none), `State.Running` is a boolean, `Labels` and `Config.Labels` are maps, `Config.Env` and `Config.Cmd` are lists, and `State` is docker's object in JSON and the word in text. `Config` and `Config.*` are new fields of both kinds. A dash in text is a null in JSON. Before (the binary of `3fa36a6`): `{{json .Labels}}` gave `"team=ci"`, `{{json .Pid}}` gave `"27332"`. After: `{"team":"ci"}`, `16763`, `{{.Labels}}` gives `map[team:ci]`, `{{.Config.Cmd}}` gives `[sleep 300]`, and an image of Alpine 3.20 gives `["PATH=..."]|[/bin/sh]`. The two table tests hold the types.
+
+# T-2061: The sixth outside pass, OQ-09: docker differences of `-t`, `exec`, `logs`, `-v` and the manual
+
+**Source:** the sixth outside pass (T-2044), OQ-09 (P2)
+**Category:** cli
+**Milestone:** none
+**Priority:** P2
+**Effort:** S
+**Status:** done
+
+## Problem
+
+Six differences from docker: `run -t` sets no `TERM` (docker: `xterm`); `HOSTNAME` is not set to the short id of the container, and the host name is the host's; `exec` into an exited container runs, and docker refuses it; `logs --tail all` is refused; `-v H:G:rw,z` is refused with a text that is false on the namespace rung; `start -a` and `cp NAME:PATH -` are refused as unknown.
+
+## Premise
+
+Each is a difference that the manual does not name. The refusal of `z` is checked at the parse, where the rung is not known.
+
+## Approach
+
+Fix the clear ones: `TERM=xterm` for `-t` where neither the image nor `-e` sets `TERM`; `exec` refuses a container that exited or died with `container NAME is not running (STATE)` and exit 1, the code of a refusal after the parse in `podvm-probe::exit`; `--tail all` is the whole log; `z` and `Z` are accepted and do nothing (podvm labels nothing for SELinux, and docker does nothing where SELinux is off). Name the rest in the parity table as known differences: `start -a`, `cp NAME:PATH -`, and `HOSTNAME`.
+
+## Decision
+
+-
+
+## Prove
+
+A table test for each rule: `a_tty_gets_term_xterm_unless_the_caller_set_one`, `exec_into_a_container_that_ended_is_refused`, `tail_all_is_the_whole_log`, and the table of `a_volume_spelling_podvm_cannot_serve_is_refused`. As uid 1000: `run -t` prints `TERM=xterm`; `exec` into an exited container exits 1 with one line.
+
+## Done
+
+**Done (2026-11-21).** `TERM=xterm` (`run/home.rs`: `tty_term`), the refusal of `exec` into an exited or dead container (`exec/ns.rs`: `not_running`, exit 1; a created container keeps the entry of T-0505), `--tail all` (`lifecycle/logs.rs`), and `:z`, `:Z` as no-ops (`lifecycle/volume.rs`). Left, and named as known differences in the parity table (so in `podvm man`): `start -a` and `cp NAME:PATH -`, which need an attach (the follow of `logs`, `wait` and the signals) and a tar writer that are not small; and the host name of a run with no `--hostname`, which is the host's, with no `HOSTNAME`, because a foreground run has no container id at the entry. Before (`3fa36a6`): `exec c1 echo into-exited` gave `into-exited` and 0; `--tail all` gave 125; `-v ...:rw,z` gave 125. After: 1 with the line "podvm exec: container c1 is not running (exited)" and the way to start it; the whole log; 0.

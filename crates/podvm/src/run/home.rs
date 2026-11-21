@@ -22,6 +22,14 @@ pub(super) fn home_of(env: &[String]) -> String {
         .to_string()
 }
 
+/// TODO/cli.md T-2061: docker gives `-t` the word `xterm` for `TERM` where
+/// neither the image nor `-e` sets one.
+pub(super) fn tty_term(tty: bool, env: &mut Vec<String>) {
+    if tty && !env.iter().any(|e| e == "TERM" || e.starts_with("TERM=")) {
+        env.push("TERM=xterm".to_string());
+    }
+}
+
 /// On the userland rung, give the home of the run the owner's write bit
 /// in the tree `rootfs`. A home that is no directory, a link, or a path
 /// with `..` stays as it is: nothing out of the tree changes.
@@ -89,5 +97,23 @@ mod tests {
             set(p, 0o755);
         }
         let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// TODO/cli.md T-2061: `-t` sets `TERM=xterm` where nothing sets it.
+    #[test]
+    fn a_tty_gets_term_xterm_unless_the_caller_set_one() {
+        // (tty, the environment before, the environment after)
+        let rows: [(bool, &[&str], &[&str]); 5] = [
+            (true, &[], &["TERM=xterm"]),
+            (true, &["A=1"], &["A=1", "TERM=xterm"]),
+            (true, &["TERM=vt100"], &["TERM=vt100"]),
+            (true, &["TERM"], &["TERM"]),
+            (false, &["A=1"], &["A=1"]),
+        ];
+        for (tty, before, after) in rows {
+            let mut env: Vec<String> = before.iter().map(|s| s.to_string()).collect();
+            tty_term(tty, &mut env);
+            assert_eq!(env, after, "{tty} {before:?}");
+        }
     }
 }

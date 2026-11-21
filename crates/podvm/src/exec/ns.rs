@@ -59,3 +59,16 @@ pub(crate) fn joins_the_run(
 ) -> bool {
     state == podvm_supervise::table::State::Running && rung == "namespace" && pid.is_some()
 }
+
+/// TODO/cli.md T-2061: the refusal of `exec` into a container that ended,
+/// as docker words it, with its exit code; `None` where the entry goes on.
+pub(super) fn not_running(name: &str, state: podvm_supervise::table::State) -> Option<i32> {
+    use podvm_supervise::table::State;
+    matches!(state, State::Exited | State::Dead).then(|| {
+        eprintln!(
+            "podvm exec: container {name} is not running ({}). Start it with `podvm start {name}`",
+            state.word()
+        );
+        podvm_image::error::EXIT_CLI_ERROR
+    })
+}
