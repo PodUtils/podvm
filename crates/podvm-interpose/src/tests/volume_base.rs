@@ -6,7 +6,7 @@
 //! path reads and writes.
 
 use super::*;
-use crate::map::base::{pin, Pin};
+use crate::map::base::{Pin, pin};
 
 unsafe extern "C" {
     fn close(fd: c_int) -> c_int;
@@ -143,6 +143,22 @@ fn a_volume_under_the_base_reaches_no_file_out_of_the_base() {
     });
     for p in [c"/w/away/f", c"/w/away/sub/f", c"/w2/f", c"/w2/sub/f"] {
         assert_ne!(cat(p), Ok("OUTSIDE".into()), "{p:?}");
+    }
+
+    // OQ-11 of the sixth outside pass (TODO/enter.md T-2055): a link in a
+    // volume to an absolute path resolves in guest names, as the kernel
+    // resolves it in the root of the namespace rung: the link of the host
+    // and the link of the payload to `/etc` read the image's file.
+    host(|| {
+        std::fs::write(root.join("etc/hostname"), b"image").unwrap();
+        std::os::unix::fs::symlink("/etc", base.join("w/etcl")).unwrap();
+    });
+    assert_eq!(
+        unsafe { crate::symlink(c"/etc".as_ptr(), c"/w/esc".as_ptr()) },
+        0
+    );
+    for p in [c"/w/etcl/hostname", c"/w/esc/hostname"] {
+        assert_eq!(cat(p), Ok("image".into()), "{p:?}");
     }
 
     // The class at the check itself, with each link a change of the host
