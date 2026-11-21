@@ -16,9 +16,8 @@ usage: podvm logs [-f|--follow] [--tail N] [--limit-bytes N] [--podvm-tier incus
   --limit-bytes N  stop after the first N bytes and exit 0 (N from 1 to
                    9223372036854775807). With --tail: the first N bytes of
                    the tail. With -f: stop at N bytes or at the end.
-  --podvm-tier incus  the log of an instance of incus. The API of incus
-                   gives the file whole: podvm holds it in memory, 64 MiB at
-                   most (a larger log is refused), and refuses --tail.
+  --podvm-tier incus  the log of an instance of incus, of any size, read
+                   in pieces of 64 KiB; --tail is refused.
 ";
 
 /// The largest `--limit-bytes`: the largest offset of a file (`off_t`).
@@ -144,7 +143,7 @@ pub fn logs(args: &[String]) -> i32 {
         Ok(s) => s,
         Err(c) => return c,
     };
-    let opened = match podvm_supervise::stream::open_log(&s, &o.want) {
+    let opened = match podvm_supervise::open_log(&s, &o.want) {
         Ok(f) => f,
         Err(e) => return fail("logs", e),
     };
@@ -165,15 +164,11 @@ pub fn logs(args: &[String]) -> i32 {
     // comes between the two is written one time.
     let left = o.limit.map(|l| l - written);
     let r = match left {
+        // TODO/cli.md T-2046: the bound ends the follow, with 0.
         Some(left) => {
-            let mut cap = podvm_supervise::stream::Capped::new(&mut out, left);
-            match podvm_supervise::stream::follow_from(&s, &o.want, &mut cap, len) {
-                // TODO/cli.md T-2046: the bound ends the follow, with 0.
-                Err(_) if cap.full() => Ok(()),
-                r => r,
-            }
+            podvm_supervise::follow_from_limit(&s, &o.want, &mut out, len, left).map(drop)
         }
-        None => podvm_supervise::stream::follow_from(&s, &o.want, &mut out, len),
+        None => podvm_supervise::follow_from(&s, &o.want, &mut out, len),
     };
     match r {
         Ok(()) => 0,

@@ -25,7 +25,11 @@
 
 pub mod launcher;
 pub mod report; // TODO/cli.md T-1825
-pub mod stream; // TODO/cli.md T-2046
+/// TODO/cli.md T-2046: the log as a stream (`CHUNK`, `open`, `tail_start`,
+/// `copy_range`, `Capped`), from `pod-supervise` (podcrates `v0.81.0`,
+/// PodUtils/podvm#631). `open` and each read of a log refuse a symbolic
+/// link at the place of the log.
+pub use pod_supervise::stream;
 pub mod table;
 
 use podvm_image::Store;
@@ -285,6 +289,51 @@ pub fn follow(store: &Store, want: &str, out: &mut dyn std::io::Write) -> Result
         &settings(store),
         want,
         out,
+    )?)
+}
+
+/// The log file of the container `want`, open for a read with no link
+/// followed, and its length at the open. `None`: the container wrote
+/// nothing yet (TODO/cli.md T-2046).
+pub fn open_log(store: &Store, want: &str) -> Result<Option<(std::fs::File, u64)>> {
+    Ok(pod_supervise::stream::open_log::<Detail>(
+        &settings(store),
+        want,
+    )?)
+}
+
+/// Follow the log of `want` from the byte `from` until the container ends
+/// (TODO/cli.md T-1337).
+pub fn follow_from(
+    store: &Store,
+    want: &str,
+    out: &mut dyn std::io::Write,
+    from: u64,
+) -> Result<()> {
+    Ok(pod_supervise::follow_from::<Detail>(
+        &settings(store),
+        want,
+        out,
+        from,
+    )?)
+}
+
+/// [`follow_from`] up to `limit` bytes: the follow ends at the bound, or
+/// at the end of the container. Gives the count of bytes written
+/// (TODO/cli.md T-2046, `--limit-bytes`).
+pub fn follow_from_limit(
+    store: &Store,
+    want: &str,
+    out: &mut dyn std::io::Write,
+    from: u64,
+    limit: u64,
+) -> Result<u64> {
+    Ok(pod_supervise::follow_from_limit::<Detail>(
+        &settings(store),
+        want,
+        out,
+        from,
+        limit,
     )?)
 }
 

@@ -9,6 +9,12 @@ use serde_json::json;
 
 const LOG: &[u8] = b"one\ntwo\nthree\n";
 
+/// The log of the instance `big`: three pieces of 64 KiB and a part, each
+/// byte its offset modulo 251.
+fn big() -> Vec<u8> {
+    (0..200_000u32).map(|i| (i % 251) as u8).collect()
+}
+
 /// An incusd with the stopped instance `inc1` of podvm, whose log is
 /// [`LOG`], and the instance `other` of another user.
 fn stand_in(sock: &std::path::Path) {
@@ -31,6 +37,10 @@ fn stand_in(sock: &std::path::Path) {
                 ("X-Incus-type: file\r\n", LOG.to_vec())
             } else if p.starts_with("/1.0/instances/inc1") {
                 ("", instance("inc1", json!({"user.podvm": "1"})))
+            } else if p.starts_with("/1.0/instances/big/files?") {
+                ("X-Incus-type: file\r\n", big())
+            } else if p.starts_with("/1.0/instances/big") {
+                ("", instance("big", json!({"user.podvm": "1"})))
             } else {
                 ("", instance("other", json!({})))
             };
@@ -50,7 +60,7 @@ fn the_log_of_an_instance_stops_at_the_limit() {
     std::fs::create_dir_all(&d).unwrap();
     let sock = d.join("unix.socket");
     stand_in(&sock);
-    let c = Client::new(Settings::new(sock));
+    let c = Client::new(Settings::new(&sock));
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -70,6 +80,28 @@ fn the_log_of_an_instance_stops_at_the_limit() {
         rt.block_on(super::copy(&c, "inc1", follow, limit, pause, &mut out))
             .unwrap();
         assert_eq!(out, want, "follow={follow} limit={limit:?}");
+    }
+    // T-2046 (podcrates `v0.81.0`, #631): the read has no bound of
+    // `max_body`; a log larger than it is copied in pieces, whole or to the
+    // limit.
+    let mut small = Settings::new(&sock);
+    small.max_body = 4096;
+    let small = Client::new(small);
+    let log = big();
+    for (follow, limit, want) in [
+        (false, None, &log[..]),
+        (false, Some(70_000), &log[..70_000]),
+        (true, None, &log[..]),
+        (true, Some(65_537), &log[..65_537]),
+    ] {
+        let mut out = Vec::new();
+        rt.block_on(super::copy(&small, "big", follow, limit, pause, &mut out))
+            .unwrap();
+        assert!(
+            out == want,
+            "max_body 4096: follow={follow} limit={limit:?}: {} bytes",
+            out.len()
+        );
     }
     // An instance with no label of podvm is refused by name.
     let mut out = Vec::new();

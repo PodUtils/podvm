@@ -2,15 +2,15 @@
 //! (TODO/machine.md T-1722), with `-f` and `--limit-bytes N` (TODO/cli.md
 //! T-2046).
 //!
-//! ⚠ The API of incus gives a file whole (`GET .../files?path=`), and
-//! `pod-incus` reads that answer whole, 64 MiB at most (`Settings::max_body`):
-//! a larger log is refused. `--limit-bytes` bounds what podvm writes, not
-//! what it reads. A ranged or streamed read of a file is the ask to
-//! podcrates in the record of T-2046.
+//! Each read is `pod_incus::Client::get_file_to` (podcrates `v0.81.0`,
+//! PodUtils/podvm#631): the bytes from the offset that podvm wrote last, in
+//! pieces of 64 KiB, to stdout, at most the bytes that `--limit-bytes`
+//! leaves. The memory of a read is one piece, not the size of the log, and
+//! a log of any size is read.
 
 use std::io::Write;
 
-use pod_incus::{Client, FileContent};
+use pod_incus::{ByteRange, Client, ErrorKind};
 use podvm_image::error::{EXIT_FLAG_ERROR, EXIT_RUNTIME_ERROR};
 
 use super::verbs::{block_on, connect, ours};
@@ -80,7 +80,7 @@ pub(crate) async fn copy(
             "not an instance of podvm (no user.podvm label)".into(),
         ));
     }
-    let mut seen = 0usize;
+    let mut seen = 0u64;
     let mut left = limit;
     loop {
         // The state before the read: a read after a stop has each byte.
@@ -89,33 +89,39 @@ pub(crate) async fn copy(
                 .await
                 .map(|i| i.status == "Running")
                 .map_err(incus)?;
-        let bytes = match c.get_file(name, super::LOG).await {
-            Ok(f) => match f.content {
-                FileContent::Bytes(b) => b,
-                FileContent::Entries(_) => {
-                    return Err(Fault::Incus(format!("{} is a directory", super::LOG)))
+        let read = c
+            .get_file_to(
+                name,
+                super::LOG,
+                Some(ByteRange::from(seen)),
+                left,
+                &mut *out,
+            )
+            .await;
+        match read {
+            Ok(r) => {
+                seen += r.written;
+                // A file that became shorter sets the offset back, as the
+                // follow of a container does.
+                if r.written == 0 && r.size.is_some_and(|size| size < seen) {
+                    seen = r.size.unwrap_or(0);
                 }
-            },
-            // The file can be missing before the command writes its first
-            // line, while the instance runs.
-            Err(_) if running => Vec::new(),
-            Err(e) => return Err(incus(e)),
-        };
-        // A file that became shorter sets the offset back, as the follow
-        // of a container does.
-        let from = seen.min(bytes.len());
-        let new = &bytes[from..];
-        let n = left.map_or(new.len(), |l| {
-            new.len().min(usize::try_from(l).unwrap_or(usize::MAX))
-        });
-        out.write_all(&new[..n])
-            .and_then(|()| out.flush())
-            .map_err(Fault::Write)?;
-        seen = from + n;
-        if let Some(l) = left.as_mut() {
-            *l -= n as u64;
-            if *l == 0 {
-                return Ok(());
+                if let Some(l) = left.as_mut() {
+                    *l -= r.written.min(*l);
+                    if *l == 0 {
+                        return Ok(());
+                    }
+                }
+            }
+            Err(e) => {
+                if let ErrorKind::Output(w) = e.kind() {
+                    return Err(Fault::Write(std::io::Error::new(w.kind(), w.to_string())));
+                }
+                // The file can be missing before the command writes its
+                // first line, while the instance runs.
+                if !running {
+                    return Err(incus(e));
+                }
             }
         }
         if !running {
