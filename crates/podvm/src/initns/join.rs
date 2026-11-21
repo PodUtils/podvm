@@ -287,7 +287,7 @@ pub fn run_command(
     // The wait of pod-enter reaps the child; the handle of std must not.
     std::mem::forget(child);
     let mut err = std::io::stderr();
-    let code = podvm_enter::Child::of(pid).wait_forwarding(&mut err);
+    let code = podvm_enter::wait_forwarding(&podvm_enter::Child::of(pid), &mut err);
     drop(relay);
     match code {
         Ok(code) => code,

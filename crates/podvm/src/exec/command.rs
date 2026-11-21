@@ -474,7 +474,7 @@ pub fn exec(args: &[String]) -> i32 {
         }
         None => match podvm_enter::spawn(&root, &plan, &mut err).and_then(|c| {
             tty::on_spawn(c.pid);
-            c.wait_forwarding(&mut err)
+            podvm_enter::wait_forwarding(&c, &mut err)
         }) {
             Ok(c) => c,
             Err(e) => {

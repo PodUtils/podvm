@@ -51,6 +51,8 @@ fn help_argv(verb: &str) -> Vec<&str> {
         "prune" => vec!["image", "prune"],
         "install-names" | "abi" | "df" => vec!["system", verb],
         "remote ssh" => vec!["remote", "ssh"],
+        // TODO/cli.md T-2064: it is a command, and its section shows the usage.
+        "container prune" => vec!["container", "prune"],
         "machine ssh" => vec!["machine", "ssh"],
         _ => vec![verb],
     }

@@ -354,7 +354,7 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
                 // the run as it was: the record lands at the end.
                 let code = child.and_then(|c| {
                     take_hold(&store, &fg.id, c.pid, &mut fg.hold, &mut err);
-                    c.wait_forwarding(&mut err)
+                    podvm_enter::wait_forwarding(&c, &mut err)
                 });
                 match code {
                     Ok(c) => c,

@@ -168,9 +168,10 @@ pub const RUN_OPTIONS: &str = "\
   --tmpfs P[:O]    an empty writable directory at P for a foreground run,
                    removed at its end; not a mount, so size= is not enforced
                    (TODO/cli.md T-1655)
-  --read-only      a write outside a writable volume fails with EROFS, through
-                   the interposer of the userland loader family; elsewhere it
-                   is refused by name (TODO/cli.md T-1655)
+  --read-only      a write outside a writable volume fails with EROFS: through
+                   the interposer of the userland loader family, and on the
+                   namespace rung as a read-only root; elsewhere it is refused
+                   by name (TODO/cli.md T-1655, T-2064)
   --cap-drop ALL   the same bit; a named capability is refused
                    (TODO/cli.md T-1655)
   --timeout S      podman's: at S seconds the payload and its tree are
@@ -402,6 +403,8 @@ pub(crate) use runsc::unserved as runsc_unserved; // T-2007
 // TODO/cli.md T-1706: the reason of a SIGXFSZ death.
 mod exit_note;
 
+#[cfg(test)]
+mod messages_tests;
 #[cfg(test)]
 mod timeout_tests;
 

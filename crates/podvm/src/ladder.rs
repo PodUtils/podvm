@@ -187,7 +187,7 @@ fn run_held(
     }
     let child = r?;
     on_pid(child.pid, err);
-    child.wait_forwarding(err)
+    podvm_enter::wait_forwarding(&child, err)
 }
 
 /// Enter a caller-staged directory rung and clean up behind it. `keep`
@@ -295,7 +295,7 @@ pub(crate) fn enter_forced(
                     }
                     let child = child?;
                     on_pid(child.pid, err);
-                    return child.wait_forwarding(err);
+                    return podvm_enter::wait_forwarding(&child, err);
                 }
                 None => {
                     return Err(podvm_enter::runtime(format!(

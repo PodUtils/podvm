@@ -212,7 +212,7 @@ pub fn enter_userland_with(
     let ran = podvm_enter::spawn_userland(root, plan, &userland.maps, exec_argv, active, fd, err)
         .and_then(|c| {
             on_spawn(c.pid, err);
-            c.wait_forwarding(err)
+            podvm_enter::wait_forwarding(&c, err)
         });
     match ran {
         Ok(c) => UserlandOutcome {

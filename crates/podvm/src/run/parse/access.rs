@@ -32,10 +32,7 @@ pub(in crate::run) fn report_path(verb: &str, path: &str) -> std::result::Result
     ));
     let dir_ok = std::fs::metadata(dir).is_ok_and(|m| caller_may(&m, 0o300));
     let opened: Result<bool, String> = if !dir_ok {
-        Err(format!(
-            "the directory {} takes no file of the caller",
-            dir.display()
-        ))
+        Err(dir_refusal(dir))
     } else if p.exists()
         && !std::fs::metadata(p).is_ok_and(|m| m.is_file() && caller_may(&m, 0o200))
     {
@@ -62,6 +59,20 @@ pub(in crate::run) fn report_path(verb: &str, path: &str) -> std::result::Result
             eprintln!("podvm {verb}: --report {path:?}: {why} (TODO/cli.md T-1825)");
             Err(podvm_image::error::EXIT_RUNTIME_ERROR)
         }
+    }
+}
+
+/// TODO/cli.md T-2064: why a directory takes no report: a directory that
+/// is not there says so, and the rest is the access of the caller.
+pub(in crate::run) fn dir_refusal(dir: &std::path::Path) -> String {
+    match std::fs::metadata(dir) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            format!("the directory {} does not exist", dir.display())
+        }
+        _ => format!(
+            "the directory {} takes no file of the caller",
+            dir.display()
+        ),
     }
 }
 

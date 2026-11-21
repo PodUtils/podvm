@@ -465,7 +465,7 @@ pub(super) fn enter(
                 .and_then(|p| crate::userns::joined_pidfd().or_else(|| super::ns::pidfd_open(p)));
             let wait = |c: podvm_enter::Child, err: &mut dyn Write| {
                 super::tty::on_spawn(c.pid); // T-2043: the interrupt key
-                c.wait_forwarding(err)
+                podvm_enter::wait_forwarding(&c, err)
             };
             let r = match joined {
                 Some(fd) => {

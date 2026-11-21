@@ -36,7 +36,7 @@ pub(super) fn run(
         );
     }
     take_hold(store, &fg.id, pid, &mut fg.hold, err);
-    let code = podvm_enter::Child::of(pid).wait_forwarding(err);
+    let code = podvm_enter::wait_forwarding(&podvm_enter::Child::of(pid), err);
     crate::initns::end(&base);
     match code {
         Ok(c) => c,

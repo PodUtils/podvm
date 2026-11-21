@@ -3,16 +3,7 @@
 
 use super::*;
 
-/// The seconds of `--timeout`: a whole number over 0. TODO/cli.md T-1655.
-pub(super) fn timeout(verb: &str, a: &str) -> Result<u64, i32> {
-    match a.parse::<u64>() {
-        Ok(n) if n > 0 && n <= u64::MAX / 1000 => Ok(n),
-        _ => {
-            eprintln!("podvm {verb}: --timeout takes whole seconds over 0, not {a:?}");
-            Err(EXIT_FLAG_ERROR)
-        }
-    }
-}
+pub(super) use super::bound::timeout;
 
 /// One `--ulimit`, checked now so that a bad spec is a flag error before
 /// anything is fetched. TODO/cli.md T-1655.
@@ -233,6 +224,13 @@ pub(crate) fn push_label(labels: &mut Vec<String>, kv: String) {
     labels.push(kv);
 }
 
+/// The line and the byte of the first byte that is not UTF-8 (TODO/cli.md
+/// T-2064); `(1, 0)` for bytes that are.
+pub(crate) fn utf8_line(bytes: &[u8]) -> (usize, usize) {
+    let at = std::str::from_utf8(bytes).map_or_else(|e| e.valid_up_to(), |_| 0);
+    (bytes[..at].iter().filter(|b| **b == b'\n').count() + 1, at)
+}
+
 /// `--env-file`: docker's file of `KEY=VALUE` lines, loaded at the flag's
 /// position so a later `-e` wins over the file and a later file over an
 /// earlier flag, the same rule `-e` already documents. TODO/cli.md T-0801.
@@ -263,8 +261,16 @@ pub(crate) fn read_env_file(verb: &str, path: &str) -> std::result::Result<Vec<S
         );
         return Err(EXIT_FLAG_ERROR);
     }
-    let text = std::fs::read_to_string(path).map_err(|e| {
+    let bytes = std::fs::read(path).map_err(|e| {
         eprintln!("podvm {verb}: --env-file {path:?}: {e}");
+        EXIT_FLAG_ERROR
+    })?;
+    // TODO/cli.md T-2064: bytes that are not UTF-8 name the line.
+    let text = String::from_utf8(bytes).map_err(|e| {
+        let (line, at) = utf8_line(e.as_bytes());
+        eprintln!(
+            "podvm {verb}: --env-file {path:?} line {line} is not UTF-8 (byte {at} of the file)"
+        );
         EXIT_FLAG_ERROR
     })?;
     let mut out = Vec::new();

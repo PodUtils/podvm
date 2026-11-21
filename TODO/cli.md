@@ -6638,3 +6638,36 @@ A run takes an exclusive `flock` on its memo when it makes the name (`interpose:
 ## Done
 
 **Done (2026-11-21).** `Store::sweep_staging` and `sweep_staging_aged` (`podvm-image/src/store/blobs.rs`) take `memo-*.tmp` by the lock, and each `podvm` command that opens the store sweeps with an age of 10 s; `container prune` sweeps with none. A live run holds the lock (`interpose::hold_memo`), a payload does not (close-on-exec). The table test holds the rule for a locked file, a young file, a name that is not a memo, and a `.partial`.
+
+# T-2064: The sixth outside pass, OQ-13: texts of the manual and of messages
+
+**Source:** the sixth outside pass (T-2044), OQ-13 (P3)
+**Category:** cli
+**Milestone:** none
+**Priority:** P3
+**Effort:** S
+**Status:** done
+
+## Problem
+
+The section of `container prune` in the manual says that it is no command; it is one. The manual says that `--read-only` is refused outside the loader family, and it works on the namespace rung. `--timeout 99999999999999999999` says "takes whole seconds over 0". `--report tmp/nodir/r.json` says that the directory "takes no file of the caller". The lines for a forwarded signal and for a signal exit of the payload have no `podvm` prefix. `--env-file` with bytes that are not UTF-8 names no file and no line. (The version of the candidate was a build before the bump, and is not a fault.)
+
+## Premise
+
+Each text was written for the first case that the author saw. `pod-enter` writes the two lines of the wait to a writer that the caller gives, with no name of the program.
+
+## Approach
+
+Each text says what is true. A table test holds the refusals of a value (`a_refused_value_says_what_is_wrong_with_it`). A writer that starts each line with `podvm: ` wraps the writer of each wait (`podvm_enter::wait_forwarding`).
+
+## Decision
+
+-
+
+## Prove
+
+`a_refused_value_says_what_is_wrong_with_it`, `the_lines_of_the_wait_start_with_the_name`; `podvm man container prune` shows the usage; the help and the parity row of `--read-only` name the namespace rung.
+
+## Done
+
+**Done (2026-11-21).** `--timeout` names the bound (`run/parse/bound.rs`: from 1 to 18446744073709551 seconds, and a number of digits over it is too large); the directory of `--report` that is not there says `does not exist`; `--env-file` names the file, the line and the byte; the lines `forwarded SIGINT to the payload (pid N)` and `the payload died on SIGINT: exit 130` start with `podvm: `; the section of `container prune` shows its usage (`man.rs`); `--read-only` is documented for the namespace rung.

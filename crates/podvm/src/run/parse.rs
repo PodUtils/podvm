@@ -481,7 +481,8 @@ pub use values::usage;
 use values::*;
 pub(crate) use values::{env_arg, read_env_file, read_env_file0};
 
-mod access;
+pub(super) mod access;
+pub(super) mod bound;
 pub(crate) mod limits;
 mod opts; // TODO/machine.md T-1897 // PodUtils/podvm#513, #552
 mod volume_base;

@@ -142,6 +142,10 @@ pub fn ns_fallback_line(cause: &str) -> String {
 /// The spec of `--podvm-confine` (TODO/enter.md T-1658).
 pub mod confine;
 
+/// The wait of the payload, with `podvm:` before each line (TODO/cli.md T-2064).
+mod wait;
+pub use wait::{wait_forwarding, Prefixed};
+
 pub mod ladder {
     pub use pod_enter::ladder::*;
 
@@ -481,8 +485,8 @@ mod tests {
             EXIT_CANNOT_INVOKE
         );
         assert_eq!(Error::NotFound("x".into()).exit_code(), EXIT_NOT_FOUND);
-    }
-}
         // T-2062: the program is there and its arguments are too large.
         let big = "\"sh\": the payload could not be started: execve of every candidate path failed with E2BIG (7)";
         assert_eq!(Error::NotFound(big.into()).exit_code(), EXIT_CANNOT_INVOKE);
+    }
+}
