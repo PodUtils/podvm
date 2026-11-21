@@ -174,6 +174,9 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
     let mut env = p.env.clone();
     let volumes = podvm_supervise::launcher::binds_of(&env);
     env.retain(|e| !e.starts_with("PODVM_BINDS=") && !e.starts_with("PODVM_BINDS_BASE="));
+    if p.userland.is_none() {
+        podvm_supervise::table::drop_host_paths(&mut env); // T-2054: a root
+    }
     match podvm_enter::device::specs_of(&env).and_then(|s| podvm_enter::device::open_all(&s)) {
         Ok(opened) => {
             pass.extend(opened.pass.iter().copied());
@@ -261,16 +264,22 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
             return code;
         }
     };
-    if let Err(e) = held.hand_to_payload() {
+    // ⛔ TODO/supervise.md T-1708: podvm is the child subreaper of the
+    // payload's tree, so an orphan of the payload is reached at the end.
+    let reaper = podvm_supervise::tree::become_subreaper();
+    // TODO/enter.md T-2054 (OQ-08): in podvm's PID namespace no process of
+    // the tree outlives podvm's end of it, so podvm keeps the lock and the
+    // payload gets no descriptor of the store; elsewhere the payload holds
+    // it (T-0204).
+    if !(reaper && crate::userns::active())
+        && let Err(e) = held.hand_to_payload()
+    {
         let _ = writeln!(err, "podvm run: {e}");
         fg_end(&store, fg, podvm_image::error::EXIT_RUNTIME_ERROR);
         drop(memo);
         let _ = std::fs::remove_file(&p.memo_host_path);
         return podvm_image::error::EXIT_RUNTIME_ERROR;
     }
-    // ⛔ TODO/supervise.md T-1708: podvm is the child subreaper of the
-    // payload's tree, so an orphan of the payload is reached at the end.
-    let reaper = podvm_supervise::tree::become_subreaper();
     // TODO/cli.md T-1655: `--timeout` ends the tree at the bound.
     let wall = p.wall_ms.map(super::wall::arm_wall);
     // ⭐ TODO/packaging.md T-1003. A forced launch rung drives through the

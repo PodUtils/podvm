@@ -5753,3 +5753,44 @@ As uid 1000 under `scripts/dev/nouserns.c` with `mirror.gcr.io/library/alpine:3.
 ## Done
 
 **Done (2026-11-20).** `crates/podvm-interpose/src/exec/walk.rs` and `map/prepare.rs` apply the Decision. Measured as uid 1000 under `scripts/dev/nouserns.c` (`mode=userland`, the loader family) with `mirror.gcr.io/library/alpine:3.20`; the host's name is `vm`, the image's `localhost`. Before (the interposer of `main` at `0490555`): `cat ROOTFS/../../../../../../../etc/hostname` gave `localhost`, and `vm` for a link to `ROOTFS/../../../../../../../etc`, for `ROOTFS/tmp/rel/hostname` with `rel -> ../../../../../../../../../etc`, and for a link to `ROOTFS/.podvm/../../../../../../../../etc`. After: each gives `localhost`; `ls ROOTFS/.podvm/`, a read of `ROOTFS/lib/ld-musl-x86_64.so.1` and of the link `ROOTFS/lib/libc.musl-x86_64.so.1`, and a write to `ROOTFS/tmp/made` exit 0. With `mirror.gcr.io/library/python:3.13-slim`, the path that `dladdr` gives for `libz.so.1` (a host path under the rootfs, a link) opens, before and after (T-1705); `import ssl, json, sqlite3` works. The measure of T-2040 gives the same lines as its Done. `a_host_path_of_the_rootfs_reads_no_file_out_of_the_rootfs` (13 reads and a create: a link to `ROOTFS/..`, to `ROOTFS/.podvm/..` and to `ROOTFS/tmp/../..`; as given, a relative link, a link to `ROOTFS/..`, `ROOTFS/..`, an absolute link of the image, a link to a host directory; a relative link in the rootfs, a path of the loader, `ROOTFS/.podvm/obj`) pins the class: on the code before, 7 of its cases read the file out of the rootfs or did not open.
+
+# T-2054: The namespace rung: podvm's argv, its environment, host paths and descriptors of the store reach the payload
+
+**Source:** the sixth outside pass ([T-2044](cli.md)), OQ-08 (P2)
+**Category:** enter
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+As uid 1000, `run -d --name pv -e SECRET=hunter2 IMAGE sleep 30` and `exec pv ps -o pid,args`: pid 1 is `podvm run -d --name pv -e SECRET=hunter2 ...`, and the `exec` process is in the list with its argv. In a foreground run pid 1 and pid 2 show the same, and the payload is pid 104. The environment of the payload holds host paths (`PODVM_DISPATCH_SELF`, `PODVM_MEMO_PATH`), and the payload inherits a read-write descriptor of `store/locks/<digest>.lock`. Measured in this session: the payload also reads the whole environment of podvm (the variables of the caller, a token too) in `/proc/1/environ` and `/proc/2/environ`.
+
+## Premise
+
+Each process of podvm in the PID namespace of the payload is a fork with no exec: pid 1 and pid 2 of podvm's user namespace (T-1909), the init of `Plan::pid_namespace` (a fork of the launcher, T-1930), the relay of pod-enter's join and the process of podvm's own join (T-1910). `/proc/PID/cmdline` and `/proc/PID/environ` read the strings of the process that it forked from. The image lock is handed to the payload (`Lock::hand_to_payload`, T-0204) so that it outlives podvm. The two host paths serve the interposer of the loader family only (T-2000, T-1724).
+
+## Approach
+
+A title and no environment for each process of podvm in the PID namespace; no lock for the payload where an init or podvm ends each process of its tree before the lock goes; no host path of the loader family in the environment of an entry with a root. Ask pod-enter for the part of its init and its relay.
+
+## Decision
+
+2026-11-21, the session's call. The payload stays pid 2 or later: pid 1 is the init that reaps and forwards (pod-enter's `ns_pid`, podvm's `userns`, and the init of the image of T-2002); a payload as pid 1 is a change of that design, and the owner's table of T-2002 keeps it. The title is `prctl(PR_SET_MM, PR_SET_MM_MAP)` with `exe_fd` -1, which needs no capability: `/proc/PID/cmdline` gives `podvm-init`, `podvm-run` or `podvm-exec`, `/proc/PID/environ` gives nothing, and `/proc/PID/comm` takes the title; the strings that `std::env` reads do not move. Where the call is refused, pid 1 of podvm's user namespace writes NUL over its own strings (it reads none again), pid 2 says so under `--verbose`, and the launcher writes one line to the log of the container. A process with more than one thread takes no title (another thread can move the break of the heap). The memo descriptor and its variables, `LD_PRELOAD`, `PODVM_GUEST_EXE` and `PODVM_ACTIVE_MODE` stay: the interposer reads them in the payload, and none of their values is a host path (the link of the memo descriptor names one).
+
+## Prove
+
+As root and as uid 1000 with `public.ecr.aws/docker/library/alpine:3.20`, on the namespace rung: `ps -o pid,args` in a foreground run, in a `run -d` container through `exec` and `exec -t`, and `/proc/1/environ`, show no argument and no variable of podvm; `env` shows no `PODVM_MEMO_PATH` and no `PODVM_DISPATCH_SELF`; `/proc/self/fd` of the payload and of a payload of `run -d` names no lock of the store. A test of the title in a process of its own, and a table test of the variables that an entry with a root drops.
+
+## Done
+
+**Partial (2026-11-21).** `crates/podvm-enter/src/title.rs` (new: `hide`, `restore`, `blank_in_place`) gives the title; `userns.rs` gives it to pid 1 (`podvm-init`, also for the reaper, which now starts with no environment and `podvm-init` as its `argv[0]`) and to pid 2 (`podvm-run`); `userns/join.rs` to the process of the join of an `exec` (`podvm-exec`); `exec::ns::spawn_joined` to the relay of pod-enter; `podvm-supervise/src/launcher.rs` to the init of `run -d` (the launcher takes its own back after the fork). The lock of the image goes to the payload only where no PID namespace holds its tree: `run -d` of the namespace rung keeps it in the launcher, which outlives the init, and a foreground run in podvm's user namespace keeps it in pid 2, the child subreaper that ends each process of the tree (T-1708). `podvm_supervise::table::drop_host_paths` removes `PODVM_MEMO_PATH` and `PODVM_DISPATCH_SELF` from the environment of an entry with a root (`run`, `run -d`, `exec`). Measured on the cloud host, `-e SECRET=hunter2`. Before (`main` at `3fa36a6`), as uid 1000: pid 1 and pid 2 of a foreground run showed `./podvm-main run --rm -e SECRET=hunter2 ...`, `/proc/1/environ` gave the variables of the caller, `env` gave both host paths, and descriptor 5 named `store/locks/<digest>.lock`; `run -d`: pid 1 `./podvm-main run -d --rm --name pvu -e SECRET=hunter2 ...` and pid 3 `./podvm-main exec pvu ...`. After, as uid 1000: `1 podvm-init`, `2 podvm-run` (and `/proc/1/comm` is `podvm-init`), an empty `/proc/1/environ`, no host path in `env`, no lock descriptor; `run -d`: `1 podvm-init`, `2 sleep 30`, `3 podvm-exec` (also with `exec -t`), and the descriptors of `sleep` are its log and its memo; as root, `run -d` gives `1 podvm-init` and no lock descriptor. The unit tests `a_hidden_process_shows_its_title_and_no_environment` (a process of its own: the title, the name, the empty environment, `std::env::args`, the restore), `the_map_is_read_from_the_fields_of_proc_stat` and `an_entry_with_a_root_drops_the_host_paths_of_the_loader_family` hold the rule.
+
+Remaining:
+
+1. A foreground run of uid 0 has no PID namespace (T-2053 names it in the banner): the payload sees the processes of the host, podvm's argv too, and holds the lock descriptor (T-0204).
+2. The memo descriptor (17) and the log of `run -d` (descriptors 1 and 2) name host paths of the store in `/proc/self/fd`; the memo is the interface of the interposer (T-0710), and the log is the design of `pod-supervise`.
+3. `PODVM_MEMO_FD`, `PODVM_MEMO_ID`, `PODVM_GUEST_EXE`, `PODVM_ACTIVE_MODE` and `LD_PRELOAD` reach the payload: the interposer reads them; a copy in the interposer and a restore at each exec would lose them in a child that a raw `execve` starts (a Go program).
+4. The relay of pod-enter's join, as uid 0 with `-t`, takes no title (the threads of the pty relay); the init and the relay of pod-enter are dumpable, so a payload of the same ids can `ptrace` them and read the memory that holds podvm's environment. The ask to podcrates: the init of `Plan::pid_namespace` and the relay of `spawn_joined` set their own title and an empty environment (`PR_SET_MM_MAP`, `exe_fd` -1) and `PR_SET_DUMPABLE` 0 after the maps of the user namespace and before the fork of the payload; `podvm_enter::title` is the code to take (rule 2a).
+5. The helpers of podvm that pid 2 starts in the PID namespace (the fill of the spare tree, the removal of a `--rm` tree) exec podvm with an argv of store paths and the environment of the caller.

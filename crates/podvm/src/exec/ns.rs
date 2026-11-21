@@ -72,3 +72,24 @@ pub(super) fn not_running(name: &str, state: podvm_supervise::table::State) -> O
         podvm_image::error::EXIT_CLI_ERROR
     })
 }
+
+/// `pod_enter::spawn_joined` of the payload of `pidfd`. TODO/enter.md
+/// T-2054 (OQ-08): the relay that pod-enter leaves in the PID namespace of
+/// the run is a fork of this process, so this process takes a title and no
+/// environment for the fork (`podvm_enter::title`), and its own back after
+/// it. With the threads of `-t` the title is refused, and the relay shows
+/// podvm's command line as before.
+pub(crate) fn spawn_joined(
+    root: &podvm_enter::RootDir,
+    plan: &podvm_enter::Plan,
+    pidfd: &std::os::fd::OwnedFd,
+    err: &mut dyn std::io::Write,
+) -> podvm_enter::Result<podvm_enter::Child> {
+    use std::os::fd::AsRawFd;
+    let hidden = podvm_enter::title::hide("podvm-exec");
+    let spawned = podvm_enter::spawn_joined(root, plan, pidfd.as_raw_fd() as i64, err);
+    if let Ok(saved) = &hidden {
+        let _ = podvm_enter::title::restore(saved);
+    }
+    spawned
+}
