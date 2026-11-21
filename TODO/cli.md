@@ -6592,7 +6592,7 @@ An E2BIG of `execve` (a 1 MB value of `--env-file`) exits 127, and the manual sa
 
 ## Approach
 
-One table: `podvm-probe/src/exit.rs` (`CASES`, and the code of the manual's `GLOBAL`). `cannot-invoke` holds E2BIG, and `cli-error` names the refusals above. The code follows the table: `podvm_enter::ExitCode` gives 126 for an E2BIG; `rmi`, `cp` and the archive verbs give 1. A failure of the store stays 125. The ask for podcrates: `invocable_but_refused` takes E2BIG, and podvm then drops its read of the text.
+One table: `podvm-probe/src/exit.rs` (`CASES`, and the code of the manual's `GLOBAL`). `cannot-invoke` holds E2BIG, and `cli-error` names the refusals above. The code follows the table: `podvm_enter::ExitCode` gives 126 for an E2BIG; `rmi`, `cp` and the archive verbs give 1. A failure of the store stays 125. The ask for podcrates (#639, COORD-225): `invocable_but_refused` takes E2BIG, and podvm then drops its read of the text.
 
 ## Decision
 
