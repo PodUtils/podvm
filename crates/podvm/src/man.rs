@@ -156,6 +156,7 @@ fn render(only: Option<&str>, help: &dyn Fn(&str) -> Option<String>) -> Option<S
     out.push('\n');
     global(&mut out);
     out.push_str(&crate::environ::section());
+    out.push_str(&podvm_probe::isolation::section()); // TODO/cli.md T-2053
     out.push_str("COMMAND REFERENCE\n");
     for row in &verbs {
         render_section(&mut out, row, &help);

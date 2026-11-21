@@ -6,12 +6,17 @@ use super::*;
 /// the caller reuses for `--strict` and the container record.
 pub(super) fn entry_banner(
     findings: &podvm_probe::Findings,
+    facts: podvm_probe::isolation::Facts,
     userland: Option<&crate::lifecycle::Userland>,
     interpose_note: &str,
     devices: &[podvm_enter::device::Mapping],
     dropped_preload: Option<&str>,
     userland_note: &str,
-) -> (String, podvm_probe::select::Rung) {
+) -> (
+    String,
+    podvm_probe::select::Rung,
+    podvm_probe::isolation::Opened,
+) {
     let selection = podvm_probe::select::Selection::choose(findings);
     // ⭐ T-0804 rule 4. The banner is built from the rung podvm ENTERS with,
     // not the one the machine would permit: the namespace rung where
@@ -21,7 +26,9 @@ pub(super) fn entry_banner(
     let entered = userland
         .map(|_| podvm_probe::select::Rung::Userland)
         .unwrap_or_else(|| podvm_enter::entered_rung(selection.rung));
-    let mut banner = podvm_probe::report::entry_banner(findings, &selection, entered);
+    // TODO/cli.md T-2053 (OQ-07): what the entry opens, from its facts.
+    let opened = podvm_probe::isolation::of_entry(entered, facts);
+    let mut banner = podvm_probe::report::entry_banner_of(findings, &selection, entered, opened);
     // ⭐ TODO/cli.md T-0803. Where podvm was reached under somebody else's
     // name, the banner says which name was used and that this is podvm.
     // Taking the name is the product requirement; taking it silently is what
@@ -30,12 +37,6 @@ pub(super) fn entry_banner(
         banner.push_str(&note);
     }
     banner.push_str(interpose_note);
-    if crate::userns::active() {
-        banner.push_str(
-            "podvm opened a user, a PID and a UTS namespace for this run: the caller \
-             is uid 0 in it, and the payload has its own /proc (TODO/probe.md T-1909)\n",
-        );
-    }
     // ⭐ TODO/enter.md T-0501. Every mapping is named before anything of
     // the payload's runs: what the guest spelling serves (a duplicate of a
     // host descriptor opened before the chroot, never a node), where it
@@ -58,7 +59,34 @@ pub(super) fn entry_banner(
         // exe substitution, named once beside the rung account above.
         banner.push_str(userland_note);
     }
-    (banner, entered)
+    (banner, entered, opened)
+}
+
+/// TODO/cli.md T-2053 (OQ-07): the facts of the entry of `o`, for each
+/// statement of what it opens (`podvm_probe::isolation`).
+pub(super) fn facts(o: &Opts, detached: bool, rootfs: &str) -> podvm_probe::isolation::Facts {
+    podvm_probe::isolation::Facts {
+        userns_active: crate::userns::active(),
+        host_root: crate::userns::host_root(),
+        detached,
+        hostname: o.hostname.is_some(),
+        // pod-enter mounts a procfs on a directory of the image, not on a
+        // link and not where the image has none.
+        proc_dir: std::fs::symlink_metadata(std::path::Path::new(rootfs).join("proc"))
+            .is_ok_and(|m| m.is_dir()),
+    }
+}
+
+/// The hardening of the record of `o`, with the parts that its entry
+/// opened (TODO/cli.md T-2053): `inspect` reads them.
+pub(super) fn with_opened(
+    o: &Opts,
+    opened: podvm_probe::isolation::Opened,
+) -> podvm_supervise::table::Hardening {
+    podvm_supervise::table::Hardening {
+        opened: opened.words(),
+        ..super::report::with_detached_path(o.hardening.clone(), o.detach)
+    }
 }
 
 /// Make sure the store holds the image, honouring `--pull`.

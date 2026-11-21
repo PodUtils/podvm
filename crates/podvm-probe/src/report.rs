@@ -58,7 +58,25 @@ pub fn banner(f: &Findings, sel: &Selection) -> String {
 /// are two facts, and a caller deciding whether to move the workload needs the
 /// second.
 pub fn entry_banner(f: &Findings, sel: &Selection, entered: Rung) -> String {
-    let p = Provides::of(entered, f);
+    entry_banner_of(f, sel, entered, crate::isolation::Opened::NONE)
+}
+
+/// [`entry_banner`] for an entry that opens `opened` (TODO/cli.md T-2053,
+/// OQ-07): the `namespaces:` and `pids:` cells, the "does NOT provide"
+/// line and the `/proc` line read the facts of the entry
+/// ([`crate::isolation`]), not the name of the rung.
+pub fn entry_banner_of(
+    f: &Findings,
+    sel: &Selection,
+    entered: Rung,
+    opened: crate::isolation::Opened,
+) -> String {
+    let mut p = Provides::of(entered, f);
+    if let Some(ns) = opened.namespaces_cell() {
+        p.namespaces = ns;
+    }
+    p.pids = opened.pids_cell().to_string();
+    let never = opened.never_claim(entered);
     let mut out = format!(
         "podvm {VERSION}: mode={} (namespaces: {}; mounts: {}; devices: {};\n\
          ownership: {}; network: {}; pids: {})\n",
@@ -79,12 +97,10 @@ pub fn entry_banner(f: &Findings, sel: &Selection, entered: Rung) -> String {
         out.push_str(&cells[4..].join(" "));
         out.push('\n');
     }
-    if !entered.must_never_claim().is_empty() {
-        out.push_str(&format!(
-            "this mode does NOT provide: {}\n",
-            entered.must_never_claim()
-        ));
+    if !never.is_empty() {
+        out.push_str(&format!("this mode does NOT provide: {never}\n"));
     }
+    out.push_str(opened.line().unwrap_or_default());
     // TODO/supervise.md T-0606. Where syscall mediation is refused but
     // the lifecycle still tracks, the banner says so: supervision
     // without mediation is the fallback, and a silent one would be the
@@ -104,9 +120,11 @@ pub fn entry_banner(f: &Findings, sel: &Selection, entered: Rung) -> String {
     // T-0413 emulation: the interposer answers pipe descriptors, the
     // resolved exe path and mount-table reads, so those are named as
     // emulated and only the rest stays a casualty.
-    // ⭐ TODO/enter.md T-1339: the namespace rung mounts a tmpfs on
-    // `/tmp` and no /proc, so the sentence holds there too.
-    if entered == Rung::Chroot || entered == Rung::Namespace {
+    // TODO/cli.md T-2053 (OQ-07): the namespace rung mounts a /proc where
+    // the image has the directory, so the sentence holds there only where
+    // the entry mounts none.
+    let no_proc = entered == Rung::Namespace && !opened.has(crate::isolation::Part::Proc);
+    if entered == Rung::Chroot || no_proc {
         out.push_str(
             "no /proc is mounted in the payload root: the interposer emulates \
              /proc/self/fd pipe descriptors, /proc/self/exe and the mount-table \

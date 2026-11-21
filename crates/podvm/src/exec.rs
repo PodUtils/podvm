@@ -106,6 +106,18 @@ pub fn degradation() -> String {
     )
 }
 
+/// The line of `exec` into the running container of the namespace rung
+/// whose entry opened `opened` (TODO/cli.md T-2053, OQ-07): it joins the
+/// namespaces of the run, so [`degradation`] is not true of it.
+pub fn joined_line(opened: podvm_probe::isolation::Opened) -> String {
+    format!(
+        "podvm exec: this exec joins the running container: it shares {} \
+         (inspect gives it as .Exec.Shares). It takes the environment that the \
+         container started with (TODO/cli.md T-1765, T-2053)\n",
+        opened.exec_shares("namespace"),
+    )
+}
+
 #[derive(Debug)]
 struct Opts {
     env: Vec<String>,

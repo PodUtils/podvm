@@ -356,12 +356,11 @@ pub(crate) fn prepare(
     }
 
     // ------------------------------------------------------------- the banner
-    // ⭐ TODO/probe.md T-0107 and T-0108's remaining halves: the rung is
-    // selected here, for a real entry, and the banner names it and what it must
-    // never claim. The probe ran up front (T-1317's gate); the banner reuses
-    // its findings.
-    let (mut banner, entered) = entry_banner(
+    // ⭐ TODO/probe.md T-0107, T-0108: the rung is selected here, and the banner
+    // names it and what the entry opens (T-2053), from the probe of T-1317.
+    let (mut banner, entered, opened) = entry_banner(
         &findings,
+        super::acquire::facts(&o, detached, &rootfs), // T-2053
         userland.as_ref(),
         &interpose_note,
         &devices,
@@ -377,6 +376,7 @@ pub(crate) fn prepare(
     // somebody else's image and the payload can see it.
     let mut ask = o.ask.clone();
     ask.container_name = o.name.clone();
+    ask.entry_mounts_proc = opened.has(podvm_probe::isolation::Part::Proc);
     let mut completion = crate::complete::prepare(verb, &rootfs, &ask, &mut banner)?;
     if !cfg.config.user.is_empty() && !super::user_ns::applied(&env) {
         // ⚠ Read and REPORTED, not applied (T-1927 applies it on the namespace rung). podvm cannot setuid to an id
@@ -475,7 +475,7 @@ pub(crate) fn prepare(
         tty: o.tty,
         interactive: o.interactive,
         wall_ms: o.timeout.map(|s| s * 1000),
-        hardening: super::report::with_detached_path(o.hardening.clone(), o.detach),
+        hardening: super::acquire::with_opened(&o, opened), // T-2053
         memo_host_path,
         ladder,
         findings,

@@ -444,3 +444,43 @@ fn the_probe_rows_say_that_they_are_of_the_host_outside_a_user_namespace() {
         assert!(next.starts_with(&" ".repeat(PROBES_LABEL.len())), "{b}");
     }
 }
+
+/// TODO/cli.md T-2053 (OQ-07): for each shape of the manual, the banner
+/// of the namespace rung claims no part that the entry did not open and
+/// denies none that it opened, and says "no /proc" only where it mounts
+/// none.
+#[test]
+fn the_namespace_banner_reads_what_the_entry_opened() {
+    use crate::isolation::{of_entry, Facts, Part, ROWS, SHAPES};
+    let f = Findings::empty();
+    let sel = Selection::choose(&f);
+    let no_proc = Facts {
+        proc_dir: false,
+        ..SHAPES[0].1
+    };
+    for (shape, facts) in SHAPES
+        .iter()
+        .chain([("an image with no /proc", no_proc)].iter())
+    {
+        let o = of_entry(Rung::Namespace, *facts);
+        let b = entry_banner_of(&f, &sel, Rung::Namespace, o);
+        let never = b
+            .lines()
+            .find_map(|l| l.strip_prefix("this mode does NOT provide: "))
+            .unwrap_or_default();
+        for r in ROWS.iter().filter(|r| r.part != Part::Uts) {
+            assert_eq!(
+                never.contains(r.not),
+                !o.has(r.part) && r.part != Part::Mount,
+                "{shape}: {}",
+                r.word
+            );
+        }
+        assert_eq!(
+            b.contains("no /proc is mounted"),
+            !o.has(Part::Proc),
+            "{shape}"
+        );
+        assert_eq!(b.contains("pids: private"), o.has(Part::Pid), "{shape}");
+    }
+}

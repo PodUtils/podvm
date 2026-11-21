@@ -84,6 +84,12 @@ pub struct Hardening {
     /// T-1825): the launcher writes the end of the payload into it.
     #[serde(default)]
     pub report: Option<String>,
+    /// What the entry opened, as the words of `podvm_probe::isolation`
+    /// (TODO/cli.md T-2053): `.Exec.Mode` and `.Exec.Shares` of `inspect`
+    /// read them. Empty for a record of an older podvm and for a rung that
+    /// opens nothing.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub opened: Vec<String>,
 }
 
 impl Hardening {

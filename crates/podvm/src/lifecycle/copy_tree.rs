@@ -302,6 +302,17 @@ pub fn inspect_container(want: &str, template: Option<&str>) -> Option<Result<St
 }
 
 /// One field of the end of the last run, or a dash where no run ended.
+/// What the entry of `c` opened (TODO/cli.md T-2053). A record of the
+/// namespace rung from before the words were kept reads as its mount
+/// namespace alone, the part that each entry of the rung opens.
+pub(crate) fn opened_of(c: &Container) -> podvm_probe::isolation::Opened {
+    use podvm_probe::isolation::{Opened, Part};
+    match Opened::from_words(&c.hardening.opened) {
+        o if o == Opened::NONE && c.rung == "namespace" => Opened::of(&[Part::Mount]),
+        o => o,
+    }
+}
+
 fn end_field(c: &Container, f: impl Fn(&podvm_supervise::End) -> String) -> String {
     c.end.as_ref().map(f).unwrap_or_else(|| "-".into())
 }
@@ -436,8 +447,10 @@ pub(super) fn container_fields(
         ("Config.Image", c.image.clone()),
         ("Config.WorkingDir", c.working_dir.clone()),
         ("Config.Labels", c.hardening.labels.join(",")),
-        ("Exec.Mode", crate::images::EXEC_MODE.to_string()),
-        ("Exec.Shares", crate::images::EXEC_SHARES.to_string()),
+        // TODO/cli.md T-2053 (OQ-07): what `exec` into the running
+        // container shares, from what its entry opened.
+        ("Exec.Mode", opened_of(c).exec_mode(&c.rung).to_string()),
+        ("Exec.Shares", opened_of(c).exec_shares(&c.rung)),
         // ⛔ SAID, NOT IMPLIED. TODO/supervise.md T-1708: the launcher is the
         // child subreaper of the payload's tree and kills each descendant at
         // the end. podvm has no PID namespace, so a process that reparents
