@@ -26,6 +26,7 @@ They describe their recorded revision, not the current build.
 - An E2BIG of `execve` exits 126. `rmi` of a referenced image, a refused `cp`, and a `load` or `import` that refuses its archive exit 1, as the manual says (T-2062, OQ-10).
 - A foreground run holds a lock on its memo. A SIGKILL of podvm no longer leaves `store/staging/memo-*.tmp`: the next command that opens the store, and `container prune`, remove the memo of a run that has ended (T-2063, OQ-12).
 - Texts: `--timeout` names its bound, `--report` says that its directory does not exist, `--env-file` names the line of bytes that are not UTF-8, the lines of a forwarded signal and of a signal exit start with `podvm:`, the manual shows the usage of `container prune` and says that `--read-only` works on the namespace rung (T-2064, OQ-13).
+- The interrupt key (`^C`) and the quit key of `run -it` and `exec -it` go to each process of the payload's tree in its process group, as a terminal sends them: `sh -c 'sleep 6'` ends at once, not after the `sleep` (T-2052, OQ-05 of the sixth outside pass). Before, only the pid of the payload got SIGINT, and the quit key went to the payload as a byte.
 
 ## 0.2.0-beta.37 (2026-11-21)
 

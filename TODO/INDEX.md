@@ -692,6 +692,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2048](machine.md) | P1 | M | none | machine | partial | The save of the state of a guest hangs the run with no line when the monitor of the emulator answers late |
 | [T-2050](deps.md) | P2 | L | none | deps | partial | Take podcrates `v0.80.0`: the write table, `pod-beneath`, the loader rule, five `#!` levels, the signals, the saved state of a line, the static QEMU 11.0.0 |
 | [T-2051](machine.md) | P2 | M | none | machine | blocked | The save and the load of the Linux guest of the machine tier keep their own code beside `pod_guest::warm::line` |
+| [T-2052](cli.md) | P2 | S | none | cli | done | `run -it`: the interrupt key does not stop the foreground child of the payload |
 | [T-2060](cli.md) | P2 | S | none | cli | done | The sixth outside pass, OQ-06: `inspect --format` gives lists and maps as flat strings |
 | [T-2061](cli.md) | P2 | S | none | cli | done | The sixth outside pass, OQ-09: docker differences of `-t`, `exec`, `logs`, `-v` and the manual |
 | [T-2062](cli.md) | P2 | S | none | cli | done | The sixth outside pass, OQ-10: exit codes are not the documented ones |
@@ -701,7 +702,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-632 entries: 23 open, 40 partial, 7 blocked, 562 done.
+633 entries: 23 open, 40 partial, 7 blocked, 563 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -712,9 +713,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 19 | 1 | 255 | 278 |
-| P2 | 15 | 16 | 5 | 187 | 223 |
+| P2 | 15 | 16 | 5 | 188 | 224 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 23 | 40 | 7 | 562 | 632 |
+| **All** | 23 | 40 | 7 | 563 | 633 |
 
 ## Work order
 

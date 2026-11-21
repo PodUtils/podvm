@@ -6671,3 +6671,36 @@ Each text says what is true. A table test holds the refusals of a value (`a_refu
 ## Done
 
 **Done (2026-11-21).** `--timeout` names the bound (`run/parse/bound.rs`: from 1 to 18446744073709551 seconds, and a number of digits over it is too large); the directory of `--report` that is not there says `does not exist`; `--env-file` names the file, the line and the byte; the lines `forwarded SIGINT to the payload (pid N)` and `the payload died on SIGINT: exit 130` start with `podvm: `; the section of `container prune` shows its usage (`man.rs`); `--read-only` is documented for the namespace rung.
+
+# T-2052: `run -it`: the interrupt key does not stop the foreground child of the payload
+
+**Source:** the sixth outside pass ([T-2044](cli.md)), OQ-05 (P2)
+**Category:** cli
+**Milestone:** none
+**Priority:** P2
+**Effort:** S
+**Status:** done
+
+## Problem
+
+In a pty, `run --rm -it IMAGE sh -c 'echo ready; sleep 6'` and a `^C` after 3 s: the run ends after the `sleep` (about 6 s), and a trap of `sh` runs only then. With `-t` and no `-i` the same key ends the run at once. The manual: "a SIGINT or SIGQUIT of the terminal reaches the payload once".
+
+## Premise
+
+The slave of the pty is not the controlling terminal of the payload (pod-enter makes no session; COORD-188 asks for one), so the line discipline signals no process. With `-i` the terminal of the caller is raw, and podvm takes the `VINTR` byte out of the input and sends SIGINT to the pid of the payload alone (`run/pty.rs`, T-1970). A shell runs its trap after its foreground command ends, and `sleep` got no signal. With no `-i` the terminal of the caller stays cooked: its key goes to the whole process group of podvm, which holds the payload and its children.
+
+## Approach
+
+Send the signal of a key as a terminal does: to each process of the tree of the payload that is in the process group of the payload. Read the tree in the procfs whose pids are the pids of the payload.
+
+## Decision
+
+2026-11-21, the session's call. The keys are `VINTR` (SIGINT) and `VQUIT` (SIGQUIT), read from the pty where its `ISIG` is on; `VSUSP` stays a byte of the input, as no job control can continue a stopped payload. A process of podvm in the tree (the relay of `exec` that stays in a PID namespace) gets no signal: it forwards one, and the payload would take it twice. A process that left the group (`setsid`) gets none, as from a terminal. Where no procfs gives the tree, the payload alone gets the signal, as before.
+
+## Prove
+
+In a pty, as root and as uid 1000 with a subordinate range, on the namespace rung: `run --rm -it` and `exec -it` into a `run -d` container of `sh -c 'trap "echo got-INT; exit 9" INT; echo ready; sleep 6'`, `^C` after 3 s: the trap runs at once and the exit is 9. A table-driven test of the targets of a key.
+
+## Done
+
+**Done (2026-11-21).** `crates/podvm/src/run/pty/keys.rs` (new) gives the targets of a key: the payload and its descendants (`pod_supervise::launcher::tree::descendants`) in the process group of the payload, less each process whose program is podvm's (`/proc/PID/exe` against `/proc/self/exe`), else the payload alone; `run/pty.rs` reads `VINTR` and `VQUIT` of the pty (`keys_of`) and sends their signals to those targets. The procfs is the first of `/proc` and, for `exec` into a running container, the `/proc` of its root (`exec::tty::proc_of`) whose `self` link names the pid that `getpid` gives: after the join of the PID namespace of a run (T-1910), the `/proc` of podvm names the pids of the host. Measured on the cloud host with `mirror.gcr.io/library/alpine:3.20` and a `^C` (0x03) 3 s after the start, in a pty (`script` of Python): before (the binary of `main` at `3fa36a6`), `run -it` gave `got-INT` after 6.2 s (uid 1000) and 6.0 s (root), and `exec -it` into a `run -d` container after 5.2 s and 5.0 s; after, 3.4 s, 3.1 s, 2.0 s and 2.0 s, each with exit 9, and with no trap `the payload died on SIGINT: exit 130` after 3.2 s; `-t` with no `-i` gave the trap at once before and after. The unit tests `a_key_signals_the_group_of_the_payload_in_its_tree` (six shapes of a tree), `the_group_is_read_after_the_last_parenthesis`, `the_procfs_of_this_process_is_the_one_whose_self_is_its_pid`, `the_tree_of_a_live_process_names_its_child` and `the_keys_of_a_fresh_pty_are_intr_and_quit` hold the rule. The parity row of `run -t` names the keys, and no longer says that `tty` finds no name on the namespace rung: the rung mounts a `/proc`, and `tty` prints `/dev/pts/N` as root and as uid 1000.

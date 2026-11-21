@@ -19,9 +19,10 @@ use std::os::fd::{AsRawFd, OwnedFd};
 use std::os::unix::fs::OpenOptionsExt;
 use std::time::Duration;
 
+mod keys;
+
 unsafe extern "C" {
     fn ioctl(fd: c_int, req: c_ulong, ...) -> c_int;
-    fn kill(pid: c_int, sig: c_int) -> c_int;
 }
 
 /// Block in this thread each signal that the waiter of a foreground run
@@ -183,44 +184,63 @@ pub fn set_payload(pid: i64) {
     PAYLOAD.store(pid, std::sync::atomic::Ordering::Relaxed);
 }
 
+/// The procfs of the root of a container whose PID namespace `exec`
+/// joined (T-2052): the processes of the interrupt key are read there.
+pub fn set_proc(proc: std::path::PathBuf) {
+    let _ = keys::PROC.set(proc);
+}
+
 /// The outside pass of 2026-11-18, OQ-02 (TODO/cli.md T-1970): the slave
 /// is no controlling terminal (pod-enter makes no session), so the line
 /// discipline sends no SIGINT for the interrupt key. Where the pty has
-/// `ISIG`, podvm takes its `VINTR` byte out of the input and sends SIGINT
-/// to the payload, as a terminal sends it to its foreground process. A
-/// raise on podvm itself reached the relay thread, which does not block
-/// SIGINT, and ended podvm and its payload with it (OR-02 of the second
-/// pass). A payload that turns `ISIG` off (an editor) gets the byte.
+/// `ISIG`, podvm takes the byte of each key of [`keys::KEYS`] (`VINTR`,
+/// `VQUIT`) out of the input and sends its signal to the processes of the
+/// payload, as a terminal sends it to its foreground process group
+/// ([`keys::signal`], OQ-05 of the sixth pass, T-2052). A raise on podvm
+/// itself reached the relay thread, which does not block SIGINT, and ended
+/// podvm and its payload with it (OR-02 of the second pass). A payload that
+/// turns `ISIG` off (an editor) gets the byte.
 fn send(to: &mut std::fs::File, mut input: &[u8]) -> std::io::Result<()> {
     while !input.is_empty() {
-        let at = intr_of(to.as_raw_fd()).and_then(|c| input.iter().position(|b| *b == c));
+        let keys = keys_of(to.as_raw_fd());
+        let at = input.iter().position(|b| keys.iter().any(|(k, _)| k == b));
         let Some(at) = at else {
             return to.write_all(input);
         };
         to.write_all(&input[..at])?;
         let pid = PAYLOAD.load(std::sync::atomic::Ordering::Relaxed);
-        if pid > 0 {
-            // SAFETY: a signal to the payload of this run.
-            unsafe { kill(pid as c_int, 2) };
+        if pid > 0
+            && let Some((_, sig)) = keys.iter().find(|(k, _)| *k == input[at])
+        {
+            keys::signal(pid, *sig);
         }
         input = &input[at + 1..];
     }
     Ok(())
 }
 
-/// The `VINTR` byte of the pty of `fd` where its `ISIG` is on.
-fn intr_of(fd: c_int) -> Option<u8> {
+/// The byte and the signal of each key of [`keys::KEYS`] of the pty of
+/// `fd`, where its `ISIG` is on; none where it is off or `TCGETS` fails.
+fn keys_of(fd: c_int) -> Vec<(u8, c_int)> {
     const TCGETS: c_ulong = 0x5401;
     const ISIG: u32 = 0o1;
     // `struct termios` of the kernel: four flags, the line, 19 controls.
     let mut t = [0u8; 4 * 4 + 1 + 19];
     // SAFETY: TCGETS writes one `struct termios` of 36 bytes.
     if unsafe { ioctl(fd, TCGETS, t.as_mut_ptr()) } != 0 {
-        return None;
+        return Vec::new();
     }
     let lflag = u32::from_ne_bytes([t[12], t[13], t[14], t[15]]);
-    let intr = t[17];
-    (lflag & ISIG != 0 && intr != 0).then_some(intr)
+    if lflag & ISIG == 0 {
+        return Vec::new();
+    }
+    keys::KEYS
+        .iter()
+        .filter_map(|(i, sig)| {
+            let c = t[17 + i];
+            (c != 0).then_some((c, *sig))
+        })
+        .collect()
 }
 
 /// The VEOF character of a fresh pty (`^D`).
@@ -283,6 +303,20 @@ mod tests {
             }
         }
         assert_eq!(&buf[..n], b"hi\r\n", "the line discipline maps NL to CR NL");
+    }
+
+    /// T-2052 (OQ-05): the keys that send a signal, as a fresh pty gives
+    /// them: `^C` is SIGINT and `^\\` is SIGQUIT, and with `ISIG` off none.
+    #[test]
+    fn the_keys_of_a_fresh_pty_are_intr_and_quit() {
+        let Ok(p) = Pty::open() else {
+            eprintln!("T-1760: /dev/ptmx does not open here; skipped");
+            return;
+        };
+        let fd = p.master.as_raw_fd();
+        assert_eq!(keys_of(fd), vec![(0x03, 2), (0x1c, 3)]);
+        crate::machine::guest::tty::make_raw(p.slave.as_raw_fd());
+        assert_eq!(keys_of(fd), Vec::new(), "raw: no ISIG");
     }
 
     /// TODO/cli.md T-1817: VEOF written to the master is the end of input
