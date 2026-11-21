@@ -157,3 +157,32 @@ fn the_userland_layer_runs_podvm_itself_and_the_emulator() {
     }
     let _ = std::fs::remove_dir_all(&d);
 }
+
+/// TODO/enter.md T-2054 (OQ-08): an entry with a root gets no variable
+/// that names a host path for the loader family; each other variable
+/// stays, also one whose name starts with the same letters.
+#[test]
+fn an_entry_with_a_root_drops_the_host_paths_of_the_loader_family() {
+    let longer = [
+        format!("{MEMO_PATH_VAR}S=kept"),
+        format!("{DISPATCH_SELF_VAR}ISH=kept"),
+    ];
+    let mut env = vec![
+        format!("{MEMO_PATH_VAR}=/store/staging/memo-1.tmp"),
+        format!("{DISPATCH_SELF_VAR}=/usr/bin/podvm"),
+        memo_fd_env(),
+        longer[0].clone(),
+        longer[1].clone(),
+        "PATH=/usr/bin".to_string(),
+    ];
+    drop_host_paths(&mut env);
+    assert_eq!(
+        env,
+        [
+            memo_fd_env(),
+            longer[0].clone(),
+            longer[1].clone(),
+            "PATH=/usr/bin".to_string()
+        ]
+    );
+}

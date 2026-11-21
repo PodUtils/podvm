@@ -106,6 +106,26 @@ pub fn degradation() -> String {
     )
 }
 
+/// The line of the banner of `exec` into `c`: [`joined_line`] where it
+/// joins the running run (`joins`), else [`degradation`] (T-2053).
+fn exec_line(joins: bool, c: &podvm_supervise::table::Container) -> String {
+    if joins {
+        joined_line(crate::lifecycle::opened_of(c))
+    } else {
+        degradation()
+    }
+}
+
+/// `env` with no variable of a host path for the loader family where the
+/// entry has a root (`rooted`): neither resolves there (TODO/enter.md
+/// T-2054, OQ-08).
+fn host_paths_out(mut env: Vec<String>, rooted: bool) -> Vec<String> {
+    if rooted {
+        podvm_supervise::table::drop_host_paths(&mut env);
+    }
+    env
+}
+
 /// The line of `exec` into the running container of the namespace rung
 /// whose entry opened `opened` (TODO/cli.md T-2053, OQ-07): it joins the
 /// namespaces of the run, so [`degradation`] is not true of it.

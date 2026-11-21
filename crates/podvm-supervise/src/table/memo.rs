@@ -206,6 +206,24 @@ pub fn hand_memo_file(
 /// fact in two homes with `podvm-interpose`'s `MEMO_PATH_VAR`.
 pub const MEMO_PATH_VAR: &str = "PODVM_MEMO_PATH";
 
+/// The variable through which podvm names its own host path to the
+/// interposer of the loader family (`podvm_dispatch::SELF_VAR`).
+pub const DISPATCH_SELF_VAR: &str = "PODVM_DISPATCH_SELF";
+
+/// TODO/enter.md T-2054 (OQ-08): remove from the environment of an entry
+/// with a root (the namespace and the chroot rung, the ladder) each variable
+/// that names a host path for the interposer of the loader family: the
+/// memo's path (T-2000) and podvm's own (T-1724). Neither resolves in the
+/// root, and the payload read the paths of the store and of podvm in them.
+pub fn drop_host_paths(env: &mut Vec<String>) {
+    let host = [MEMO_PATH_VAR, DISPATCH_SELF_VAR];
+    env.retain(|e| {
+        !host
+            .iter()
+            .any(|v| e.strip_prefix(v).is_some_and(|r| r.starts_with('=')))
+    });
+}
+
 fn hand_memo_meta(env: &mut Vec<String>, meta: &std::fs::Metadata, path: &std::path::Path) {
     use std::os::unix::fs::MetadataExt;
     let (fd, id, at) = (

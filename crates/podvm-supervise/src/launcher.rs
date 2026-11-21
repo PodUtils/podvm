@@ -142,6 +142,9 @@ fn enter_in_launcher(
     // namespace rung ride in `PODVM_BINDS`; the payload does not see it.
     let binds = binds_of(&env);
     env.retain(|e| !e.starts_with("PODVM_BINDS=") && !e.starts_with("PODVM_BINDS_BASE="));
+    if container.userland_exec.is_empty() {
+        table::drop_host_paths(&mut env); // T-2054: an entry with a root
+    }
     let mut plan = Plan {
         argv: container.argv.clone(),
         env: env.clone(),
@@ -199,8 +202,13 @@ fn enter_in_launcher(
     let held = store
         .hold(record)
         .map_err(|e| format!("holding the image: {e}"))?;
-    held.hand_to_payload()
-        .map_err(|e| format!("handing the image lock to the payload: {e}"))?;
+    // TODO/enter.md T-2054 (OQ-08): with a PID namespace no process of the
+    // payload outlives its init, and this launcher holds the lock until the
+    // init ends, so the payload gets no descriptor of the store.
+    if !plan.pid_namespace {
+        held.hand_to_payload()
+            .map_err(|e| format!("handing the image lock to the payload: {e}"))?;
+    }
 
     // ⭐ TODO/enter.md T-1411: where the record carries the loader drive
     // `create` decided, the launcher execs it with no chroot through
@@ -224,7 +232,26 @@ fn enter_in_launcher(
     } else if container.userland_exec.is_empty() {
         let findings = podvm_probe::run();
         let selection = podvm_probe::select::Selection::choose(&findings);
-        podvm_enter::spawn_selected(&root, &plan, selection.rung, log).map_err(|e| e.to_string())?
+        // TODO/enter.md T-2054 (OQ-08): the init of the PID namespace is a
+        // fork of this launcher, and the payload reads its `/proc/1`: it
+        // takes a title and no environment, and the launcher its own back.
+        let hidden = plan
+            .pid_namespace
+            .then(|| podvm_enter::title::hide("podvm-init"));
+        if let Some(Err(e)) = &hidden {
+            // The log is the stderr of the payload: a lost line stops no run.
+            writeln!(
+                log,
+                "podvm: the payload can read the command line and the environment of \
+                 podvm in /proc/1: {e} (TODO/enter.md T-2054)"
+            )
+            .unwrap_or(());
+        }
+        let spawned = podvm_enter::spawn_selected(&root, &plan, selection.rung, log);
+        if let Some(Ok(saved)) = &hidden {
+            let _ = podvm_enter::title::restore(saved);
+        }
+        spawned.map_err(|e| e.to_string())?
     } else {
         // ⭐ TODO/enter.md T-1653: the volumes of the record join the root
         // pair, so a working directory in a volume resolves in the volume.

@@ -694,6 +694,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2051](machine.md) | P2 | M | none | machine | done | The save and the load of the Linux guest of the machine tier keep their own code beside `pod_guest::warm::line` |
 | [T-2052](cli.md) | P2 | S | none | cli | done | `run -it`: the interrupt key does not stop the foreground child of the payload |
 | [T-2053](cli.md) | P2 | M | none | cli | done | The banner, `--strict` and `inspect` of the namespace rung deny the PID namespace and the `/proc` that the run has |
+| [T-2054](enter.md) | P2 | M | none | enter | partial | The namespace rung: podvm's argv, its environment, host paths and descriptors of the store reach the payload |
 | [T-2060](cli.md) | P2 | S | none | cli | done | The sixth outside pass, OQ-06: `inspect --format` gives lists and maps as flat strings |
 | [T-2061](cli.md) | P2 | S | none | cli | done | The sixth outside pass, OQ-09: docker differences of `-t`, `exec`, `logs`, `-v` and the manual |
 | [T-2062](cli.md) | P2 | S | none | cli | done | The sixth outside pass, OQ-10: exit codes are not the documented ones |
@@ -704,7 +705,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-635 entries: 23 open, 41 partial, 5 blocked, 566 done.
+636 entries: 23 open, 42 partial, 5 blocked, 566 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -715,9 +716,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 19 | 0 | 256 | 278 |
-| P2 | 15 | 17 | 4 | 190 | 226 |
+| P2 | 15 | 18 | 4 | 190 | 227 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 23 | 41 | 5 | 566 | 635 |
+| **All** | 23 | 42 | 5 | 566 | 636 |
 
 ## Work order
 

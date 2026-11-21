@@ -80,10 +80,13 @@ pub mod owners;
 mod range;
 pub mod sigrelay;
 mod sweep; // PodUtils/podvm#535
+mod title; // TODO/enter.md T-2054
 pub use host::{bind_devices, bind_onto, bind_volumes, check_volume_under_base, host_pid};
 pub use join::{joined_pidfd, rejoin};
 pub use range::{again_in_range, available as range_available, cp_in_range, enter_alone};
 pub use sweep::sweep;
+use title::HIDDEN;
+pub use title::{shown_line, TITLE_INIT, TITLE_RUN};
 
 static CHILD: AtomicI32 = AtomicI32::new(0);
 static ACTIVE: AtomicBool = AtomicBool::new(false);
@@ -405,6 +408,11 @@ pub fn enter_if(argv: &[String]) {
     if pid2 == 0 {
         // SAFETY: the write end of pid 1.
         unsafe { close(code_w) };
+        // TODO/enter.md T-2054 (OQ-08): the payload reads no argv and no
+        // environment of podvm in `/proc/2`.
+        if let Err(e) = podvm_enter::title::hide(TITLE_RUN) {
+            HIDDEN.store(e.errno.max(1), Ordering::Relaxed);
+        }
         const O_PATH_DIR_CLOEXEC: i32 = 0o10000000 | O_DIRECTORY | 0o2000000;
         // SAFETY: a NUL-ended literal.
         let host = unsafe { open(c"/proc".as_ptr(), O_PATH_DIR_CLOEXEC) };
@@ -424,6 +432,12 @@ pub fn enter_if(argv: &[String]) {
         return;
     }
     CHILD.store(pid2, Ordering::Relaxed);
+    // T-2054: pid 1 reads no argument and no variable again, so where the
+    // title is refused its bytes become NUL in place.
+    if podvm_enter::title::hide(TITLE_INIT).is_err() {
+        // SAFETY: the reaper below takes its argv and no variable.
+        let _ = unsafe { podvm_enter::title::blank_in_place() };
+    }
     sigrelay::relay_signals();
     let mut code = 125;
     let mut told = false;
@@ -456,7 +470,12 @@ pub fn enter_if(argv: &[String]) {
             // names no payload; the exec keeps its pid and its children.
             if let Ok(me) = std::env::current_exe() {
                 use std::os::unix::process::CommandExt;
-                let e = std::process::Command::new(me).arg(sweep::REAPER_ARG).exec();
+                // T-2054: no path and no variable of the host in `/proc/1`.
+                let e = std::process::Command::new(me)
+                    .arg0(TITLE_INIT)
+                    .arg(sweep::REAPER_ARG)
+                    .env_clear()
+                    .exec();
                 eprintln!("podvm: the reaper of the namespace: {e} (TODO/probe.md T-1909)");
             }
         }
@@ -469,32 +488,4 @@ pub fn enter_if(argv: &[String]) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn v(xs: &[&str]) -> Vec<String> {
-        xs.iter().map(|s| s.to_string()).collect()
-    }
-
-    #[test]
-    fn only_a_foreground_run_of_a_caller_that_asks_enters() {
-        let run = v(&["podvm", "run", "--rm", "img", "true"]);
-        assert!(wanted(&run, 1000, Some("1")));
-        assert!(!wanted(&run, 0, Some("1")), "uid 0 has the rights");
-        assert!(wanted(&run, 1000, None), "the default");
-        assert!(!wanted(&run, 1000, Some("0")), "turned off");
-        for d in ["-d", "--detach", "-itd", "--podvm-tier=machine"] {
-            let a = v(&["podvm", "run", d, "img", "true"]);
-            assert!(!wanted(&a, 1000, Some("1")), "{d}");
-        }
-        assert!(wanted(&v(&["podvm", "run", "-it", "img"]), 1000, Some("1")));
-        assert!(!wanted(
-            &v(&["podvm", "exec", "c", "true"]),
-            1000,
-            Some("1")
-        ));
-        let m = maps(1000, 100);
-        assert_eq!(m[1].1, "0 1000 1");
-        assert_eq!(m[2].1, "0 100 1");
-    }
-}
+mod tests;

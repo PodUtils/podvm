@@ -36,6 +36,7 @@ pub(super) fn entry_banner(
     if let Some(note) = crate::names::alias_note() {
         banner.push_str(&note);
     }
+    banner.push_str(&crate::userns::shown_line().unwrap_or_default()); // T-2054
     banner.push_str(interpose_note);
     // ⭐ TODO/enter.md T-0501. Every mapping is named before anything of
     // the payload's runs: what the guest spelling serves (a duplicate of a

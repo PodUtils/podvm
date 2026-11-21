@@ -271,12 +271,8 @@ pub(super) fn enter(
     if let Some(note) = crate::names::alias_note() {
         banner.push_str(&note);
     }
-    // TODO/cli.md T-2053: a join of the running run shares its namespaces.
-    if super::ns::joins_the_run(state, &container.rung, container.pid) {
-        banner.push_str(&super::joined_line(crate::lifecycle::opened_of(&container)));
-    } else {
-        banner.push_str(&degradation());
-    }
+    let joins = joins_the_run(state, &container.rung, container.pid);
+    banner.push_str(&super::exec_line(joins, &container)); // T-2053
     banner.push_str(&interpose_note);
     // ⭐ TODO/enter.md T-0501. The re-entry serves the container's
     // mappings, so it names them like the entry did.
@@ -407,7 +403,7 @@ pub(super) fn enter(
     );
     let mut plan = Plan {
         argv: o.command.clone(),
-        env,
+        env: super::host_paths_out(env, userland.is_none()), // T-2054
         working_dir,
         fds: Fds { pass },
         // ⚠ Empty: the banner was printed above, before the steps.
@@ -441,10 +437,8 @@ pub(super) fn enter(
             return e.exit_code();
         }
     };
-    // ⭐ TODO/enter.md T-1410. The shared entry decision drives here: the
-    // userland families through the one shared drive, the chroot sequence
-    // as before. The container's memo is the container's own, so nothing
-    // ephemeral is removed on any path out.
+    // ⭐ TODO/enter.md T-1410: the shared entry decision drives here. The
+    // container's memo is its own: nothing ephemeral is removed on a way out.
     super::tty::proc_of(rootfs);
     let relay = super::tty::start(term, o.interactive);
     let code = match &userland {
@@ -461,10 +455,8 @@ pub(super) fn enter(
             outcome.code
         }
         None => {
-            // TODO/cli.md T-1765: in a running container of the namespace
-            // rung, `exec` joins the payload's mount namespace and sees
-            // its `/tmp` and `/proc`; `pod-enter` names a refused join and
-            // enters a namespace of its own.
+            // TODO/cli.md T-1765: `exec` joins the mount namespace of a running
+            // run of the namespace rung; pod-enter names a refused join.
             let joined = joins_the_run(state, &container.rung, container.pid)
                 .then_some(container.pid)
                 .flatten()
@@ -476,9 +468,8 @@ pub(super) fn enter(
             let r = match joined {
                 Some(fd) => {
                     super::ns::join_uts(&fd); // TODO/enter.md T-1908
-                    let r =
-                        podvm_enter::spawn_joined(&root, &plan, fd.as_raw_fd() as i64, &mut err)
-                            .and_then(|c| wait(c, &mut err));
+                    let spawned = super::ns::spawn_joined(&root, &plan, &fd, &mut err);
+                    let r = spawned.and_then(|c| wait(c, &mut err));
                     drop(fd);
                     r
                 }

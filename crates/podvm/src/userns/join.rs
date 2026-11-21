@@ -88,6 +88,10 @@ pub(super) fn join_if() {
         super::sigrelay::relay_signals();
         std::process::exit(wait_for(child));
     }
+    // TODO/enter.md T-2054 (OQ-08): this process is in the PID namespace of
+    // the run, so its argv (the values of `-e`) and its environment show
+    // in the `/proc` of the payload. A refused title leaves them, as before.
+    let _ = podvm_enter::title::hide("podvm-exec");
 }
 
 /// TODO/enter.md T-1910: where the running payload `pid` (a host pid) is

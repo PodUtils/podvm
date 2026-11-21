@@ -134,6 +134,7 @@ pub fn ns_fallback_line(cause: &str) -> String {
 /// The launch ladder with podvm's names.
 /// The spec of `--podvm-confine` (TODO/enter.md T-1658).
 pub mod confine;
+pub mod title; // TODO/enter.md T-2054
 
 /// The wait of the payload, with `podvm:` before each line (TODO/cli.md T-2064).
 mod wait;
