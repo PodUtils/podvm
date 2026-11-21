@@ -440,6 +440,7 @@ pub(super) fn enter(
     // userland families through the one shared drive, the chroot sequence
     // as before. The container's memo is the container's own, so nothing
     // ephemeral is removed on any path out.
+    super::tty::proc_of(rootfs);
     let relay = super::tty::start(term, o.interactive);
     let code = match &userland {
         Some(u) => {

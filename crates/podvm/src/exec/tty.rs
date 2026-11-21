@@ -135,6 +135,13 @@ pub(crate) fn on_spawn(pid: i64) {
     crate::run::pty::set_payload(pid);
 }
 
+/// TODO/cli.md T-2052: the interrupt key reads the processes of the
+/// payload in the `/proc` of `rootfs` where the `/proc` of podvm names the
+/// pids of another PID namespace (a join of the PID namespace of a run).
+pub(crate) fn proc_of(rootfs: &str) {
+    crate::run::pty::set_proc(std::path::Path::new(rootfs).join("proc"));
+}
+
 /// Finish the relay where one runs.
 pub(crate) fn finish(running: Option<Running>, err: &mut dyn Write) {
     if let Some(r) = running {
