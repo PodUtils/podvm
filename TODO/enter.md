@@ -5797,3 +5797,36 @@ Remaining:
 3. `PODVM_MEMO_FD`, `PODVM_MEMO_ID`, `PODVM_GUEST_EXE`, `PODVM_ACTIVE_MODE` and `LD_PRELOAD` reach the payload: the interposer reads them; a copy in the interposer and a restore at each exec would lose them in a child that a raw `execve` starts (a Go program).
 4. The relay of pod-enter's join, as uid 0 with `-t`, takes no title (the threads of the pty relay); the init and the relay of pod-enter are dumpable, so a payload of the same ids can `ptrace` them and read the memory that holds podvm's environment. The ask to podcrates: the init of `Plan::pid_namespace` and the relay of `spawn_joined` set their own title and an empty environment (`PR_SET_MM_MAP`, `exe_fd` -1) and `PR_SET_DUMPABLE` 0 after the maps of the user namespace and before the fork of the payload; `podvm_enter::title` is the code to take (rule 2a). The draft of the COORD issue of this ask is with the lead (2026-11-23). podvm's own pid 1 and pid 2 stay dumpable: a non-dumpable process has its `/proc/PID` files owned by the root of the host, so the outer podvm of uid 1000 cannot write `uid_map` and `exec` of a join cannot open `/proc/PID/ns/*` of it (`PTRACE_MODE_READ`). `PR_SET_DUMPABLE` 0 of these two needs the maps written first and the join to open the namespaces through a descriptor that the run holds.
 5. The helpers of podvm that pid 2 starts in the PID namespace (the fill of the spare tree, the removal of a `--rm` tree) exec podvm with an argv of store paths and the environment of the caller. Read on 2026-11-23: pid 2 starts them at its exit (`run::spare::spawn_pending`), after the end of the payload's tree (T-1708), and the sweep at that exit sends SIGKILL to each other process of the namespace but the helper. So only a process of the payload that outlived both sweeps can read them. A helper with no environment needs a check that `podvm tree-prefill` reads no variable of the caller.
+
+# T-2055: `--podvm-volume-base` on the loader family: a link under DIR resolves into the image, not to ELOOP
+
+**Source:** the sixth outside pass ([T-2044](cli.md)), OQ-11 (P2)
+**Category:** enter
+**Milestone:** none
+**Priority:** P2
+**Effort:** S
+**Status:** done
+
+## Problem
+
+As uid 1000 under `scripts/dev/nouserns.c` (the loader family), `run --podvm-volume-base DIR -v DIR/real:/d IMAGE sh -c 'cat /d/sub/hostname; sleep 3; cat /d/sub/hostname'`, and the host replaces `DIR/real/sub` with a link to `/etc` during the sleep: the second `cat` prints the image's `/etc/hostname`. A link that the payload makes (`ln -s /etc /d/esc`) resolves into the image's root too. The manual of `0.2.0-beta.36` said "A link under DIR is a refusal (exit 125 at the start, ELOOP for the call after it)". No host data leaked.
+
+## Premise
+
+The interposer rewrites a path of a volume into the host path before the beneath-open: the walk of links of T-1725 reads each link of the path in guest names, so the absolute target `/etc` is a guest path, and it maps to the `/etc` of the rootfs. That host path is in no volume under the base, so `map::base::pin` gives `Apart`, and the call opens the image's file. The beneath-open (`pod-beneath`, T-2050) holds the host path of the volume and the rest of a path that the walk left in the volume: a link there is a change of the host between the walk and the call, and gives `ELOOP`.
+
+## Approach
+
+Decide which of the two is the rule: the code or the manual.
+
+## Decision
+
+2026-11-21, the session's call, as Decision (3) of T-2040: the code is the rule, and the manual was wrong. A link in a volume names a guest path, as on the namespace rung, where the kernel follows it in the root of the payload; a refusal of each link under DIR would break the links of a tree of the payload (`node_modules/.bin`, the case "a link in the volume" of T-1972), and the base guards the host side of a volume, which a link in guest names never leaves. The manual (`run --help`, the parity row, `docs/limits.md`) gives this rule since `c5c00ee` (T-2040).
+
+## Prove
+
+As uid 1000 under `scripts/dev/nouserns.c` with `public.ecr.aws/docker/library/alpine:3.20`: the repro of the pass reads the image's file and no file of the host; the manual states the rule; a test of the interposer reads the image's file through a link of the host and through a link of the payload.
+
+## Done
+
+**Done (2026-11-21).** Measured on the cloud host with `mirror.gcr.io/library/alpine:3.20` and the binary of this branch (`mode=userland`, the loader family): the repro of the pass prints `hostfile`, then `localhost` (the image's `/etc/hostname`) after the host swapped in the link; `ln -s /etc /d/esc; head -1 /d/esc/os-release` prints `NAME="Alpine Linux"`; a link of the payload to a host directory (`/var/tmp/oqr`) gives `No such file or directory`. `podvm man` says: "A link in a volume after the start resolves in guest names, as a link of the payload does, so it never reaches a host file out of DIR; a link that the host makes between that walk and the call gives ELOOP". `a_volume_under_the_base_reaches_no_file_out_of_the_base` (`crates/podvm-interpose/src/tests/volume_base.rs`) now also reads `image` through a link that the host makes to `/etc` and through a link that the payload makes to `/etc`; its other cases hold `ELOOP` for a link between the walk and the call.
