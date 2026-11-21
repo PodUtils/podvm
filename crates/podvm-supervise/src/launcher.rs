@@ -242,8 +242,7 @@ fn enter_in_launcher(
             // The log is the stderr of the payload: a lost line stops no run.
             writeln!(
                 log,
-                "podvm: the payload can read the command line and the environment of \
-                 podvm in /proc/1: {e} (TODO/enter.md T-2054)"
+                "podvm: /proc/1 shows podvm's argv and environment: {e} (TODO/enter.md T-2054)"
             )
             .unwrap_or(());
         }

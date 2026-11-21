@@ -432,12 +432,8 @@ pub fn enter_if(argv: &[String]) {
         return;
     }
     CHILD.store(pid2, Ordering::Relaxed);
-    // T-2054: pid 1 reads no argument and no variable again, so where the
-    // title is refused its bytes become NUL in place.
-    if podvm_enter::title::hide(TITLE_INIT).is_err() {
-        // SAFETY: the reaper below takes its argv and no variable.
-        let _ = unsafe { podvm_enter::title::blank_in_place() };
-    }
+    // T-2054: a refusal is the one of pid 2, which `--verbose` names.
+    let _ = podvm_enter::title::hide(TITLE_INIT);
     sigrelay::relay_signals();
     let mut code = 125;
     let mut told = false;

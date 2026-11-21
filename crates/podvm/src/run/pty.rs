@@ -203,7 +203,9 @@ pub fn set_proc(proc: std::path::PathBuf) {
 fn send(to: &mut std::fs::File, mut input: &[u8]) -> std::io::Result<()> {
     while !input.is_empty() {
         let keys = keys_of(to.as_raw_fd());
-        let at = input.iter().position(|b| keys.iter().any(|(k, _)| k == b));
+        let at = input
+            .iter()
+            .position(|b| keys.iter().any(|(k, _)| *k != 0 && k == b));
         let Some(at) = at else {
             return to.write_all(input);
         };
@@ -220,27 +222,19 @@ fn send(to: &mut std::fs::File, mut input: &[u8]) -> std::io::Result<()> {
 }
 
 /// The byte and the signal of each key of [`keys::KEYS`] of the pty of
-/// `fd`, where its `ISIG` is on; none where it is off or `TCGETS` fails.
-fn keys_of(fd: c_int) -> Vec<(u8, c_int)> {
+/// `fd`, where its `ISIG` is on; byte 0 (no key) where it is off, where
+/// `TCGETS` fails, or where the pty has no such key.
+fn keys_of(fd: c_int) -> [(u8, c_int); 2] {
     const TCGETS: c_ulong = 0x5401;
     const ISIG: u32 = 0o1;
     // `struct termios` of the kernel: four flags, the line, 19 controls.
     let mut t = [0u8; 4 * 4 + 1 + 19];
+    let [(a, sa), (b, sb)] = keys::KEYS;
     // SAFETY: TCGETS writes one `struct termios` of 36 bytes.
-    if unsafe { ioctl(fd, TCGETS, t.as_mut_ptr()) } != 0 {
-        return Vec::new();
-    }
-    let lflag = u32::from_ne_bytes([t[12], t[13], t[14], t[15]]);
-    if lflag & ISIG == 0 {
-        return Vec::new();
-    }
-    keys::KEYS
-        .iter()
-        .filter_map(|(i, sig)| {
-            let c = t[17 + i];
-            (c != 0).then_some((c, *sig))
-        })
-        .collect()
+    let on = unsafe { ioctl(fd, TCGETS, t.as_mut_ptr()) } == 0
+        && u32::from_ne_bytes([t[12], t[13], t[14], t[15]]) & ISIG != 0;
+    let key = |i: usize| if on { t[17 + i] } else { 0 };
+    [(key(a), sa), (key(b), sb)]
 }
 
 /// The VEOF character of a fresh pty (`^D`).
@@ -314,9 +308,9 @@ mod tests {
             return;
         };
         let fd = p.master.as_raw_fd();
-        assert_eq!(keys_of(fd), vec![(0x03, 2), (0x1c, 3)]);
+        assert_eq!(keys_of(fd), [(0x03, 2), (0x1c, 3)]);
         crate::machine::guest::tty::make_raw(p.slave.as_raw_fd());
-        assert_eq!(keys_of(fd), Vec::new(), "raw: no ISIG");
+        assert_eq!(keys_of(fd), [(0, 2), (0, 3)], "raw: no ISIG");
     }
 
     /// TODO/cli.md T-1817: VEOF written to the master is the end of input

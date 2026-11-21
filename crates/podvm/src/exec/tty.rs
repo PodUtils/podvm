@@ -136,10 +136,13 @@ pub(crate) fn on_spawn(pid: i64) {
 }
 
 /// TODO/cli.md T-2052: the interrupt key reads the processes of the
-/// payload in the `/proc` of `rootfs` where the `/proc` of podvm names the
-/// pids of another PID namespace (a join of the PID namespace of a run).
+/// payload in the `/proc` of `rootfs` where this process joined the PID
+/// namespace of a run (T-1910): its own `/proc` names the pids of the host,
+/// and the pid of the payload is a pid of the run, as in that `/proc`.
 pub(crate) fn proc_of(rootfs: &str) {
-    crate::run::pty::set_proc(std::path::Path::new(rootfs).join("proc"));
+    if crate::userns::joined() {
+        crate::run::pty::set_proc(std::path::Path::new(rootfs).join("proc"));
+    }
 }
 
 /// Finish the relay where one runs.

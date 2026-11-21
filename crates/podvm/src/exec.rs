@@ -131,9 +131,8 @@ fn host_paths_out(mut env: Vec<String>, rooted: bool) -> Vec<String> {
 /// namespaces of the run, so [`degradation`] is not true of it.
 pub fn joined_line(opened: podvm_probe::isolation::Opened) -> String {
     format!(
-        "podvm exec: this exec joins the running container: it shares {} \
-         (inspect gives it as .Exec.Shares). It takes the environment that the \
-         container started with (TODO/cli.md T-1765, T-2053)\n",
+        "podvm exec: this exec joins the running container and shares {} \
+         (.Exec.Shares) and its first environment (TODO/cli.md T-1765, T-2053)\n",
         opened.exec_shares("namespace"),
     )
 }

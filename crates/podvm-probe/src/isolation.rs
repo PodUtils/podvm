@@ -9,7 +9,7 @@
 //! whose `exec` joins its mount and PID namespaces. Each text came from the
 //! name of the rung, not from the run.
 //!
-//! ⭐ Each statement about the isolation of a run now reads [`ROWS`] and the
+//! ⭐ Each statement about the isolation of a run now reads [`rows`] and the
 //! facts of one entry ([`Opened`], made by [`of_entry`] from what podvm
 //! opens and what `pod-enter` mounts): the cells and the "does NOT provide"
 //! line of the banner, its `/proc` line, the `entry_mounts_proc` of the
@@ -55,51 +55,71 @@ pub struct Row {
     pub join: Join,
 }
 
-/// The table. The order is the order of each list that it gives.
-pub const ROWS: &[Row] = &[
-    Row {
-        part: Part::User,
-        word: "user",
-        gives: "a user namespace, where the caller is uid 0",
-        not: "user isolation",
-        join: Join::Always,
-    },
-    Row {
-        part: Part::Pid,
-        word: "pid",
-        gives: "a PID namespace: the payload sees and signals only the processes of the run",
-        not: "pid isolation",
-        join: Join::Always,
-    },
-    Row {
-        part: Part::Uts,
-        word: "uts",
-        gives: "a UTS namespace: --hostname names it",
-        not: "a host name of its own",
-        join: Join::WithUser,
-    },
-    Row {
-        part: Part::Net,
-        word: "net",
-        gives: "a network namespace: no entry of podvm opens one",
-        not: "network isolation",
-        join: Join::Always,
-    },
-    Row {
-        part: Part::Mount,
-        word: "mount",
-        gives: "a mount namespace, with a private tmpfs on /tmp",
-        not: "mount isolation",
-        join: Join::Always,
-    },
-    Row {
-        part: Part::Proc,
-        word: "proc",
-        gives: "a /proc in the root, of the PID namespace of the payload",
-        not: "a /proc filesystem",
-        join: Join::Seen,
-    },
+/// The parts, in the order of each list that the table gives.
+pub const PARTS: [Part; 6] = [
+    Part::User,
+    Part::Pid,
+    Part::Uts,
+    Part::Net,
+    Part::Mount,
+    Part::Proc,
 ];
+
+/// The row of a part. ⚠ A `match`, not a static table of `&str`: each
+/// pointer of a static table is a relocation of the static binary
+/// (call C24, the size ceiling).
+pub fn row(part: Part) -> Row {
+    let (word, gives, not, join) = match part {
+        Part::User => (
+            "user",
+            "a user namespace, where the caller is uid 0",
+            "user isolation",
+            Join::Always,
+        ),
+        Part::Pid => (
+            "pid",
+            "a PID namespace: the payload sees only the processes of the run",
+            "pid isolation",
+            Join::Always,
+        ),
+        Part::Uts => (
+            "uts",
+            "a UTS namespace: --hostname names it",
+            "a host name of its own",
+            Join::WithUser,
+        ),
+        Part::Net => (
+            "net",
+            "a network namespace: no entry opens one",
+            "network isolation",
+            Join::Always,
+        ),
+        Part::Mount => (
+            "mount",
+            "a mount namespace, with a private tmpfs on /tmp",
+            "mount isolation",
+            Join::Always,
+        ),
+        Part::Proc => (
+            "proc",
+            "a /proc in the root, of the PID namespace of the payload",
+            "a /proc filesystem",
+            Join::Seen,
+        ),
+    };
+    Row {
+        part,
+        word,
+        gives,
+        not,
+        join,
+    }
+}
+
+/// The table: the row of each part of [`PARTS`].
+pub fn rows() -> impl Iterator<Item = Row> {
+    PARTS.into_iter().map(row)
+}
 
 /// The parts that one entry opened.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -107,8 +127,9 @@ pub struct Opened {
     bits: u8,
 }
 
+/// The bit of a part: its place in [`PARTS`], the order of the enum.
 fn bit(p: Part) -> u8 {
-    1 << ROWS.iter().position(|r| r.part == p).unwrap_or(0)
+    1 << p as u8
 }
 
 impl Opened {
@@ -125,25 +146,23 @@ impl Opened {
         self.bits & bit(p) != 0
     }
 
-    fn rows(self) -> impl Iterator<Item = &'static Row> {
-        ROWS.iter().filter(move |r| self.has(r.part))
+    fn rows(self) -> impl Iterator<Item = Row> {
+        rows().filter(move |r| self.has(r.part))
     }
 
-    /// The words of the parts, in the order of [`ROWS`], for the record.
-    pub fn words(self) -> Vec<String> {
-        self.rows().map(|r| r.word.to_string()).collect()
+    /// The words of the parts, in the order of [`rows`], one space
+    /// between two: the record keeps them.
+    pub fn words(self) -> String {
+        self.rows().map(|r| r.word).collect::<Vec<_>>().join(" ")
     }
 
     /// The parts of the words of a record. An unknown word (a record of
     /// another podvm) is left out.
-    pub fn from_words(words: &[String]) -> Opened {
-        Opened::of(
-            &ROWS
-                .iter()
-                .filter(|r| words.iter().any(|w| w == r.word))
-                .map(|r| r.part)
-                .collect::<Vec<_>>(),
-        )
+    pub fn from_words(words: &str) -> Opened {
+        let bits = rows()
+            .filter(|r| words.split(' ').any(|w| w == r.word))
+            .fold(0, |b, r| b | bit(r.part));
+        Opened { bits }
     }
 
     /// The `namespaces:` cell of the banner, or `None` where the entry
@@ -187,22 +206,13 @@ impl Opened {
         rung.must_never_claim_with(self.hostprobe())
     }
 
-    /// The line of the banner that names each part of this entry, or
-    /// `None` where it opened none.
-    pub fn line(self) -> Option<String> {
-        let parts: Vec<&str> = self.rows().map(|r| r.gives).collect();
-        if parts.is_empty() {
-            return None;
-        }
-        let mut s = format!("this run opens: {}", parts.join("; "));
-        if self.has(Part::Proc) && !self.has(Part::Pid) {
-            s.push_str(
-                ". With no PID namespace, the /proc of the payload is of the PID namespace \
-                 of the host, and it lists the processes of the host",
-            );
-        }
-        s.push_str(" (TODO/cli.md T-2053)\n");
-        Some(s)
+    /// The line of the banner where the payload has a `/proc` and no PID
+    /// namespace: that `/proc` lists the processes of the host.
+    pub fn line(self) -> Option<&'static str> {
+        (self.has(Part::Proc) && !self.has(Part::Pid)).then_some(
+            "the /proc of the payload lists the processes of the host: the run has no \
+             PID namespace (TODO/cli.md T-2053)\n",
+        )
     }
 
     /// `.Exec.Mode` of `inspect` for a container of `rung`: `join` where
@@ -282,81 +292,55 @@ pub fn of_entry(rung: Rung, f: Facts) -> Opened {
     Opened::of(&parts)
 }
 
-/// The shapes of a run that the manual names, with their facts.
-pub const SHAPES: &[(&str, Facts)] = &[
-    (
-        "a foreground run of a caller that is not uid 0",
-        Facts {
-            userns_active: true,
-            host_root: false,
-            detached: false,
-            hostname: false,
-            proc_dir: true,
-        },
-    ),
-    (
-        "the same with PODVM_USERNS=0",
-        Facts {
-            userns_active: false,
-            host_root: false,
-            detached: false,
-            hostname: false,
-            proc_dir: true,
-        },
-    ),
-    (
-        "a foreground run of uid 0",
-        Facts {
-            userns_active: false,
-            host_root: true,
-            detached: false,
-            hostname: false,
-            proc_dir: true,
-        },
-    ),
-    (
-        "run -d or create of a caller that is not uid 0",
-        Facts {
-            userns_active: false,
-            host_root: false,
-            detached: true,
-            hostname: false,
-            proc_dir: true,
-        },
-    ),
-    (
-        "run -d or create of uid 0",
-        Facts {
-            userns_active: false,
-            host_root: true,
-            detached: true,
-            hostname: false,
-            proc_dir: true,
-        },
-    ),
-];
+/// The shape of a run that the manual names, by its index, with its
+/// facts; `None` past the last (a `match`, as [`row`]).
+pub fn shape(i: usize) -> Option<(&'static str, Facts)> {
+    let f = |userns_active, host_root, detached| Facts {
+        userns_active,
+        host_root,
+        detached,
+        hostname: false,
+        proc_dir: true,
+    };
+    Some(match i {
+        0 => (
+            "a foreground run of a caller that is not uid 0",
+            f(true, false, false),
+        ),
+        1 => ("the same with PODVM_USERNS=0", f(false, false, false)),
+        2 => ("a foreground run of uid 0", f(false, true, false)),
+        3 => (
+            "run -d or create of a caller that is not uid 0",
+            f(false, false, true),
+        ),
+        4 => ("run -d or create of uid 0", f(false, true, true)),
+        _ => return None,
+    })
+}
+
+/// Each shape of [`shape`].
+pub fn shapes() -> impl Iterator<Item = (&'static str, Facts)> {
+    (0..).map_while(shape)
+}
 
 /// The ISOLATION section of the text manual: the rows, then what each
 /// shape of a run on the namespace rung opens and what `exec` shares.
 pub fn section() -> String {
     let mut out = String::from(
         "ISOLATION\n\
-         What a run opens on the namespace rung depends on the caller and the verb, \
-         not on the name of the rung. The banner of --verbose, --strict, and \
-         .Exec.Mode and .Exec.Shares of inspect read this table. --hostname adds \
-         uts; an image with no /proc directory gets no proc. The chroot and \
-         userland rungs open none of them.\n\n",
+         What a run of the namespace rung opens, by caller and verb; --verbose, \
+         --strict and inspect read this table. --hostname adds uts; an image with \
+         no /proc directory gets no proc. The other rungs open none.\n\n",
     );
-    for r in ROWS {
+    for r in rows() {
         out.push_str(&format!("  {:<6} {}\n", r.word, r.gives));
     }
     out.push('\n');
-    for (shape, f) in SHAPES {
-        let o = of_entry(Rung::Namespace, *f);
+    for (shape, f) in shapes() {
+        let o = of_entry(Rung::Namespace, f);
         out.push_str(&format!(
-            "  {shape}\n    opens: {}\n    does not provide: {}\n    exec of the running \
-             container: {}, shares {}\n",
-            o.words().join(" "),
+            "  {shape}\n    opens: {}\n    does not provide: {}\n    exec: {}, shares {}\n",
+            o.words(),
             o.never_claim(Rung::Namespace),
             o.exec_mode("namespace"),
             o.exec_shares("namespace"),

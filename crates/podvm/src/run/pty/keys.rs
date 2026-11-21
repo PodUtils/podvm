@@ -23,7 +23,6 @@
 //! from a terminal. Where `/proc` cannot give the tree, the payload alone
 //! gets the signal, as before.
 
-use std::collections::BTreeMap;
 use std::ffi::c_int;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
@@ -35,7 +34,7 @@ const SIGQUIT: c_int = 3;
 /// `c_cc` of `struct termios` (`VINTR` 0, `VQUIT` 1), and the signal. The
 /// suspend key (`VSUSP`) is not in the table: with no job control a stop
 /// of the payload stops the run, so its byte goes to the payload.
-pub const KEYS: &[(usize, c_int)] = &[(0, SIGINT), (1, SIGQUIT)];
+pub const KEYS: [(usize, c_int); 2] = [(0, SIGINT), (1, SIGQUIT)];
 
 /// The most entries of `/proc` that one key reads: a bound of the work of
 /// one key press on a host with very many processes.
@@ -91,25 +90,19 @@ fn program(path: &Path) -> Option<(u64, u64)> {
 /// out. `None` where `proc` gives no tree.
 fn tree_of(proc: &Path, payload: i64) -> Option<Vec<Proc>> {
     let me = program(&proc.join("self/exe"));
-    let mut pids = vec![payload];
-    pids.extend(podvm_supervise::tree::descendants(proc, payload)?);
+    let mut pids = podvm_supervise::tree::descendants(proc, payload)?;
+    // `descendants` names each process once, and never the payload.
     pids.truncate(MOST_PROCS);
-    let mut seen = BTreeMap::new();
-    for pid in pids {
+    pids.push(payload);
+    let one = |pid: i64| {
         let dir = proc.join(pid.to_string());
-        let Some(pgrp) = std::fs::read_to_string(dir.join("stat"))
-            .ok()
-            .as_deref()
-            .and_then(pgrp_of)
-        else {
-            continue;
-        };
+        let pgrp = pgrp_of(&std::fs::read_to_string(dir.join("stat")).ok()?)?;
         // A program that cannot be read is not podvm's: the signal goes to
         // it, as to each process of the payload.
         let podvm = me.is_some() && program(&dir.join("exe")) == me;
-        seen.insert(pid, Proc { pid, pgrp, podvm });
-    }
-    Some(seen.into_values().collect())
+        Some(Proc { pid, pgrp, podvm })
+    };
+    Some(pids.into_iter().filter_map(one).collect())
 }
 
 /// A second procfs for [`signal`]: the `/proc` of the root of a container
@@ -117,27 +110,13 @@ fn tree_of(proc: &Path, payload: i64) -> Option<Vec<Proc>> {
 /// host there, and the pid of the payload is a pid of the container.
 pub static PROC: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 
-/// The first procfs of `candidates` whose `self` names this process by
-/// the pid that `getpid` gives: the one whose pids are the pids of the
-/// payload.
-fn own_proc(candidates: &[&Path]) -> Option<PathBuf> {
-    let me = std::process::id().to_string();
-    candidates
-        .iter()
-        .find(|p| std::fs::read_link(p.join("self")).is_ok_and(|l| l.as_os_str() == me.as_str()))
-        .map(|p| p.to_path_buf())
-}
-
 /// Send `sig` to the processes of [`targets`] for the payload `payload`.
 pub fn signal(payload: i64, sig: c_int) {
     unsafe extern "C" {
         fn kill(pid: c_int, sig: c_int) -> c_int;
     }
-    let mut candidates = vec![Path::new("/proc")];
-    candidates.extend(PROC.get().map(PathBuf::as_path));
-    let tree = own_proc(&candidates)
-        .and_then(|proc| tree_of(&proc, payload))
-        .unwrap_or_default();
+    let proc = PROC.get().map_or(Path::new("/proc"), PathBuf::as_path);
+    let tree = tree_of(proc, payload).unwrap_or_default();
     for pid in targets(payload, &tree) {
         if let Ok(p) = c_int::try_from(pid)
             && p > 0
@@ -210,14 +189,6 @@ mod tests {
         for (stat, want) in cases {
             assert_eq!(pgrp_of(stat), *want, "{stat}");
         }
-    }
-
-    #[test]
-    fn the_procfs_of_this_process_is_the_one_whose_self_is_its_pid() {
-        let none = Path::new("/nonexistent-proc");
-        let proc = Path::new("/proc");
-        assert_eq!(own_proc(&[none, proc]).as_deref(), Some(proc));
-        assert_eq!(own_proc(&[none]), None);
     }
 
     /// The tree of this test process, as `/proc` gives it: a child in the

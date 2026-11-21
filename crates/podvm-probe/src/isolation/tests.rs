@@ -116,28 +116,17 @@ fn each_statement_of_an_entry_reads_its_facts() {
     for c in cases {
         let o = of_entry(c.rung, c.f);
         let rung = c.rung.word();
-        assert_eq!(o.words().join(" "), c.words, "{}", c.what);
+        assert_eq!(o.words(), c.words, "{}", c.what);
         assert_eq!(o.namespaces_cell().as_deref(), c.ns, "{}", c.what);
         assert_eq!(o.pids_cell(), c.pids, "{}", c.what);
         assert_eq!(o.never_claim(c.rung), c.never, "{}", c.what);
         assert_eq!(o.exec_mode(rung), c.mode, "{}", c.what);
         assert_eq!(o.exec_shares(rung), c.shares, "{}", c.what);
         assert_eq!(Opened::from_words(&o.words()), o, "{}: the record", c.what);
-        // The line names each part that the entry opened, and only those.
-        let line = o.line().unwrap_or_default();
-        for r in ROWS {
-            assert_eq!(
-                line.contains(r.gives),
-                o.has(r.part),
-                "{}: {}",
-                c.what,
-                r.word
-            );
-        }
         assert_eq!(
-            line.contains("lists the processes of the host"),
+            o.line().is_some(),
             o.has(Part::Proc) && !o.has(Part::Pid),
-            "{}",
+            "{}: the /proc of the host",
             c.what
         );
     }
@@ -146,25 +135,21 @@ fn each_statement_of_an_entry_reads_its_facts() {
 #[test]
 fn the_manual_names_each_row_and_each_shape() {
     let s = section();
-    for r in ROWS {
+    for r in rows() {
         assert!(s.contains(r.gives), "{}", r.word);
     }
-    for (shape, f) in SHAPES {
-        let o = of_entry(Rung::Namespace, *f);
+    for (shape, f) in shapes() {
+        let o = of_entry(Rung::Namespace, f);
         assert!(s.contains(shape), "{shape}");
-        assert!(
-            s.contains(&format!("opens: {}", o.words().join(" "))),
-            "{shape}"
-        );
+        assert!(s.contains(&format!("opens: {}", o.words())), "{shape}");
     }
 }
 
 #[test]
 fn an_unknown_word_of_a_record_is_left_out() {
-    let w = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-    assert_eq!(Opened::from_words(&w(&[])), Opened::NONE);
+    assert_eq!(Opened::from_words(""), Opened::NONE);
     assert_eq!(
-        Opened::from_words(&w(&["mount", "cgroup", "pid"])),
+        Opened::from_words("mount cgroup pid"),
         Opened::of(&[Part::Pid, Part::Mount])
     );
 }

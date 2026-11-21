@@ -100,9 +100,7 @@ pub fn entry_banner_of(
     if !never.is_empty() {
         out.push_str(&format!("this mode does NOT provide: {never}\n"));
     }
-    if let Some(line) = opened.line() {
-        out.push_str(&line);
-    }
+    out.push_str(opened.line().unwrap_or_default());
     // TODO/supervise.md T-0606. Where syscall mediation is refused but
     // the lifecycle still tracks, the banner says so: supervision
     // without mediation is the fallback, and a silent one would be the

@@ -18,8 +18,8 @@ pub fn shown_line() -> Option<String> {
     let e = HIDDEN.load(Ordering::Relaxed);
     (e != 0).then(|| {
         format!(
-            "podvm: the payload can read the command line and the environment of podvm \
-             in /proc/2: prctl(PR_SET_MM_MAP) failed with errno {e} (TODO/enter.md T-2054)\n"
+            "podvm: /proc/1 and /proc/2 show podvm's argv and environment: prctl(PR_SET_MM_MAP): \
+             errno {e} (TODO/enter.md T-2054)\n"
         )
     })
 }

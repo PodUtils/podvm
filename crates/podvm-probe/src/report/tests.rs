@@ -451,24 +451,21 @@ fn the_probe_rows_say_that_they_are_of_the_host_outside_a_user_namespace() {
 /// none.
 #[test]
 fn the_namespace_banner_reads_what_the_entry_opened() {
-    use crate::isolation::{of_entry, Facts, Part, ROWS, SHAPES};
+    use crate::isolation::{of_entry, rows, shape, shapes, Facts, Part};
     let f = Findings::empty();
     let sel = Selection::choose(&f);
     let no_proc = Facts {
         proc_dir: false,
-        ..SHAPES[0].1
+        ..shape(0).unwrap().1
     };
-    for (shape, facts) in SHAPES
-        .iter()
-        .chain([("an image with no /proc", no_proc)].iter())
-    {
-        let o = of_entry(Rung::Namespace, *facts);
+    for (shape, facts) in shapes().chain([("an image with no /proc", no_proc)]) {
+        let o = of_entry(Rung::Namespace, facts);
         let b = entry_banner_of(&f, &sel, Rung::Namespace, o);
         let never = b
             .lines()
             .find_map(|l| l.strip_prefix("this mode does NOT provide: "))
             .unwrap_or_default();
-        for r in ROWS.iter().filter(|r| r.part != Part::Uts) {
+        for r in rows().filter(|r| r.part != Part::Uts) {
             assert_eq!(
                 never.contains(r.not),
                 !o.has(r.part) && r.part != Part::Mount,

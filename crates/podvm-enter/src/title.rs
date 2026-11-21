@@ -19,7 +19,8 @@
 //! `env_end` only. The name of the process (`/proc/PID/comm`, the base
 //! name of podvm's binary) takes the title too. A fork takes the map and the
 //! name with it, so a child of a hidden process is hidden until its exec.
-//! [`restore`] gives both back.
+//! [`restore`] gives the map back; the name keeps the title, as it names no
+//! argument.
 //!
 //! The title lives in memory of the heap: the kernel reads those two files
 //! with `FOLL_ANON`, so a title in `.data` of the binary reads empty
@@ -30,7 +31,6 @@ use std::ffi::c_int;
 const PR_SET_MM: c_int = 35;
 const PR_SET_MM_MAP: u64 = 14;
 const PR_SET_NAME: c_int = 15;
-const PR_GET_NAME: c_int = 16;
 
 /// `struct prctl_mm_map` of `linux/prctl.h`.
 #[repr(C)]
@@ -54,7 +54,7 @@ pub struct Map {
 
 /// The map of this process before [`hide`], for [`restore`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Saved(Map, [u8; 16]);
+pub struct Saved(Map);
 
 /// Why the title did not take: the errno of the call that failed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -72,11 +72,21 @@ impl std::fmt::Display for Refused {
 /// The fields of the map in the text of `/proc/self/stat`: 26 to 28 and 45
 /// to 51 of `proc(5)`, counted after the last `)` of the command name.
 pub fn map_of(stat: &str, brk: u64) -> Option<Map> {
+    map_and_threads(stat, brk).map(|(m, _)| m)
+}
+
+/// [`map_of`] and the number of threads, field 20 of `proc(5)`.
+fn map_and_threads(stat: &str, brk: u64) -> Option<(Map, u64)> {
     let rest = &stat[stat.rfind(')')? + 1..];
-    // Field 3 (the state) is the first after the name.
-    let f: Vec<&str> = rest.split_whitespace().collect();
-    let at = |n: usize| -> Option<u64> { f.get(n.checked_sub(3)?)?.parse().ok() };
-    Some(Map {
+    // Field 3 (the state) is the first after the name; a field that is no
+    // number (the state) reads as 0, and a missing one as `None`.
+    let mut f = [None::<u64>; 52];
+    for (i, w) in rest.split_whitespace().take(49).enumerate() {
+        f[i + 3] = Some(w.parse().unwrap_or(0));
+    }
+    let at = |n: usize| f[n];
+    let threads = at(20)?;
+    let map = Map {
         start_code: at(26)?,
         end_code: at(27)?,
         start_stack: at(28)?,
@@ -91,7 +101,8 @@ pub fn map_of(stat: &str, brk: u64) -> Option<Map> {
         auxv: 0,
         auxv_size: 0,
         exe_fd: u32::MAX,
-    })
+    };
+    Some((map, threads))
 }
 
 /// `map` with the command line at `title` (its bytes and a NUL, at
@@ -110,7 +121,10 @@ fn errno() -> i32 {
     std::io::Error::last_os_error().raw_os_error().unwrap_or(0)
 }
 
-fn current() -> Result<Map, Refused> {
+/// The map of this process. ⛔ A refusal where it has more than one
+/// thread: another thread can move the break of the heap between its read
+/// and the call, and the call would set a stale one.
+fn current(alone: bool) -> Result<Map, Refused> {
     unsafe extern "C" {
         fn syscall(n: i64, ...) -> i64;
     }
@@ -135,32 +149,14 @@ fn current() -> Result<Map, Refused> {
     })?;
     // SAFETY: brk(0) changes nothing and gives the current break.
     let brk = unsafe { syscall(SYS_BRK, 0i64) } as u64;
-    map_of(&stat, brk).ok_or(Refused {
-        call: "the parse of /proc/self/stat",
-        errno: 0,
-    })
-}
-
-/// The number of threads in the text of `/proc/self/status`.
-pub fn threads_of(status: &str) -> Option<u32> {
-    status
-        .lines()
-        .find_map(|l| l.strip_prefix("Threads:"))
-        .and_then(|v| v.trim().parse().ok())
-}
-
-/// A refusal where this process has more than one thread: another thread
-/// can move the break of the heap between its read and the call, and the
-/// call would set a stale one.
-fn one_thread() -> Result<(), Refused> {
-    let n = std::fs::read_to_string("/proc/self/status")
-        .ok()
-        .as_deref()
-        .and_then(threads_of);
-    match n {
-        Some(1) => Ok(()),
-        _ => Err(Refused {
+    match map_and_threads(&stat, brk) {
+        Some((m, n)) if n == 1 || !alone => Ok(m),
+        Some(_) => Err(Refused {
             call: "a title with more than one thread",
+            errno: 0,
+        }),
+        None => Err(Refused {
+            call: "the parse of /proc/self/stat",
             errno: 0,
         }),
     }
@@ -196,59 +192,40 @@ fn set(map: &Map) -> Result<(), Refused> {
 /// ⛔ With one thread: the break of the heap must not move between its
 /// read and the call.
 pub fn hide(title: &str) -> Result<Saved, Refused> {
-    one_thread()?;
-    let old = current()?;
+    hide_as(title, true)
+}
+
+/// [`hide`]; `alone` false takes a process of more threads (a test whose
+/// other threads wait).
+fn hide_as(title: &str, alone: bool) -> Result<Saved, Refused> {
+    let old = current(alone)?;
     let mut bytes = title.as_bytes().to_vec();
     bytes.push(0);
     // The kernel reads the title for the life of the process.
     let bytes: &'static mut [u8] = Box::leak(bytes.into_boxed_slice());
     let new = titled(old, bytes.as_ptr() as u64, bytes.len() as u64);
     set(&new)?;
-    let mut comm = [0u8; 16];
-    // SAFETY: PR_GET_NAME writes at most 16 bytes, PR_SET_NAME reads a
-    // NUL-ended name; the name of a thread is no secret, so a failure of
-    // either leaves the title as it is.
-    unsafe {
-        prctl(PR_GET_NAME, comm.as_mut_ptr() as u64);
-        prctl(PR_SET_NAME, bytes.as_ptr() as u64);
-    }
-    Ok(Saved(old, comm))
+    // SAFETY: PR_SET_NAME reads a NUL-ended name (the kernel takes 15
+    // bytes); a refusal leaves the name of the binary, which is no secret.
+    unsafe { prctl(PR_SET_NAME, bytes.as_ptr() as u64) };
+    Ok(Saved(old))
 }
 
-/// Give back the command line and the environment of [`Saved`].
+/// Give back the command line and the environment of [`Saved`] (not the
+/// name).
 pub fn restore(saved: &Saved) -> Result<(), Refused> {
-    one_thread()?;
-    let now = current()?;
+    restore_as(saved, true)
+}
+
+fn restore_as(saved: &Saved, alone: bool) -> Result<(), Refused> {
+    let now = current(alone)?;
     set(&Map {
         arg_start: saved.0.arg_start,
         arg_end: saved.0.arg_end,
         env_start: saved.0.env_start,
         env_end: saved.0.env_end,
         ..now
-    })?;
-    if saved.1[0] != 0 {
-        // SAFETY: a NUL-ended name of at most 16 bytes.
-        unsafe { prctl(PR_SET_NAME, saved.1.as_ptr() as u64) };
-    }
-    Ok(())
-}
-
-/// The second path where [`hide`] is refused, for a process that reads no
-/// argument and no variable again (pid 1 of podvm's user namespace): the
-/// bytes of its command line and of its environment become NUL in place.
-///
-/// # Safety
-/// No code of this process reads `argv` or `environ` after the call.
-pub unsafe fn blank_in_place() -> Result<(), Refused> {
-    let m = current()?;
-    for (start, end) in [(m.arg_start, m.arg_end), (m.env_start, m.env_end)] {
-        if start != 0 && end > start {
-            // SAFETY: the kernel gives these bounds of this process's own
-            // stack, which is mapped and writable.
-            unsafe { std::ptr::write_bytes(start as *mut u8, 0, (end - start) as usize) };
-        }
-    }
-    Ok(())
+    })
 }
 
 #[cfg(test)]
@@ -285,15 +262,8 @@ mod tests {
         );
         assert_eq!(t.start_code, m.start_code);
         assert_eq!(std::mem::size_of::<Map>(), 104, "struct prctl_mm_map");
-        let cases: &[(&str, Option<u32>)] = &[
-            ("Name:\tx\nThreads:\t1\n", Some(1)),
-            ("Threads:\t12\n", Some(12)),
-            ("Threads:\tmany\n", None),
-            ("Name:\tx\n", None),
-        ];
-        for (status, want) in cases {
-            assert_eq!(threads_of(status), *want, "{status:?}");
-        }
+        let threads = map_and_threads(&stat, 9).map(|(_, t)| t);
+        assert_eq!(threads, Some(20), "the threads");
     }
 
     /// The child of [`a_hidden_process_shows_its_title_and_no_environment`]:
@@ -302,18 +272,23 @@ mod tests {
     #[ignore = "the child of a_hidden_process_shows_its_title_and_no_environment"]
     fn hidden_child() {
         let before = std::fs::read("/proc/self/cmdline").unwrap();
-        let Ok(saved) = hide("podvm-test") else {
-            println!("T-2054: REFUSED");
-            return;
+        // The other thread of the harness waits for this one.
+        let saved = match hide_as("podvm-test", false) {
+            Ok(saved) => saved,
+            Err(e) => {
+                println!("T-2054: REFUSED: {e}");
+                return;
+            }
         };
         let cmd = std::fs::read("/proc/self/cmdline").unwrap();
         let env = std::fs::read("/proc/self/environ").unwrap();
         assert_eq!(cmd, b"podvm-test\0", "the title");
-        let comm = std::fs::read_to_string("/proc/self/comm").unwrap();
+        // The name is of a thread: this test runs on one of the harness.
+        let comm = std::fs::read_to_string("/proc/thread-self/comm").unwrap();
         assert_eq!(comm, "podvm-test\n", "the name");
         assert!(env.is_empty(), "no environment");
         assert!(std::env::args_os().count() > 1, "the arguments stay");
-        restore(&saved).unwrap();
+        restore_as(&saved, false).unwrap();
         assert_eq!(
             std::fs::read("/proc/self/cmdline").unwrap(),
             before,
@@ -328,6 +303,11 @@ mod tests {
     /// says so and passes.
     #[test]
     fn a_hidden_process_shows_its_title_and_no_environment() {
+        // The harness has threads: the title is refused, and nothing moves.
+        let before = std::fs::read("/proc/self/cmdline").unwrap();
+        let e = hide("podvm-test").expect_err("more than one thread");
+        assert_eq!(e.call, "a title with more than one thread");
+        assert_eq!(std::fs::read("/proc/self/cmdline").unwrap(), before);
         let out = std::process::Command::new(std::env::current_exe().unwrap())
             .args(["--ignored", "--exact", "title::tests::hidden_child"])
             .args(["--nocapture", "--test-threads=1"])

@@ -421,7 +421,7 @@ pub fn exec(args: &[String]) -> i32 {
     pass.extend(term.as_ref().map(tty::Term::pass).into_iter().flatten());
     let mut plan = Plan {
         argv,
-        env: super::host_paths_out(env, userland.is_none()), // T-2054
+        env,
         working_dir,
         fds: Fds { pass },
         // ⚠ Empty: the banner was printed above, before the steps.
