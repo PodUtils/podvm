@@ -109,19 +109,13 @@ pub fn inspect(verb: &str, args: &[String]) -> i32 {
         }
         match store.find_one(want) {
             Ok(r) => match &template {
-                Some(t) => {
-                    match format::render_with_documents(
-                        t,
-                        &inspect_fields(&r, &store),
-                        &["Config.Labels"],
-                    ) {
-                        Ok(line) => docs.push(line),
-                        Err(bad) => {
-                            eprintln!("podvm inspect: {bad}");
-                            code = EXIT_CLI_ERROR;
-                        }
+                Some(t) => match format::render_typed(t, &inspect_fields(&r, &store), &[]) {
+                    Ok(line) => docs.push(line),
+                    Err(bad) => {
+                        eprintln!("podvm inspect: {bad}");
+                        code = EXIT_CLI_ERROR;
                     }
-                }
+                },
                 None => docs.push(inspect_json(&r, &store)),
             },
             Err(e) => {
@@ -194,6 +188,8 @@ pub const INSPECT_FIELDS: &[&str] = &[
     "Config.WorkingDir",
     "Config.User",
     "Config.Labels",
+    // T-2060: the whole object, as `{{json .Config}}` reads it in docker.
+    "Config",
 ];
 
 /// `podvm exec`'s mode, in one word each, for `inspect` and for the banner.
@@ -243,51 +239,21 @@ pub(super) fn image_fields(
     ]
 }
 
-pub(super) fn inspect_fields(r: &Record, store: &Store) -> Vec<(&'static str, String)> {
-    let cfg = run_config_of(store, r);
-    let flat = config_flat(&cfg);
-    vec![
-        ("Id", r.config_digest.clone()),
-        ("Digest", r.digest.clone()),
-        (
-            "RepoTags",
-            r.tag.as_ref().map(|_| r.name()).unwrap_or_default(),
-        ),
-        (
-            "RepoDigests",
-            format!("{}@{}", r.display_repository(), r.digest),
-        ),
-        ("Architecture", r.architecture.clone()),
-        ("Os", r.os.clone()),
-        ("Created", r.created.clone().unwrap_or_else(|| "-".into())),
-        ("Platform", r.platform.clone()),
-        ("Size", r.stored_bytes.to_string()),
-        ("Store", store.root().display().to_string()),
-        ("Layers", r.layers.join(" ")),
-        ("RootfsPath", {
-            let (rootfs, _) = podvm_extract::paths(store, &r.manifest_digest);
-            rootfs.display().to_string()
-        }),
-        // ⚠ Whether the rootfs is THERE, which is a different question from
-        // where it would be. `inspect` on a pulled-but-unextracted image must
-        // not imply a tree that does not exist.
-        (
-            "Extracted",
-            podvm_extract::is_extracted(store, &r.manifest_digest).to_string(),
-        ),
-        ("Exec.Mode", EXEC_MODE.to_string()),
-        ("Exec.Shares", EXEC_SHARES.to_string()),
-        ("Config.Env", flat.0),
-        ("Config.Cmd", flat.1),
-        ("Config.Entrypoint", flat.2),
-        ("Config.WorkingDir", flat.3),
-        ("Config.User", flat.4),
-        // TODO/image.md T-1840: an object, as `images --filter label=` reads.
-        (
-            "Config.Labels",
-            super::table_more::labels_json(store, r).to_string(),
-        ),
-    ]
+/// The fields of `--format`, each read from the document of `inspect`, so
+/// that the two cannot differ (T-2060): a dotted name is a path into it.
+pub(super) fn inspect_fields(r: &Record, store: &Store) -> Vec<(&'static str, serde_json::Value)> {
+    let doc = inspect_doc(r, store);
+    INSPECT_FIELDS
+        .iter()
+        .map(|name| {
+            let at = name
+                .split('.')
+                .try_fold(&doc, |v, part| v.get(part))
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            (*name, at)
+        })
+        .collect()
 }
 
 /// TODO/cli.md T-1417. The image's declared `Config`, read through the
@@ -301,39 +267,6 @@ pub(super) fn run_config_of(store: &Store, r: &Record) -> Option<podvm_image::oc
     let bytes = store.read_blob(&d).ok()?;
     let cfg: podvm_image::oci::Config = serde_json::from_slice(&bytes).ok()?;
     Some(cfg.config)
-}
-
-/// The Config half as flat `--format` strings: lists space-joined like
-/// `.Layers` above, `-` where the image omits the field.
-pub(super) fn config_flat(
-    c: &Option<podvm_image::oci::RunConfig>,
-) -> (String, String, String, String, String) {
-    let none = || "-".to_string();
-    match c {
-        None => (none(), none(), none(), none(), none()),
-        Some(c) => (
-            if c.env.is_empty() {
-                none()
-            } else {
-                c.env.join(" ")
-            },
-            c.cmd.as_ref().map(|v| v.join(" ")).unwrap_or_else(none),
-            c.entrypoint
-                .as_ref()
-                .map(|v| v.join(" "))
-                .unwrap_or_else(none),
-            if c.working_dir.is_empty() {
-                none()
-            } else {
-                c.working_dir.clone()
-            },
-            if c.user.is_empty() {
-                none()
-            } else {
-                c.user.clone()
-            },
-        ),
-    }
 }
 
 /// The Config half as a JSON document with docker's key names, null where
@@ -356,7 +289,14 @@ pub(super) fn config_json(c: &Option<podvm_image::oci::RunConfig>) -> serde_json
     }
 }
 
-fn inspect_json(r: &Record, store: &Store) -> String {
+pub(super) fn inspect_json(r: &Record, store: &Store) -> String {
+    inspect_doc(r, store).to_string()
+}
+
+/// The one model of an image's fields: `inspect` prints it, and `--format`
+/// reads its parts.
+fn inspect_doc(r: &Record, store: &Store) -> serde_json::Value {
+    let (rootfs, _) = podvm_extract::paths(store, &r.manifest_digest);
     // TODO/image.md T-1840: `.Config.Labels` beside the run config.
     let mut config = config_json(&run_config_of(store, r));
     config["Labels"] = super::table_more::labels_json(store, r);
@@ -382,8 +322,11 @@ fn inspect_json(r: &Record, store: &Store) -> String {
         // ⛔ T-0505, and nested here because it is nested in --format too. A
         // caller that reads one and not the other must not find two shapes.
         "Exec": { "Mode": EXEC_MODE, "Shares": EXEC_SHARES },
+        "RootfsPath": rootfs.display().to_string(),
+        // ⚠ Whether the rootfs is THERE, which is a different question from
+        // where it would be.
+        "Extracted": podvm_extract::is_extracted(store, &r.manifest_digest),
     })
-    .to_string()
 }
 
 pub(super) fn pick(fields: &[(&str, String)], key: &str) -> String {

@@ -46,8 +46,7 @@ impl std::fmt::Display for Bad {
 fn walk(
     template: &str,
     known: &[&str],
-    documents: &[&str],
-    mut value: impl FnMut(&str) -> Option<String>,
+    mut value: impl FnMut(&str) -> Option<Typed>,
     out: &mut String,
 ) -> Result<(), Bad> {
     let template = template.replace("\\t", "\t").replace("\\n", "\n");
@@ -100,16 +99,15 @@ fn walk(
                 known: known.iter().map(|k| format!(".{k}")).collect(),
             });
         }
-        // ⛔ A field is either already a JSON document or a plain string, and
-        // the verb says which. `{{json .X}}` on a string quotes and escapes it;
-        // `{{.X}}` on a document prints the document. Guessing from the value's
-        // first byte would make a string that happens to start with `[` come
-        // out unquoted, which is a wrong answer that parses.
-        let is_document = documents.contains(&name);
-        if let Some(v) = value(name) {
-            match (as_json, is_document) {
-                (true, false) => out.push_str(&serde_json::Value::String(v).to_string()),
-                _ => out.push_str(&v),
+        // ⛔ One typed value for each field (T-2060): `{{json .X}}` prints the
+        // value as JSON, and `{{.X}}` prints it as Go does (`[a b]`, `map[k:v]`).
+        // A string is quoted under `json` and bare otherwise, and no guess is
+        // made from its first byte.
+        if let Some(t) = value(name) {
+            match (as_json, t.plain) {
+                (false, Some(p)) => out.push_str(&p),
+                (false, Option::None) => out.push_str(&go_text(&t.json)),
+                (true, _) => out.push_str(&t.json.to_string()),
             }
         }
     }
@@ -130,9 +128,13 @@ pub fn check(template: &str, known: &[&str]) -> Result<(), Bad> {
 /// document. ⚠ `documents` is a subset of `known`, never a second list of
 /// names: a name in one and not the other would be a field only one of the two
 /// paths can see.
-pub fn check_with_documents(template: &str, known: &[&str], documents: &[&str]) -> Result<(), Bad> {
+pub fn check_with_documents(
+    template: &str,
+    known: &[&str],
+    _documents: &[&str],
+) -> Result<(), Bad> {
     let mut sink = String::new();
-    walk(template, known, documents, |_| None, &mut sink)
+    walk(template, known, |_| None, &mut sink)
 }
 
 /// Expand `{{.Field}}` against `fields`, and the two escapes docker expands in
@@ -152,12 +154,75 @@ pub fn render_with_documents(
     walk(
         template,
         &known,
-        documents,
         |name| {
-            fields
+            let v = fields.iter().find(|(k, _)| *k == name).map(|(_, v)| v)?;
+            Some(if documents.contains(&name) {
+                // A string that holds a document: `json` prints it as one.
+                Typed {
+                    json: serde_json::from_str(v).unwrap_or_else(|_| v.clone().into()),
+                    plain: Some(v.clone()),
+                }
+            } else {
+                Typed {
+                    json: v.clone().into(),
+                    plain: None,
+                }
+            })
+        },
+        &mut out,
+    )?;
+    Ok(out)
+}
+
+/// A field with its JSON type, and the text for `{{.X}}` where it is not the
+/// Go text of the value (`{{.State}}` is the word, and `{{json .State}}` is
+/// docker's object).
+pub struct Typed {
+    pub json: serde_json::Value,
+    pub plain: Option<String>,
+}
+
+/// The text that Go prints for a value with `{{.X}}`: `[a b]` for a list,
+/// `map[k:v k2:v2]` for a map (keys in order), the number or the word as it
+/// is. A null is a dash (AGENTS.md section 5: an unknown value is a dash).
+pub fn go_text(v: &serde_json::Value) -> String {
+    use serde_json::Value as V;
+    match v {
+        V::Null => "-".to_string(),
+        V::String(s) => s.clone(),
+        V::Array(a) => format!("[{}]", a.iter().map(go_text).collect::<Vec<_>>().join(" ")),
+        V::Object(o) => {
+            let mut keys: Vec<&String> = o.keys().collect();
+            keys.sort();
+            let items: Vec<String> = keys
+                .iter()
+                .map(|k| format!("{k}:{}", go_text(&o[*k])))
+                .collect();
+            format!("map[{}]", items.join(" "))
+        }
+        other => other.to_string(),
+    }
+}
+
+/// The same, for a verb whose fields have JSON types. `plain` names the text
+/// of a field for `{{.X}}` where it is not `go_text` of its value.
+pub fn render_typed(
+    template: &str,
+    fields: &[(&str, serde_json::Value)],
+    plain: &[(&str, String)],
+) -> Result<String, Bad> {
+    let known: Vec<&str> = fields.iter().map(|(k, _)| *k).collect();
+    let mut out = String::new();
+    walk(
+        template,
+        &known,
+        |name| {
+            let json = fields.iter().find(|(k, _)| *k == name)?.1.clone();
+            let plain = plain
                 .iter()
                 .find(|(k, _)| *k == name)
-                .map(|(_, v)| v.clone())
+                .map(|(_, v)| v.clone());
+            Some(Typed { json, plain })
         },
         &mut out,
     )?;

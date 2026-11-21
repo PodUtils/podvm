@@ -45,48 +45,7 @@ usage: podvm ps [-a|--all] [-q|--quiet] [--format T] [--no-trunc] [--podvm-tier 
     machine's network namespace, so there is nothing to publish.
 ";
 
-pub const CONTAINER_INSPECT_FIELDS: &[&str] = &[
-    "Id",
-    "Name",
-    "Image",
-    "State",
-    "State.Status",
-    "State.Running",
-    "State.ExitCode",
-    "State.Pid",
-    "State.StartedAt",
-    "State.FinishedAt",
-    "Status",
-    "Pid",
-    "LauncherPid",
-    "ExitCode",
-    "Created",
-    "StartedAt",
-    "FinishedAt",
-    "RootfsPath",
-    "LogPath",
-    "Rung",
-    "Tier",
-    "Labels",
-    "Complete.Fixups",
-    "Complete.Degraded",
-    "Command",
-    "Exec.Mode",
-    "Exec.Shares",
-    "Contains",
-    "Noticed",
-    "End.Reason",
-    "End.RunMs",
-    "End.UserMs",
-    "End.SystemMs",
-    "End.MaxRssKiB",
-    "End.Residual",
-    "Interpose.Emulated.mknod",
-    "Interpose.Emulated.mount",
-    "Interpose.Emulated.unshare",
-    "Interpose.Emulated.clone",
-    "Interpose.Emulated.procfs",
-];
+pub use typed::CONTAINER_INSPECT_FIELDS;
 
 fn store() -> Result<podvm_image::Store, i32> {
     podvm_image::open_store().map_err(|e| {
@@ -458,6 +417,7 @@ pub use prune::container_group;
 mod entry;
 mod prepared;
 pub(crate) mod target; // TODO/machine.md T-2042
+mod typed; // TODO/cli.md T-2060
 #[cfg(test)]
 use prepared::container_json;
 pub use prepared::Prepared;

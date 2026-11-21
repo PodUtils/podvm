@@ -150,7 +150,12 @@ usage: podvm inspect [--format T] [--podvm-tier incus] <image> [image...]
           .Platform .Size .Store .Layers .RootfsPath .Extracted
           .Exec.Mode .Exec.Shares
           .Config.Env .Config.Cmd .Config.Entrypoint .Config.WorkingDir
-          .Config.User
+          .Config.User .Config.Labels .Config
+
+  note: a field has docker's type. A list, a map, a number and a boolean
+    are those in `{{json .X}}`, and `{{.X}}` prints them as Go does:
+    `[a b]`, `map[k:v]`, a dash for null. `--format` reads the fields
+    that plain `inspect` prints (TODO/cli.md T-2060).
 
   note: .Config.* is what the image DECLARES, read through the stored
     config digest with docker's key names and null where the image omits
@@ -166,7 +171,9 @@ usage: podvm inspect [--format T] [--podvm-tier incus] <image> [image...]
     docker's namespace entry.
 
   A container: .Id .Name .Image .State .Status .Pid .ExitCode .Created
-    .StartedAt .FinishedAt .Rung .Tier .Labels .Command, and docker's
+    .StartedAt .FinishedAt .Rung .Tier .Labels .Command .Config (with
+    .Config.Env .Config.Cmd .Config.Image .Config.WorkingDir
+    .Config.Labels), and docker's
     .State.Status .State.Running .State.ExitCode .State.Pid
     .State.StartedAt .State.FinishedAt. .State alone is the word (created,
     running, exited, dead); the JSON gives State as docker's object, with
@@ -360,6 +367,8 @@ mod exit_tests;
 mod messages_tests;
 #[cfg(test)]
 mod tests; // TODO/image.md T-1842 // TODO/image.md T-1836
+#[cfg(test)]
+mod types_tests; // TODO/cli.md T-2060
 
 /// docker's `image` sub-command group.
 pub fn group(args: &[String]) -> i32 {

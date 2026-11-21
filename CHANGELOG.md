@@ -21,6 +21,7 @@ They describe their recorded revision, not the current build.
 - The end of the tree of a detached run whose payload holds the init of a PID namespace and a second process of it takes milliseconds, not 5 s (`pod-supervise` of podcrates `v0.80.0`; T-2018, #624).
 - The save and the load of the Linux guest of the machine tier keep podvm's code with the bounded connect of T-2048: `pod_guest::warm::line` of podcrates `v0.80.0` still connects to the monitor with no bound (T-2051, blocked on COORD-222).
 - The store copy of QEMU for a host with none is the static QEMU 11.0.0 of hermeticbuild/qemu-prebuilt (release `11.0.0.1`, the service `hermeticbuild-qemu` of `pod-services`), which holds the fix of the use-after-free of `address_space_translate_for_iotlb` (T-2016, #618), in place of QEMU 9.2.0 of pkgforge. podvm checks each archive and each member that it takes by its size and sha256. `podvm windows doctor` names a warm start from QEMU 11.1, the first QEMU that saves an NVMe disk (podcrates@T-1035), not from 11.0.
+- `inspect --format` gives each field its docker type: `{{json .Config.Env}}` is a list, `{{.Config.Cmd}}` prints `[python3]`, `{{json .Labels}}` is a map, and `Pid`, `ExitCode` and the counts of `End` are numbers. Plain `inspect` and `--format` read one model of the fields. A container has docker's `Config` (T-2060, OQ-06).
 
 ## 0.2.0-beta.37 (2026-11-21)
 

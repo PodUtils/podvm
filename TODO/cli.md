@@ -6506,3 +6506,36 @@ As uid 1000: a container whose log is 200 MB; the peak RSS of `podvm logs` under
 ## Done
 
 **Done (2026-11-20).** `logs` streams the log from its start to stdout through one buffer of 64 KiB (`crates/podvm-supervise/src/stream.rs`: `copy_range`, and `tail_start`, which finds the start of the last N lines from the end in pieces of the same size), on each path: a container, `-f` (the first read, then `pod_supervise::follow_from` from its end), `--tail` and `-f --tail`, and the serial log of a detached machine, which ignored `--tail` before. `--limit-bytes N` stops after the first N bytes with exit 0; with `--tail` it gives the first N bytes of the tail, and with `-f` the follow ends at N bytes (a writer that refuses each write past the bound ends `follow_from` at once) or at the end of the container. `--since`, `--until`, `-t` and `--details` have no row in the parity table and are refused by name with 125. One parser of a whole number with a range (`lifecycle::logs::whole`) reads `--tail` (0 to 2^64-1) and `--limit-bytes` (1 to 9223372036854775807); 0, a sign, a letter, an empty value and a larger N are refused by name with 125. On `--podvm-tier=incus` the verb takes the same parser, `-f` and `--limit-bytes` (`crates/podvm/src/incus/logs.rs`) and refuses `--tail` as before; the API of incus gives the file whole and `pod-incus` reads it whole, 64 MiB at most, so podvm holds the log in memory and refuses a larger one, and the help, the parity row, `docs/limits.md` and `docs/incus.md` say so. A write to a closed stdout ends with SIGPIPE (T-1769), and where SIGPIPE is ignored with exit 125 and one line (T-1816), never a panic. The unit tests `the_values_of_logs_are_parsed_by_one_rule`, `limit_bytes_composes_with_each_flag_of_logs`, `the_copy_of_a_log_is_the_slice_of_the_whole_read` and `the_help_states_the_bounds` hold the parse, the combinations and the copy; `the_tail_from_the_end_is_the_tail_of_the_whole_read` holds `tail_start` to `pod_supervise::tail_offset` for each text, count and size of piece; `the_log_of_an_instance_stops_at_the_limit` holds the incus path against a stand-in of the API. As uid 1000 with `mirror.gcr.io/library/alpine:3.20`, a container whose log is 200,000,000 bytes: `podvm logs` of `bf0608c` has a peak RSS of 200,160 KiB, and now 4,952 KiB with the same 200,000,000 bytes on stdout; `--tail 1` of the same log (no line end) 4,952 KiB; `--limit-bytes 1000` gives 1000 bytes and exit 0; `-f --limit-bytes 20` of a container that runs 30 s more ends after 0.3 s with 20 bytes and 0. Clause 25 of experiment 434 (`PODVM_434_MIRROR=1`) passes: `--limit-bytes 4` of a running instance gives `star` and 0, `-f --limit-bytes 3` ends with `sta` and 0, and `--limit-bytes 0` is refused by name with 125. The ask to podcrates: the stream of `stream.rs` in `pod-supervise` (`logs`, `follow_tail` and `append_from` read whole), and a ranged or streamed read of a file in `pod-incus`; the lead writes it as a COORD issue.
+
+# T-2060: The sixth outside pass, OQ-06: `inspect --format` gives lists and maps as flat strings
+
+**Source:** the sixth outside pass (T-2044), OQ-06 (P2)
+**Category:** cli
+**Milestone:** none
+**Priority:** P2
+**Effort:** S
+**Status:** done
+
+## Problem
+
+`inspect --format '{{json .Config.Env}}'` gives one string of the variables, space-joined; `{{.Config.Cmd}}` gives `python3`, where docker gives `[python3]`; and `{{json .Labels}}` of a container gives `"team=ci"`. The JSON of a container gives `Labels`, `ExitCode`, `Pid` and the counts of `End` as strings, and has no `Config`. docker gives lists, maps and numbers, and the manual says that `--format` reads the same fields as `inspect`.
+
+## Premise
+
+The engine of `--format` (`crates/podvm/src/format.rs`) took each field as text. An image built its fields as flat text (`config_flat`) and its document as JSON by a second path. A container built its fields as text, and the document wrapped each of them as a JSON string (`json_of`).
+
+## Approach
+
+One model of the fields, typed as docker types them. The engine takes a JSON value for each field: `{{json .X}}` prints it as JSON, and `{{.X}}` prints it as Go does (`[a b]` for a list, `map[k:v]` for a map in key order, a dash for null). An image reads its fields from the one document that plain `inspect` prints (`inspect_doc`). A container types its text fields in one place (`lifecycle/typed.rs`), and plain `inspect` and `--format` both read that. A container has docker's `Config` (`Env`, `Cmd`, `Image`, `WorkingDir`, `Labels`); `Env` leaves out the `PODVM_*` variables and `LD_PRELOAD` of the entry, as `exec` does.
+
+## Decision
+
+-
+
+## Prove
+
+Two table tests hold each field type against docker's: `the_fields_of_an_image_have_dockers_types` and `the_fields_of_a_container_have_dockers_types`. As uid 1000: `inspect --format '{{json .Config.Env}}|{{.Config.Cmd}}'` of an image gives `["PATH=..."]|[/bin/sh]`; a container made with `--label team=ci` gives `{"team":"ci"}` for `{{json .Labels}}`, and a number for `{{json .Pid}}`.
+
+## Done
+
+**Done (2026-11-21).** The engine takes typed values (`format::render_typed`, `Typed`, `go_text`), and `render` and `render_with_documents` keep their text interface through it. `inspect` of an image builds one document, and `--format` reads its parts by their dotted names (`images/inspect.rs`: `inspect_doc`, `inspect_fields`); `config_flat` is gone. `inspect` of a container types its fields in `lifecycle/typed.rs`: `Pid`, `LauncherPid`, `ExitCode` and `End.*` are numbers (null where the record has none), `State.Running` is a boolean, `Labels` and `Config.Labels` are maps, `Config.Env` and `Config.Cmd` are lists, and `State` is docker's object in JSON and the word in text. `Config` and `Config.*` are new fields of both kinds. A dash in text is a null in JSON. Before (the binary of `3fa36a6`): `{{json .Labels}}` gave `"team=ci"`, `{{json .Pid}}` gave `"27332"`. After: `{"team":"ci"}`, `16763`, `{{.Labels}}` gives `map[team:ci]`, `{{.Config.Cmd}}` gives `[sleep 300]`, and an image of Alpine 3.20 gives `["PATH=..."]|[/bin/sh]`. The two table tests hold the types.

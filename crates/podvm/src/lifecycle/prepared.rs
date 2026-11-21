@@ -2,39 +2,10 @@
 
 use super::*;
 
-#[cfg(test)] // inspect renders through `json_of`
+#[cfg(test)] // inspect renders through `typed::document`
 pub(super) fn container_json(s: &podvm_image::Store, c: &Container) -> String {
-    json_of(&container_fields(s, c), c)
-}
-
-/// The document of `c` with its `fields` (a machine's are its own, T-2042).
-pub(super) fn json_of(fields: &[(&'static str, String)], c: &Container) -> String {
-    let mut o = serde_json::Map::new();
-    for (k, v) in fields {
-        // TODO/cli.md T-2001 OP-06: `State` is docker's object, with typed
-        // values; `--format '{{.State}}'` stays the word.
-        if *k == "State" || k.starts_with("State.") {
-            continue;
-        }
-        // ⚠ The nested pair is nested here too, so a caller reading the
-        // document and one reading `--format` do not find two shapes.
-        if let Some((group, rest)) = k
-            .strip_prefix("Exec.")
-            .map(|r| ("Exec", r))
-            .or_else(|| k.strip_prefix("End.").map(|r| ("End", r)))
-        {
-            let e = o
-                .entry(group.to_string())
-                .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()));
-            if let Some(m) = e.as_object_mut() {
-                m.insert(rest.to_string(), serde_json::Value::String(v.clone()));
-            }
-            continue;
-        }
-        o.insert(k.to_string(), serde_json::Value::String(v.clone()));
-    }
-    o.insert("State".to_string(), state_json(c));
-    serde_json::Value::Array(vec![serde_json::Value::Object(o)]).to_string()
+    let typed = super::typed::fields(&container_fields(s, c), c);
+    serde_json::Value::Array(vec![super::typed::document(&typed)]).to_string()
 }
 
 /// docker's `State` of a container: a null where podvm has no value (no

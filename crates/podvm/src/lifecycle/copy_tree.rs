@@ -291,20 +291,13 @@ pub fn inspect_container(want: &str, template: Option<&str>) -> Option<Result<St
             (c, f)
         }
     };
+    let typed = super::typed::fields(&fields, &c);
     Some(match template {
-        Some(t) => format::render(t, &fields).map_err(|bad| {
+        Some(t) => format::render_typed(t, &typed, &super::typed::plain(&c)).map_err(|bad| {
             eprintln!("podvm inspect: {bad}");
             EXIT_CLI_ERROR
         }),
-        None => {
-            let doc = super::prepared::json_of(&fields, &c);
-            // `json_of` gives an array of one object.
-            Ok(doc
-                .strip_prefix('[')
-                .and_then(|d| d.strip_suffix(']'))
-                .unwrap_or(&doc)
-                .to_string())
-        }
+        None => Ok(super::typed::document(&typed).to_string()),
     })
 }
 
@@ -435,6 +428,14 @@ pub(super) fn container_fields(
         ("Complete.Fixups", c.completion_note()),
         ("Complete.Degraded", c.completion_degraded.to_string()),
         ("Command", c.argv.join(" ")),
+        // T-2060: docker's `.Config`. The strings are the flat text; the
+        // typed values come from `typed::fields`.
+        ("Config", String::new()),
+        ("Config.Env", c.env.join(" ")),
+        ("Config.Cmd", c.argv.join(" ")),
+        ("Config.Image", c.image.clone()),
+        ("Config.WorkingDir", c.working_dir.clone()),
+        ("Config.Labels", c.hardening.labels.join(",")),
         ("Exec.Mode", crate::images::EXEC_MODE.to_string()),
         ("Exec.Shares", crate::images::EXEC_SHARES.to_string()),
         // ⛔ SAID, NOT IMPLIED. TODO/supervise.md T-1708: the launcher is the

@@ -63,9 +63,8 @@ fn verify_parses_one_image_all_or_nothing() {
 }
 
 /// TODO/cli.md T-1417. The Config half renders docker's key names
-/// with null where the image omits a field, flat strings space-joined
-/// with a dash where absent, and a missing blob renders null rather
-/// than failing the document.
+/// with null where the image omits a field, and a missing blob renders
+/// null rather than failing the document.
 #[test]
 fn config_renders_docker_names_null_safe() {
     let full = Some(podvm_image::oci::RunConfig {
@@ -81,9 +80,6 @@ fn config_renders_docker_names_null_safe() {
     assert_eq!(doc["Entrypoint"], serde_json::json!(["/entry"]));
     assert_eq!(doc["WorkingDir"], serde_json::json!("/w"));
     assert_eq!(doc["User"], serde_json::json!("u"));
-    let flat = config_flat(&full);
-    assert_eq!(flat.0, "A=1");
-    assert_eq!(flat.1, "a b");
     // Omitted fields are null in JSON and a dash flat. An explicitly
     // cleared entrypoint (`Some(vec![])`) is an empty array, not null:
     // None and Some([]) stay apart, as the parser keeps them.
@@ -97,11 +93,6 @@ fn config_renders_docker_names_null_safe() {
     assert_eq!(doc["Entrypoint"], serde_json::json!([]));
     assert!(doc["WorkingDir"].is_null(), "{doc}");
     assert!(doc["User"].is_null(), "{doc}");
-    let flat = config_flat(&thin);
-    assert_eq!(
-        flat,
-        ("-".into(), "-".into(), "".into(), "-".into(), "-".into())
-    );
     let doc = config_json(&None);
     assert!(doc["Env"].is_null() && doc["User"].is_null(), "{doc}");
     // A record whose config blob is absent renders the same nulls.
@@ -109,8 +100,9 @@ fn config_renders_docker_names_null_safe() {
         .unwrap();
     assert!(run_config_of(&store, &a_record()).is_none());
     let fields = inspect_fields(&a_record(), &store);
-    assert_eq!(pick(&fields, "Config.Env"), "-");
-    assert_eq!(pick(&fields, "Config.User"), "-");
+    assert!(fields
+        .iter()
+        .all(|(k, v)| !k.starts_with("Config.") || v.is_null() || k.ends_with("Labels")));
     let _ = std::fs::remove_dir_all(store.root());
 }
 
@@ -179,7 +171,7 @@ fn a_template_naming_a_field_no_verb_has_is_refused_without_any_record() {
     assert!(format::check("{{.RepoTags}}", INSPECT_FIELDS).is_ok());
 }
 
-fn a_record() -> Record {
+pub(super) fn a_record() -> Record {
     Record {
         repository: "docker.io/library/alpine".into(),
         tag: Some("latest".into()),
