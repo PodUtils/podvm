@@ -1,11 +1,11 @@
-date      2026-11-20T19:37:32Z
+date      2026-11-21T06:47:10Z
 podvm     podvm 0.2.0-beta.37
 user      pv465 (uid 30034)
 kernel    6.18.44-fc-v726
 kvm       no (a guest runs under TCG)
 subuid    pv465:165536:65536
 cgroup    /sys/fs/cgroup/unified/; delegated: /sys/fs/cgroup/unified/podvm-465 (a stand-in that root made)
-clause 1  rc 7 in 14 s
+clause 1  rc 7 in 13 s
     CHECK pid1 systemd
     CHECK state running
     CHECK uid_map  0 30034 1 1 165536 65536 
@@ -16,7 +16,7 @@ clause 1  rc 7 in 14 s
     CHECK stop inactive
     CHECK failed-units 
     VERDICT pass
-clause 2  rc 7 in 34 s
+clause 2  rc 7 in 48 s
     CHECK pid1 systemd
     CHECK state running
     CHECK uid_map  0 0 4294967295 
@@ -29,7 +29,7 @@ clause 2  rc 7 in 34 s
     VERDICT pass
     stderr: podvm run: --podvm-init=image: the host delegates no cgroup2 subtree to the caller (none: /sys/fs/cgroup is not cgroup2 (f_type 0x1021994; cgroup v1 or a hybrid); no user bus of systemd answers), and systemd as PID 1 needs one; no runsc tier: PODVM_RUNSC=/none
 clause 2  state files after the run: 1
-clause 3  rc 7 in 11 s
+clause 3  rc 7 in 15 s
     CHECK pid1 systemd
     CHECK state running
     CHECK uid_map  0 0 4294967295 
@@ -41,9 +41,9 @@ clause 3  rc 7 in 11 s
     CHECK failed-units 
     VERDICT pass
     stderr: podvm run: --podvm-init=image: the namespace rung boots an init of the image for a caller that is not uid 0, with PODVM_USERNS not 0; no runsc tier: PODVM_RUNSC=/nonexistent/runsc names no file; the run takes the machine tier, where the init of the image is PI
-clause 3  the guest came from a saved state: 1 state file, 11 s
+clause 3  the guest came from a saved state: 1 state file, 15 s
 clause 4  rc 127 (the userland rung with no init: mode=userland)
-    pid1=process_api self=8720 uid=30034
+    pid1=process_api self=23421 uid=30034
     stderr: podvm: interpose: setresuid failed with errno 1 (EPERM); the payload keeps uid 30034, and podvm does not change it (TODO/interpose.md T-0711)
     stderr: setpriv: setresuid failed: Operation not permitted
 clause 5  rc 125 (run --podvm-tier=syscall --podvm-init=image)
@@ -52,10 +52,10 @@ clause 5  rc 125 (run -d --podvm-init=image from a cgroup that is not delegated)
     stderr: podvm run: --podvm-init=image: the host delegates no cgroup2 subtree to the caller (none: /sys/fs/cgroup is not cgroup2 (f_type 0x1021994; cgroup v1 or a hybrid); no user bus of systemd answers), and 
 clause 6  processes that stay: none
 clause 6  cgroups that stay: none
-clause 7  a run with podvm's init: podvm was pid 8788; processes that stay: none
-clause 7  a run with the init of the image: podvm was pid 8921; processes that stay: none
+clause 7  a run with podvm's init: podvm was pid 23486; processes that stay: none
+clause 7  a run with the init of the image: podvm was pid 23667; processes that stay: none
 runsc     runsc version release-20261102.0
-clause 8  rc 7 in 9 s
+clause 8  rc 7 in 8 s
     CHECK pid1 systemd
     CHECK state running
     CHECK uid_map  0 0 4294967295 
@@ -68,7 +68,7 @@ clause 8  rc 7 in 9 s
     VERDICT pass
     stderr: podvm run: --podvm-init=image: the host delegates no cgroup2 subtree to the caller (none: /sys/fs/cgroup is not cgroup2 (f_type 0x1021994; cgroup v1 or a hybrid); no user bus of systemd answers), and systemd as PID 1 needs one; the run takes the runsc tier, wh
     stderr: podvm run: --podvm-init=image: /sbin/init of the image is PID 1 of the sandbox, with the cgroup2 tree and each uid of gVisor's kernel; the writes of the root go to an overlay that ends with the run (TODO/enter.md T-2007)
-clause 8  rc 7 in 9 s
+clause 8  rc 7 in 8 s
     CHECK pid1 systemd
     CHECK state running
     CHECK uid_map  0 0 4294967295 
@@ -81,9 +81,9 @@ clause 8  rc 7 in 9 s
     VERDICT pass
     stderr: podvm run: --podvm-init=image: the namespace rung boots an init of the image for a caller that is not uid 0, with PODVM_USERNS not 0; the run takes the runsc tier, where the init of the image is PID 1 of a gVisor sandbox (TODO/enter.md T-2007)
     stderr: podvm run: --podvm-init=image: /sbin/init of the image is PID 1 of the sandbox, with the cgroup2 tree and each uid of gVisor's kernel; the writes of the root go to an overlay that ends with the run (TODO/enter.md T-2007)
-clause 8  a SIGKILL of podvm on the runsc tier: podvm was pid 9640; processes that stay: none
+clause 8  a SIGKILL of podvm on the runsc tier: podvm was pid 24390; processes that stay: none
 clause 8  processes of gVisor that stay: none
-clause 9  rc 7 in 39 s
+clause 9  rc 7 in 41 s
     CHECK pid1 systemd
     CHECK state running
     CHECK uid_map  0 0 4294967295 
@@ -95,10 +95,10 @@ clause 9  rc 7 in 39 s
     CHECK failed-units 
     VERDICT pass
     stderr: podvm run: --podvm-init=image: the namespace rung boots an init of the image for a caller that is not uid 0, with PODVM_USERNS not 0; no runsc tier: PODVM_RUNSC=/nonexistent/runsc names no file; the run takes the machine tier, where the init of the image is PI
-clause 9  the run that saves: state files 1, state-9bef8f23f6fb578d4c8e309d14fe1714ffdea2e967a5e4652dad65abf69d75d9-fc605b5437a48713688cf1cc.vm
-clause 9  a SIGKILL of podvm with a guest from a state: podvm was pid 10009; processes that stay: none
+clause 9  the run that saves: state files 1, state-9bef8f23f6fb578d4c8e309d14fe1714ffdea2e967a5e4652dad65abf69d75d9-1452ac59164c04947abcde71.vm
+clause 9  a SIGKILL of podvm with a guest from a state: podvm was pid 24706; processes that stay: none
 clause 9  emulators that stay: none
-clause 9  rc 7 in 33 s
+clause 9  rc 7 in 43 s
     CHECK pid1 systemd
     CHECK state running
     CHECK uid_map  0 0 4294967295 
@@ -110,7 +110,7 @@ clause 9  rc 7 in 33 s
     CHECK failed-units 
     VERDICT pass
     stderr: podvm run: --podvm-init=image: the namespace rung boots an init of the image for a caller that is not uid 0, with PODVM_USERNS not 0; no runsc tier: PODVM_RUNSC=/nonexistent/runsc names no file; the run takes the machine tier, where the init of the image is PI
-clause 9  rc 7 in 29 s
+clause 9  rc 7 in 40 s
     CHECK pid1 systemd
     CHECK state running
     CHECK uid_map  0 0 4294967295 
@@ -122,9 +122,9 @@ clause 9  rc 7 in 29 s
     CHECK failed-units 
     VERDICT pass
     stderr: podvm run: --podvm-init=image: the namespace rung boots an init of the image for a caller that is not uid 0, with PODVM_USERNS not 0; no runsc tier: PODVM_RUNSC=/nonexistent/runsc names no file; the run takes the machine tier, where the init of the image is PI
-    stderr: podvm run: machine tier: the guest that podvm started from a saved state did not reach the command after 0.3 s (the emulator exited with code 1, before the guest reached the command; qemu: qemu-system-x86_64: load of migration failed: Input/output error; conso
+    stderr: podvm run: machine tier: the guest that podvm started from a saved state did not reach the command after 0.4 s (the emulator exited with code 1, before the guest reached the command; qemu: qemu-system-x86_64: load of migration failed: Input/output error; conso
 clause 9  markers of a failed state: 1; state files: 0
-clause 9  rc 7 in 32 s
+clause 9  rc 7 in 41 s
     CHECK pid1 systemd
     CHECK state running
     CHECK uid_map  0 0 4294967295 
@@ -137,7 +137,7 @@ clause 9  rc 7 in 32 s
     VERDICT pass
     stderr: podvm run: --podvm-init=image: the namespace rung boots an init of the image for a caller that is not uid 0, with PODVM_USERNS not 0; no runsc tier: PODVM_RUNSC=/nonexistent/runsc names no file; the run takes the machine tier, where the init of the image is PI
 clause 9  PODVM_MACHINE_STATE=maybe: rc 125
-clause 10  rc 0 in 2 s (run -d --podvm-init=image)
+clause 10  rc 0 in 5 s (run -d --podvm-init=image)
 clause 10  exec systemctl is-system-running: running
 clause 10  rc 7 (the check through exec)
     CHECK pid1 systemd
@@ -161,8 +161,9 @@ clause 10  five times run -d and rm -f: 0 of them took 4 s or more
 clause 10  processes that stay: none; cgroups with a process: none
 clause 10  records of c465: 0; trees in the store: 3 (a run that a SIGKILL ended keeps its tree and its record)
 clause 11  run -t: tty and the terminal of the process: /dev/pts/0 pts/0 
-clause 11  rc 4 (a shell that reads two lines from the pipe of -it); typed-42: 1
+clause 11  rc 4 (a shell that reads two lines from the pipe of -it); typed-42: 0
+FAIL: clause 11: the input of -it
 clause 11  processes that stay: none; cgroups with a process: none
 clause 12  rc 125 (run --podvm-confine read=/usr --podvm-init=image)
 clause 12  rc 125 (run --ulimit nofile=64 --podvm-init=image)
-THE INIT OF THE IMAGE RUNS
+A CLAUSE FAILED
