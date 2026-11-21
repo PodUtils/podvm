@@ -6000,3 +6000,36 @@ Experiment 465 with the fix, as root for that user (`PODVM_465_USER`), under TCG
 Under KVM on a hosted runner (`kvm.yml` run 44808044333 on `7324fe0`, QEMU 10.2.1): experiment 465 clause 2 gives 7 in 17 s and saves a state, clause 3 loads it in 1 s, each check of clause 9 runs on the machine tier and holds (`PODVM_MACHINE_STATE=maybe` gives 125); experiment 468 gives the rows `machine` 12.2 s, `mach-sav` 19.5 s and `mach-lod` 3.4 s (the first byte after 0.6 s; a state of 1545 MiB, no marker of a failed state); no emulator stays.
 
 Remaining: (1) done (the run above). (2) A SIGTERM that comes during a save waits for the end of the save (at most about 7 minutes with each bound, an estimate from the bounds); the drive reads the signal after it. (3) The ask for podcrates of the Decision (#633), and the take of `Monitor::ask_within` when podcrates tags it.
+
+# T-2051: The save and the load of the Linux guest of the machine tier keep their own code beside `pod_guest::warm::line`
+
+**Source:** PodUtils/podcrates#250 (the COORD message of `v0.80.0`), the answer to #618 (COORD-217): `pod_guest::warm::line` and `qmp::Monitor::ask_within`; T-2050
+**Category:** machine
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** blocked
+
+## Problem
+
+podcrates `v0.80.0` gives `pod_guest::warm::line` (`save`, `check`, `running`, `Inputs`, `Record`): the saved state of any machine line, with the late answer of `query-migrate` read on the same connection (`Monitor::ask_within`, `Monitor::late`). podvm keeps its own save and load of the Linux guest (`crates/podvm/src/machine/guest/state/save.rs`, `store.rs`, `run.rs`), a second copy of the same steps (the rule "Shared code first").
+
+## Premise
+
+Read on 2026-11-21 at the tag `v0.80.0`: `line::freeze` connects once before the stop and polls on that connection, so a late answer within the bound is no failure, and a monitor that answers nothing ends at the bound. But `qmp::Monitor::connect` calls `UnixStream::connect` with no bound, and `line::running` connects again after each failed poll. QEMU serves one client of its monitor and queues one more connection (its backlog is 1), so a `connect` to a full queue waits in the kernel with no bound: the hang of T-2048 (`kvm.yml` run 44786700578). podvm's `connect` runs each try in a thread and waits within a bound (T-2048, `tests_monitor.rs`, the rows `Peer::Late` and `Peer::Hangs`). A take before the crate bounds its connect brings back an unbounded wait. The rows of `tests_monitor.rs` were not run against `warm::line`.
+
+## Approach
+
+When a tag of podcrates bounds `Monitor::connect` (COORD-222, #633): take `line::save` with the hooks of podvm (`Stopped`: the check of the mailbox, the copy of the disks), `line::check` and `Inputs` for the fingerprint, and `line::running` for the load; keep the lines of podvm's errors (the transport, the request, the status before, the late answers, the free disk) through the failures of the crate; make `tests_monitor.rs` drive `line::save` with each row. A state of the old record format loads as stale once and the guest boots cold.
+
+## Decision
+
+(1) 2026-11-21, the take of `v0.80.0` (T-2050): podvm keeps its save and its load, with the bounded connect of T-2048. The pins of #618 are taken: the static QEMU 11.0.0 of `hermeticbuild-qemu` (T-2016) and the doctor's QEMU 11.1 for a warm start.
+
+## Prove
+
+`tests_monitor.rs` with each row (`Peer::Works`, `NoFile`, `Fails`, `Empty`, `Leaves`, `NoCont`, `Late`, `Hangs`) passes with `pod_guest::warm::line` in place of `state/save.rs`; `kvm.yml` experiment 468 rows `mach-sav` and `mach-lod` pass; `grep -n "fn migrate\|fn connect" crates/podvm/src/machine/guest/state/save.rs` finds nothing.
+
+## Blocker
+
+A tag of podcrates whose `qmp::Monitor::connect` has a bound for the `connect` itself (COORD-222, #633). The entry clears when such a tag is out.
