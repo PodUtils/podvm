@@ -531,6 +531,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #635 | COORD-223: podvm took v0.80.0 (to podcrates) | open | T-2050, T-2051 |
 | #636 | COORD-224: v0.2.0-beta.37 is out (to podrunner) | open | T-1949, T-2002, T-2008, T-2046, T-2048 |
 | #637 | [gh action] requested | closed (on 4dc5744: gate 44849108235, arm 44849112350, workloads 44849118194 and kvm 44849121664 init passed) | the gate, arm, workloads and kvm.yml init runs of 4dc5744, the take of podcrates v0.80.0 (T-2050) |
+| #638 | [gh action] requested | open | the job mem of kvm.yml (experiment 470) on 8de9873: the memory of a guest for an initrd of N bytes (T-2047) |
 
 ## Messages whose title does not start with COORD-NNN
 
