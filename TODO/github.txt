@@ -526,4 +526,4 @@
 634 issue closed
 635 issue open
 636 issue open
-637 issue open
+637 issue closed
