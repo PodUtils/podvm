@@ -209,7 +209,7 @@ fn drain(mut master: std::fs::File, verbose: bool) -> Arc<Mutex<Vec<u8>>> {
         // the waiter: this thread would take it with the default action,
         // and the end of the supervisor is a SIGKILL of the init.
         let mut old = 0u64;
-        let _ = podvm_probe::sys::sigblock(podvm_enter::WAIT_FORWARDED, &mut old);
+        let _ = podvm_enter::block_forwarded(&mut old);
         let mut buf = [0u8; 4096];
         while let Ok(n) = master.read(&mut buf) {
             if n == 0 {

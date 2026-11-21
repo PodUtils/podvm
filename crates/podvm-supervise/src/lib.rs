@@ -166,20 +166,17 @@ pub type Hold = pod_supervise::Foreground<table::Detail>;
 /// reaps the payload and gives its code to [`Hold::finish`].
 ///
 /// ⛔ TODO/supervise.md T-1708: a new thread takes the signal mask of its
-/// creator, and the thread of the hold leaves SIGINT and SIGTERM
-/// unblocked. Such a thread takes a signal with the default action, and
-/// podvm ends 143 with the payload still running. So the shutdown signals
-/// are blocked while the hold starts its thread, and the old mask comes
-/// back after.
+/// creator, and a thread of the hold that leaves a forwarded signal
+/// unblocked takes it with the default action: podvm ended 143 with the
+/// payload still running. `pod_supervise::foreground` blocks the list of
+/// `pod_enter::block_forwarded` around the spawn of its thread (podcrates
+/// `v0.80.0`, PodUtils/podvm#616), so podvm no longer blocks it here.
 pub fn foreground(store: &Store, want: &str, payload_pid: i64) -> Result<Hold> {
-    let mut old = 0u64;
-    // T-2001 OP-05: each signal that the waiter forwards (podcrates `v0.79.0`).
-    let blocked = podvm_probe::sys::sigblock(podvm_enter::WAIT_FORWARDED, &mut old).is_ok();
-    let hold = pod_supervise::foreground(&settings(store), want, payload_pid);
-    if blocked {
-        let _ = podvm_probe::sys::sigrestore(old);
-    }
-    Ok(hold?)
+    Ok(pod_supervise::foreground(
+        &settings(store),
+        want,
+        payload_pid,
+    )?)
 }
 
 /// Send a signal to a running container's payload.

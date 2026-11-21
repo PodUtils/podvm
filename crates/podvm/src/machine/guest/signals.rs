@@ -80,7 +80,7 @@ pub fn wrap(run: &str) -> String {
 /// default action ended it with no end.
 pub fn block_early() {
     let mut old = 0u64;
-    let _ = k::sigblock(podvm_enter::WAIT_FORWARDED, &mut old);
+    let _ = podvm_enter::block_forwarded(&mut old);
 }
 
 /// The forward of the host for one drive of an emulator.
@@ -98,8 +98,7 @@ impl Forward {
     /// run goes on as before.
     pub fn new(verb: &str, nonce: &str) -> Forward {
         let mut old = 0u64;
-        let sfd = k::sigblock(podvm_enter::WAIT_FORWARDED, &mut old)
-            .and_then(|_| k::signalfd(podvm_enter::WAIT_FORWARDED));
+        let sfd = podvm_enter::block_forwarded(&mut old).and_then(|_| k::signalfd_proxied());
         let sfd = match sfd {
             Ok(fd) => Some(fd),
             Err(e) => {

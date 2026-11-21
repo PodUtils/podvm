@@ -2114,7 +2114,7 @@ pid 1 sets `PR_SET_PDEATHSIG` to SIGKILL at its start, and clears it when pid 2 
 **Milestone:** none
 **Priority:** P3
 **Effort:** S
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -2135,3 +2135,7 @@ Ask podcrates (rule 2a: the launcher is `pod-supervise`): in `end_tree`, wait on
 ## Prove
 
 A test of `pod-supervise`: a payload that opens a PID namespace, starts its init and one more child in it, and ends on SIGKILL: the end of the tree takes less than 1 s, and the count of the processes that stayed is 0.
+
+## Done
+
+**Done (2026-11-21).** podcrates `v0.80.0` answers PodUtils/podvm#624 (COORD-218) with no change of podvm's code: `end_tree` of `pod-supervise` waits in one `ppoll` over the pidfd of each process of the tree and reaps after each wake. podvm takes the tag (T-2050). The test step `a_pid_namespace_init_and_its_second_process_end_well_below_the_bound` of the test `tree` of `pod-supervise` at the tag is the Prove: the payload is the parent of the init of a new PID namespace (in a user namespace) and of a second process of it. Run on the cloud host at the tag, with one line that prints the time: as root, the end of the tree took 7.3 ms with `residual_processes` 0; as uid 1000, 6.5 ms with 0 (before, the same tree waited `TREE_KILL_MS`, 5 s). Each of the 8 steps of the test passed. CI of podcrates runs the test as a user with no root (its script of the tests in a user namespace).

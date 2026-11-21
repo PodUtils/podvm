@@ -12,11 +12,11 @@
 //! code, and [`runtime`] makes one from podvm's text.
 
 pub use pod_enter::{
-    abi, binfmt, check_exec, check_exec_argv, check_exec_guest, check_workdir, chroot_landed,
-    entered_rung, entered_word, exit_status, fuse, ns_setup_step, ns_tmp_target, plan, run,
-    run_ladder, run_namespace, run_selected, run_userland, spawn, spawn_joined, spawn_ladder,
-    spawn_namespace, spawn_selected, spawn_userland, status, Bounded, Child, Error, Fds, Names,
-    NsMount, Plan, Program, Result, RootDir, VolumeBind, DEVPTS_FLAGS, DEVPTS_OPTIONS,
+    abi, binfmt, block_forwarded, check_exec, check_exec_argv, check_exec_guest, check_workdir,
+    chroot_landed, entered_rung, entered_word, exit_status, fuse, ns_setup_step, ns_tmp_target,
+    plan, run, run_ladder, run_namespace, run_selected, run_userland, spawn, spawn_joined,
+    spawn_ladder, spawn_namespace, spawn_selected, spawn_userland, status, Bounded, Child, Error,
+    Fds, Names, NsMount, Plan, Program, Result, RootDir, VolumeBind, DEVPTS_FLAGS, DEVPTS_OPTIONS,
     ENTERED_RUNG, WAIT_FORWARDED,
 };
 

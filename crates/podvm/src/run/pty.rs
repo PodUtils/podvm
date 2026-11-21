@@ -22,27 +22,17 @@ use std::time::Duration;
 unsafe extern "C" {
     fn ioctl(fd: c_int, req: c_ulong, ...) -> c_int;
     fn kill(pid: c_int, sig: c_int) -> c_int;
-    fn syscall(n: i64, ...) -> i64;
 }
 
 /// Block in this thread each signal that the waiter of a foreground run
-/// forwards (`podvm_enter::WAIT_FORWARDED`): a process-directed signal
-/// then goes to the waiter, not to a relay thread whose default action
-/// ends podvm (OR-03 of the outside pass of 2026-11-18).
+/// forwards (`pod_enter::block_forwarded`, podcrates `v0.80.0`): a
+/// process-directed signal then goes to the waiter, not to a relay thread
+/// whose default action ends podvm (OR-03 of the outside pass of
+/// 2026-11-18). The copy before it took the number of `rt_sigprocmask` of
+/// x86_64 (14) on each machine; on aarch64 it is 135.
 fn block_forwarded() {
-    const SIG_BLOCK: i64 = 0;
-    const RT_SIGPROCMASK: i64 = 14;
-    let mask: u64 = podvm_enter::WAIT_FORWARDED;
-    // SAFETY: rt_sigprocmask reads one 8-byte mask of this thread.
-    unsafe {
-        syscall(
-            RT_SIGPROCMASK,
-            SIG_BLOCK,
-            &mask as *const u64,
-            0usize,
-            8usize,
-        )
-    };
+    let mut old = 0u64;
+    let _ = podvm_enter::block_forwarded(&mut old);
 }
 
 use crate::machine::guest::tty::Raw;
