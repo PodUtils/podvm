@@ -705,10 +705,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2066](deps.md) | P2 | L | none | deps | partial | Take podcrates `v0.81.0`: the warm line with a bounded connect, the static QEMU 11.1.3, the streamed log reads, one atomic replace of a file |
 | [T-2067](gate.md) | P2 | S | none | gate | done | Tests of `podvm` and the machine tier fail with a long `TMPDIR`: a probe in the working directory, socket paths longer than `sun_path` |
 | [T-2068](image.md) | P1 | S | none | image | done | `load` of an image of 14 layers or more is refused: the load holds one lock for each blob |
+| [T-2069](image.md) | P2 | S | none | image | open | The staging files of the store: a name that a pid alone makes unique, and a lock that `put_bytes` drops before its rename |
 
 ## Counts
 
-639 entries: 22 open, 43 partial, 5 blocked, 569 done.
+640 entries: 23 open, 43 partial, 5 blocked, 569 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -719,9 +720,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 19 | 0 | 257 | 279 |
-| P2 | 14 | 19 | 4 | 192 | 229 |
+| P2 | 15 | 19 | 4 | 192 | 230 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 22 | 43 | 5 | 569 | 639 |
+| **All** | 23 | 43 | 5 | 569 | 640 |
 
 ## Work order
 

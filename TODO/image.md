@@ -4692,3 +4692,35 @@ podrunner: `podvm load` (0.2.0-beta.37) of the OCI-layout tar of `ghcr.io/poduti
 **Done (2026-11-23).** `layout.rs`: `load` commits each blob by its computed digest at once (`commit_entry`: the staging file, then `pod_oci::pull::Blobs::commit` of the store, the flush, the sync and the rename under the staging lock; the staging file goes on each failure), and keeps the digest and the name of the entry (`LoadedBlob`); `take_loaded` checks the manifest, the config and each layer against that list, with the texts of T-1836 and of a blob that the manifest does not name. `store/records.rs`: `Store::put_written` checks each blob of the record under the index lock and refuses with the digest; `load`, `import` and `pull` write their record with it. Tests (`cargo test -p podvm-image`, 89 passed): `an_image_with_more_layers_than_the_lock_slots_loads_and_saves` (40 layers, the index first, last, and the blobs in reverse; `save` and a second `load`; no `*.partial` stays; it fails on the code before, at the first order), `a_pull_of_more_blobs_than_the_lock_slots_commits_each_one` (40 blobs through the pull pool), `a_record_is_written_only_where_each_blob_that_it_names_is_there` (the manifest, the config, the layer). Measured on the cloud host with OCI-layout tars of Python's `tarfile` (one file in each layer, a static program in the first): the release before (0.2.0-beta.37) loads 13 layers from a file and exits 125 at 14 (at 13 from stdin), as root and as uid 1000; the release of the fix loads 40 and 85 layers from a file and from stdin, `run --rm` sees each layer ("layers seen: 85"), `save` gives 87 blobs and the tarball loads again, as root and as uid 1000 (`setpriv`, `HOME`, `TMPDIR` and `PODVM_STORE` in a new directory under `/var/tmp`), and no staging file stays. The load of a layer of 512 MiB took 1.41 s and 1.49 s before, 1.34 s and 1.49 s after: the sync adds no time that this host shows.
 
 Known limit: the image of podrunner (85 layers, about 16 GiB) is not measured here.
+
+# T-2069: The staging files of the store: a name that a pid alone makes unique, and a lock that `put_bytes` drops before its rename
+
+**Source:** the work of T-2068 (2026-11-23)
+**Category:** image
+**Milestone:** none
+**Priority:** P2
+**Effort:** S
+**Status:** open
+
+## Problem
+
+The work of T-2068 found two faults of the staging files of the store, outside its scope:
+
+1. `Store::stage` names a staging file `{hint}.{pid}.{seq}.partial`. A pid is not unique across PID namespaces (AGENTS.md 2b): two writers in two PID namespaces can make the same name. The exclusive create refuses the second writer, so the store stays safe, but the refusal calls the clash a defect, which is not true.
+2. `Store::put_bytes` drops the lock of its staging file before the rename. In that window the sweep of the strays can take the lock and remove the file, and the rename then fails.
+
+## Premise
+
+The other staging paths (`pod_oci::pull::Blobs::commit`, `load` of T-2068) rename under the lock.
+
+## Approach
+
+Name a staging file with an id that is unique across PID namespaces (for example `pod_core`'s unique id of a file, if one exists; ask podcrates first, AGENTS.md 2a). Keep the lock of `put_bytes` until the rename ends. Give a clash of names its own true line.
+
+## Decision
+
+-
+
+## Prove
+
+A table test: two writers with the same pid and sequence (a test seam) get two names, or a refusal that names the clash; `put_bytes` holds its lock through the rename (a test that runs the sweep in the window).
