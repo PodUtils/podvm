@@ -3,9 +3,11 @@
 The state on 2026-11-21, 08:30 (UTC), at the end of a session. `main` is
 at the commit that changes this file. `0.2.0-beta.37` is the last release
 (2026-11-21, release run 44846783317 on `c92ac65`, podcrates `v0.79.0`).
-After it, `main` carries podcrates `v0.80.0` (T-2050), the CLI fixes of
-the sixth outside pass (T-2060 to T-2064) and the memory rule of T-2047.
-Two branches of work wait on origin (below, "WIP branches"). A fresh
+After it, `main` carries podcrates `v0.81.0` (T-2066: `wip/podcrates-081`
+is merged in `51c16c5`, after call C29), the CLI fixes of the sixth outside
+pass (T-2060 to T-2064) and the memory rule of T-2047. One branch of work
+waits on origin (below, "WIP branches"). Corrections of 2026-11-23 are
+marked "(2026-11-23)". A fresh
 session with no memory reads this file first, then `AGENTS.md`,
 `TODO/PROGRESS.md` and `docs/decisions.md`. Remove this file when each
 step below is done.
@@ -18,14 +20,16 @@ step below is done.
   own order. The session of podcrates coordinates; COORD issues are the
   one channel (PodUtils/podcrates#227, COORD-136). Each session writes its
   state to the coordinator at its start: podvm's is COORD-184 (#571);
-  amend it.
+  amend it. (2026-11-23) The owner closed PodUtils/podcrates#225
+  (COORD-134) on 2026-11-23 as complete.
 * "Schema ids": an added optional field keeps `run-report.v1`; a changed
   or removed field needs `v2` and a COORD issue `(to all)`.
 
 ## Where things are
 
-* podcrates is taken at `v0.80.0` (`a5e4936` to `4dc5744`, COORD-223,
-  #635; CI green in #637). A podvm session can not write on
+* (2026-11-23) podcrates is taken at `v0.81.0` (T-2066, PodUtils/podcrates#254;
+  merged in `51c16c5`). Before it, `v0.80.0` (`a5e4936` to `4dc5744`,
+  COORD-223, #635; CI green in #637). A podvm session can not write on
   PodUtils/podcrates issues (its GitHub access reaches podvm only): each
   take is a COORD issue of this repository.
 * Each release publishes `ghcr.io/podutils/podvm:TAG` by the job `image`
@@ -34,6 +38,13 @@ step below is done.
 * The issue-sync bot of a push reopens or closes an issue as the record of
   THAT commit says: a sync of an older commit can reopen an issue that a
   newer record closed; the sync of the newer commit closes it again.
+  (2026-11-23) The issue events of 2026-11-18 to 2026-11-20 show the
+  pattern: a session closed #428, #471, #586, #589, #595, #597, #600 and
+  #601 on GitHub, the bot reopened each within minutes (the record still
+  said open), and a later sync or the session closed it again. So close an
+  issue in the record first: its row in `TODO/issues.md` and its line in
+  `TODO/github.txt`, in one commit on `main`, before or with the close on
+  GitHub.
 * The pkgforge mirrors answer for podvm and podcrates reads, with some
   403s; retry. Release assets of another repository: the GitHub MCP tool.
 * The cloud host runs incus (route A): `PODVM_434_MIRROR=1 sh
@@ -86,8 +97,8 @@ step below is done.
   `exec` in a bound `-w`, `-v H:/tmp` of the syscall tier, links across
   volumes: T-1975); OR-07, OR-08 and OR-10 to OR-17 are in "Known gaps"
   of beta.33.
-* C24 (`docs/decisions.md`): the size ceiling of the binary is 9 000 000
-  bytes.
+* C24 (`docs/decisions.md`): the size ceiling of the binary was 9 000 000
+  bytes. (2026-11-23) Call C29 (`4d8da41`) moved it to 9 500 000 bytes.
 * T-1976 (partial): the gate of beta.33 died of SIGSEGV in
   `exec_loads_the_next_program_in_the_root` on CI only. The SIGSYS
   handler runs on the payload's alternate signal stack (8 KiB from Rust's
@@ -275,13 +286,15 @@ step below is done.
 
 * The entries of a branch (2052 to 2055, 2066) are in the `TODO/` files of
   that branch; the index of `main` has them after the merge.
-* `wip/podcrates-081` (`1b98db4`, 5 commits on `ac02435`): the take of
+* (2026-11-23: merged in `51c16c5`, after call C29.) `wip/podcrates-081`
+  (`1b98db4`, 5 commits on `ac02435`): the take of
   podcrates `v0.81.0` (PodUtils/podcrates#254): entry 2066 partial, T-2051 done
   (`pod_guest::warm::line` with the bounded `Monitor::connect`), T-2046
   (`pod_supervise::stream`, the incus log in pieces with no 64 MiB bound),
   the static QEMU 11.1.3, `pod_core::files::replace`. `checks.sh`, 1,111
-  tests and the aarch64 check pass. NOT merged: the binary is 9,005,240
-  bytes, over the ceiling of call C24 (9,000,000). Its 465 run failed clause
+  tests and the aarch64 check pass. The binary was 9,005,240
+  bytes, over the ceiling of call C24 (9,000,000) then; the ceiling is
+  9,500,000 bytes since C29. Its 465 run failed clause
   11 only (fixed on `main` since). Left: the load wait `save::running`
   stays podvm's (the crate needs the emulator's `Child`).
 * `wip/oq-run` (`57463ac`, rebased on `ac02435`): OQ-05 (entry 2052, Ctrl-C of
@@ -295,23 +308,26 @@ step below is done.
   suites with no failure. A COORD ask is in its entry 2054 text: pod-enter's
   PID-namespace init and join relay set a title, an empty environment and
   `PR_SET_DUMPABLE` 0.
-* The two branches together are far over the ceiling. First decide the
-  size: a call C29 that raises the ceiling with its delta (the release
-  profile is already `opt-level = "z"`, LTO, one codegen unit, stripped),
-  or cuts. Then merge one branch at a time, run
+* (2026-11-23) The size call is made: call C29 (`4d8da41`) raises the
+  ceiling to 9 500 000 bytes with its delta (the release profile is already
+  `opt-level = "z"`, LTO, one codegen unit, stripped). `wip/podcrates-081`
+  is merged. Merge `wip/oq-run` next, run
   `cargo test --workspace --no-fail-fast`, and request gate, arm and
-  `kvm.yml` (`init`) for each.
+  `kvm.yml` (`init`) for it.
 
 ## Next steps, in order
 
 1. Start the session (`AGENTS.md`, section 8), with the watcher.
 2. podrunner first: watch #583, #585, #593, #596, #599, #605, #636, #640
    and #644; podrunner#339 waits for #643.
-3. The size call, then `wip/podcrates-081` (close #631 and #633 with its
-   take; write the COORD of the take), then `wip/oq-run` (write the COORD
-   of entry 2054; amend T-2044 with OQ-05 to OQ-13).
+3. (2026-11-23) The size call (C29) and `wip/podcrates-081` are done.
+   Close #631 and #633 with the take (the record first, then GitHub; the
+   COORD of the take lists podvm under "Takes" of PodUtils/podcrates#254).
+   Then `wip/oq-run` (write the COORD of entry 2054; amend T-2044 with
+   OQ-05 to OQ-13).
 4. podcrates: watch #602, #604, #639 and #643; take the tag that has #639
-   and #643, then answer #644 with the version.
+   and #643 (`v0.82.0`, taken in the session of 2026-11-23, T-2066), then
+   answer #644 with the version.
 5. T-2050 remainders: the integration tests as uid 1000; a machine run
    with the store's static QEMU.
 6. T-2048 remainder: a SIGTERM during a save waits for the save (at most
@@ -350,8 +366,12 @@ step below is done.
   host path is not there. Check the rung with `run --verbose` (`mode=`).
 * A probe verb or a test helper in `global_asm!` must carry
   `#[cfg(target_arch = "x86_64")]`: the nightly builds each arch.
-* An issue body that the sync tool rewrote has lost its footer: an amend
-  puts it back before the block `pod-todo:state`.
+* The sync tool writes only the block `pod-todo:state` and keeps each other
+  byte of a body (`with_block` in the script issue-sync.py of podcrates,
+  `v0.81.0` and `v0.82.0`). Where an issue body has no footer, an amend
+  puts it back before the block `pod-todo:state` (the footer rule of
+  `AGENTS.md`, section 3). The source of a body text is the body on GitHub,
+  not the record: the record holds the subject, the state and the entries.
 * A subagent in a worktree under `.claude/worktrees/` cannot run cargo
   of `crates/podvm-interpose` there: cargo finds `/workspace/podvm/Cargo.toml`
   above it ("believes it's in a workspace"). Build the interposer in the

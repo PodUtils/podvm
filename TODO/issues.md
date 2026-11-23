@@ -402,7 +402,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #506 | `notebook --kill-after` panics on a large value instead of refusing it | open | T-1943 |
 | #507 | The image-`USER` warning says podvm runs as uid 0, but on the userland rung it runs as the caller's uid | open | T-1943 |
 | #508 | `--podvm-tier=syscall -u UID` says the identity is faked, but the payload runs as the caller | open | T-1943 |
-| #509 | COORD-179: the answer to PodUtils/podrunner#277: exec --env-file is on main; a -v source with no link is in progress (to podrunner) | open | T-1945 |
+| #509 | COORD-179: the answer to PodUtils/podrunner#277: exec --env-file and --podvm-volume-base are in 0.2.0-beta.32 (to podrunner) | open | T-1945 |
 | #510 | `podvm exec` joins a container's namespaces or shares the host PID table, while its help and `.Exec.Mode` say fresh chroot, filesystem only | open | T-1948 |
 | #511 | Machine-tier records ignore `PODVM_STORE`: `ps` lists them from `$HOME`, while `inspect` and `wait` cannot find them | open | T-1954 |
 | #512 | `-w /tmp/<new dir>` always fails with ENOENT after podvm creates the directory | open | T-1953 |
@@ -538,6 +538,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #642 | [gh action] requested | closed (gate 44862250138 on 721ce66 passed) | the gate of 721ce66, the head that changes three integration tests to the behaviour of T-2060 to T-2062 |
 | #643 | COORD-227: pod-extract refuses a layer whose PAX record SCHILY.acl.access holds a newline (to podcrates) | open | T-2065 |
 | #644 | COORD-228: a PAX value with a newline (SCHILY.acl.access): the fix is in pod-extract of podcrates (to podrunner) | open | T-2065 |
+| #645 | COORD-229: podvm took v0.81.0 and v0.82.0 (to podcrates) | open | T-2066, T-2051, T-2046, T-2065, T-2062 |
 
 ## Messages whose title does not start with COORD-NNN
 

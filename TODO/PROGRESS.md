@@ -11,6 +11,9 @@ start.
 
 The state on 2026-11-21 (`docs/HANDOFF.md` has the detail):
 
+* (2026-11-23) After `v0.2.0-beta.37`, `main` carries podcrates `v0.81.0`
+  (T-2066, `51c16c5`) and the size ceiling of 9 500 000 bytes (call C29,
+  `4d8da41`); `wip/oq-run` is the one branch that is not merged.
 * The newest release is `v0.2.0-beta.37` (2026-11-21, release run
   44846783317 on `c92ac65`): systemd as PID 1 on each route with
   `--podvm-init=image` (T-2002), the saved state of a machine guest
@@ -57,8 +60,11 @@ The state on 2026-11-21 (`docs/HANDOFF.md` has the detail):
   dispatches each workflow. A newer push cancels the gate of an older
   commit. The issue `[gh action] requested` is the fallback only
   (`docs/decisions.md`, 2026-11-13, "Workflow fallback").
-* podvm takes the crates of PodUtils/podcrates at `v0.79.0`
-  (PodUtils/podcrates#245, COORD-149 of podcrates: the signals and the
+* podvm takes the crates of PodUtils/podcrates at `v0.81.0`
+  (PodUtils/podcrates#254, COORD-151 of podcrates: the bounded connect of
+  pod-guest, the streamed log of pod-supervise, `pod_core::files::replace`;
+  before it `v0.80.0`, PodUtils/podcrates#250, COORD-150; before it
+  `v0.79.0`, PodUtils/podcrates#245, COORD-149 of podcrates: the signals and the
   RUNPATH of pod-enter; before it `v0.78.1`,
   PodUtils/podcrates#241, COORD-146 of podcrates, which holds `v0.77.0`
   and `v0.78.0`, PodUtils/podcrates#240; before it `v0.76.0`,
