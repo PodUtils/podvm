@@ -169,3 +169,141 @@ pub(super) fn tmp_is_given(o: &super::Opts) -> bool {
         .chain(o.volumes.iter().map(|v| &v.guest))
         .any(|t| t == "/tmp")
 }
+
+/// TODO/enter.md T-1920: the volumes of a run in podvm's own user namespace
+/// as binds on the namespace rung, less those at or under `/tmp`, which
+/// pod-enter binds after its tmpfs (OQ-01, T-1970).
+/// ⛔ OR-B38-06 of the seventh outside pass (TODO/cli.md T-2072): only after
+/// the completion, `/etc/hostname` and each other write of podvm to the
+/// tree. Before, the binds came first, and `-v DIR:/etc` or `-v DIR:/dev`
+/// got podvm's fixups in the caller's directory (`passwd`, `hosts`, the CA
+/// bundle; a `/dev/zero` of 1 MiB). podvm writes no file of its own through
+/// a volume: the payload sees the directory as the caller left it. Docker
+/// binds its own `hosts`, `hostname` and `resolv.conf` over a volume of
+/// `/etc`; podvm has no mount on each rung, and does not.
+/// The banner takes the line of [`covered`] first.
+pub(super) fn bind(
+    verb: &str,
+    o: &super::Opts,
+    rootfs: &std::path::Path,
+    userland: Option<&crate::lifecycle::Userland>,
+    report: &podvm_complete::Report,
+    banner: &mut String,
+) -> Result<(), i32> {
+    banner.push_str(&covered(report, &o.volumes));
+    if userland.is_some() {
+        return Ok(());
+    }
+    let (_, rest) = split_tmp(&o.volumes);
+    crate::userns::bind_volumes(rootfs, &rest, &o.ro_volumes, o.volume_base.as_deref()).map_err(
+        |e| {
+            eprintln!("podvm {verb}: {e}");
+            podvm_image::error::EXIT_RUNTIME_ERROR
+        },
+    )
+}
+
+/// TODO/cli.md T-2072: one line of the banner for each volume that covers a
+/// file of the completion: the payload sees the directory of the caller
+/// there, not the fixup, and podvm wrote nothing into it. Empty where no
+/// volume covers a fixup.
+pub(super) fn covered(
+    report: &podvm_complete::Report,
+    volumes: &[podvm_enter::userland::Volume],
+) -> String {
+    use podvm_complete::Action;
+    let mut out = String::new();
+    for v in volumes {
+        let g = v.guest.trim_matches('/');
+        let under = |p: &str| g.is_empty() || p == g || p.starts_with(&format!("{g}/"));
+        let paths: Vec<&str> = report
+            .fixups
+            .iter()
+            .filter(|f| matches!(f.action, Action::Created | Action::Rewrote))
+            .map(|f| f.path.as_str())
+            .filter(|p| !p.is_empty() && *p != "-" && under(p))
+            .collect();
+        if paths.is_empty() {
+            continue;
+        }
+        out.push_str(&format!(
+            "podvm: -v {}:{} covers {} of the tree: the payload sees the directory of \
+             the volume there, and podvm writes no file into it (TODO/cli.md T-2072)\n",
+            v.host,
+            v.guest,
+            paths.join(", ")
+        ));
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// T-2072: one rule for each fixup target and each volume: a volume
+    /// names each fixup at or under its guest path, and no other.
+    #[test]
+    fn a_volume_names_each_fixup_that_it_covers() {
+        use podvm_complete::{Action, Fixup};
+        let fixup = |path: &str, action| Fixup {
+            entry: "-",
+            id: "t",
+            path: path.to_string(),
+            action,
+            detail: String::new(),
+            degraded: false,
+        };
+        let report = podvm_complete::Report {
+            fixups: vec![
+                fixup("etc/passwd", Action::Created),
+                fixup("etc/hosts", Action::Rewrote),
+                fixup("etc/ssl/certs/ca-certificates.crt", Action::Created),
+                fixup("dev/zero", Action::Created),
+                fixup("dev/pts", Action::Created),
+                fixup("etc/group", Action::Unchanged),
+                fixup("etcetera", Action::Created),
+                fixup("", Action::Created),
+            ],
+            ..Default::default()
+        };
+        let vol = |g: &str| podvm_enter::userland::Volume {
+            guest: g.to_string(),
+            host: "/h".to_string(),
+        };
+        let cases: &[(&str, &[&str])] = &[
+            (
+                "/etc",
+                &[
+                    "etc/passwd",
+                    "etc/hosts",
+                    "etc/ssl/certs/ca-certificates.crt",
+                ],
+            ),
+            (
+                "/etc/",
+                &[
+                    "etc/passwd",
+                    "etc/hosts",
+                    "etc/ssl/certs/ca-certificates.crt",
+                ],
+            ),
+            ("/etc/ssl", &["etc/ssl/certs/ca-certificates.crt"]),
+            ("/dev", &["dev/zero", "dev/pts"]),
+            ("/data", &[]),
+        ];
+        for (guest, want) in cases {
+            let line = covered(&report, &[vol(guest)]);
+            if want.is_empty() {
+                assert_eq!(line, "", "{guest}");
+                continue;
+            }
+            assert!(line.contains(&want.join(", ")), "{guest}: {line}");
+            assert!(
+                !line.contains("etc/group") && !line.contains("etcetera"),
+                "{line}"
+            );
+            assert_eq!(line.lines().count(), 1, "{line}");
+        }
+    }
+}

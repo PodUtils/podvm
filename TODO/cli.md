@@ -6763,3 +6763,123 @@ As root and as uid 1000 with `public.ecr.aws/docker/library/alpine:3.20`: `run -
 **Done (2026-11-21).** `crates/podvm-probe/src/isolation.rs` (new) holds the table and `of_entry` (the facts: podvm's user namespace, uid 0 of the host, `run -d` or `create`, `--hostname`, a `/proc` directory in the image); `podvm_probe::report::entry_banner_of` takes the `namespaces:` and `pids:` cells, the "does NOT provide" line, the `/proc` sentence, and a line where the `/proc` of the payload lists the processes of the host, from it; `run/acquire.rs` gives the facts of the run, sets `entry_mounts_proc` of the completion, and keeps the words in the record; `lifecycle/copy_tree.rs` gives `.Exec.Mode` and `.Exec.Shares`; `exec` into a running container of the rung says that it joins (`exec::joined_line`); `podvm man` has an ISOLATION section from the table; the parity row of `exec` no longer says "never an entry into a running container's namespaces". Measured on the cloud host with `mirror.gcr.io/library/alpine:3.20`. Before (`main` at `3fa36a6`), as uid 1000 and as root: `namespaces: mount-only`, `pids: host-shared`, "does NOT provide: user, pid or network isolation, or a /proc filesystem", "no /proc is mounted", the mtab warning of `--strict`, and `fresh-chroot | filesystem`. After, as uid 1000: `namespaces: user+pid+uts+mount`, `pids: private`, "does NOT provide: network isolation", no `/proc` sentence, no warning of `--strict`, and `join | filesystem+user+pid+mount` for a `run -d` container; as root: `namespaces: mount-only`, `pids: host-shared`, "does NOT provide: network isolation, or user isolation, or pid isolation", a line that the `/proc` of the payload lists the processes of the host, no mtab warning, and `join | filesystem+pid+mount`. The unit tests `each_statement_of_an_entry_reads_its_facts` (eight shapes: each cell, the words, the record, `.Exec.*` and the line), `the_manual_names_each_row_and_each_shape`, `an_unknown_word_of_a_record_is_left_out` and `the_namespace_banner_reads_what_the_entry_opened` hold the rule. Not changed: the reason of the built-in profile of Chromium (`profile/builtin.rs`) still says that the namespace rung mounts no `/proc`; the profile keeps the loader family for its other reasons.
 
 The cuts of the size commit of `wip/oq-run` in the table (reviewed at the merge, 2026-11-23). Kept: the banner has no line "this run opens: ..." that repeats the `namespaces:` cell in long words; its one added line says that the `/proc` of the payload lists the processes of the host where the run has no PID namespace (`Opened::line`). Reverted: the rows as a `match` and the shapes as a function (the cut was for the relocations only; a static table `ROWS` and `SHAPES` is the table that the manual reads), the words of the record as one string (`Hardening::opened` stays a list of words, as JSON gives a list), and the shorter texts of the manual, of `exec`, and of the parity rows of `exec` and `run -t`.
+
+# T-2070: The faults of the seventh outside pass (2026-11-23, the gate of the next beta)
+
+**Source:** the seventh outside pass (2026-11-23, the gate of the next beta): an agent with the release binary of `4887fb72` and `podvm man` only, as uid 1000 through `setpriv`, with a store root that root owns with mode 777, for about one hour
+**Category:** cli
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+The pass found 18 faults, OR-B38-01 to OR-B38-18. The tester gave OR-B38-01 P1, OR-B38-02 to OR-B38-10 P2 and OR-B38-11 to OR-B38-18 P3; the lead made OR-B38-06 P1 and OR-B38-09 P3. The rule of the gate: no P0 or P1 finding stays open.
+
+## Premise
+
+Each finding was reproduced at least twice by the pass, on the binary of `4887fb72` (`--version` 0.2.0-beta.37).
+
+## Approach
+
+Fix the two P1 findings and the P2 findings that the lead marked "fix"; give OR-B38-05 to T-2069; keep each other finding in the table below, as a line of "Known gaps" of the release.
+
+## Decision
+
+-
+
+## Prove
+
+`sh scripts/dev/checks.sh` passes with a test of the class of each fixed finding; the reproducer of each fixed finding, run again on the new release binary as uid 1000, gives the docker result; each other finding is a line in "Known gaps" of the release.
+
+## Done
+
+**Partial (2026-11-23).** The state of each finding:
+
+| Finding | Sev | Triage | Entry | State |
+| --- | --- | --- | --- | --- |
+| OR-B38-01, `exec -it CTR sh` takes no input after the first chunk | P1 | fix | [T-2071](cli.md) | done |
+| OR-B38-02, a foreground `run` reports the owner of the store for a name collision or a corrupt `containers.json` | P2 | fix | - | open |
+| OR-B38-03, each `exec` rewrites `/etc/hosts` and drops `--add-host`; `run -d --hostname hx` maps 127.0.0.1 to the name of the container | P2 | fix | - | open |
+| OR-B38-04, `run -d --rm` keeps the container after its end | P2 | fix | - | open |
+| OR-B38-05, a killed `pull` or `load` leaves a `.partial` in `store/staging` that no verb removes or counts | P2 | T-2069 | [T-2069](image.md) | open |
+| OR-B38-06, `-v DIR:/etc` and `-v DIR:/dev` write podvm's fixups into DIR | P1 (lead) | fix | [T-2072](cli.md) | done |
+| OR-B38-07, `cp -r` onto an existing copy of a tree with symbolic links fails half way ("is a symlink; writing through one is refused") | P2 | known gap | - | open |
+| OR-B38-08, `login` prints "Login Succeeded" for a registry that it did not contact | P2 | known gap | - | open |
+| OR-B38-09, `run -h hx IMAGE CMD` prints the usage (docker's `-h` is `--hostname`) | P3 | by design: the manual says that each verb takes `-h` as help | - | open |
+| OR-B38-10, `probe` says mount only, no user or PID isolation and no `/proc`, where `run` enters user+pid+uts+mount with `/proc` | P2 | known gap | - | open |
+| OR-B38-11, `--env-file`: a line with no `=` refuses the run (docker passes the host value); a UTF-8 BOM on line 1 stays | P3 | known gap | - | open |
+| OR-B38-12, `run -d IMAGE /nonexistent` exits 125, a foreground run 127 (docker: 127) | P3 | known gap | - | open |
+| OR-B38-13, `run` with no `-i` passes stdin; `run -it` with a stdin that is no terminal is accepted with no line (docker refuses) | P3 | known gap | - | open |
+| OR-B38-14, `cp` prints paths of the store; `cp FILE CTR:/missing/dir/file` makes the parents (docker: an error) | P3 | known gap | - | open |
+| OR-B38-15, gaps of docker's `--format`, `--filter` and flags, each refused with a true line | P3 | documented | - | open |
+| OR-B38-16, `--tmpfs P:mode=1777` drops the mode with no line | P3 | known gap | - | open |
+| OR-B38-17, `run -it sh` and `exec -it CTR sh`: "can't access tty; job control turned off" (the pty is no controlling terminal) | P3 | known gap | - | open |
+| OR-B38-18, texts: 14 spaces in the note of an exec into a created container; `/proc/mounts` of `--read-only`; `--cap-drop ALL`; `pull http://x/y` names registry-1.docker.io; `system df --verbose`; `podvm help run`; `system df` after a refused extraction; the text of a refused hard link; `ps -a` on a store with no write; `rmi -f`; `pull -a` and schema 1; `HOSTNAME` and `hostname` with no `--hostname` | P3 | known gap | - | open |
+
+# T-2071: `exec -it CTR sh`: a job-control shell takes the caller's terminal, and the relay gets no more input
+
+**Source:** the seventh outside pass (T-2070), OR-B38-01 (P1)
+**Category:** cli
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+As uid 1000, `exec -it CTR sh` into a `run -d` container shows the prompt and then takes no input: `echo one` is not echoed and does not run. `exec -it CTR sh -i` is the same; `exec -it CTR sh -c 'set -m; cat'` gives the first line and no second; `exec -it CTR sh +m`, `exec -it CTR cat` and `run -it IMAGE sh` work.
+
+## Premise
+
+-
+
+## Approach
+
+Find what stops the relay of the pty when a job-control shell starts, and give the payload no way to the caller's terminal.
+
+## Decision
+
+-
+
+## Prove
+
+A test that types three lines into a job-control shell (`sh`, `sh -i`, `sh -c 'set -m; cat'`) through the pty of `exec -it` and `run -it`, from a terminal of its own, and gets each answer in order, as root and as uid 1000; the reproducer of the pass on the new release binary.
+
+## Done
+
+**Done (2026-11-23).** The cause: the payload of `exec` was a member of podvm's session, whose controlling terminal is the caller's terminal, and a `run -d` of a user namespace binds the host's `/dev/tty` in its tree (the device binds of T-1909). A job-control shell opened `/dev/tty`, which is the controlling terminal of its session, so the caller's terminal, and made its own process group the foreground group of that terminal (measured on the binary of the pass: the shell's `tpgid` is its own pgrp, its session is podvm's, its descriptor 10 is `/dev/tty`). podvm's relay thread, then in a background group, got no more input from the caller's terminal. The fault is not a regression of T-2052: the release binary of `v0.2.0-beta.37` has it too (measured). The fix (`crates/podvm/src/run/pty.rs`, `leave_the_session`): where podvm relays stdin to the pty (`-i` with `-t`), the process that spawns the payload leaves the caller's session (`setsid`) before the spawn, so the payload has no controlling terminal: `/dev/tty` gives `ENXIO` and the shell turns job control off, as on each other rung ("can't access tty; job control turned off", OR-B38-17). The caller's terminal is raw then and sends no signal, so the move changes no signal; with `-t` and no `-i` the session stays, as the interrupt key of the cooked terminal must reach podvm's group (OR-03). `setsid` fails where podvm leads its process group (a foreground run of root from a shell); no rung of such a run binds `/dev/tty`. The integration test `a_job_control_shell_on_the_pty_of_exec_it_and_run_it_gets_each_line` (`crates/podvm/tests/tty_job_control.rs`, an image of the host's `dash`, `cat` and `sleep`) is the caller's terminal: it opens a pty, makes it the controlling terminal of podvm's session, and types three lines into `exec -it CTR sh -i`, `exec -it CTR sh`, `exec -it CTR sh -c 'set -m; cat'`, `run --rm -it IMAGE sh -i` and `run --rm -it IMAGE sh -c 'set -m; cat'`; each answer must come in order, and the exit code of the end. It passes as root and as uid 1000; as uid 1000 with the `setsid` taken out it fails on each `exec` case after the first line. As uid 1000 with `alpine:3.20`, `exec -it ex1 sh` through a pty: the binary of the pass and of `v0.2.0-beta.37` show the prompt and take no input; the new binary runs `echo one`, `echo two`, `echo three` and `exit 0`, and a Ctrl-C ends `sleep 30` and the shell goes on.
+
+# T-2072: `-v DIR:/etc` and `-v DIR:/dev` write podvm's fixups into DIR
+
+**Source:** the seventh outside pass (T-2070), OR-B38-06 (P2; P1 by the lead)
+**Category:** cli
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+As uid 1000, `run --rm -v $PWD/vol:/etc alpine true` leaves `group`, `hosts`, `mtab`, `passwd`, `resolv.conf` and `ssl/certs/ca-certificates.crt` in `vol`, made by podvm (216 KiB). `-v DIR:/dev` leaves `null`, `zero`, `random` and `urandom` as regular files (1 MiB each for three), the links `stdin`, `stdout`, `stderr` and `fd`, and `pts/` and `shm/`. Docker writes no such file into a bound host directory.
+
+## Premise
+
+-
+
+## Approach
+
+podvm never writes a file of its own through a volume into a host directory. Find each rung where a fixup goes through a volume, and keep the fixups in the tree there.
+
+## Decision
+
+The payload sees the directory of the volume as the caller left it: a volume over `/etc` hides podvm's `hosts`, `hostname` and `resolv.conf`, and a volume over `/dev` hides the device nodes. Docker binds its own `hosts`, `hostname` and `resolv.conf` over a volume of `/etc`; podvm has no mount on each rung (the userland families, the syscall tier), so it writes none of them and names the difference. podvm does not refuse `-v DIR:/dev`: docker takes it. `--verbose` names each fixup that a volume covers in one line.
+
+## Prove
+
+A table-driven test over the fixup targets and a volume over `/etc`, `/etc/ssl`, `/etc/ssl/certs`, `/dev` and `/dev/pts`: the host directory gets no file that podvm wrote, as root and as uid 1000; the reproducer of the pass on the new release binary.
+
+## Done
+
+**Done (2026-11-23).** The cause: on the namespace rung of a foreground run in podvm's own user namespace (a caller with no root), `run::acquire::hostname_env` bound the volumes into the tree (`userns::bind_volumes`) before `complete::prepare` and before `/etc/hostname`, so each write of the completion went through the bind into the host directory. A detached run (pod-enter binds at the launch), an `exec` (measured: no file), the userland families (a path table, no bind) and the rungs of root (pod-enter binds at the entry) wrote into the tree. The fix: the bind is `run::binds::bind`, called after the completion (`crates/podvm/src/run/prepare.rs`); the volumes at or under `/tmp` stay pod-enter's (OQ-01). A working directory in a volume is the volume's, as before (`make_workdir`). `run::binds::covered` gives one line of the banner for each volume that covers a fixup ("podvm: -v DIR:/etc covers etc/resolv.conf, etc/hosts ... of the tree: the payload sees the directory of the volume there, and podvm writes no file into it"); the unit test `a_volume_names_each_fixup_that_it_covers` holds the rule for each target and volume. The integration test `a_volume_over_a_fixup_target_gets_no_file_of_podvm` (`crates/podvm/tests/volume_fixups.rs`) seeds a directory with one file for each case (`/etc`, `/etc` with `--hostname` and `--add-host`, `/etc/ssl`, `/etc/ssl/certs`, `/dev`, `/dev/pts`) and checks that it holds that file alone after the run. It passes as root and as uid 1000; as uid 1000 with the bind before the completion it fails on five of the six cases. As uid 1000 with `alpine:3.20`: on the binary of the pass, `-v DIR:/etc` left six files and `-v DIR:/dev` eleven entries in DIR; on the new binary DIR holds its own file alone, and the payload runs (exit 0 for `/dev` and `/etc/ssl`; with `/etc`, `cat /etc/hostname` finds no file).

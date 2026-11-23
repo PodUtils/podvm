@@ -52,6 +52,12 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   image), podvm prints why and refuses the volume on the chroot rung; it
   refuses one on the memfd family too. A working directory or a first program in a volume resolves
   through the same table, to the file of the volume.
+- podvm writes no file of its own into a volume (T-2072). A volume over a
+  path that podvm completes (`/etc`, `/etc/ssl`, `/dev`) hides the
+  fixups there: with `-v DIR:/etc` the payload gets no `hosts`,
+  `hostname` or `resolv.conf` of podvm, where docker binds its own over
+  the volume, and with `-v DIR:/dev` no device node. `--verbose` names
+  each fixup that a volume covers.
 - `:ro` and `--read-only` are a read-only layer of the same interposer
   (T-1655): a write through libc under a read-only guest path fails with
   `EROFS`, and `/dev` stays writable. The layer reads a host path of a

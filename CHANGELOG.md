@@ -40,6 +40,8 @@ They describe their recorded revision, not the current build.
 - On the machine tier, podvm puts the sockets of a run under `/tmp` where their path under `TMPDIR` passes the 108 bytes of `sun_path`; before, a `TMPDIR` of 73 bytes or more stopped the run with "AF_UNIX path too long" (T-2067).
 - `load` of an image of 14 layers or more (13 from stdin) no longer exits 125 with "this process already holds 16 locks": the load commits each blob as soon as its bytes are written and holds one staging lock at a time, as `pull` does. `pull`, `load` and `import` write the record only where each blob that it names is in the store; where an `rmi` or a prune of another image removed a shared blob during the command, the command names the blob and writes no record (T-2068, PodUtils/podrunner#344).
 - Tests: the test of the path of `--report` and each stand-in with a unix socket use a new directory of their own, and a socket path that fits `sun_path`, so they pass as uid 1000 with a long `TMPDIR` (T-2067).
+- `exec -it CTR sh` (and `sh -i`, `set -m`) into a `run -d` container of a caller with no root takes each line typed: the payload no longer shares podvm's session, so a job-control shell cannot take the caller's terminal from the relay of the pty (T-2071, OR-B38-01 of the seventh outside pass; also in `v0.2.0-beta.37`).
+- A foreground run of a caller with no root writes no fixup of podvm (`passwd`, `hosts`, `resolv.conf`, the CA bundle, the device stand-ins) through a volume into the caller's directory: `-v DIR:/etc` and `-v DIR:/dev` leave DIR as it was, and `--verbose` names each fixup that a volume covers (T-2072, OR-B38-06).
 
 ## 0.2.0-beta.37 (2026-11-21)
 

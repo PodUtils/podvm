@@ -148,6 +148,14 @@ pub fn refuse_unserved(
     refuse(verb, volumes, &why)
 }
 
+/// TODO/cli.md T-1412, T-1772, T-2001: the working directory, as docker
+/// makes a missing one ([`make_workdir`]; `check_workdir` refuses a bad one
+/// at 125), and the mount point of each volume ([`make_mount_points`]).
+pub fn make_paths(rootfs: &str, workdir: &str, volumes: &[Volume]) {
+    make_workdir(rootfs, workdir, volumes);
+    make_mount_points(rootfs, volumes);
+}
+
 /// TODO/cli.md T-1772: make the working directory in the rootfs where it
 /// is absent, as docker does, before `check_workdir`. Each component is
 /// made in turn and none is followed: a link or a file of the image on the

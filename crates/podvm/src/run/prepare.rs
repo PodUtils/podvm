@@ -347,9 +347,7 @@ pub(crate) fn prepare(
     let (rf, ul) = (rootfs.as_ref(), userland.as_ref()); // T-1655, T-1908, T-1926
     ro_env(verb, &mut o, rf, ul, &findings, &mut env)?;
     super::user_ns::push(verb, &o, &cfg.config.user, &rootfs, ul, &findings, &mut env)?;
-    // T-1412, T-1772: make a missing workdir as docker; refuse a bad one at 125.
-    crate::lifecycle::volume::make_workdir(&rootfs, &working_dir, &o.volumes);
-    crate::lifecycle::volume::make_mount_points(&rootfs, &o.volumes); // T-2001
+    crate::lifecycle::volume::make_paths(&rootfs, &working_dir, &o.volumes); // T-1772, T-2001
     if let Err(e) = podvm_enter::check_workdir(&maps, &working_dir, &image) {
         eprintln!("podvm {verb}: {e}");
         return Err(e.exit_code());
@@ -378,6 +376,7 @@ pub(crate) fn prepare(
     ask.container_name = o.name.clone();
     ask.entry_mounts_proc = opened.has(podvm_probe::isolation::Part::Proc);
     let mut completion = crate::complete::prepare(verb, &rootfs, &ask, &mut banner)?;
+    super::binds::bind(verb, &o, rf, ul, &completion, &mut banner)?; // T-2072
     if !cfg.config.user.is_empty() && !super::user_ns::applied(&env) {
         // ⚠ Read and REPORTED, not applied (T-1927 applies it on the namespace rung). podvm cannot setuid to an id
         // this machine does not map, which is the wall the project is about.

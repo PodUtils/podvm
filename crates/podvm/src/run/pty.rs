@@ -127,6 +127,9 @@ impl Pty {
         // no input, and the terminal stays cooked, so its interrupt key is a
         // SIGINT of podvm, which the waiter forwards to the payload.
         let raw = stdin.then(Raw::new);
+        if stdin {
+            leave_the_session();
+        }
         let (done, wait) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
             block_forwarded();
@@ -174,6 +177,31 @@ impl Pty {
             raw,
         })
     }
+}
+
+/// OR-B38-01 of the seventh outside pass (TODO/cli.md T-2071): where podvm
+/// relays its stdin to the pty, the payload must not get the caller's
+/// terminal. Before, the payload was a member of podvm's session, whose
+/// controlling terminal is the caller's. In a joined run of a user
+/// namespace, `/dev/tty` of the container is the host's, so a job-control
+/// shell (`sh`, `sh -i`, `set -m`) opened it, made its own process group
+/// the foreground group of the caller's terminal, and the relay, now in a
+/// background group, got no more input after the first chunk. This
+/// process leaves the session before the spawn (`setsid`), so its
+/// payload has no controlling terminal: `/dev/tty` is `ENXIO` and the
+/// shell turns job control off, as on each other rung.
+/// ⚠ Only with `-i`: the caller's terminal is then raw and sends no
+/// signal. With `-t` and no `-i` it stays cooked, and its interrupt key
+/// must reach the process group of podvm and the payload (OR-03).
+/// ⚠ `setsid` fails (`EPERM`) where this process leads its process group
+/// (a foreground run of root from a shell); the session then stays, and
+/// no rung of such a run binds `/dev/tty`.
+fn leave_the_session() {
+    unsafe extern "C" {
+        fn setsid() -> c_int;
+    }
+    // SAFETY: setsid takes no argument; a refusal changes nothing.
+    let _ = unsafe { setsid() };
 }
 
 /// The payload of the run, for the interrupt key (0: none yet).

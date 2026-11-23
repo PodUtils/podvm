@@ -215,16 +215,8 @@ pub(super) fn hostname_env(
                                           // OQ-01 of the outside pass (T-1970): pod-enter mounts a tmpfs on
                                           // `/tmp` after podvm's binds, so a volume at or under `/tmp` goes to
                                           // pod-enter's own binds, which come after it.
-    let (at_tmp, rest) = super::binds::split_tmp(&o.volumes);
-    if userland.is_none() {
-        // TODO/enter.md T-1920: the volumes as binds on the namespace rung.
-        if let Err(e) =
-            crate::userns::bind_volumes(rootfs, &rest, &o.ro_volumes, o.volume_base.as_deref())
-        {
-            eprintln!("podvm {verb}: {e}");
-            return Err(podvm_image::error::EXIT_RUNTIME_ERROR);
-        }
-    }
+                                          // The other volumes are bound after the completion (`binds::bind`).
+    let (at_tmp, _) = super::binds::split_tmp(&o.volumes);
     super::binds::push_env(
         &o.volumes,
         &o.ro_volumes,

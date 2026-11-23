@@ -706,10 +706,13 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2067](gate.md) | P2 | S | none | gate | done | Tests of `podvm` and the machine tier fail with a long `TMPDIR`: a probe in the working directory, socket paths longer than `sun_path` |
 | [T-2068](image.md) | P1 | S | none | image | done | `load` of an image of 14 layers or more is refused: the load holds one lock for each blob |
 | [T-2069](image.md) | P2 | S | none | image | open | The staging files of the store: a name that a pid alone makes unique, and a lock that `put_bytes` drops before its rename |
+| [T-2070](cli.md) | P1 | M | none | cli | partial | The faults of the seventh outside pass (2026-11-23, the gate of the next beta) |
+| [T-2071](cli.md) | P1 | S | none | cli | done | `exec -it CTR sh`: a job-control shell takes the caller's terminal, and the relay gets no more input |
+| [T-2072](cli.md) | P1 | S | none | cli | done | `-v DIR:/etc` and `-v DIR:/dev` write podvm's fixups into DIR |
 
 ## Counts
 
-640 entries: 23 open, 43 partial, 5 blocked, 569 done.
+643 entries: 23 open, 44 partial, 5 blocked, 571 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -719,10 +722,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 19 | 0 | 257 | 279 |
+| P1 | 3 | 20 | 0 | 259 | 282 |
 | P2 | 15 | 19 | 4 | 192 | 230 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 23 | 43 | 5 | 569 | 640 |
+| **All** | 23 | 44 | 5 | 571 | 643 |
 
 ## Work order
 
