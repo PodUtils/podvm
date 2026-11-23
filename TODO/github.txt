@@ -533,7 +533,7 @@
 641 issue closed
 642 issue closed
 643 issue open
-644 issue open
+644 issue closed
 645 issue open
 646 issue open
 647 issue open
