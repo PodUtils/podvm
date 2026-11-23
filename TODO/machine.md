@@ -6089,7 +6089,7 @@ Unit tests: one table over the answer of incusd for the file (values, zero value
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -6103,19 +6103,31 @@ job, so a lost exit code is a wrong result of a job.
 
 ## Premise
 
-The cause is not measured. Candidates: the OOM killer of the cgroup of the
-instance takes PID 1 (`guest-hold`) or the writer, not only the command;
-the write of the files needs memory that the full cgroup does not give;
-incusd stops the instance before PID 1 writes.
+Measured on the cloud host (cgroup v1, the incusd of route A, the release
+binary of `8e72b4c4`): a loop of the payload of clause 26 (`run -d --memory
+32m` of `head -c 200000000 /dev/zero | tail`) lost the exit code and the
+use in 5 of 20 and 7 of 24 runs (12 of 44). The kernel log of each lost
+run that it holds in full shows two OOM events of the cgroup of the
+instance some 5 ms apart: the first kills `tail` (8063 pages); the second
+comes (`head` writes to its pipe, `__GFP_ACCOUNT`, or `tail` exits) before
+the memory of `tail` is free, and the OOM killer takes `podvm`, PID 1
+(`guest-hold --run`, some 1100 pages, `oom_score_adj` 0, the largest task
+that stays above `sh` and `head` with some 220 each). Then the instance
+stops with no file. incusd gives the same events for a lost run and a good
+one ("Instance initiated stop", then "Shut down instance"); its log and the
+console log of the instance are empty. In an instance of this incusd,
+`echo -1000 >/proc/1/oom_score_adj` gives EACCES (no `CAP_SYS_RESOURCE` of
+the host), and a raise to 1000 and a return to 0 are allowed.
 
 ## Approach
 
-Measure first: the kernel log of each lost run (`dmesg`, the OOM lines and
-the name of the killed process), the exit of PID 1, and the events of
-incusd. Then, by the cause: make PID 1 immune to the OOM killer of the
-instance (`oom_score_adj` -1000 before the command starts, which a process
-of root in the instance can set), keep the pages of the writer before the
-command starts, or reserve the memory of the write.
+PID 1, before the command starts, writes -1000 to its own
+`oom_score_adj`; the command gets back the value that PID 1 had, in a
+`pre_exec` that allocates nothing, and does not start where that write
+fails (with -1000 no process of the command is killable). Where the kernel
+refuses -1000, PID 1 keeps its value and the command gets 1000, so that
+each process of the command has a score above each score of PID 1, and the
+init writes the reason on the console of the instance.
 
 ## Decision
 
@@ -6126,3 +6138,7 @@ command starts, or reserve the memory of the write.
 Experiment 434 clause 26 with `--memory`: 24 runs on the cloud host, each
 gives its exit code and its use; the clause keeps no retry for a missing
 file.
+
+## Done
+
+**Done (2026-11-23).** `incus::oom` (new): `Guard::take` writes -1000 to the `oom_score_adj` of PID 1 (`guest-hold --run`) before the command starts and reads it back; the command gets the value that PID 1 had (`Guard::Immune`), and does not start where its write fails (`set_in_child` in the `pre_exec`, no allocation). Where the kernel refuses -1000 (route A: EACCES), PID 1 keeps its value, the command gets 1000 (`Guard::Last`), and the init writes the reason on the console of the instance. The T-2076 rules stay: the command cannot write the files, as no process of it lives when the init writes. No crate of podcrates and no sibling has a writer of `oom_score_adj`. Unit tests `pid1_takes_the_lowest_value_and_the_command_one_that_the_killer_takes_first` (one table: values, -1000 already, not a value, out of range, no directory, a directory, a write that does not hold) and `the_command_starts_with_its_value_or_not_at_all` (`crates/podvm/src/incus/oom_tests.rs`). Proof on the cloud host (route A, cgroup v1): the loop of the clause-26 payload, 24 runs, gave `Stopped`, an exit code 137 and the use in each (0 of 24 lost; before, 12 of 44): `OomKills` 1 in 18 runs and 2 in 6 runs, where the second event took `sh` or `head` of the command, not PID 1. A command that fills a tmpfs over the limit and exits with 3 kept its exit file and its usage file in 4 of 4 runs (exit 3 once, 137 three times when the killer took `sh`). Clause 26 keeps no retry: one run over `--memory 32m` gives `0.266 33554432 2 137`. The full experiment (`PODVM_434_MIRROR=1`) passed on the second run, "THE INCUS TIER RUNS". The first run disagreed only in clause 23, the metrics of incusd as T-2076 records: `run --rm` uses `incus exec` and `guest-hold` with no `--run`, which this change does not touch. Limits, in `docs/incus.md`: with 1000 the command reads 1000 and a host-wide OOM takes it first; a command can lower its own value to 0, and a process that `exec` starts (also the command of a foreground run) has the value of incusd, so with such processes the OOM killer can still take PID 1. Not measured: an incusd that gives -1000 (an incusd of root).

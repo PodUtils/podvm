@@ -13,6 +13,12 @@ They describe their recorded revision, not the current build.
   after the command and each other process of the instance ended; before,
   each was a dash once the instance stopped. `inspect --verbose` says why a
   value is a dash (T-2076, PodUtils/podrunner#345).
+- On the incus tier, the OOM killer of an instance no longer takes its
+  init when a command passes `--memory`: the init sets its own
+  `oom_score_adj` to -1000 (or, where the kernel refuses it, gives the
+  command 1000) before the command starts. Before, in 12 of 44 runs, the
+  instance stopped with no exit code and no usage for `inspect` (T-2077,
+  PodUtils/podrunner#345).
 
 ## 0.2.0-beta.38 (2026-11-23)
 

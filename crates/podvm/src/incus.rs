@@ -7,12 +7,15 @@ pub(crate) mod image;
 pub(crate) mod inspect;
 pub(crate) mod logs; // TODO/cli.md T-2046
 pub(crate) mod net;
+pub(crate) mod oom; // TODO/machine.md T-2077
 pub(crate) mod run;
 pub(crate) mod systemd;
 pub(crate) mod usage; // TODO/machine.md T-2076
 pub(crate) mod verbs;
 mod xattrs; // TODO/machine.md T-1999
 
+#[cfg(test)]
+mod oom_tests; // TODO/machine.md T-2077
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
@@ -194,13 +197,27 @@ pub fn hold(args: &[String]) -> i32 {
     // and the exit and the usage of a run before go.
     let pid1 = std::process::id() == 1;
     let mut end_of = None;
+    let mut guard = None;
     if args.iter().any(|a| a == "--run") {
         if pid1 {
             let _ = std::fs::remove_file(EXIT);
             let _ = std::fs::remove_file(usage::USAGE);
             end_of = Some((usage::Anchor::take(), usage::Meter::open()));
+            // TODO/machine.md T-2077: the OOM killer of the instance takes
+            // each process of the command before PID 1, which writes the
+            // files of the end.
+            let (g, why) = oom::Guard::take(std::path::Path::new(oom::SELF));
+            if let Some(why) = why {
+                // The console of the instance, not the log of the command.
+                eprintln!(
+                    "podvm guest-hold: {why}; the command gets oom_score_adj {} \
+                     (TODO/machine.md T-2077)",
+                    g.child()
+                );
+            }
+            guard = Some(g);
         }
-        match start_cmd() {
+        match start_cmd(guard) {
             Ok(pid) => CHILD.store(pid, std::sync::atomic::Ordering::Relaxed),
             Err(e) => {
                 let _ = std::fs::write(LOG, format!("podvm guest-hold: {e}\n"));
@@ -283,8 +300,9 @@ fn finish(code: i32, anchor: Option<&usage::Anchor>, meter: &mut usage::Meter) {
     }
 }
 
-/// Start the command of [`CMD`]; its pid.
-fn start_cmd() -> Result<i32, String> {
+/// Start the command of [`CMD`]; its pid. With `guard`, the command gets
+/// the `oom_score_adj` of [`oom::Guard::child`] before its `exec`.
+fn start_cmd(guard: Option<oom::Guard>) -> Result<i32, String> {
     let text = std::fs::read(CMD).map_err(|e| format!("{CMD}: {e}"))?;
     let cmd = Cmd::parse(&text).map_err(|e| format!("{CMD}: {e}"))?;
     let (prog, rest) = cmd.argv.split_first().ok_or("the command is empty")?;
@@ -301,7 +319,17 @@ fn start_cmd() -> Result<i32, String> {
         Ok(f) => std::process::Stdio::from(f),
         Err(_) => std::process::Stdio::null(),
     };
-    let child = std::process::Command::new(prog)
+    let mut command = std::process::Command::new(prog);
+    if let Some(g) = guard {
+        let (text, must) = (g.child_text(), g.must_set());
+        // SAFETY: the closure makes three system calls and allocates
+        // nothing (`oom::set_in_child`).
+        unsafe {
+            use std::os::unix::process::CommandExt;
+            command.pre_exec(move || oom::set_in_child(&text, must));
+        }
+    }
+    let child = command
         .args(rest)
         .env_clear()
         .envs(cmd.env.iter().filter_map(|e| e.split_once('=')))
@@ -310,7 +338,13 @@ fn start_cmd() -> Result<i32, String> {
         .stdout(log)
         .stderr(err)
         .spawn()
-        .map_err(|e| format!("{prog}: {e}"))?;
+        .map_err(|e| match guard {
+            Some(g) if g.must_set() => format!(
+                "{prog}: {e} (before its exec the command sets its oom_score_adj to {})",
+                g.child()
+            ),
+            _ => format!("{prog}: {e}"),
+        })?;
     let _ = std::fs::remove_file(STDIN);
     Ok(child.id() as i32)
 }

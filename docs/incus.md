@@ -156,10 +156,24 @@ of incus says STOPPED about 0.5 s before the instance does, and the status
 of an instance that stops can go from Stopped back to Running for one read.
 Limits: a command with root in the instance can reset the peak of cgroup
 v1 (`memory.max_usage_in_bytes`) through the kernel; a command that traces
-PID 1 (`CAP_SYS_PTRACE` in the instance) can change any state of the init;
-and under `--memory`, the init of an instance whose command passes the
-limit ends with no exit file and no usage file in about one run of six
-(2 of 12 on 0.2.0-beta.38 too, which lost the exit code).
+PID 1 (`CAP_SYS_PTRACE` in the instance) can change any state of the init.
+
+PID 1 and the OOM killer (T-2077): under `--memory`, a command over the
+limit can cause two OOM events a few milliseconds apart. Before the fix,
+the second event came before the memory of the first victim was free, and
+the OOM killer of the instance took PID 1, the largest task that stayed.
+The instance then stopped with no exit file and no usage file (12 of 44
+runs on the cloud host). Now, before the command starts, the init sets its
+own `oom_score_adj` to -1000, and the command gets back the value that PID
+1 had. The kernel refuses -1000 in an instance of an incusd that has no
+`CAP_SYS_RESOURCE` of the host (route A: EACCES). There, PID 1 keeps its
+value and the command gets 1000, so that the OOM killer takes each process
+of the command before PID 1, and the init writes the reason on the console
+of the instance (`incus console --show-log`). Limits: with 1000, the
+command reads 1000 in `/proc/self/oom_score_adj`, and a host-wide OOM takes
+it before other processes of the host; a command can lower its own value
+back to 0, and a process that `exec` starts has the value of incusd. With
+such processes, the OOM killer can take PID 1 again.
 
 ## The tier by configuration (T-1722)
 

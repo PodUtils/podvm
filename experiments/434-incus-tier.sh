@@ -117,10 +117,9 @@
 #      most 1 s more, `PeakMemoryBytes` from 64 MiB to 256 MiB (the CPU
 #      time and the memory of the host are far above both bounds), and
 #      `OomKills` 0; a command over `--memory 32m` gives `OomKills` 1 or
-#      more and exit 137 (up to three runs: the init of such an instance
-#      ends with no exit file and no usage file in about one run of six, as
-#      on 2ae4b410, which lost the exit code in 2 of 12; the misses are
-#      recorded, not a clause); a command that writes a false /.podvm/usage,
+#      more and exit 137 in one run (T-2077: the OOM killer of the instance
+#      took PID 1 in 12 of 44 runs before PID 1 set its oom_score_adj); a
+#      command that writes a false /.podvm/usage,
 #      mounts a tmpfs on /.podvm and leaves a child that writes false values
 #      gives none of them and its own exit code; after a forced stop each
 #      value is a dash and `--verbose` says why. Each value comes from the
@@ -706,22 +705,15 @@ P run -d --name use26 --podvm-tier=incus "$OCI" sh -c 'timeout 2 sh -c "while :;
 u=$(stopped26 use26)
 echo "  truth    $(P logs --podvm-tier=incus use26 2>&1 | tr '\n' ' ')"
 echo "  usage    $u"
-k=0; o=""
-while [ $k -lt 3 ]; do
-	P run -d --name oom26-$k --memory 32m --podvm-tier=incus "$OCI" sh -c 'head -c 200000000 /dev/zero | tail' </dev/null >/dev/null 2>&1
-	o=$(stopped26 oom26-$k); P rm -f --podvm-tier=incus oom26-$k >/dev/null 2>&1
-	[ "$o" = "- - - -" ] || break
-	k=$((k+1))
-done
-echo "  oom      $o"
-echo "  misses   $k (runs over --memory whose init wrote no file)"
+P run -d --name oom26 --memory 32m --podvm-tier=incus "$OCI" sh -c 'head -c 200000000 /dev/zero | tail' </dev/null >/dev/null 2>&1
+echo "  oom      $(stopped26 oom26)"
 P run -d --name forge26 --podvm-tier=incus "$OCI" sh -c 'echo "{\"v\":1,\"cpu_usec\":1,\"peak_bytes\":1,\"oom_kills\":99}" >/.podvm/usage; mount -t tmpfs none /.podvm; (while :; do echo "{\"v\":1,\"cpu_usec\":7,\"peak_bytes\":7,\"oom_kills\":77}" >/.podvm/usage; echo 5 >/.podvm/exit; done) & sleep 1; exit 4' </dev/null >/dev/null 2>&1
 echo "  forged   $(stopped26 forge26)"
 P run -d --name kill26 --podvm-tier=incus "$OCI" sleep 60 </dev/null >/dev/null 2>&1
 sleep 2
 RI stop --force kill26 >/dev/null 2>&1
 echo "  forced   $(stopped26 kill26 --verbose)"
-for n in use26 forge26 kill26; do P rm -f --podvm-tier=incus "$n" >/dev/null 2>&1; done
+for n in use26 oom26 forge26 kill26; do P rm -f --podvm-tier=incus "$n" >/dev/null 2>&1; done
 } >"$WORK/c26.txt" 2>&1
 cat "$WORK/c26.txt" >>"$REPORT"
 c26() { grep -Eq "$1" "$WORK/c26.txt" || { note "26: $2"; fail=1; }; }
