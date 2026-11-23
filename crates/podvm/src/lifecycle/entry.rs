@@ -164,8 +164,10 @@ pub fn ensure_store_exec(verb: &str, store_root: &std::path::Path) -> Result<(),
 /// TODO/cli.md T-1414. The no-chroot refusal code follows the payload
 /// status on every rung, exactly as the chroot path emits from the child:
 /// `Absent` is 127, found-but-not-invocable is 126 (the errno split
-/// T-0802 pins: ENOENT against EPERM, ENOEXEC, EACCES, EISDIR and
-/// ETXTBSY), and a genuine podvm failure stays 125.
+/// T-0802 pins: ENOENT against the errnos of pod-enter's
+/// `invocable_but_refused`, podcrates `v0.82.0`: EPERM, E2BIG, ENOEXEC,
+/// EACCES, EISDIR, EINVAL, ETXTBSY and ELIBBAD), and a genuine podvm
+/// failure stays 125.
 ///
 /// ⚠ Matched on `ladder::resolve_payload`'s own sentences rather than
 /// re-derived: the resolution kinds are rendered there into strings, so
