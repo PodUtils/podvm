@@ -6,7 +6,7 @@
 //! path reads and writes.
 
 use super::*;
-use crate::map::base::{Pin, pin};
+use crate::map::base::{pin, Pin};
 
 unsafe extern "C" {
     fn close(fd: c_int) -> c_int;
