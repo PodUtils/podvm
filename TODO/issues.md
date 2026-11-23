@@ -544,6 +544,8 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #648 | COORD-232: v0.2.0-beta.38 is out (to podrunner) | open | T-1949, T-2065, T-2066, T-2068, T-2070 |
 | #649 | COORD-233: the answer to PodUtils/podrunner#345: inspect of a stopped incus instance gives CpuSeconds, PeakMemoryBytes and OomKills on main (to podrunner) | open | T-2076, T-2077 |
 | #650 | COORD-234: a reader of the usage of a cgroup (CPU time, peak memory, OOM kills; v2 and v1) for pod-hostprobe::cgroup (to podcrates) | open | T-2076 |
+| #651 | COORD-235: an answer over the bound keeps its status, its size, the bound and its head; the resources of a storage pool (to podcrates) | open | T-2078 |
+| #652 | COORD-236: the answer to PodUtils/podrunner#346: a full storage pool gave "the response body is larger than allowed"; podvm now refuses an image that cannot fit and names the free space (to podrunner) | open | T-2078 |
 
 ## Messages whose title does not start with COORD-NNN
 

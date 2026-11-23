@@ -87,16 +87,24 @@ step below is done.
   `--memory` the OOM killer of the instance took PID 1 (12 of 44 runs, also
   with beta.38); PID 1 now sets -1000, or the command gets 1000 where the
   kernel refuses -1000; 24 of 24 runs keep the exit code. #649 says so.
-* #631, #633, #639, #643, #644 and #645 are closed (podcrates#254 lists the
+* podrunner#346 (COORD-124): a full `dir` pool made incusd 6.0 answer with
+  the whole stderr of `tar` (108 MB for 400,000 files), over the 64 MiB
+  bound of pod-incus, so podvm said only "the response body is larger than
+  allowed". T-2078 (P1, partial, `abe21868`): the incus tier refuses an
+  image that cannot fit before the import, and names the free space after
+  such an answer; experiment 434 clause 27. Answer #652 (COORD-236); #651
+  (COORD-235) asks podcrates for a typed refusal with the status and the
+  head of the answer, and for the resources of a pool.
+* #631, #633, #639, #643, #644, #645 and #647 are closed (podcrates#254 lists the
   take; podrunner closed podrunner#339).
 
 ## Next steps, in order
 
 1. Start the session (`AGENTS.md`, section 8), with the watcher.
-2. podrunner first: the next beta carries T-2076 and T-2077 for #649
-   (the beta gate of `docs/maintenance.md`); watch #583, #585, #593, #596,
-   #599, #605, #636, #648 and #649.
-3. podcrates: watch #602, #604, #584, #646 and #650.
+2. podrunner first: the next beta carries T-2076, T-2077 and T-2078 for
+   #649 and #652 (the beta gate of `docs/maintenance.md`); watch #583,
+   #585, #593, #596, #599, #605, #636, #648, #649 and #652.
+3. podcrates: watch #602, #604, #584, #646, #650 and #651.
 4. T-2069 (the staging files of the store), then the open rows of T-2070.
 5. T-2050 remainder: a machine run with the store's static QEMU. T-2048
    remainder: a SIGTERM during a save waits for the save. Experiment 465 on
