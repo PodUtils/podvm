@@ -524,21 +524,21 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #628 | [gh action] requested | closed (on 3924ccd: gate 44797433321 and the nightly trial 44797438827 passed) | the gate and the nightly trial of 3924ccd, after the nightly trial 44792968495 failed on the licence text of asn1-rs-impl 0.2.0 (T-1949) |
 | #629 | COORD-219: the memory of a microvm guest for an image of N unpacked bytes (to podrunner) | closed (podrunner closed PodUtils/podrunner#334 with the curve of T-2047) | T-1922, T-1994, T-2047 |
 | #630 | COORD-220: logs streams the log and takes --limit-bytes N (to podrunner) | closed (podrunner closed PodUtils/podrunner#333 with 0.2.0-beta.37) | T-2046 |
-| #631 | COORD-221: a streamed read of a log in pod-supervise, and a ranged read of a file in pod-incus (to podcrates) | open | T-2046 |
+| #631 | COORD-221: a streamed read of a log in pod-supervise, and a ranged read of a file in pod-incus (to podcrates) | closed (podcrates v0.81.0 has both parts (T-1045, T-1046); taken in 93524ce; PodUtils/podcrates#254 lists the take) | T-2046 |
 | #632 | [gh action] requested | closed (on 7324fe0: gate 44808019999, workloads 44808026072, the nightly trial 44808031605, arm 44808038480 and kvm 44808044333 init passed; the save under KVM holds) | the beta gate of 7324fe0: gate, workloads, the nightly trial, arm and kvm.yml init, after the fix of the hang of the save (T-1949, T-2046, T-2048) |
-| #633 | COORD-222: pod-guest's Monitor::connect has no bound; QEMU queues one client (to podcrates) | open | T-2048 |
+| #633 | COORD-222: pod-guest's Monitor::connect has no bound; QEMU queues one client (to podcrates) | closed (podcrates v0.81.0 has the bounded Monitor::connect; taken in 8fd14c2; PodUtils/podcrates#254 lists the take) | T-2048 |
 | #634 | [gh action] requested | closed (gate 44845403636 on c92ac65 passed; release 44846783317 published v0.2.0-beta.37, the nightly 44846830226 on the tag passed) | the release of 0.2.0-beta.37 on c92ac65 (T-1949) |
 | #635 | COORD-223: podvm took v0.80.0 (to podcrates) | closed (podcrates closed PodUtils/podcrates#250 after each take) | T-2050, T-2051 |
 | #636 | COORD-224: v0.2.0-beta.37 is out (to podrunner) | open | T-1949, T-2002, T-2008, T-2046, T-2048 |
 | #637 | [gh action] requested | closed (on 4dc5744: gate 44849108235, arm 44849112350, workloads 44849118194 and kvm 44849121664 init passed) | the gate, arm, workloads and kvm.yml init runs of 4dc5744, the take of podcrates v0.80.0 (T-2050) |
 | #638 | [gh action] requested | closed (kvm 44854125431 job mem on 8de9873 passed: the curve of T-2047) | the job mem of kvm.yml (experiment 470) on 8de9873: the memory of a guest for an initrd of N bytes (T-2047) |
-| #639 | COORD-225: pod-enter reads E2BIG at execve as "not found" (127); it is "found, not invocable" (126) (to podcrates) | open | T-2062 |
+| #639 | COORD-225: pod-enter reads E2BIG at execve as "not found" (127); it is "found, not invocable" (126) (to podcrates) | closed (podcrates v0.82.0 gives 126 for E2BIG (T-1080); taken in 0eb10b2a; PodUtils/podcrates#254 lists the take) | T-2062 |
 | #640 | COORD-226: on podvm's main, for the next release: typed inspect JSON, exit codes, exec into an exited container, the memory rule (to podrunner) | closed (released in `v0.2.0-beta.38`, release run 45212007696; #648 names the tag) | T-2047, T-2060, T-2061, T-2062, T-2064 |
 | #641 | [gh action] requested | closed (on cb8bbf4: arm 44859012273 and workloads 44859015855 passed; gate 44859009048 failed on three integration tests that held the behaviour before T-2060 to T-2062, changed in the next commit) | the gate, arm and workloads runs of cb8bbf4, after the fixes of the sixth outside pass for the CLI (T-2047, T-2060 to T-2064) |
 | #642 | [gh action] requested | closed (gate 44862250138 on 721ce66 passed) | the gate of 721ce66, the head that changes three integration tests to the behaviour of T-2060 to T-2062 |
-| #643 | COORD-227: pod-extract refuses a layer whose PAX record SCHILY.acl.access holds a newline (to podcrates) | open | T-2065 |
+| #643 | COORD-227: pod-extract refuses a layer whose PAX record SCHILY.acl.access holds a newline (to podcrates) | closed (podcrates v0.82.0 reads PAX SCHILY.acl.* (T-1086); taken in 0eb10b2a; PodUtils/podcrates#254 lists the take) | T-2065 |
 | #644 | COORD-228: a PAX value with a newline (SCHILY.acl.access): the fix is in pod-extract of podcrates (to podrunner) | closed (podrunner closed PodUtils/podrunner#339 after `v0.2.0-beta.38`) | T-2065 |
-| #645 | COORD-229: podvm took v0.81.0 and v0.82.0 (to podcrates) | open | T-2066, T-2051, T-2046, T-2065, T-2062 |
+| #645 | COORD-229: podvm took v0.81.0 and v0.82.0 (to podcrates) | closed (PodUtils/podcrates#254 lists the take of v0.81.0 and v0.82.0) | T-2066, T-2051, T-2046, T-2065, T-2062 |
 | #646 | COORD-230: pod-enter's PID-namespace init and join relay show podvm's argv and environment to the payload (to podcrates) | open | T-2054 |
 | #647 | COORD-231: the answer to PodUtils/podrunner#344: podvm load of an image of 85 layers is fixed on main (to podrunner) | open | T-2068 |
 | #648 | COORD-232: v0.2.0-beta.38 is out (to podrunner) | open | T-1949, T-2065, T-2066, T-2068, T-2070 |
