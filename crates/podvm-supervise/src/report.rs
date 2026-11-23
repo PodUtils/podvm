@@ -52,9 +52,14 @@ pub fn finish(path: &Path, c: &Container) -> Result<(), String> {
 /// The count `oom_kill` of `memory.events` of the cgroup `dir`, or `None`
 /// where the file or the line is not there.
 pub fn oom_kills_of(dir: &Path) -> Option<u64> {
-    std::fs::read_to_string(dir.join("memory.events"))
-        .ok()?
-        .lines()
+    oom_kills_in(&std::fs::read_to_string(dir.join("memory.events")).ok()?)
+}
+
+/// The count of the line `oom_kill N` of the text of `memory.events`
+/// (cgroup v2) or `memory.oom_control` (cgroup v1), or `None` where the
+/// line is not there or N is not a count (TODO/machine.md T-2076).
+pub fn oom_kills_in(text: &str) -> Option<u64> {
+    text.lines()
         .find_map(|l| l.strip_prefix("oom_kill "))
         .and_then(|n| n.trim().parse().ok())
 }

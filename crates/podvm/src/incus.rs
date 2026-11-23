@@ -9,13 +9,16 @@ pub(crate) mod logs; // TODO/cli.md T-2046
 pub(crate) mod net;
 pub(crate) mod run;
 pub(crate) mod systemd;
+pub(crate) mod usage; // TODO/machine.md T-2076
 pub(crate) mod verbs;
 mod xattrs; // TODO/machine.md T-1999
 
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
-mod verbs_tests; // TODO/machine.md T-1846
+mod usage_tests;
+#[cfg(test)]
+mod verbs_tests; // TODO/machine.md T-1846 // TODO/machine.md T-2076
 
 /// The verbs that `--podvm-tier=incus` serves on an instance that stays
 /// (TODO/machine.md T-1722): their exit, or `None` for another verb.
@@ -123,7 +126,9 @@ fn code_of(status: i32) -> i32 {
 /// [`CMD`] with stdout and stderr appended to [`LOG`], passes a stop signal
 /// to it as SIGTERM, and ends with the command's exit code, which it writes
 /// to [`EXIT`]: the instance stops when its command ends, as a docker
-/// container does.
+/// container does. As PID 1 (TODO/machine.md T-2076) it first ends each
+/// other process of the instance and writes the usage of the instance's
+/// cgroup to [`usage::USAGE`], which `inspect` reads after the stop.
 pub fn hold(args: &[String]) -> i32 {
     unsafe extern "C" {
         fn signal(sig: i32, handler: usize) -> usize;
@@ -134,6 +139,10 @@ pub fn hold(args: &[String]) -> i32 {
     }
     static CHILD: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
     extern "C" fn end(_: i32) {
+        // T-2076: the end of the instance runs; a stop signal changes nothing.
+        if ENDING.load(std::sync::atomic::Ordering::Relaxed) {
+            return;
+        }
         let child = CHILD.load(std::sync::atomic::Ordering::Relaxed);
         if child > 0 {
             // SAFETY: kill is async-signal-safe; the loop reaps the child.
@@ -180,12 +189,27 @@ pub fn hold(args: &[String]) -> i32 {
     // listens on 127.0.0.1 before the command starts.
     let _ = crate::machine::guest::net::lo_up();
     net::listen();
+    // TODO/machine.md T-2076: as PID 1 with a command, the files of the
+    // cgroup and the root are taken before the command can change them,
+    // and the exit and the usage of a run before go.
+    let pid1 = std::process::id() == 1;
+    let mut end_of = None;
     if args.iter().any(|a| a == "--run") {
+        if pid1 {
+            let _ = std::fs::remove_file(EXIT);
+            let _ = std::fs::remove_file(usage::USAGE);
+            end_of = Some((usage::Anchor::take(), usage::Meter::open()));
+        }
         match start_cmd() {
             Ok(pid) => CHILD.store(pid, std::sync::atomic::Ordering::Relaxed),
             Err(e) => {
                 let _ = std::fs::write(LOG, format!("podvm guest-hold: {e}\n"));
-                let _ = std::fs::write(EXIT, "127\n");
+                match end_of.as_mut() {
+                    Some((anchor, meter)) => finish(127, anchor.as_ref(), meter),
+                    None => {
+                        let _ = std::fs::write(EXIT, "127\n");
+                    }
+                }
                 return 127;
             }
         }
@@ -204,6 +228,10 @@ pub fn hold(args: &[String]) -> i32 {
             }
             if pid == CHILD.load(std::sync::atomic::Ordering::Relaxed) {
                 let code = code_of(status);
+                if let Some((anchor, meter)) = end_of.as_mut() {
+                    finish(code, anchor.as_ref(), meter);
+                    return code;
+                }
                 let _ = std::fs::write(EXIT, format!("{code}\n"));
                 // TODO/machine.md T-1993: where the init of the image is
                 // PID 1, the instance stops when its command ends, as with
@@ -213,6 +241,44 @@ pub fn hold(args: &[String]) -> i32 {
                 }
                 return code;
             }
+        }
+    }
+}
+
+/// Set at the end of an instance: the handler of a stop signal does nothing.
+static ENDING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// TODO/machine.md T-2076: the end of an instance whose PID 1 is the hold,
+/// after its command ended with `code`. Each other process of the instance
+/// ends first, so that none of them can write after the hold: then the
+/// exit code goes to [`EXIT`] and the usage to [`usage::USAGE`].
+fn finish(code: i32, anchor: Option<&usage::Anchor>, meter: &mut usage::Meter) {
+    ENDING.store(true, std::sync::atomic::Ordering::Relaxed);
+    let ended = usage::end_tree(usage::END_WAIT);
+    let mut m = meter.read();
+    if !ended {
+        m.why.push(format!(
+            "a process of the instance was still there {} s after SIGKILL",
+            usage::END_WAIT.as_secs()
+        ));
+    }
+    let root = match anchor {
+        Some(a) => a.restore(),
+        None => Err("the init could not open its root at the start".to_string()),
+    };
+    if usage::seal(EXIT, format!("{code}\n").as_bytes()).is_err() {
+        let _ = std::fs::write(EXIT, format!("{code}\n"));
+    }
+    match root {
+        // The root of the instance: the measure is the one that a reader
+        // finds after the stop.
+        Ok(()) => {
+            let _ = usage::seal(usage::USAGE, &m.to_json());
+        }
+        // The root may be one that the command made: no usage file, and a
+        // reader gives no value.
+        Err(_) => {
+            let _ = std::fs::remove_file(usage::USAGE);
         }
     }
 }

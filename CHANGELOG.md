@@ -8,6 +8,12 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- `inspect --podvm-tier=incus` of a stopped instance gives `CpuSeconds`,
+  `PeakMemoryBytes` and `OomKills`: the init writes them to `/.podvm/usage`
+  after the command and each other process of the instance ended; before,
+  each was a dash once the instance stopped. `inspect --verbose` says why a
+  value is a dash (T-2076, PodUtils/podrunner#345).
+
 ## 0.2.0-beta.38 (2026-11-23)
 
 ### Known gaps: what the checks of 0.2.0-beta.38 prove, and what stays open, 2026-11-23

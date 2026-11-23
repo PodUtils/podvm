@@ -289,12 +289,7 @@ extern "C" fn release() {
         return;
     }
     let events = std::fs::read_to_string(leaf.join("memory.events")).unwrap_or_default();
-    if let Some(n) = events
-        .lines()
-        .find_map(|l| l.strip_prefix("oom_kill "))
-        .and_then(|n| n.trim().parse::<u64>().ok())
-        .filter(|n| *n > 0)
-    {
+    if let Some(n) = podvm_supervise::report::oom_kills_in(&events).filter(|n| *n > 0) {
         eprintln!(
             "podvm: the run passed its --memory: the OOM killer of the kernel ended {n} \
              process(es) of it ({}: oom_kill {n}) (TODO/cli.md T-1747)",

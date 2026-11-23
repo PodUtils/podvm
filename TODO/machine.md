@@ -5437,7 +5437,7 @@ Experiment 434: after `run -d --podvm-tier=incus public.ecr.aws/docker/library/a
 
 ## Done
 
-**Done (2026-11-18).** `inspect --podvm-tier=incus NAME` gives `CpuSeconds` (the `cpu.usage` of the state, in seconds), `PeakMemoryBytes` (`memory.usage_peak`) and `OomKills` (`Client::oom_kills`, from the metrics of incusd), as fields of `--format` and in the JSON; a value that incusd does not give is a dash (`incus::inspect::usage_of`). Experiment 434 clause 18: a `run -d` that counts to 300000 and holds 30 MB gives `1.162 61513728 0`. The values are those of a running instance: the instance of a `run -d` stays after its command ends, so they stay readable until `rm`.
+**Done (2026-11-18).** `inspect --podvm-tier=incus NAME` gives `CpuSeconds` (the `cpu.usage` of the state, in seconds), `PeakMemoryBytes` (`memory.usage_peak`) and `OomKills` (`Client::oom_kills`, from the metrics of incusd), as fields of `--format` and in the JSON; a value that incusd does not give is a dash (`incus::inspect::usage_of`). Experiment 434 clause 18: a `run -d` that counts to 300000 and holds 30 MB gives `1.162 61513728 0`. The values are those of a running instance. Corrected on 2026-11-23: the instance of a `run -d` stops when its command ends, and incusd then gives no value, so each was a dash after the end; [T-2076](machine.md) gives the usage of a stopped instance.
 
 
 # T-1966: The incus tier cannot run a container engine in an instance
@@ -6047,3 +6047,37 @@ The tests run against the crate: `tests_monitor.rs` passes with each row (`Peer:
 Left in podvm, with the reason: the wait for a guest that loads a state (`save::running`). `line::running` takes the emulator (`Option<&mut Child>`) to see its end during the load, and podvm waits in the thread that writes the job, which does not hold the emulator: with `None`, an emulator that ends during the load costs the whole bound of 60 s before the guest boots with no state, where podvm's wait ends at the closed connection. podvm's wait uses the bounded `Monitor::connect` of the crate and no thread of its own. A `running` that ends at a closed connection, or that takes a probe of the end of the emulator, is a later ask for podcrates.
 
 Measured: experiment 465, clauses 2, 3 and 9, under TCG as root for a user with no root ([T-2066](deps.md)). Only CI can prove the rows `mach-sav` and `mach-lod` of experiment 468 under KVM (`kvm.yml` job `init`).
+
+
+# T-2076: `inspect` of a stopped instance of the incus tier gives a dash for the CPU time, the peak memory and the OOM kills
+
+**Source:** PodUtils/podrunner#345 (COORD-123 of podrunner; podrunner@T-483, podrunner@T-515)
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** done
+
+## Problem
+
+`podvm inspect --podvm-tier=incus --format '{{.CpuSeconds}} {{.PeakMemoryBytes}} {{.OomKills}}' NAME` gives `- - -` once the instance stopped, and the instance of `run -d` stops when its command ends. podrunner measured it in runner-image.yml 45163987810 with 0.2.0-beta.37: four units, each a dash after the payload ended; one used 2.3 s of CPU and 64 MiB.
+
+## Premise
+
+The init of the instance (`guest-hold --run`) writes the exit code and returns, so PID 1 ends and the instance stops. incusd fills the CPU and the memory of the state only while the instance runs, its metrics refuse a stopped instance, and the cgroup of the instance goes at the stop. `incus::inspect::usage_of` maps each missing value to a dash.
+
+## Approach
+
+The init, as PID 1, opens the files of the instance's cgroup before the command starts. After the command ended, it ends each other process of the instance, reads the files and writes `/.podvm/usage`; `inspect` of a stopped instance reads the file.
+
+## Decision
+
+-
+
+## Prove
+
+Unit tests: one table over the answer of incusd for the file (values, zero values, a missing value with its reason, an empty file, not JSON, another version, a value that is not a count, too large, a directory, a link) and one over the texts of the files of a cgroup v2 and v1. Experiment 434 clause 26 on the incusd of route A: a `run -d` that burns 2 s of CPU and holds 64 MiB gives values close to what the command counted after the stop; a command over `--memory 32m` gives `OomKills` 1 or more; a command that forges the file gives none of its values; a forced stop gives dashes and `--verbose` says why.
+
+## Done
+
+**Done (2026-11-23).** `incus::usage` (new): `Meter::open` mounts the cgroup file systems of the instance (the root of its cgroup namespace) at `/.podvm/.meter` before the command starts, opens `memory.peak`, `cpu.stat` and `memory.events` of cgroup v2 where its memory controller is there, else `memory.max_usage_in_bytes`, `memory.oom_control` and `cpuacct.usage` of cgroup v1, and detaches the mounts; the open files stay. A cgroup v2 with no memory controller is not taken: on a host with both versions its `cpu.stat` is that of the host (measured: 43 s in an instance that had run for 1 s). `incus::hold` as PID 1 with `--run` removes the exit and the usage of a run before, and after the command ended calls `finish`: SIGKILL to each other process of the PID namespace (`end_tree`, 5 s to reap), the root of the start back (`Anchor`: `fchdir` and `chroot`, as a command with root can `pivot_root`), then `seal` of `/.podvm/exit` and `/.podvm/usage`: it takes away a mount on `/.podvm` or on the path, a link or a file at `/.podvm`, a directory at the path and a file at a temporary name, and replaces the file atomically (`pod_core::files::replace`). `inspect` of a stopped instance whose init is `guest-hold --run` reads the file (`stopped_usage`, `usage_of_file`); a value that it does not give is a dash, and `inspect --verbose` (new, refused by name without the incus tier) says why on stderr. The command cannot give other values: no process of it lives when the init reads and writes, and the init reads through descriptors that it opened before the command started. Limits, in `docs/incus.md`: a command with root can reset the peak of cgroup v1 through the kernel, and a command that traces PID 1 can change any state of the init. The parse of `oom_kill` is `podvm_supervise::report::oom_kills_in`, one copy for the native run and the instance. Unit tests `the_usage_of_a_stopped_instance_comes_from_its_file`, `the_usage_file_reads_back` and `the_files_of_a_cgroup_give_their_counts` (`crates/podvm/src/incus/usage_tests.rs`). Experiment 434 clause 26 on the cloud host (cgroup v1): the command counted 3.13 s of CPU (a loop of 2 s, then 64 MiB through `tr`), and after the stop `inspect` gave `3.168 136228864 0 0`; over `--memory 32m`: `0.450 33554432 1 137`; the forging command (a false file, a tmpfs on `/.podvm`, a child that writes false values and exit 5): `0.949 2465792 0 4`; after `incus stop --force`: `- - - -`, and `--verbose` names the 404 of the file and a forced stop. Before the fix (podrunner, 0.2.0-beta.37): `- - -`.

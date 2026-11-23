@@ -38,6 +38,75 @@ pub struct Usage {
     pub oom_kills: Option<u64>,
 }
 
+/// The usage of a stopped instance from the file that its init wrote
+/// (TODO/machine.md T-2076, PodUtils/podrunner#345), or why there is none.
+/// Only an instance whose init is podvm's hold (`guest-hold --run`) has
+/// the file: with `--podvm-init=image` the init of the image is PID 1.
+pub async fn stopped_usage(
+    c: &pod_incus::Client,
+    i: &pod_incus::Instance,
+) -> (Usage, Option<String>) {
+    if i.config.get("raw.lxc").map(String::as_str) != Some(super::verbs::INIT) {
+        return (
+            Usage::default(),
+            Some(
+                "the init of the instance is not podvm's (--podvm-init=image): no usage \
+                 stays after the stop"
+                    .into(),
+            ),
+        );
+    }
+    let file = match c.get_file(&i.name, super::usage::USAGE).await {
+        Ok(f) => f,
+        Err(e) => {
+            return (
+                Usage::default(),
+                Some(format!(
+                    "{}: {e}: a podvm before 0.2.0-beta.39 made the instance, or its init \
+                     did not end on its own (a forced stop)",
+                    super::usage::USAGE
+                )),
+            );
+        }
+    };
+    usage_of_file(file.meta.kind, &file.content)
+}
+
+/// The usage of the answer of incusd for the usage file: the kind of the
+/// entry and its content. A value that the file does not give is `None`,
+/// with the reason.
+pub fn usage_of_file(kind: pod_incus::FileKind, content: &FileContent) -> (Usage, Option<String>) {
+    let path = super::usage::USAGE;
+    let b = match (kind, content) {
+        (pod_incus::FileKind::File, FileContent::Bytes(b)) => b,
+        (k, _) => {
+            return (
+                Usage::default(),
+                Some(format!("{path} is a {}, not a file", k.word())),
+            );
+        }
+    };
+    match super::usage::Measure::parse(b) {
+        Ok(m) => {
+            let u = Usage {
+                cpu_s: m.cpu_usec.map(|us| us as f64 / 1e6),
+                peak_bytes: m.peak_bytes.and_then(|b| i64::try_from(b).ok()),
+                oom_kills: m.oom_kills,
+            };
+            let missing = u.cpu_s.is_none() || u.peak_bytes.is_none() || u.oom_kills.is_none();
+            let why = missing.then(|| {
+                if m.why.is_empty() {
+                    format!("{path} gives no value")
+                } else {
+                    format!("{path}: {}", m.why.join("; "))
+                }
+            });
+            (u, why)
+        }
+        Err(e) => (Usage::default(), Some(format!("{path}: {e}"))),
+    }
+}
+
 /// The usage of the instance `name` from its state and the metrics.
 pub async fn usage_of(c: &pod_incus::Client, name: &str) -> Usage {
     let mut u = Usage::default();
@@ -58,9 +127,12 @@ fn or_dash<T: ToString>(v: Option<T>) -> String {
 pub fn inspect(args: &[String]) -> i32 {
     let mut template: Option<String> = None;
     let mut names: Vec<String> = Vec::new();
+    let mut verbose = false;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         match a.as_str() {
+            // T-2076: why a value of the usage is a dash, on stderr.
+            "--verbose" => verbose = true,
             "-f" | "--format" => match it.next() {
                 Some(t) => template = Some(t.clone()),
                 None => {
@@ -132,7 +204,17 @@ pub fn inspect(args: &[String]) -> i32 {
                 },
                 Err(_) => Vec::new(),
             };
-            let usage = usage_of(&c, n).await;
+            let usage = if i.status == "Running" {
+                usage_of(&c, n).await
+            } else {
+                // T-2076: incusd gives no usage of a stopped instance; its
+                // init wrote it at the end.
+                let (u, why) = stopped_usage(&c, &i).await;
+                if verbose && let Some(why) = why {
+                    eprintln!("podvm inspect: {n}: a usage value is a dash: {why}");
+                }
+                u
+            };
             let fields = fields(&i, &exit, &cmd, &usage);
             match &template {
                 Some(t) => match crate::format::render(t, &fields) {

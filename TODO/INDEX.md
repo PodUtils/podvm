@@ -712,10 +712,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2073](cli.md) | P2 | S | none | cli | done | A foreground `run` reports the owner of the store for each failure of its record |
 | [T-2074](cli.md) | P2 | S | none | cli | done | `run -d --rm` keeps the container after its end |
 | [T-2075](cli.md) | P2 | S | none | cli | done | Each `exec` rewrites `/etc/hosts` and drops the lines of `--add-host` and `--hostname` |
+| [T-2076](machine.md) | P1 | M | none | machine | done | `inspect` of a stopped instance of the incus tier gives a dash for the CPU time, the peak memory and the OOM kills |
 
 ## Counts
 
-646 entries: 23 open, 44 partial, 5 blocked, 574 done.
+647 entries: 23 open, 44 partial, 5 blocked, 575 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -725,10 +726,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 20 | 0 | 259 | 282 |
+| P1 | 3 | 20 | 0 | 260 | 283 |
 | P2 | 15 | 19 | 4 | 195 | 233 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 23 | 44 | 5 | 574 | 646 |
+| **All** | 23 | 44 | 5 | 575 | 647 |
 
 ## Work order
 

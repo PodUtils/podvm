@@ -144,7 +144,7 @@ usage: podvm image prune [-a|--all] [-f|--force]
 ";
 
 pub const INSPECT_USAGE: &str = "\
-usage: podvm inspect [--format T] [--podvm-tier incus] <image> [image...]
+usage: podvm inspect [--format T] [--podvm-tier incus [--verbose]] <image> [image...]
 
   Fields: .Id .Digest .RepoTags .RepoDigests .Architecture .Os .Created
           .Platform .Size .Store .Layers .RootfsPath .Extracted
@@ -178,6 +178,12 @@ usage: podvm inspect [--format T] [--podvm-tier incus] <image> [image...]
     .State.StartedAt .State.FinishedAt. .State alone is the word (created,
     running, exited, dead); the JSON gives State as docker's object, with
     null for an exit code that does not exist yet.
+
+  An instance of the incus tier: .Id .Name .Image .State .State.Status
+    .State.Running .State.ExitCode .Status .Running .ExitCode .Created
+    .Cmd .EnteredRung .CpuSeconds .PeakMemoryBytes .OomKills. A stopped
+    instance gives the usage that its init wrote at the end of its
+    command; a dash is a value that is not known, and --verbose says why.
 
   Without --format, one JSON array, as docker prints.
 ";

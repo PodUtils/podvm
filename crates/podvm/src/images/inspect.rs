@@ -58,6 +58,13 @@ pub fn inspect(verb: &str, args: &[String]) -> i32 {
             other if other.starts_with("--format=") => {
                 template = Some(other["--format=".len()..].to_string())
             }
+            "--verbose" => {
+                eprintln!(
+                    "podvm inspect: --verbose serves --podvm-tier=incus only: it says why a \
+                     usage value of an instance is a dash (TODO/machine.md T-2076)"
+                );
+                return EXIT_FLAG_ERROR;
+            }
             other if other.starts_with('-') => {
                 if let Err(c) = crate::parity::admit(verb, other, INSPECT_USAGE) {
                     return c;

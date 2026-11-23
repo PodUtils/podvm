@@ -135,7 +135,25 @@ the instance stops, and `logs --limit-bytes N` stops after its first N bytes
 (T-2046, clause 25). Each read is a ranged `GET .../files` from the
 offset that podvm wrote last, which pod-incus copies in pieces of 64 KiB
 to stdout (`Client::get_file_to`), so a log of any size is read. `inspect` gives the state of an instance as JSON
-or through `--format` (`.Name`, `.Status`, `.ExitCode`, `.EnteredRung`).
+or through `--format` (`.Name`, `.Status`, `.ExitCode`, `.EnteredRung`,
+`.CpuSeconds`, `.PeakMemoryBytes`, `.OomKills`).
+
+The usage of a stopped instance (T-2076, PodUtils/podrunner#345): incusd
+gives the CPU time and the memory only while an instance runs, and the
+cgroup of the instance goes at the stop. So the init, as PID 1, opens the
+files of the instance's cgroup before the command starts (cgroup v2 where
+its memory controller is there, else the v1 hierarchies `memory` and
+`cpuacct`). When the command ended, the init sends SIGKILL to each other
+process of the instance and reaps them, takes back its own root, reads the
+files, and replaces `/.podvm/usage` atomically (it first takes away a
+mount, a link or a directory that the command left at the path). Then PID 1
+ends. `inspect` of a stopped instance reads that file; a value that the
+file does not give is a dash, and `inspect --verbose` says why (an
+instance of an older podvm, a forced stop, `--podvm-init=image`).
+Limits: a command with root in the instance can reset the peak of cgroup
+v1 (`memory.max_usage_in_bytes`) through the kernel, and a command that
+traces PID 1 (`CAP_SYS_PTRACE` in the instance) can change any state of
+the init.
 
 ## The tier by configuration (T-1722)
 

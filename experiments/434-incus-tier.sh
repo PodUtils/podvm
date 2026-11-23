@@ -109,6 +109,20 @@
 #      bytes of its log and exit 0; with `-f` the follow of the instance,
 #      which never ends, ends at 3 bytes with exit 0; `--limit-bytes 0` is
 #      refused by name with 125.
+#  26. The usage of a stopped instance (T-2076, PodUtils/podrunner#345):
+#      after `run -d` of a command that burns 2 s of CPU and holds 64 MiB
+#      ends and `inspect` gives Stopped, `inspect --format` gives
+#      `CpuSeconds` no less than the CPU time that the shell of the command
+#      counted (its own and its reaped children's, /proc/$$/stat) and at
+#      most 1 s more, `PeakMemoryBytes` from 64 MiB to 256 MiB (the CPU
+#      time and the memory of the host are far above both bounds), and
+#      `OomKills` 0; a command over `--memory 32m` gives `OomKills` 1 or
+#      more and exit 137; a command that writes a false /.podvm/usage,
+#      mounts a tmpfs on /.podvm and leaves a child that writes false values
+#      gives none of them and its own exit code; after a forced stop each
+#      value is a dash and `--verbose` says why. The waits read the status
+#      of `inspect`, not of `incus list`: the list says STOPPED some 0.5 s
+#      before the instance does.
 #
 # Exit: 0 every clause matched, 1 a clause disagreed, 2 the lane could not
 # run (not root, no user namespaces, no package).
@@ -672,6 +686,43 @@ c24() { grep -Eq "$1" "$WORK/c24.txt" || { note "24: $2"; fail=1; }; }
 c24 "^  run -d   en434$" "run -d of an image whose Entrypoint is its init did not start"
 c24 "^  logs     started systemd" "the command did not run beside the init (the Entrypoint was its prefix)"
 c24 "^  exitcode 3$" "inspect did not give the exit code of the command"
+
+# ---- clause 26 ----------------------------------------------------------
+# TODO/machine.md T-2076 (PodUtils/podrunner#345): the usage of an instance
+# after its command ended and the instance stopped.
+echo ""; echo "== 26. the usage of a stopped instance" >>"$REPORT"
+F26='{{.CpuSeconds}} {{.PeakMemoryBytes}} {{.OomKills}} {{.ExitCode}}'
+stopped26() { i=0; while [ $i -lt 60 ] && [ "$(P inspect --podvm-tier=incus --format '{{.Status}}' "$1" 2>/dev/null)" != Stopped ]; do i=$((i+1)); sleep 1; done; }
+{
+P run -d --name use26 --podvm-tier=incus "$OCI" sh -c 'timeout 2 sh -c "while :; do :; done"; x=$(head -c 67108864 /dev/zero | tr "\0" a); echo "held ${#x}"; set -- $(cut -d" " -f14-17 /proc/$$/stat); echo "cpu $(( $1 + $2 + $3 + $4 ))"' </dev/null >/dev/null 2>&1
+stopped26 use26
+echo "  truth    $(P logs --podvm-tier=incus use26 2>&1 | tr '\n' ' ')"
+echo "  usage    $(P inspect --podvm-tier=incus --format "$F26" use26 2>&1)"
+P run -d --name oom26 --memory 32m --podvm-tier=incus "$OCI" sh -c 'head -c 200000000 /dev/zero | tail' </dev/null >/dev/null 2>&1
+stopped26 oom26
+echo "  oom      $(P inspect --podvm-tier=incus --format "$F26" oom26 2>&1)"
+P run -d --name forge26 --podvm-tier=incus "$OCI" sh -c 'echo "{\"v\":1,\"cpu_usec\":1,\"peak_bytes\":1,\"oom_kills\":99}" >/.podvm/usage; mount -t tmpfs none /.podvm; (while :; do echo "{\"v\":1,\"cpu_usec\":7,\"peak_bytes\":7,\"oom_kills\":77}" >/.podvm/usage; echo 5 >/.podvm/exit; done) & sleep 1; exit 4' </dev/null >/dev/null 2>&1
+stopped26 forge26
+echo "  forged   $(P inspect --podvm-tier=incus --format "$F26" forge26 2>&1)"
+P run -d --name kill26 --podvm-tier=incus "$OCI" sleep 60 </dev/null >/dev/null 2>&1
+sleep 2
+RI stop --force kill26 >/dev/null 2>&1
+stopped26 kill26
+echo "  forced   $(P inspect --podvm-tier=incus --verbose --format "$F26" kill26 2>&1 | tr '\n' ' ')"
+for n in use26 oom26 forge26 kill26; do P rm -f --podvm-tier=incus "$n" >/dev/null 2>&1; done
+} >"$WORK/c26.txt" 2>&1
+cat "$WORK/c26.txt" >>"$REPORT"
+c26() { grep -Eq "$1" "$WORK/c26.txt" || { note "26: $2"; fail=1; }; }
+c26 "^  truth    .*held 67108864 cpu [0-9]+" "the command did not hold 64 MiB or give its CPU time"
+c26 "^  usage    [0-9]+\.[0-9]+ [0-9]+ 0 0$" "inspect of the stopped instance gave no CPU time, peak memory or 0 OOM kills"
+awk '/^  truth/ {for (i = 1; i <= NF; i++) if ($i == "cpu") t = $(i+1) / 100}
+     /^  usage/ {c = $2; p = $3}
+     END {h = 67108864; ok = (c != "" && t >= 1.9 && c >= t - 0.02 && c <= t + 1.0 && p >= h && p <= 4 * h)
+          printf "  compare  cpu %s of %s s, peak %s of %s to %s bytes: %s\n", c, t, p, h, 4 * h, (ok ? "close" : "FAR"); exit !ok}' \
+	"$WORK/c26.txt" >>"$REPORT" || { note "26: the CPU time or the peak memory is not close to what the command counted"; fail=1; }
+c26 "^  oom      [0-9.]+ [0-9]+ [1-9][0-9]* 137$" "a command over --memory gave no OOM kill or no 137"
+c26 "^  forged   [0-9.]+ [0-9]+ 0 4$" "a command that forged the usage file changed the values or the exit code"
+c26 "^  forced   podvm inspect: kill26: a usage value is a dash: .*forced stop.* - - - -" "a forced stop did not give dashes with the reason"
 
 # ---- clause 9 -----------------------------------------------------------
 left_i=$(RI list --format csv -c n 2>&1 | grep -c .)
