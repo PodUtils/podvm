@@ -150,10 +150,16 @@ mount, a link or a directory that the command left at the path). Then PID 1
 ends. `inspect` of a stopped instance reads that file; a value that the
 file does not give is a dash, and `inspect --verbose` says why (an
 instance of an older podvm, a forced stop, `--podvm-init=image`).
+A caller takes the values from the one `inspect` that also gives the
+status `Stopped` (`--format '{{.Status}} {{.CpuSeconds}} ...'`): the list
+of incus says STOPPED about 0.5 s before the instance does, and the status
+of an instance that stops can go from Stopped back to Running for one read.
 Limits: a command with root in the instance can reset the peak of cgroup
-v1 (`memory.max_usage_in_bytes`) through the kernel, and a command that
-traces PID 1 (`CAP_SYS_PTRACE` in the instance) can change any state of
-the init.
+v1 (`memory.max_usage_in_bytes`) through the kernel; a command that traces
+PID 1 (`CAP_SYS_PTRACE` in the instance) can change any state of the init;
+and under `--memory`, the init of an instance whose command passes the
+limit ends with no exit file and no usage file in about one run of six
+(2 of 12 on 0.2.0-beta.38 too, which lost the exit code).
 
 ## The tier by configuration (T-1722)
 
