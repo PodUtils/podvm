@@ -4630,7 +4630,7 @@ Re-verify the line of `runsc.rs` that builds a container id from the pid.
 **Milestone:** none
 **Priority:** P1
 **Effort:** S
-**Status:** blocked
+**Status:** done
 
 ## Problem
 
@@ -4652,6 +4652,8 @@ Take the tag; where the crate counts dropped ACLs, podvm says the count in one l
 
 A layer of GNU tar `--format=posix --xattrs --acls` with an extended ACL on a file extracts with the mode of each file, as uid 1000; the ACL is set, or the line names the count of dropped ACLs.
 
-## Blocker
+## Done
 
-A tag of podcrates whose `pod-extract` does not pass a record that it does not use to the `tar` reader, and applies or counts the ACLs (#643).
+**Done (2026-11-23).** podcrates `v0.82.0` (`51c0939`, the answer to #643) cleared the blocker: `pod-extract` gives each `SCHILY.acl.*` record to the entry, with any byte in its value, converts the text form to `system.posix_acl_access` or `system.posix_acl_default`, and sets it, or names it as not set in the sidecar and in the count of the line of the layer (`N extended attributes set`). The take is [T-2066](deps.md), step 5. The integration test `a_layer_with_the_acls_of_gnu_tar_extracts_with_its_modes` (`crates/podvm/tests/extract_modes.rs`) imports and extracts a layer with a default ACL on a directory and an access ACL on a file, each a PAX record of the text of GNU tar `--acls --numeric-owner` with a newline byte between entries, as the caller and as uid 1000: each mode stays, and each ACL is on disk with the bytes that Linux gives for it, or the sidecar names it. On the cloud host as root, the same layer (made by Python's `tarfile` in PAX format): the release `podvm` of `4d8da41` (podcrates `v0.80.0`) exits 125 with "the PAX record "SCHILY.acl.default" has a newline byte, which the tar reader cuts. The layer is refused whole"; the build of the take exits 0 with "Extracted (2 entries, 0 whiteouts); 2 extended attributes set", and `system.posix_acl_access` of the file holds the ACL. The line of the count is the crate's; podvm adds no line of its own. The answer to podrunner (#644) is the lead's.
+
+Known limit: the image that podvm makes for the incus tier (`crates/podvm/src/incus/xattrs.rs`) carries `security.capability` and `user.*` only, so an ACL of a layer does not reach an incus instance. Not measured.
