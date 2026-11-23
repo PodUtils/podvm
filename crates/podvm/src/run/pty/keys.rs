@@ -110,27 +110,13 @@ fn tree_of(proc: &Path, payload: i64) -> Option<Vec<Proc>> {
 /// host there, and the pid of the payload is a pid of the container.
 pub static PROC: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 
-/// The first procfs of `candidates` whose `self` names this process by
-/// the pid that `getpid` gives: the one whose pids are the pids of the
-/// payload.
-fn own_proc(candidates: &[&Path]) -> Option<PathBuf> {
-    let me = std::process::id().to_string();
-    candidates
-        .iter()
-        .find(|p| std::fs::read_link(p.join("self")).is_ok_and(|l| l.as_os_str() == me.as_str()))
-        .map(|p| p.to_path_buf())
-}
-
 /// Send `sig` to the processes of [`targets`] for the payload `payload`.
 pub fn signal(payload: i64, sig: c_int) {
     unsafe extern "C" {
         fn kill(pid: c_int, sig: c_int) -> c_int;
     }
-    let mut candidates = vec![Path::new("/proc")];
-    candidates.extend(PROC.get().map(PathBuf::as_path));
-    let tree = own_proc(&candidates)
-        .and_then(|proc| tree_of(&proc, payload))
-        .unwrap_or_default();
+    let proc = PROC.get().map_or(Path::new("/proc"), PathBuf::as_path);
+    let tree = tree_of(proc, payload).unwrap_or_default();
     for pid in targets(payload, &tree) {
         if let Ok(p) = c_int::try_from(pid)
             && p > 0
@@ -203,14 +189,6 @@ mod tests {
         for (stat, want) in cases {
             assert_eq!(pgrp_of(stat), *want, "{stat}");
         }
-    }
-
-    #[test]
-    fn the_procfs_of_this_process_is_the_one_whose_self_is_its_pid() {
-        let none = Path::new("/nonexistent-proc");
-        let proc = Path::new("/proc");
-        assert_eq!(own_proc(&[none, proc]).as_deref(), Some(proc));
-        assert_eq!(own_proc(&[none]), None);
     }
 
     /// The tree of this test process, as `/proc` gives it: a child in the

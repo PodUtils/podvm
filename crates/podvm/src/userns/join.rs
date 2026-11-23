@@ -8,6 +8,9 @@ use super::*;
 pub const JOIN_VAR: &str = "PODVM_USERNS_JOIN";
 pub(super) static JOINED: AtomicBool = AtomicBool::new(false);
 pub(super) static JOIN_FD: AtomicI32 = AtomicI32::new(-1);
+/// The host pid of the payload whose PID namespace this process joined, 0
+/// for none (`joined_root`).
+pub(super) static JOIN_PID: AtomicI64 = AtomicI64::new(0);
 
 /// A new pidfd of the payload that this process joined, or `None`. The
 /// record names a host pid, which names nothing in the PID namespace.
@@ -71,6 +74,7 @@ pub(super) fn join_if() {
     if !pid_ns {
         return;
     }
+    JOIN_PID.store(pid, Ordering::Relaxed);
     // After `setns(CLONE_NEWPID)` this process makes no thread, and its
     // children go into the PID namespace: a child goes on with the verb as
     // a member of it, and this process waits and relays, as in `enter_if`.

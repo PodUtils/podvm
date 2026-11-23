@@ -19,7 +19,7 @@
 //! It is the default where the trial of the whole entry works (call C21 of
 //! `docs/decisions.md`); `PODVM_USERNS=0` leaves the entry as before.
 
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, Ordering};
 
 /// The variable that turns the entry off (`0`).
 pub const VAR: &str = "PODVM_USERNS";
@@ -100,6 +100,14 @@ pub fn owns_uts() -> bool {
 /// True where this process joined the namespaces of a run (T-1910).
 pub fn joined() -> bool {
     join::JOINED.load(Ordering::Relaxed)
+}
+
+/// `/proc/PID/root` of the payload (a host pid) of the run whose PID
+/// namespace this process joined, or `None`: the `/proc` of the run is in
+/// its mount namespace only, which this process did not join (T-2052).
+pub fn joined_root() -> Option<std::path::PathBuf> {
+    let pid = join::JOIN_PID.load(Ordering::Relaxed);
+    (pid > 0).then(|| std::path::PathBuf::from(format!("/proc/{pid}/root")))
 }
 
 /// True in pid 2, where this process owns the UTS namespace.

@@ -439,7 +439,7 @@ pub(super) fn enter(
     };
     // ⭐ TODO/enter.md T-1410: the shared entry decision drives here. The
     // container's memo is its own: nothing ephemeral is removed on a way out.
-    super::tty::proc_of(rootfs);
+    super::tty::proc_of();
     let relay = super::tty::start(term, o.interactive);
     let code = match &userland {
         Some(u) => {
