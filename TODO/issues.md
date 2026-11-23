@@ -542,6 +542,8 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #646 | COORD-230: pod-enter's PID-namespace init and join relay show podvm's argv and environment to the payload (to podcrates) | open | T-2054 |
 | #647 | COORD-231: the answer to PodUtils/podrunner#344: podvm load of an image of 85 layers is fixed on main (to podrunner) | open | T-2068 |
 | #648 | COORD-232: v0.2.0-beta.38 is out (to podrunner) | open | T-1949, T-2065, T-2066, T-2068, T-2070 |
+| #649 | COORD-233: the answer to PodUtils/podrunner#345: inspect of a stopped incus instance gives CpuSeconds, PeakMemoryBytes and OomKills on main (to podrunner) | open | T-2076, T-2077 |
+| #650 | COORD-234: a reader of the usage of a cgroup (CPU time, peak memory, OOM kills; v2 and v1) for pod-hostprobe::cgroup (to podcrates) | open | T-2076 |
 
 ## Messages whose title does not start with COORD-NNN
 

@@ -80,19 +80,22 @@ step below is done.
 * COORD-230 (#646) asks podcrates for the title, the environment and the
   dumpable flag of pod-enter's init and join relay (T-2054, OQ-08).
 * podrunner#345 (COORD-123): `inspect` of a stopped incus instance gives
-  `-` for `CpuSeconds`, `PeakMemoryBytes` and `OomKills`. An agent works on
-  it (the fix writes the last use before PID 1 of the instance ends); its
-  answer goes to podrunner as a COORD issue with the next beta.
+  the last `CpuSeconds`, `PeakMemoryBytes` and `OomKills` (T-2076,
+  `a4b75950`, `bafd6dec`; experiment 434 clause 26); answer #649
+  (COORD-233). #650 (COORD-234) asks podcrates for one reader of the usage
+  of a cgroup. The work found T-2077 (P1, open): under `--memory` the init
+  of an instance can end with no exit file (2 of 12 runs, also with
+  beta.38), so `inspect` gives no exit code.
+* #631, #633, #639, #643, #644 and #645 are closed (podcrates#254 lists the
+  take; podrunner closed podrunner#339).
 
 ## Next steps, in order
 
 1. Start the session (`AGENTS.md`, section 8), with the watcher.
-2. podrunner first: podrunner#345 (above), then watch #583, #585, #593,
-   #596, #599, #605, #636, #644, #647 and #648.
-3. podcrates: when podcrates#254 lists the take of `v0.81.0`, close #631
-   and #633; when its next COORD lists the take of `v0.82.0`, close #639,
-   #643 and #645 (the record first, then GitHub). Watch #602, #604, #584
-   and #646.
+2. podrunner first: T-2077 (the lost exit code under `--memory` on the
+   incus tier), then the next beta for #649 (T-2076); watch #583, #585,
+   #593, #596, #599, #605, #636, #647, #648 and #649.
+3. podcrates: watch #602, #604, #584, #646 and #650.
 4. T-2069 (the staging files of the store), then the open rows of T-2070.
 5. T-2050 remainder: a machine run with the store's static QEMU. T-2048
    remainder: a SIGTERM during a save waits for the save. Experiment 465 on

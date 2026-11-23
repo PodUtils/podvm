@@ -6081,3 +6081,48 @@ Unit tests: one table over the answer of incusd for the file (values, zero value
 ## Done
 
 **Done (2026-11-23).** `incus::usage` (new): `Meter::open` mounts the cgroup file systems of the instance (the root of its cgroup namespace) at `/.podvm/.meter` before the command starts, opens `memory.peak`, `cpu.stat` and `memory.events` of cgroup v2 where its memory controller is there, else `memory.max_usage_in_bytes`, `memory.oom_control` and `cpuacct.usage` of cgroup v1, and detaches the mounts; the open files stay. A cgroup v2 with no memory controller is not taken: on a host with both versions its `cpu.stat` is that of the host (measured: 43 s in an instance that had run for 1 s). `incus::hold` as PID 1 with `--run` removes the exit and the usage of a run before, and after the command ended calls `finish`: SIGKILL to each other process of the PID namespace (`end_tree`, 5 s to reap), the root of the start back (`Anchor`: `fchdir` and `chroot`, as a command with root can `pivot_root`), then `seal` of `/.podvm/exit` and `/.podvm/usage`: it takes away a mount on `/.podvm` or on the path, a link or a file at `/.podvm`, a directory at the path and a file at a temporary name, and replaces the file atomically (`pod_core::files::replace`). `inspect` of a stopped instance whose init is `guest-hold --run` reads the file (`stopped_usage`, `usage_of_file`); a value that it does not give is a dash, and `inspect --verbose` (new, refused by name without the incus tier) says why on stderr. The command cannot give other values: no process of it lives when the init reads and writes, and the init reads through descriptors that it opened before the command started. Limits, in `docs/incus.md`: a command with root can reset the peak of cgroup v1 through the kernel, and a command that traces PID 1 can change any state of the init. The parse of `oom_kill` is `podvm_supervise::report::oom_kills_in`, one copy for the native run and the instance. Unit tests `the_usage_of_a_stopped_instance_comes_from_its_file`, `the_usage_file_reads_back` and `the_files_of_a_cgroup_give_their_counts` (`crates/podvm/src/incus/usage_tests.rs`). Experiment 434 clause 26 on the cloud host (cgroup v1), each value from the `inspect` that gives Stopped: the command counted 3.28 s of CPU (a loop of 2 s, then 64 MiB through `tr`), and `inspect` gave `3.321 135741440 0 0`; over `--memory 32m`: `0.526 33554432 1 137`; the forging command (a false file, a tmpfs on `/.podvm`, a child that writes false values and exit 5, then exit 4): `0.970 2568192 0 4`; after `incus stop --force`: `- - - -`, and `--verbose` names the 404 of the file and a forced stop. The full experiment passes (`PODVM_434_MIRROR=1`). Two faults that 0.2.0-beta.38 has too, recorded in `docs/incus.md`: the status of an instance that stops can go from Stopped back to Running for one read (one of six), so a caller takes the values from the read that gives Stopped; and under `--memory` the init ends with no exit file in about one run of six (2 of 12 with the binary of `2ae4b410`, 2 of 12 with this one), so clause 26 takes up to three runs and records the misses. Clause 19 took the last line of the native run, which on a host with no QEMU is the fetch of QEMU (T-1875): it now takes the line that names the route. Clause 23 fails in some runs on both binaries (in two series on one incusd, only the first run gave `oom_kills`, with either binary first: the metrics of incusd), as its text says. Before the fix (podrunner, 0.2.0-beta.37): `- - -`.
+
+# T-2077: Under `--memory`, the init of an incus instance can end with no exit file: `inspect` gives no exit code
+
+**Source:** the work of T-2076 (2026-11-23), PodUtils/podrunner#345
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+On the incus tier, a `run -d --memory N` whose command passes the limit
+sometimes ends with no `/.podvm/exit` and no `/.podvm/usage` in the
+instance. `inspect` then gives no exit code and a dash for each value of
+the use. The work of T-2076 measured it in experiment 434 clause 26 on the
+cloud host (cgroup v1): 2 of 12 runs with 0.2.0-beta.38 (`2ae4b41`), and 2
+of 12 runs with the fix of T-2076. podrunner reads the exit code of each
+job, so a lost exit code is a wrong result of a job.
+
+## Premise
+
+The cause is not measured. Candidates: the OOM killer of the cgroup of the
+instance takes PID 1 (`guest-hold`) or the writer, not only the command;
+the write of the files needs memory that the full cgroup does not give;
+incusd stops the instance before PID 1 writes.
+
+## Approach
+
+Measure first: the kernel log of each lost run (`dmesg`, the OOM lines and
+the name of the killed process), the exit of PID 1, and the events of
+incusd. Then, by the cause: make PID 1 immune to the OOM killer of the
+instance (`oom_score_adj` -1000 before the command starts, which a process
+of root in the instance can set), keep the pages of the writer before the
+command starts, or reserve the memory of the write.
+
+## Decision
+
+-
+
+## Prove
+
+Experiment 434 clause 26 with `--memory`: 24 runs on the cloud host, each
+gives its exit code and its use; the clause keeps no retry for a missing
+file.
