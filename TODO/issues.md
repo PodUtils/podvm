@@ -539,6 +539,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #643 | COORD-227: pod-extract refuses a layer whose PAX record SCHILY.acl.access holds a newline (to podcrates) | open | T-2065 |
 | #644 | COORD-228: a PAX value with a newline (SCHILY.acl.access): the fix is in pod-extract of podcrates (to podrunner) | open | T-2065 |
 | #645 | COORD-229: podvm took v0.81.0 and v0.82.0 (to podcrates) | open | T-2066, T-2051, T-2046, T-2065, T-2062 |
+| #646 | COORD-230: pod-enter's PID-namespace init and join relay show podvm's argv and environment to the payload (to podcrates) | open | T-2054 |
 
 ## Messages whose title does not start with COORD-NNN
 
