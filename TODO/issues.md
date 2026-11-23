@@ -537,7 +537,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #641 | [gh action] requested | closed (on cb8bbf4: arm 44859012273 and workloads 44859015855 passed; gate 44859009048 failed on three integration tests that held the behaviour before T-2060 to T-2062, changed in the next commit) | the gate, arm and workloads runs of cb8bbf4, after the fixes of the sixth outside pass for the CLI (T-2047, T-2060 to T-2064) |
 | #642 | [gh action] requested | closed (gate 44862250138 on 721ce66 passed) | the gate of 721ce66, the head that changes three integration tests to the behaviour of T-2060 to T-2062 |
 | #643 | COORD-227: pod-extract refuses a layer whose PAX record SCHILY.acl.access holds a newline (to podcrates) | open | T-2065 |
-| #644 | COORD-228: a PAX value with a newline (SCHILY.acl.access): the fix is in pod-extract of podcrates (to podrunner) | open | T-2065 |
+| #644 | COORD-228: a PAX value with a newline (SCHILY.acl.access): the fix is in pod-extract of podcrates (to podrunner) | closed (podrunner closed PodUtils/podrunner#339 after `v0.2.0-beta.38`) | T-2065 |
 | #645 | COORD-229: podvm took v0.81.0 and v0.82.0 (to podcrates) | open | T-2066, T-2051, T-2046, T-2065, T-2062 |
 | #646 | COORD-230: pod-enter's PID-namespace init and join relay show podvm's argv and environment to the payload (to podcrates) | open | T-2054 |
 | #647 | COORD-231: the answer to PodUtils/podrunner#344: podvm load of an image of 85 layers is fixed on main (to podrunner) | open | T-2068 |
