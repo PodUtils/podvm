@@ -10,8 +10,8 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
 name = "pod-beneath"
-version = "0.81.0"
-source = "git+https://github.com/PodUtils/podcrates?tag=v0.81.0#0707cfa3ea7d6e6fc9fa54ba2f2889f530b17e23"
+version = "0.82.0"
+source = "git+https://github.com/PodUtils/podcrates?tag=v0.82.0#51c09390b759fe4bed35b16ac76d7e2e54e9e060"
 dependencies = [
  "linux-raw-sys",
 ]

@@ -119,16 +119,9 @@ pub trait ExitCode {
 
 impl ExitCode for Error {
     fn exit_code(&self) -> i32 {
-        // TODO/cli.md T-2062: `execve` answers E2BIG for a program that is
-        // there and whose arguments or environment are too large for the
-        // kernel. docker exits 126 for it. pod-enter reads it as "not
-        // found", so the one place that gives the code reads the errno that
-        // its text names, until pod-enter classes it.
-        if let Error::NotFound(text) = self
-            && text.contains(" failed with E2BIG (7)")
-        {
-            return EXIT_CANNOT_INVOKE;
-        }
+        // An E2BIG of `execve` (the program is there, its arguments or
+        // environment are too large) is `Error::CannotInvoke` of pod-enter
+        // (podcrates `v0.82.0`, T-1080; TODO/cli.md T-2062): 126.
         self.code_or(EXIT_RUNTIME_ERROR)
     }
 }
@@ -485,8 +478,5 @@ mod tests {
             EXIT_CANNOT_INVOKE
         );
         assert_eq!(Error::NotFound("x".into()).exit_code(), EXIT_NOT_FOUND);
-        // T-2062: the program is there and its arguments are too large.
-        let big = "\"sh\": the payload could not be started: execve of every candidate path failed with E2BIG (7)";
-        assert_eq!(Error::NotFound(big.into()).exit_code(), EXIT_CANNOT_INVOKE);
     }
 }

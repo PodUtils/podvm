@@ -89,8 +89,8 @@ pub const CASES: &[(&str, i32, &str)] = &[
         "cannot-invoke",
         EXIT_CANNOT_INVOKE,
         "the command was found and could not be invoked: the kernel refused it \
-         (EACCES, ENOEXEC, EISDIR, EPERM, ETXTBSY) or its arguments and \
-         environment are too large (E2BIG)",
+         (EPERM, ENOEXEC, EACCES, EISDIR, EINVAL, ETXTBSY, ELIBBAD) or its \
+         arguments and environment are too large (E2BIG)",
     ),
     ("not-found", EXIT_NOT_FOUND, "the command was not found"),
     (
