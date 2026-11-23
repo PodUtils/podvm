@@ -171,11 +171,32 @@ pub(super) fn take_hold(
 /// `pod-supervise` is replaced by a rename, so a run of root leaves it
 /// owned by root, and the next run of a user cannot write it. The refusal
 /// names the owner, the file and the remedy.
+/// ⛔ OR-B38-02 of the seventh outside pass (TODO/cli.md T-2073): only where
+/// that owner denies this process. Before, an owner of another uid gave this
+/// text for each failure of the record: a name in use or a table that does
+/// not parse in a store root that root owns with mode 777 read "is owned by
+/// uid 65534", which was not the cause.
 pub(crate) fn owner_refusal(root: &std::path::Path, euid: u32) -> Option<String> {
+    owner_refusal_with(root, euid, &allowed)
+}
+
+/// [`owner_refusal`] with the test of access as an argument: `access(path,
+/// mode)` is true where this process has `mode` (`R_OK`, `W_OK|X_OK`).
+fn owner_refusal_with(
+    root: &std::path::Path,
+    euid: u32,
+    access: &dyn Fn(&std::path::Path, i32) -> bool,
+) -> Option<String> {
     use std::os::unix::fs::MetadataExt;
-    for f in [root.join("containers.json"), root.to_path_buf()] {
-        if let Ok(m) = std::fs::metadata(&f)
+    const R_OK: i32 = 4;
+    const W_OK: i32 = 2;
+    const X_OK: i32 = 1;
+    let table = root.join("containers.json");
+    // The table is read, and replaced by a rename in the root.
+    for (f, mode) in [(&table, R_OK), (&root.to_path_buf(), W_OK | X_OK)] {
+        if let Ok(m) = std::fs::metadata(f)
             && m.uid() != euid
+            && !access(f, mode)
         {
             return Some(format!(
                 "the run could not be recorded: {} is owned by uid {}, and this \
@@ -187,6 +208,18 @@ pub(crate) fn owner_refusal(root: &std::path::Path, euid: u32) -> Option<String>
         }
     }
     None
+}
+
+/// `access(2)`: true where this process has `mode` on `path`.
+fn allowed(path: &std::path::Path, mode: i32) -> bool {
+    unsafe extern "C" {
+        fn access(path: *const std::ffi::c_char, mode: i32) -> i32;
+    }
+    let Ok(c) = std::ffi::CString::new(path.as_os_str().as_encoded_bytes()) else {
+        return false;
+    };
+    // SAFETY: a NUL-ended path and an int.
+    unsafe { access(c.as_ptr(), mode) == 0 }
 }
 
 fn current_euid() -> u32 {
@@ -212,12 +245,47 @@ mod tests {
         let mine = std::fs::metadata(&d).unwrap().uid();
         assert_eq!(super::owner_refusal(&d, mine), None);
         let other = mine.wrapping_add(4242);
-        let why = super::owner_refusal(&d, other).unwrap();
+        let why = super::owner_refusal_with(&d, other, &|_, _| false).unwrap();
         assert!(why.contains(&format!("owned by uid {mine}")), "{why}");
         assert!(
             why.contains("$PODVM_STORE") && why.contains("containers.json"),
             "{why}"
         );
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// T-2073 (OR-B38-02): one rule for each cause: the text of the owner
+    /// only where a file of another uid denies this process its access; a
+    /// root of another uid that this process may write (mode 777) gives
+    /// no such text, so the caller prints the true cause.
+    #[test]
+    fn the_owner_is_the_cause_only_where_it_denies_the_access() {
+        use std::os::unix::fs::MetadataExt;
+        let d = std::env::temp_dir().join(format!("podvm-t2073-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("containers.json"), "not json").unwrap();
+        let mine = std::fs::metadata(&d).unwrap().uid();
+        let other = mine.wrapping_add(4242);
+        let table = d.join("containers.json");
+        // (euid, the path that the access test refuses, the file named)
+        let cases: [(u32, Option<&std::path::Path>, Option<&std::path::Path>); 5] = [
+            (mine, None, None),
+            (mine, Some(&d), None),
+            (other, None, None),
+            (other, Some(&table), Some(&table)),
+            (other, Some(&d), Some(&d)),
+        ];
+        for (euid, denied, want) in cases {
+            let got = super::owner_refusal_with(&d, euid, &|p, _| Some(p) != denied);
+            match want {
+                None => assert_eq!(got, None, "euid {euid}, denied {denied:?}"),
+                Some(f) => {
+                    let why = got.unwrap_or_else(|| panic!("euid {euid}: no refusal"));
+                    assert!(why.contains(&format!("{} is owned", f.display())), "{why}");
+                }
+            }
+        }
         let _ = std::fs::remove_dir_all(&d);
     }
 }

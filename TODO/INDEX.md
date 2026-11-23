@@ -709,10 +709,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2070](cli.md) | P1 | M | none | cli | partial | The faults of the seventh outside pass (2026-11-23, the gate of the next beta) |
 | [T-2071](cli.md) | P1 | S | none | cli | done | `exec -it CTR sh`: a job-control shell takes the caller's terminal, and the relay gets no more input |
 | [T-2072](cli.md) | P1 | S | none | cli | done | `-v DIR:/etc` and `-v DIR:/dev` write podvm's fixups into DIR |
+| [T-2073](cli.md) | P2 | S | none | cli | done | A foreground `run` reports the owner of the store for each failure of its record |
 
 ## Counts
 
-643 entries: 23 open, 44 partial, 5 blocked, 571 done.
+644 entries: 23 open, 44 partial, 5 blocked, 572 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -723,9 +724,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 20 | 0 | 259 | 282 |
-| P2 | 15 | 19 | 4 | 192 | 230 |
+| P2 | 15 | 19 | 4 | 193 | 231 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 23 | 44 | 5 | 571 | 643 |
+| **All** | 23 | 44 | 5 | 572 | 644 |
 
 ## Work order
 

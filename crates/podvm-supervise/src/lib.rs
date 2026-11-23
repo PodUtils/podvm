@@ -69,11 +69,25 @@ impl std::fmt::Display for Error {
 }
 
 /// A failure of `pod-supervise` is its sentence: podvm's callers print it.
+/// OR-B38-02 of the seventh outside pass (TODO/cli.md T-2073): the refusal
+/// of a container table that does not parse takes the remedy, as the one of
+/// `store.json` has it ([`TABLE_REMEDY`]).
 impl From<pod_core::Failure> for Error {
     fn from(f: pod_core::Failure) -> Error {
-        Error(f.chain(), Some(f.class))
+        let mut text = f.chain();
+        if f.class == pod_core::Class::Protocol && text.contains(TABLE_UNPARSED) {
+            text.push_str(TABLE_REMEDY);
+        }
+        Error(text, Some(f.class))
     }
 }
+
+/// The words of `pod_supervise::table::decode` for a table that does not
+/// parse.
+const TABLE_UNPARSED: &str = "It is the container table of this tool";
+/// The remedy that podvm adds to them.
+pub const TABLE_REMEDY: &str =
+    "; move it aside to start an empty table (podvm then knows no container of it)";
 
 pub type Result<T> = std::result::Result<T, Error>;
 

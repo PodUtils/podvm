@@ -6800,7 +6800,7 @@ Fix the two P1 findings and the P2 findings that the lead marked "fix"; give OR-
 | Finding | Sev | Triage | Entry | State |
 | --- | --- | --- | --- | --- |
 | OR-B38-01, `exec -it CTR sh` takes no input after the first chunk | P1 | fix | [T-2071](cli.md) | done |
-| OR-B38-02, a foreground `run` reports the owner of the store for a name collision or a corrupt `containers.json` | P2 | fix | - | open |
+| OR-B38-02, a foreground `run` reports the owner of the store for a name collision or a corrupt `containers.json` | P2 | fix | [T-2073](cli.md) | done |
 | OR-B38-03, each `exec` rewrites `/etc/hosts` and drops `--add-host`; `run -d --hostname hx` maps 127.0.0.1 to the name of the container | P2 | fix | - | open |
 | OR-B38-04, `run -d --rm` keeps the container after its end | P2 | fix | - | open |
 | OR-B38-05, a killed `pull` or `load` leaves a `.partial` in `store/staging` that no verb removes or counts | P2 | T-2069 | [T-2069](image.md) | open |
@@ -6883,3 +6883,36 @@ A table-driven test over the fixup targets and a volume over `/etc`, `/etc/ssl`,
 ## Done
 
 **Done (2026-11-23).** The cause: on the namespace rung of a foreground run in podvm's own user namespace (a caller with no root), `run::acquire::hostname_env` bound the volumes into the tree (`userns::bind_volumes`) before `complete::prepare` and before `/etc/hostname`, so each write of the completion went through the bind into the host directory. A detached run (pod-enter binds at the launch), an `exec` (measured: no file), the userland families (a path table, no bind) and the rungs of root (pod-enter binds at the entry) wrote into the tree. The fix: the bind is `run::binds::bind`, called after the completion (`crates/podvm/src/run/prepare.rs`); the volumes at or under `/tmp` stay pod-enter's (OQ-01). A working directory in a volume is the volume's, as before (`make_workdir`). `run::binds::covered` gives one line of the banner for each volume that covers a fixup ("podvm: -v DIR:/etc covers etc/resolv.conf, etc/hosts ... of the tree: the payload sees the directory of the volume there, and podvm writes no file into it"); the unit test `a_volume_names_each_fixup_that_it_covers` holds the rule for each target and volume. The integration test `a_volume_over_a_fixup_target_gets_no_file_of_podvm` (`crates/podvm/tests/volume_fixups.rs`) seeds a directory with one file for each case (`/etc`, `/etc` with `--hostname` and `--add-host`, `/etc/ssl`, `/etc/ssl/certs`, `/dev`, `/dev/pts`) and checks that it holds that file alone after the run. It passes as root and as uid 1000; as uid 1000 with the bind before the completion it fails on five of the six cases. As uid 1000 with `alpine:3.20`: on the binary of the pass, `-v DIR:/etc` left six files and `-v DIR:/dev` eleven entries in DIR; on the new binary DIR holds its own file alone, and the payload runs (exit 0 for `/dev` and `/etc/ssl`; with `/etc`, `cat /etc/hostname` finds no file).
+
+# T-2073: A foreground `run` reports the owner of the store for each failure of its record
+
+**Source:** the seventh outside pass (T-2070), OR-B38-02 (P2)
+**Category:** cli
+**Milestone:** none
+**Priority:** P2
+**Effort:** S
+**Status:** done
+
+## Problem
+
+As uid 1000 with a store root that root owns with mode 777, `run --name dup IMAGE true` twice gives "the run could not be recorded: STORE is owned by uid 65534, and this process runs as uid 0; use a store of your own ($PODVM_STORE)" and 125. `run --rm --name dup` while `dup` runs, and a foreground run with an empty or cut `containers.json`, give the same line. `ps -a`, `run -d` and `create` give the true lines. The refusal of a `containers.json` that does not parse has no remedy, where the one of `store.json` says "move it aside".
+
+## Premise
+
+-
+
+## Approach
+
+Each failure gives one true line (`AGENTS.md`, 2b): the line of the owner only where the owner is the cause.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test -p podvm --test record_failure`: a table test over the causes (a name in use, a table that is empty, cut or not JSON) with a store root of another uid and mode 777: each gives its cause, with 125, and never the line of the owner; the reproducer of the pass on the new release binary.
+
+## Done
+
+**Done (2026-11-23).** The cause: `run::foreground::record::owner_refusal` (T-1851) gave its line for each failure of `podvm_supervise::create` where `containers.json` or the store root belonged to another uid, and did not look at the failure. Under a store root of root with mode 777, the user namespace of a foreground run shows root as uid 65534 and podvm as uid 0, so each failure named the owner. The fix: the line of the owner comes only where that file denies this process the access that the record needs (`access(2)`: read of `containers.json`, write and search of the root, as the table is replaced by a rename there); else the caller prints the failure of the record. `podvm_supervise::Error` from a failure of `pod-supervise` adds the remedy to the refusal of a table that does not parse: "; move it aside to start an empty table (podvm then knows no container of it)" (`TABLE_REMEDY`). The unit test `the_owner_is_the_cause_only_where_it_denies_the_access` holds the rule for each uid and each refused access; `a_table_that_does_not_parse_names_the_remedy` (`podvm-supervise`) holds the remedy for an empty, a cut, a non-JSON table and one with no version; the integration test `a_failed_record_of_a_foreground_run_names_its_cause` (`crates/podvm/tests/record_failure.rs`) gives the store root to uid 65534 with mode 777 as root and checks the line of a name in use and of three bad tables (125, one line, no owner). As root with a store root of uid 65534 and mode 777, the binary of the pass gives the line of the owner for a name in use, and the new binary "--name \"dupy\": the run could not be recorded: the name \"dupy\" is already used by a container".

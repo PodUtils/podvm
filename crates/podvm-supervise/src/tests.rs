@@ -140,3 +140,30 @@ fn the_record_of_an_env_value_is_private_under_umask_022() {
     assert_eq!(mode(&d.join(table::TABLE_FILE)), 0o600, "table");
     let _ = std::fs::remove_dir_all(&d);
 }
+
+/// TODO/cli.md T-2073 (OR-B38-02): a container table that does not parse
+/// (empty, cut, not JSON, no version) gives the remedy on each read; a
+/// store with no table gives no error.
+#[test]
+fn a_table_that_does_not_parse_names_the_remedy() {
+    let d = std::env::temp_dir().join(format!("podvm-t2073-sup-{}", std::process::id()));
+    for (i, bytes) in [&b""[..], b"{\"podvm_containers\":1,", b"not json", b"{}"]
+        .iter()
+        .enumerate()
+    {
+        let root = d.join(i.to_string());
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let store = Store::open(&root).unwrap();
+        std::fs::write(root.join("containers.json"), bytes).unwrap();
+        let e = list(&store, true).unwrap_err();
+        assert!(e.0.contains("does not parse"), "{bytes:?}: {e}");
+        assert!(e.0.ends_with(TABLE_REMEDY), "{bytes:?}: {e}");
+        assert_eq!(e.0.lines().count(), 1, "{e}");
+    }
+    let root = d.join("none");
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    assert!(list(&Store::open(&root).unwrap(), true).unwrap().is_empty());
+    let _ = std::fs::remove_dir_all(&d);
+}
