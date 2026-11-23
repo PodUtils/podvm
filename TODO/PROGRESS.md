@@ -13,7 +13,8 @@ The state on 2026-11-21 (`docs/HANDOFF.md` has the detail):
 
 * (2026-11-23) After `v0.2.0-beta.37`, `main` carries podcrates `v0.81.0`
   (T-2066, `51c16c5`) and the size ceiling of 9 500 000 bytes (call C29,
-  `4d8da41`); `wip/oq-run` is the one branch that is not merged.
+  `4d8da41`); podcrates `v0.82.0` (T-2066); the work of `wip/oq-run`
+  (T-2052 to T-2055, OQ-05, OQ-07, OQ-08 partial and OQ-11), and T-2067.
 * The newest release is `v0.2.0-beta.37` (2026-11-21, release run
   44846783317 on `c92ac65`): systemd as PID 1 on each route with
   `--podvm-init=image` (T-2002), the saved state of a machine guest
