@@ -223,3 +223,37 @@ fn naming_the_registry_insecure_gets_past_the_policy() {
     );
     let _ = std::fs::remove_dir_all(store.root());
 }
+
+/// ⛔ TODO/image.md T-2068 (PodUtils/podrunner#344): the pull side of the
+/// rule of `load`. A pull of more blobs than the slots of the lock table
+/// holds one staging lock for each worker, never one for each blob, so
+/// each blob is committed.
+#[test]
+fn a_pull_of_more_blobs_than_the_lock_slots_commits_each_one() {
+    let store = par_store("t2068");
+    let n = 2 * podvm_probe::sys::FORK_CLOSE_SLOTS + 8;
+    let (contents, jobs) = par_jobs(n);
+    let report = fetch_parallel(&store, &jobs, |job, mut file, _buf, _cancel| {
+        use std::io::Write;
+        let idx = jobs
+            .iter()
+            .position(|j| j.digest == job.digest)
+            .expect("a job this call was not given");
+        file.write_all(contents[idx].as_bytes())
+            .map_err(|e| Error::io("t2068 probe", e))?;
+        Ok(FetchStep::Done(file))
+    });
+    assert!(
+        report.error.is_none(),
+        "{:?}",
+        report.error.map(|e| e.to_string())
+    );
+    for job in &jobs {
+        assert!(
+            store.has_blob(&job.digest),
+            "{} is not committed",
+            job.digest
+        );
+    }
+    let _ = std::fs::remove_dir_all(store.root());
+}

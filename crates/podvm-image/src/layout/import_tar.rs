@@ -143,7 +143,7 @@ pub fn import(store: &Store, tar: &Path, reference: Option<&str>) -> Result<Reco
         &config,
         &format!("{}/{}", config.os, config.architecture),
     )?;
-    store.put_record(record.clone())?;
+    store.put_written(record.clone())?;
     Ok(record)
 }
 

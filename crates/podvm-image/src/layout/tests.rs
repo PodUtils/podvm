@@ -191,3 +191,182 @@ fn messages_name_the_entry_of_a_changed_blob() {
     let _ = std::fs::remove_dir_all(s.root());
     let _ = std::fs::remove_dir_all(fresh.root());
 }
+
+/// The orders of the entries of an OCI-layout tarball: the index can come
+/// first or last, and the blobs in any order (`save` sorts them by name).
+#[derive(Debug, Clone, Copy)]
+enum Order {
+    IndexFirst,
+    IndexLast,
+    Reversed,
+}
+
+/// An OCI-layout tarball of `n` layers (each a tar of one file), in
+/// `order`, at a new path; with the digest of the manifest.
+fn layered_layout(tag: &str, n: usize, order: Order) -> (std::path::PathBuf, Digest) {
+    let mut blobs: Vec<(Digest, Vec<u8>)> = Vec::new();
+    let mut layers = Vec::new();
+    let mut diff_ids = Vec::new();
+    for i in 0..n {
+        let mut b = tar::Builder::new(Vec::new());
+        let body = format!("layer {i}\n");
+        let mut h = tar::Header::new_gnu();
+        h.set_size(body.len() as u64);
+        h.set_mode(0o644);
+        h.set_cksum();
+        b.append_data(&mut h, format!("t2068/layer-{i}"), body.as_bytes())
+            .unwrap();
+        let bytes = b.into_inner().unwrap();
+        let d = Digest::of(&bytes);
+        layers.push(serde_json::json!({
+            "mediaType": MEDIA_UNTAR, "digest": d.to_string(), "size": bytes.len(),
+        }));
+        diff_ids.push(d.to_string());
+        blobs.push((d, bytes));
+    }
+    let host = crate::platform::Platform::host();
+    let config = serde_json::to_vec(&serde_json::json!({
+        "architecture": host.arch, "os": "linux",
+        "rootfs": {"type": "layers", "diff_ids": diff_ids}, "config": {},
+    }))
+    .unwrap();
+    let config_digest = Digest::of(&config);
+    let manifest = serde_json::to_vec(&serde_json::json!({
+        "schemaVersion": 2,
+        "mediaType": oci::MEDIA_OCI_MANIFEST,
+        "config": {
+            "mediaType": "application/vnd.oci.image.config.v1+json",
+            "digest": config_digest.to_string(), "size": config.len(),
+        },
+        "layers": layers,
+    }))
+    .unwrap();
+    let manifest_digest = Digest::of(&manifest);
+    let index = pod_oci::layout::index_json(
+        oci::MEDIA_OCI_MANIFEST,
+        &manifest_digest,
+        manifest.len(),
+        &format!("localhost/t2068:{tag}"),
+    )
+    .unwrap();
+    blobs.push((config_digest, config));
+    blobs.push((manifest_digest.clone(), manifest));
+    let entries: Vec<(String, Vec<u8>)> = blobs
+        .into_iter()
+        .map(|(d, b)| {
+            (
+                format!(
+                    "blobs/sha256/{}",
+                    d.to_string().trim_start_matches("sha256:")
+                ),
+                b,
+            )
+        })
+        .collect();
+    let meta = vec![
+        ("oci-layout".to_string(), OCI_LAYOUT.as_bytes().to_vec()),
+        ("index.json".to_string(), index),
+    ];
+    let entries: Vec<(String, Vec<u8>)> = match order {
+        Order::IndexFirst => meta.into_iter().chain(entries).collect(),
+        Order::IndexLast => entries.into_iter().chain(meta).collect(),
+        Order::Reversed => entries.into_iter().rev().chain(meta).collect(),
+    };
+    let mut b = tar::Builder::new(Vec::new());
+    for (path, bytes) in &entries {
+        let mut h = tar::Header::new_gnu();
+        h.set_size(bytes.len() as u64);
+        h.set_mode(0o644);
+        h.set_cksum();
+        b.append_data(&mut h, path, &bytes[..]).unwrap();
+    }
+    let path = std::env::temp_dir().join(format!(
+        "podvm-t2068-{tag}-{}-{}.tar",
+        std::process::id(),
+        crate::digest::hex_of(&rand_bytes())
+    ));
+    std::fs::write(&path, b.into_inner().unwrap()).unwrap();
+    (path, manifest_digest)
+}
+
+/// Eight bytes of the kernel's entropy: a name of a test is unique across
+/// PID namespaces too (AGENTS.md 2b).
+fn rand_bytes() -> [u8; 8] {
+    let mut r = [0u8; 8];
+    std::io::Read::read_exact(&mut std::fs::File::open("/dev/urandom").unwrap(), &mut r).unwrap();
+    r
+}
+
+/// TODO/image.md T-2068 (PodUtils/podrunner#344): a verb that walks the
+/// layers of an image holds one staging lock at a time, so an image with
+/// more layers than the slots of the lock table (`FORK_CLOSE_SLOTS`)
+/// loads, in each order of the entries, and `save` gives it back whole.
+/// Before, `load` held one lock for each blob until the end, and the 15th
+/// was refused ("this process already holds 16 locks").
+#[test]
+fn an_image_with_more_layers_than_the_lock_slots_loads_and_saves() {
+    let n = 2 * podvm_probe::sys::FORK_CLOSE_SLOTS + 8;
+    for order in [Order::IndexFirst, Order::IndexLast, Order::Reversed] {
+        let tag = format!("{order:?}").to_lowercase();
+        let (tarball, manifest_digest) = layered_layout(&tag, n, order);
+        let s = scratch(&format!("t2068-{tag}"));
+        let r = load(&s, &tarball).unwrap_or_else(|e| panic!("{order:?}: load: {e}"));
+        assert_eq!(r.layers.len(), n, "{order:?}");
+        assert_eq!(r.manifest_digest, manifest_digest.to_string(), "{order:?}");
+        for l in &r.layers {
+            s.read_blob(&Digest::parse(l).unwrap())
+                .unwrap_or_else(|e| panic!("{order:?}: {e}"));
+        }
+        let left: Vec<_> = std::fs::read_dir(s.root().join("staging"))
+            .map(|d| d.flatten().map(|e| e.file_name()).collect())
+            .unwrap_or_default();
+        assert!(left.is_empty(), "{order:?}: staging keeps {left:?}");
+        // `save` of the record and `load` of that tarball into a new store.
+        let saved = tarball.with_extension("saved.tar");
+        let mut out = std::fs::File::create(&saved).unwrap();
+        let done = save(&s, &format!("localhost/t2068:{tag}"), &mut out)
+            .unwrap_or_else(|e| panic!("{order:?}: {e}"));
+        drop(out);
+        assert_eq!(done.blobs, n + 2, "{order:?}");
+        let again = scratch(&format!("t2068-{tag}-again"));
+        let back = load(&again, &saved).unwrap_or_else(|e| panic!("{order:?}: reload: {e}"));
+        assert_eq!(back.manifest_digest, r.manifest_digest, "{order:?}");
+        for p in [&tarball, &saved] {
+            let _ = std::fs::remove_file(p);
+        }
+        let _ = std::fs::remove_dir_all(s.root());
+        let _ = std::fs::remove_dir_all(again.root());
+    }
+}
+
+/// TODO/image.md T-2068: a writer commits each blob before its record, so
+/// `rmi` or a prune of another image that shares a blob can remove it in
+/// between. The record of a writer is written only where each blob that
+/// it names is in the store, and the refusal names the blob.
+#[test]
+fn a_record_is_written_only_where_each_blob_that_it_names_is_there() {
+    let s = scratch("t2068-whole");
+    let tarball = std::env::temp_dir().join(format!(
+        "podvm-t2068-whole-{}.tar",
+        crate::digest::hex_of(&rand_bytes())
+    ));
+    std::fs::write(&tarball, rootfs_tar()).unwrap();
+    let record = import(&s, &tarball, Some("whole:1")).unwrap();
+    let _ = std::fs::remove_file(&tarball);
+    let cases: [(&str, &str); 3] = [
+        ("the manifest", &record.manifest_digest),
+        ("the config", &record.config_digest),
+        ("the layer", &record.layers[0]),
+    ];
+    for (what, blob) in cases {
+        let path = s.blob_path(&Digest::parse(blob).unwrap());
+        let bytes = std::fs::read(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        let e = s.put_written(record.clone()).expect_err(what).to_string();
+        assert!(e.contains(blob) && e.contains("rmi"), "{what}: {e}");
+        std::fs::write(&path, bytes).unwrap();
+        s.put_written(record.clone())
+            .unwrap_or_else(|e| panic!("{what}: whole: {e}"));
+    }
+    let _ = std::fs::remove_dir_all(s.root());
+}

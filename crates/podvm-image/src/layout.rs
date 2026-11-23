@@ -108,40 +108,51 @@ fn append(archive: &mut tar::Builder<&mut dyn Write>, path: &str, data: &[u8]) -
 /// decides where it goes.
 struct StagedBlob {
     digest: Digest,
-    /// The name of the entry in the tarball (untrusted; for the refusal).
-    entry: String,
     path: PathBuf,
-    // ⭐ The in-store staging handle, held until commit or cleanup. Its
-    // exclusive lock is what tells `sweep_staging` this file is being
-    // written rather than abandoned (invariant I5).
-    _guard: StagedFile,
+    // ⭐ The in-store staging handle, held until the commit. Its exclusive
+    // lock is what tells `sweep_staging` this file is being written rather
+    // than abandoned (invariant I5).
+    file: StagedFile,
+}
+
+/// A blob of the tarball after its commit: its computed digest and the
+/// name of its entry (untrusted; for the refusal).
+struct LoadedBlob {
+    digest: Digest,
+    entry: String,
 }
 
 /// `podvm load`: an OCI-layout tarball into the store. Every blob is
-/// hashed on the way in and matched against a descriptor before it is
-/// committed, so a tarball whose bytes changed in transit is refused the
-/// way a bad pull is. Staging files are removed on every path out.
+/// hashed on the way in and matched against a descriptor before the
+/// record is written, so a tarball whose bytes changed in transit is
+/// refused the way a bad pull is.
+///
+/// ⛔ TODO/image.md T-2068 (PodUtils/podrunner#344): each blob is
+/// committed by its computed digest as soon as its bytes are written, so
+/// a load holds one staging lock at a time, as each worker of a pull
+/// does. Before, the load held the staging lock of each blob until the
+/// index was read, and the 15th blob passed the slots of the lock table
+/// (`FORK_CLOSE_SLOTS`): an image of 85 layers did not load. A blob
+/// before the record is safe as the blob of a pull is: the sweep of the
+/// strays removes none while [`Store::writing`] is held, and the record
+/// is written only where each blob that it names is in the store
+/// ([`Store::put_written`]). A blob that the manifest does not name stays
+/// a stray, which `image prune` removes.
 pub fn load(store: &Store, src: &Path) -> Result<Record> {
     // PodUtils/podvm#527: a sweep keeps each blob until the record.
     let _writing = store.writing()?;
     let file = std::fs::File::open(src).map_err(|e| Error::io(src.display().to_string(), e))?;
     let mut archive = tar::Archive::new(file);
-    let mut index_bytes: Option<Vec<u8>> = None;
-    let mut staged: Vec<StagedBlob> = Vec::new();
-    let outcome = load_inner(store, src, &mut archive, &mut index_bytes, &mut staged);
-    for blob in &staged {
-        let _ = std::fs::remove_file(&blob.path);
-    }
-    outcome
+    load_inner(store, src, &mut archive)
 }
 
 fn load_inner(
     store: &Store,
     src: &Path,
     archive: &mut tar::Archive<std::fs::File>,
-    index_bytes: &mut Option<Vec<u8>>,
-    staged: &mut Vec<StagedBlob>,
 ) -> Result<Record> {
+    let mut index_bytes: Option<Vec<u8>> = None;
+    let mut loaded: Vec<LoadedBlob> = Vec::new();
     let entries = archive
         .entries()
         .map_err(|e| Error::Oci(format!("{} is not a tarball: {e}", src.display())))?;
@@ -179,14 +190,18 @@ fn load_inner(
             entry
                 .read_to_end(&mut bytes)
                 .map_err(|e| Error::Oci(format!("{} does not read: {e}", src.display())))?;
-            *index_bytes = Some(bytes);
+            index_bytes = Some(bytes);
             continue;
         }
-        let mut blob = stage_entry(store, src, &mut entry)?;
-        blob.entry = name.to_string();
-        staged.push(blob);
+        // ⛔ T-2068: committed at once, so the staging lock goes before
+        // the next entry.
+        let digest = commit_entry(store, src, &mut entry)?;
+        loaded.push(LoadedBlob {
+            digest,
+            entry: name,
+        });
     }
-    let Some(index_bytes) = index_bytes else {
+    let Some(index_bytes) = &index_bytes else {
         return Err(Error::Oci(format!(
             "{} has no index.json, so it names no image",
             src.display()
@@ -216,7 +231,7 @@ fn load_inner(
     }
     let descriptor = &index.manifests[0];
     let manifest_digest = descriptor.parsed_digest()?;
-    commit_staged(store, staged, &manifest_digest, src)?;
+    take_loaded(&mut loaded, &manifest_digest, src)?;
     let manifest_bytes = store.read_blob(&manifest_digest)?;
     let manifest: oci::Manifest = serde_json::from_slice(&manifest_bytes).map_err(|e| {
         Error::Oci(format!(
@@ -225,7 +240,7 @@ fn load_inner(
         ))
     })?;
     let config_digest = manifest.config.parsed_digest()?;
-    commit_staged(store, staged, &config_digest, src)?;
+    take_loaded(&mut loaded, &config_digest, src)?;
     let config_bytes = store.read_blob(&config_digest)?;
     let config: oci::Config = serde_json::from_slice(&config_bytes).map_err(|e| {
         Error::Oci(format!(
@@ -234,14 +249,14 @@ fn load_inner(
         ))
     })?;
     for layer in &manifest.layers {
-        commit_staged(store, staged, &layer.parsed_digest()?, src)?;
+        take_loaded(&mut loaded, &layer.parsed_digest()?, src)?;
     }
-    if !staged.is_empty() {
+    if !loaded.is_empty() {
         return Err(Error::Oci(format!(
             "{} carries {} blob(s) the manifest does not name; refusing rather than \
-             storing bytes no record points at",
+             recording bytes no record points at. `podvm image prune` removes them",
             src.display(),
-            staged.len()
+            loaded.len()
         )));
     }
     // TODO/image.md T-1839: with no name, the record has no tag and is
@@ -270,7 +285,7 @@ fn load_inner(
         record.repository = "<none>".to_string();
         record.tag = None;
     }
-    store.put_record(record.clone())?;
+    store.put_written(record.clone())?;
     Ok(record)
 }
 
@@ -287,41 +302,58 @@ fn stage_entry(store: &Store, src: &Path, entry: &mut dyn Read) -> Result<Staged
     let (path, mut out) = store.stage("load")?;
     let mut hasher = sha2::Sha256::new();
     let mut buf = [0u8; 64 * 1024];
-    loop {
-        let n = entry
-            .read(&mut buf)
-            .map_err(|e| Error::Oci(format!("{} does not read: {e}", src.display())))?;
+    let copied = loop {
+        let n = match entry.read(&mut buf) {
+            Ok(n) => n,
+            Err(e) => break Err(Error::Oci(format!("{} does not read: {e}", src.display()))),
+        };
         if n == 0 {
-            break;
+            break Ok(());
         }
         hasher.update(&buf[..n]);
-        out.write_all(&buf[..n])
-            .map_err(|e| Error::io(path.display().to_string(), e))?;
+        if let Err(e) = out.write_all(&buf[..n]) {
+            break Err(Error::io(path.display().to_string(), e));
+        }
+    };
+    if let Err(e) = copied {
+        // The staging file goes on each path out, under its lock.
+        let _ = std::fs::remove_file(&path);
+        return Err(e);
     }
     let hex = crate::digest::hex_of(&hasher.finalize());
     Ok(StagedBlob {
         digest: Digest::parse(&format!("sha256:{hex}"))?,
-        entry: String::new(),
         path,
-        _guard: out,
+        file: out,
     })
 }
 
-/// Commit the staged blob whose computed digest matches `want` into the
-/// store. A staged blob nobody names is left for the caller to refuse on.
-/// The staging file is removed on every path through here.
-fn commit_staged(
-    store: &Store,
-    staged: &mut Vec<StagedBlob>,
-    want: &Digest,
-    src: &Path,
-) -> Result<()> {
-    let Some(pos) = staged.iter().position(|b| b.digest == *want) else {
+/// Stage one tarball entry and commit it by its computed digest
+/// (TODO/image.md T-2068). The commit is the one of a pull
+/// (`pod_oci::pull::Blobs`): the flush, the sync and the rename, under the
+/// staging lock, so a crash leaves a whole blob or a `*.partial` that the
+/// sweep removes. The lock goes when this returns.
+fn commit_entry(store: &Store, src: &Path, entry: &mut dyn Read) -> Result<Digest> {
+    let blob = stage_entry(store, src, entry)?;
+    let path = blob.path.clone();
+    match pod_oci::pull::Blobs::commit(store, &blob.path, blob.file, &blob.digest) {
+        Ok(()) => Ok(blob.digest),
+        Err(e) => {
+            let _ = std::fs::remove_file(&path);
+            Err(e)
+        }
+    }
+}
+
+/// Take the committed blob whose computed digest is `want` off the list.
+/// A blob nobody names stays on it for the caller to refuse on.
+fn take_loaded(loaded: &mut Vec<LoadedBlob>, want: &Digest, src: &Path) -> Result<()> {
+    let Some(pos) = loaded.iter().position(|b| b.digest == *want) else {
         // TODO/image.md T-1836: the entry of that name and its computed
         // digest, or that no entry holds the blob.
         let hex = want.to_string();
         let hex = hex.trim_start_matches("sha256:");
-        let got = staged
+        let got = loaded
             .iter()
             .find(|b| b.entry.ends_with(hex))
             .map(|b| format!("{} for the entry {}", b.digest, b.entry))
@@ -332,11 +364,7 @@ fn commit_staged(
             got,
         });
     };
-    let blob = staged.remove(pos);
-    // ⚠ The staging file already holds exactly the verified bytes, so it
-    // commits directly: a second copy would double the I/O for no new
-    // verification.
-    store.commit(&blob.path, want)?;
+    loaded.remove(pos);
     Ok(())
 }
 

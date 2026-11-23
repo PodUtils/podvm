@@ -326,7 +326,7 @@ pub fn pull(
         &config,
         &served.unwrap_or_else(|| platform.to_string()),
     )?;
-    store.put_record(record.clone())?;
+    store.put_written(record.clone())?;
     // ⭐ TODO/image.md T-1321. How the bytes got here, recorded at pull
     // time rather than derived later: the sidecar never lives inside
     // image metadata.

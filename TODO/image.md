@@ -4657,3 +4657,38 @@ A layer of GNU tar `--format=posix --xattrs --acls` with an extended ACL on a fi
 **Done (2026-11-23).** podcrates `v0.82.0` (`51c0939`, the answer to #643) cleared the blocker: `pod-extract` gives each `SCHILY.acl.*` record to the entry, with any byte in its value, converts the text form to `system.posix_acl_access` or `system.posix_acl_default`, and sets it, or names it as not set in the sidecar and in the count of the line of the layer (`N extended attributes set`). The take is [T-2066](deps.md), step 5. The integration test `a_layer_with_the_acls_of_gnu_tar_extracts_with_its_modes` (`crates/podvm/tests/extract_modes.rs`) imports and extracts a layer with a default ACL on a directory and an access ACL on a file, each a PAX record of the text of GNU tar `--acls --numeric-owner` with a newline byte between entries, as the caller and as uid 1000: each mode stays, and each ACL is on disk with the bytes that Linux gives for it, or the sidecar names it. On the cloud host as root, the same layer (made by Python's `tarfile` in PAX format): the release `podvm` of `4d8da41` (podcrates `v0.80.0`) exits 125 with "the PAX record "SCHILY.acl.default" has a newline byte, which the tar reader cuts. The layer is refused whole"; the build of the take exits 0 with "Extracted (2 entries, 0 whiteouts); 2 extended attributes set", and `system.posix_acl_access` of the file holds the ACL. The line of the count is the crate's; podvm adds no line of its own. The answer to podrunner (#644) is the lead's.
 
 Known limit: the image that podvm makes for the incus tier (`crates/podvm/src/incus/xattrs.rs`) carries `security.capability` and `user.*` only, so an ACL of a layer does not reach an incus instance. Not measured.
+
+# T-2068: `load` of an image of 14 layers or more is refused: the load holds one lock for each blob
+
+**Source:** PodUtils/podrunner#344 (COORD-122 of podrunner; podrunner@T-606)
+**Category:** image
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+podrunner: `podvm load` (0.2.0-beta.37) of the OCI-layout tar of `ghcr.io/podutils/podrunner-hosted` (amd64, 85 layers, about 16 GiB of blobs) exits 125 after 9 s, as a user with no root: "podvm load: store: this process already holds 16 locks, which is each slot for the descriptors that a fork must close. One more would leak into each child, so the lock is refused". An image of 6 layers loads.
+
+## Premise
+
+`layout::load` (`crates/podvm-image/src/layout.rs`) wrote each blob of the tarball to a staging file of the store and kept each `StagedFile` (with its exclusive lock) in a list until it had read `index.json`, the manifest and the config, and only then committed the blobs. The lock table of `pod-supervise` (podcrates, `lock.rs`, `Lock::try_acquire_noting`) registers each lock to be closed in each child of a fork and refuses a lock past `FORK_CLOSE_SLOTS` (16). With `writers.lock`, the 16th blob of a load (the 17th lock) was refused: an image of 14 layers or more (with its manifest and config), or of 13 from stdin (the spool holds one more lock). The table is right: a lock that it does not register leaks into each child. `pull` holds one staging lock for each of its 4 workers (`FETCH_WORKERS`, a `const` assert against the slots); `import` holds one; `save` and the extraction hold none for a layer. `load` is the one verb that held one lock for each layer.
+
+## Approach
+
+`load` commits each blob by its computed digest as soon as its bytes are written (flush, sync, rename under the staging lock, the commit of `pull`), and keeps only the digest and the name of the entry. After the index, the manifest, the config and each layer must be among the committed digests; the refusals stay the same (T-1836, an unnamed blob). The blobs before the record are safe as the blobs of a pull: the sweep of the strays removes none while `writers.lock` is held (PodUtils/podvm#527), and a crash leaves whole blobs (strays, which `image prune` removes) or a `*.partial` that the sweep removes. A writer (`pull`, `load`, `import`) writes its record with `Store::put_written`: under the index lock, each blob that the record names must be in the store. `rmi` or `image prune` of another image that shares a blob can remove it between its commit and the record; this check makes that a refusal that names the blob, not a record that names a missing blob.
+
+## Decision
+
+2026-11-23, the session's call. The fix is in podvm: the lock table of podcrates does not change (AGENTS.md 2a). One rule for each verb that walks layers: a verb holds one staging lock for each blob that it writes at that time, never one for each layer of the image. A blob that the manifest does not name stays a stray and is not removed at once: a concurrent writer can need the same digest, and the sweep of the strays is the one removal that knows that.
+
+## Prove
+
+`cargo test -p podvm-image`: a load of an image with `2 * FORK_CLOSE_SLOTS + 8` layers in three orders of the entries passes, and `save` gives it back; a fetch of as many blobs by the pull pool commits each one; a record of a writer whose manifest, config or layer is missing is refused by the name of the blob. By hand, as root and as uid 1000: `load` of 85 layers, then `run --rm`.
+
+## Done
+
+**Done (2026-11-23).** `layout.rs`: `load` commits each blob by its computed digest at once (`commit_entry`: the staging file, then `pod_oci::pull::Blobs::commit` of the store, the flush, the sync and the rename under the staging lock; the staging file goes on each failure), and keeps the digest and the name of the entry (`LoadedBlob`); `take_loaded` checks the manifest, the config and each layer against that list, with the texts of T-1836 and of a blob that the manifest does not name. `store/records.rs`: `Store::put_written` checks each blob of the record under the index lock and refuses with the digest; `load`, `import` and `pull` write their record with it. Tests (`cargo test -p podvm-image`, 89 passed): `an_image_with_more_layers_than_the_lock_slots_loads_and_saves` (40 layers, the index first, last, and the blobs in reverse; `save` and a second `load`; no `*.partial` stays; it fails on the code before, at the first order), `a_pull_of_more_blobs_than_the_lock_slots_commits_each_one` (40 blobs through the pull pool), `a_record_is_written_only_where_each_blob_that_it_names_is_there` (the manifest, the config, the layer). Measured on the cloud host with OCI-layout tars of Python's `tarfile` (one file in each layer, a static program in the first): the release before (0.2.0-beta.37) loads 13 layers from a file and exits 125 at 14 (at 13 from stdin), as root and as uid 1000; the release of the fix loads 40 and 85 layers from a file and from stdin, `run --rm` sees each layer ("layers seen: 85"), `save` gives 87 blobs and the tarball loads again, as root and as uid 1000 (`setpriv`, `HOME`, `TMPDIR` and `PODVM_STORE` in a new directory under `/var/tmp`), and no staging file stays. The load of a layer of 512 MiB took 1.41 s and 1.49 s before, 1.34 s and 1.49 s after: the sync adds no time that this host shows.
+
+Known limit: the image of podrunner (85 layers, about 16 GiB) is not measured here.

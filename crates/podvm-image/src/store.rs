@@ -56,6 +56,11 @@
 //! takes that same lock while it acquires the image lock. ⛔ Checking `in_use`
 //! outside the lock is a check whose answer is stale before it is used: a
 //! `hold` taken in between kept its image lock and lost its blobs.
+//! ⛔ A writer (`pull`, `load`, `import`) commits each blob before its
+//! record, so `delete` can remove a blob that it shares with the doomed
+//! record in between. [`Store::put_written`] checks each blob of the
+//! record under the same lock and refuses by the digest
+//! ([T-2068](../../../TODO/image.md)).
 //!
 //! **I5. A killed process leaves exactly one kind of litter, and it is swept.**
 //! Blobs are only ever named by rename after verification and the index only

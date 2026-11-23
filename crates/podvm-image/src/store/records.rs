@@ -186,7 +186,39 @@ impl Store {
     /// podman keeps both and so does podvm. `Store::find` is where the
     /// resulting ambiguity is resolved, by name and never by position.
     pub fn put_record(&self, record: Record) -> Result<()> {
-        let _guard = self.lock()?;
+        let guard = self.lock()?;
+        self.put_record_locked(record, &guard)
+    }
+
+    /// [`Store::put_record`] for a writer (`pull`, `load`, `import`): the
+    /// record is written only where each blob that it names is in the
+    /// store, checked under the index lock (TODO/image.md T-2068).
+    ///
+    /// ⛔ A writer commits each blob before its record, and a blob that
+    /// it found in the store is a blob of another record. An `rmi` or an
+    /// `image prune` of that record in between removes the blob, as no
+    /// record names it for this writer yet. [`Store::delete`] takes the
+    /// same lock, so after this check each blob stays: the record that
+    /// names it is in the index.
+    pub fn put_written(&self, record: Record) -> Result<()> {
+        let guard = self.lock()?;
+        for b in record.blobs() {
+            let d = Digest::parse(b)?;
+            if !self.has_blob(&d) {
+                return Err(Error::Store(format!(
+                    "the blob {b} of {} is not in {}: an `rmi` or a prune of another \
+                     image that shares it removed it after this command found or wrote \
+                     it, so no record is written. Run the command again",
+                    record.name(),
+                    self.root.join(BLOBS).display()
+                )));
+            }
+        }
+        self.put_record_locked(record, &guard)
+    }
+
+    /// The write of [`Store::put_record`], under the index lock `_guard`.
+    fn put_record_locked(&self, record: Record, _guard: &Lock) -> Result<()> {
         let mut index = self.read_index()?;
         index.podvm_store = INDEX_VERSION;
         index.images.retain(|r| {
