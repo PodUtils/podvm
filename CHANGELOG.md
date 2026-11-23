@@ -19,6 +19,15 @@ They describe their recorded revision, not the current build.
   command 1000) before the command starts. Before, in 12 of 44 runs, the
   instance stopped with no exit code and no usage for `inspect` (T-2077,
   PodUtils/podrunner#345).
+- On the incus tier, an image that cannot fit in the storage pool of the
+  default profile (a pool of the driver `dir`) is refused before the
+  import, with one line that names the pool, its free space or inodes and
+  the need of the image; below an estimate of the need, a warning. A
+  create or an import whose answer goes over the bound of 64 MiB (on a
+  full pool incusd puts the error of `tar` for each file into its answer)
+  gives one more line with the free space of the pool and the need. Before,
+  the only line was "the response body is larger than allowed" (T-2078,
+  PodUtils/podrunner#346).
 
 ## 0.2.0-beta.38 (2026-11-23)
 

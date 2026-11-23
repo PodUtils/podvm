@@ -67,12 +67,17 @@ pub async fn create(
     new: &NewInstance,
     net_none: bool,
     channel: Option<&(PathBuf, u16)>,
-) -> Result<(), String> {
-    c.create_instance(new).await.map_err(|e| e.to_string())?;
+) -> Result<(), (String, super::space::Transport)> {
+    // TODO/machine.md T-2078: the class of a fault of the transport goes
+    // with the text of a create, so that the caller can name the free space.
+    use super::space::{transport, Transport};
+    let made = |e: pod_incus::Error| (e.to_string(), transport(&e));
+    let text = |e: pod_incus::Error| (e.to_string(), Transport::None);
+    c.create_instance(new).await.map_err(made)?;
     if !net_none {
         return Ok(());
     }
-    let inst = c.instance(&new.name).await.map_err(|e| e.to_string())?;
+    let inst = c.instance(&new.name).await.map_err(text)?;
     let left = nics(&inst.expanded_devices);
     if left.is_empty() {
         return Ok(());
@@ -87,14 +92,17 @@ pub async fn create(
         .collect();
     masks.extend(left);
     again.devices.extend(devices(true, &masks, channel));
-    c.create_instance(&again).await.map_err(|e| e.to_string())?;
-    let inst = c.instance(&again.name).await.map_err(|e| e.to_string())?;
+    c.create_instance(&again).await.map_err(made)?;
+    let inst = c.instance(&again.name).await.map_err(text)?;
     let left = nics(&inst.expanded_devices);
     if !left.is_empty() {
         let _ = c.delete_instance(&again.name).await;
-        return Err(format!(
-            "--podvm-net none: the instance keeps the NIC {} (TODO/machine.md T-1779)",
-            left.join(", ")
+        return Err((
+            format!(
+                "--podvm-net none: the instance keeps the NIC {} (TODO/machine.md T-1779)",
+                left.join(", ")
+            ),
+            Transport::None,
         ));
     }
     Ok(())

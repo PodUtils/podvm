@@ -6142,3 +6142,141 @@ file.
 ## Done
 
 **Done (2026-11-23).** `incus::oom` (new): `Guard::take` writes -1000 to the `oom_score_adj` of PID 1 (`guest-hold --run`) before the command starts and reads it back; the command gets the value that PID 1 had (`Guard::Immune`), and does not start where its write fails (`set_in_child` in the `pre_exec`, no allocation). Where the kernel refuses -1000 (route A: EACCES), PID 1 keeps its value, the command gets 1000 (`Guard::Last`), and the init writes the reason on the console of the instance. The T-2076 rules stay: the command cannot write the files, as no process of it lives when the init writes. No crate of podcrates and no sibling has a writer of `oom_score_adj`. Unit tests `pid1_takes_the_lowest_value_and_the_command_one_that_the_killer_takes_first` (one table: values, -1000 already, not a value, out of range, no directory, a directory, a write that does not hold) and `the_command_starts_with_its_value_or_not_at_all` (`crates/podvm/src/incus/oom_tests.rs`). Proof on the cloud host (route A, cgroup v1): the loop of the clause-26 payload, 24 runs, gave `Stopped`, an exit code 137 and the use in each (0 of 24 lost; before, 12 of 44): `OomKills` 1 in 18 runs and 2 in 6 runs, where the second event took `sh` or `head` of the command, not PID 1. A command that fills a tmpfs over the limit and exits with 3 kept its exit file and its usage file in 4 of 4 runs (exit 3 once, 137 three times when the killer took `sh`). Clause 26 keeps no retry: one run over `--memory 32m` gives `0.266 33554432 2 137`. The full experiment (`PODVM_434_MIRROR=1`) passed on the second run, "THE INCUS TIER RUNS". The first run disagreed only in clause 23, the metrics of incusd as T-2076 records: `run --rm` uses `incus exec` and `guest-hold` with no `--run`, which this change does not touch. Limits, in `docs/incus.md`: with 1000 the command reads 1000 and a host-wide OOM takes it first; a command can lower its own value to 0, and a process that `exec` starts (also the command of a foreground run) has the value of incusd, so with such processes the OOM killer can still take PID 1. Not measured: an incusd that gives -1000 (an incusd of root).
+
+# T-2078: On the incus tier, a full storage pool gives "the response body is larger than allowed" with no word of the cause
+
+**Source:** PodUtils/podrunner#346 (COORD-124 of podrunner), podrunner's run `hosted-measure.yml` 45276440474 (`f694571`), step "Import into incusd"
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+On a hosted `ubuntu-24.04` runner (incusd 6.0.0, a storage pool of the
+driver `dir` on `/`, a user with no root in the group `incus-admin`),
+`podvm create --name measure --podvm-tier=incus --podvm-init=image
+--podvm-net none IMAGE /bin/true` of an image of 85 layers (about 16 GiB)
+gave the line of the import, then `podvm create: incus tier: POST
+/1.0/instances: the response body is larger than allowed`, and exit 125.
+During the import and the create the use of `/` grew from 32.2 GB to
+152.3 GB, with 2.6 GB free at the end. The line gives no cause.
+
+## Premise
+
+The text is pod-proxy's (podcrates `v0.82.0`: `decode_chunked` of its
+module `http`, and `too_large` of `http::body`): an answer over the bound of the client
+(`pod_incus::Settings::max_body`, 64 MiB; podvm takes the default). The
+call is the wait of the operation of the create (`GET
+/1.0/operations/ID/wait`), which pod-incus names with the call that
+started it. The cause was not known: a real error of incusd over 64 MiB, a
+bad chunk size, or a cut connection.
+
+## Approach
+
+Reproduce on the cloud host: a root incusd 6.0.0 with its own `INCUS_DIR`,
+a pool of the driver `dir` on a loop-mounted ext4 of 400 MiB (359 MiB,
+102,400 inodes), a user of the group `incus-admin`, an image larger than
+the pool, and a recording proxy between podvm and the socket
+(`PODVM_INCUS_SOCKET`). Then refuse an image that cannot fit before the
+import, and name the free space after a failed transport.
+
+## Decision
+
+(1) The cause is a real answer of incusd over the bound: on a full pool,
+incusd 6.0 puts the whole stderr of `tar` into the error of the operation,
+one line for each file that it could not write (measured below). (2) The
+check of the room is in podvm: pod-incus has no call of the resources of a
+pool, so podvm reads `statfs` (pod-hostprobe `space::read`) of
+`INCUS_DIR/storage-pools/NAME/containers`, where the root of a new
+instance goes, for the pool of the `root` disk of the
+default profile, only where each driver of the server is `dir` and the
+pool shows that directory (an incusd in its own mount namespace mounts a
+pool with a `source` where podvm does not see it). (3)
+The need is a lower bound: the bytes of each file of the tree and one inode
+for each entry, twice the bytes where incusd's images and the pool are on
+one file system. A need over the free space (`f_bavail`) or over the free
+inodes is a refusal (exit 125); a need over 77 % of the free space (the
+estimate of experiment 434 clause 21: 1.3 times the bound) is a warning.
+(4) The check runs before an import only: the walk of a large tree takes
+about 1 s for 550,000 entries, and a run of an image that incus already has
+does not pay it. After a create or an import that failed in its transport,
+one more line gives the free space and the need; for a refusal by size it
+comes each time, as incusd removes what it wrote. (5) The head of an answer
+over the bound, its status and its size belong to pod-proxy and pod-incus:
+a COORD issue to podcrates asks for them, and for a call of the resources
+of a pool and of the size of an image.
+
+## Prove
+
+`cargo test -p podvm --bin podvm space_tests` (one table over the verdict:
+bytes, inodes, the estimate, the hosted case; the loads on one or two file
+systems; the drivers; the walk; the path of a pool; a stand-in incusd whose
+wait declares a chunk of 80 MiB). Experiment 434 clause 27 (`PODVM_434_MIRROR=1
+sh experiments/434-incus-tier.sh`): a pool of 8 MiB refuses the run before
+the import, with one line and exit 125.
+
+## Done
+
+Partial (2026-11-23). Reproduced on the cloud host (a root incusd 6.0.0,
+the pool `default` of the driver `dir` on an ext4 of 359 MiB with 102,400
+inodes, a user of `incus-admin`, 0.2.0-beta.38 at `c47e323a`). An image of
+one layer with 150,000 empty files with long paths: the create gave
+`incus refused the call (500, error_code 500): Failed creating instance
+from image: Unpack failed: Failed to run: tar ... -xf -: exit status 2
+(tar: rootfs/...` with the text cut at 512 characters (pod-incus), before
+the words "No space left on device". The recording proxy shows the answer
+of the wait: HTTP 200, chunked, one chunk of 17,309,840 bytes, an envelope
+of type `error` with 95,177 lines `tar: ...: Cannot open: No space left on
+device` or `Cannot mkdir: No such file or directory`. With 400,000 files:
+`POST /1.0/instances: the response body is larger than allowed`, exit 125,
+the line of beta.38; the answer declares one chunk of `672fa06`
+(108,198,406 bytes) and the client refuses it at the size line. So the
+size is true; a chunk size line and a cut connection are not the cause.
+After the failure incusd removed the volume: the pool had its 330 MiB
+free again.
+
+The fix (`incus::space`, new; `incus::run::ensure_image`, `incus::net::create`,
+`incus::verbs::detached`): before an import, a refusal by name where the
+image cannot fit; a warning below the estimate; after a create or an
+import that failed in its transport, one more line with the free space and
+the need. Measured with the fix on the same host: the image of 400,000
+files is refused in 0.9 s before the import with ``the storage
+pool `default` at .../storage-pools/default has 102380 free inodes and the
+root of the instance needs at least 401207 (one for each file and
+directory)``;
+an image of one file of 350 MiB with `has 330.3 MiB free and the root of
+the instance needs at least 358.7 MiB`; the image of 400,000 files that
+incus already had (imported on a large pool) gives the line of the refusal
+by size and then ``the answer of incusd was over podvm's bound of 64.0
+MiB: where a pool fills, incusd's error holds a line of tar for each file
+that it could not write (measured), and incusd then removes what it wrote;
+the storage pool `default` at ... has 330.3 MiB free and 102380 free
+inodes now, and the root of the instance needs at least 8.7 MiB and 401207
+inodes``. Each exit is 125. These lines name the directory of the pool;
+the final build reads its `containers` directory, on the same file system
+there, and names it. Unit tests `incus::space_tests` (6).
+
+Experiment 434 with clause 27 (`PODVM_434_MIRROR=1`, the incusd of route A,
+`experiments/results/incus-tier.txt`): "THE INCUS TIER RUNS". Clause 27: a
+pool `small` whose `containers` directory is a tmpfs of 8 MiB gives exit
+125 and one line, ``the storage pool `small` at
+.../storage-pools/small/containers has 8.0 MiB free and the root of the
+instance needs at least 16.1 MiB``, with no image imported and no instance
+left. The run before it disagreed only in clause 23 (the metrics of
+incusd, the known fault of T-2076); the run before that one passed clause
+23 and found two faults of clause 27 itself (a pool directory that incusd
+must make, and a directory of root in the state of incusd). `cargo test
+--workspace --no-fail-fast`: 1,147 passed, 0 failed, 1 ignored (96 test
+binaries). `cargo check --target aarch64-unknown-linux-musl --workspace`
+passes. The release `podvm` is 9,074,904 bytes.
+
+Remaining: (1) podcrates: the head, the status, the size and the bound of
+an answer over the bound (and the `error` of an incus envelope in the head),
+a kind of its own for that refusal, `f_bfree` in `Statfs`, and the calls of
+the resources of a pool and of an image (the COORD issue to podcrates);
+then podvm takes them and reads the pool through the API. (2) A check
+before the create of an image that incus already has, with the size of the
+image from incusd. (3) A run on the hosted runner of PodUtils/podrunner#346
+with the next beta after 0.2.0-beta.38.

@@ -1682,6 +1682,7 @@ dependencies = [
  "pod-beneath",
  "pod-broker",
  "pod-core",
+ "pod-hostprobe",
  "pod-incus",
  "pod-lab",
  "pod-link",

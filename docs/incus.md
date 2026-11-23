@@ -270,6 +270,36 @@ files with capabilities. Three changes serve it on the incus tier.
   root of the instance. The root of the machine tier is not proven (T-1999
   keeps it for `kvm.yml`).
 
+## The room of the pool (T-2078)
+
+On a pool of the driver `dir`, incusd unpacks the image into the root of
+each new instance with `tar`. Where the pool fills, incusd 6.0 puts the
+whole stderr of `tar` into the error of the operation, one line for each
+file that it could not write: 17 MB for 150,000 files and 108 MB for
+400,000 files on a pool of 359 MiB (measured on 2026-11-23). An answer over
+64 MiB is over the bound of the client, which then gives "the response
+body is larger than allowed" (PodUtils/podrunner#346). incusd removes what
+it wrote, so after the failure the pool has its space again.
+
+* **Before an import**, `incus::space` compares what the image needs with
+  the free space of the pool of the `root` disk of the default profile (its
+  `containers` directory, where the root of an instance goes) and of
+  incusd's images: the bytes of each file of the tree and one inode for
+  each entry, twice the bytes where both are on one file system. Where the
+  need is over the free space for a user (`f_bavail`) or over the free
+  inodes, the run is refused with one line and exit 125; where it is over
+  77 % of the free space (1.3 times the need, experiment 434 clause 21), a
+  warning comes before the import. Experiment 434 clause 27 measures the
+  refusal on a pool of 8 MiB.
+* **After a create or an import** that failed in its transport, one more
+  line gives the free space and the need of the pool: each time for a
+  refusal by size, else where the image does not fit.
+* The check needs a server whose drivers are all `dir`, and a pool whose
+  `containers` directory podvm sees at `INCUS_DIR/storage-pools/NAME`. A
+  pool with a `source` of an incusd in its own mount namespace (route A) is
+  not checked. A run of an image that incus already has is not checked
+  before its create.
+
 ## What stays open
 
 * incus virtual machines and their speed: they need `/dev/kvm`; the runner
@@ -279,3 +309,6 @@ files with capabilities. Three changes serve it on the incus tier.
 * A static `incusd`.
 * A push of podvm that each instance does not repeat (a shared file, or a
   smaller release binary).
+* The room of a pool through the API of incusd (`GET
+  /1.0/storage-pools/NAME/resources`), and the head of an answer over the
+  bound: pod-incus and pod-proxy do not have them (T-2078).

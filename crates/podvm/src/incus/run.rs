@@ -214,17 +214,37 @@ pub fn socket_path() -> PathBuf {
     PathBuf::from("/var/lib/incus/unix.socket")
 }
 
+/// A failure of a step: its line, and a second line (T-2078) where one
+/// names more of the cause.
+pub(super) type Fault = (String, Option<String>);
+
 /// The alias of the image in incus: imported now where it is not there.
-async fn ensure_image(c: &Client, job: &Job<'_>) -> Result<(String, bool), String> {
-    let me = std::fs::read("/proc/self/exe").map_err(|e| format!("/proc/self/exe: {e}"))?;
+/// Before an import (TODO/machine.md T-2078, PodUtils/podrunner#346), the
+/// need of the image is compared with the free space of the pool of the
+/// default profile and of incusd's images, where the server's pools are of
+/// the driver `dir`: a refusal by name where it cannot fit, a warning where
+/// it fits below the estimate. `storage` is the `environment.storage` of
+/// the server.
+async fn ensure_image(c: &Client, job: &Job<'_>, storage: &str) -> Result<(String, bool), Fault> {
+    let me = std::fs::read("/proc/self/exe").map_err(|e| (format!("/proc/self/exe: {e}"), None))?;
     let name = alias(job.digest, &crate::machine::guest::kernel::sha256_hex(&me));
-    if c.alias(&name).await.map_err(|e| e.to_string())?.is_some() {
+    if c.alias(&name)
+        .await
+        .map_err(|e| (e.to_string(), None))?
+        .is_some()
+    {
         return Ok((name, true));
+    }
+    if let Some(t) = super::space::Target::find(c, storage).await {
+        let need = super::space::need_of(job.rootfs, me.len() as u64);
+        for w in t.check(need, true).map_err(|e| (e, None))? {
+            eprintln!("podvm {}: incus tier: {w}", job.verb);
+        }
     }
     // TODO/machine.md T-1997 (PodUtils/podrunner#316): the tarball goes to
     // incusd through a pipe, in chunks, as a thread writes it: no tarball
     // file in the store beside the tree and the image of incusd.
-    let (r, w) = std::io::pipe().map_err(|e| format!("a pipe for the import: {e}"))?;
+    let (r, w) = std::io::pipe().map_err(|e| (format!("a pipe for the import: {e}"), None))?;
     let rootfs = job.rootfs.to_path_buf();
     let writer = std::thread::spawn(move || unified_tarball_to(&rootfs, w, &me));
     let reader = tokio::fs::File::from_std(std::fs::File::from(std::os::fd::OwnedFd::from(r)));
@@ -236,8 +256,14 @@ async fn ensure_image(c: &Client, job: &Job<'_>) -> Result<(String, bool), Strin
     let wrote = writer
         .join()
         .unwrap_or_else(|_| Err("the writer of the tarball ended with a panic".into()));
-    done.map_err(|e| e.to_string())?;
-    wrote?;
+    if let Err(e) = done {
+        let t = super::space::transport(&e);
+        return Err((
+            e.to_string(),
+            super::space::after_failure(c, job.rootfs, true, t).await,
+        ));
+    }
+    wrote.map_err(|e| (e, None))?;
     Ok((name, false))
 }
 
@@ -296,6 +322,16 @@ pub fn run(job: &Job) -> i32 {
     rt.block_on(run_async(job, sock))
 }
 
+/// Print the line of `fault` and its second line (T-2078); the exit of a
+/// runtime error.
+pub(super) fn fail_twice(verb: &str, fault: Fault) -> i32 {
+    eprintln!("podvm {verb}: incus tier: {}", fault.0);
+    if let Some(h) = fault.1 {
+        eprintln!("podvm {verb}: incus tier: {h}");
+    }
+    EXIT_RUNTIME_ERROR
+}
+
 async fn run_async(job: &Job<'_>, sock: PathBuf) -> i32 {
     let fail = |e: String| {
         eprintln!("podvm {}: incus tier: {e}", job.verb);
@@ -311,9 +347,9 @@ async fn run_async(job: &Job<'_>, sock: PathBuf) -> i32 {
     if let Err(e) = server.check() {
         return fail(e.to_string());
     }
-    let (image, cached) = match ensure_image(&c, job).await {
+    let (image, cached) = match ensure_image(&c, job, &server.environment.storage).await {
         Ok(a) => a,
-        Err(e) => return fail(e),
+        Err(f) => return fail_twice(job.verb, f),
     };
     eprintln!(
         "podvm {}: incus tier: incusd {} at {}, image {image} {} (TODO/machine.md T-1718)",
@@ -352,8 +388,9 @@ async fn run_in(c: &Client, job: &Job<'_>, image: &str, inst: &str) -> i32 {
         "raw.lxc".into(),
         "lxc.init.cmd = /.podvm/podvm guest-hold".into(),
     );
-    if let Err(e) = super::net::create(c, &new, job.net_none, job.channel.as_ref()).await {
-        return fail(e);
+    if let Err((e, t)) = super::net::create(c, &new, job.net_none, job.channel.as_ref()).await {
+        let hint = super::space::after_failure(c, job.rootfs, false, t).await;
+        return fail_twice(job.verb, (e, hint));
     }
     // podvm is in the image (T-1722): a run pushes only its stdin.
     let mut pushes = Vec::new();

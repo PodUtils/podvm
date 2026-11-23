@@ -127,6 +127,18 @@
 #      says STOPPED some 0.5 s before the instance does, and the status of
 #      an instance that stops can go from Stopped back to Running for one
 #      read (measured: one of six).
+#  27. The room of the pool (T-2078, PodUtils/podrunner#346): with the
+#      root disk of the default profile on a pool `small` of the driver
+#      `dir` whose `containers` directory is a tmpfs of 8 MiB (made by root
+#      before incusd starts, bound by root on the directory in the mount
+#      namespace of incusd and on the host, so that incusd and podvm see
+#      one file system) and the image of clause 1 removed from incusd, a run
+#      is refused before the import with exit 125 and one line that names
+#      the pool, its free space and the need of the image; no image and no
+#      instance stays.
+#      (On a full pool incusd 6.0 puts the stderr of tar, one line for each
+#      file, into its error: 108 MB for 400 000 files, over the bound of
+#      the client, measured on 2026-11-23.)
 #
 # Exit: 0 every clause matched, 1 a clause disagreed, 2 the lane could not
 # run (not root, no user namespaces, no package).
@@ -170,6 +182,8 @@ cleanup() {
 	while [ "$i" -lt 10 ] && [ -n "$(ranged)" ]; do
 		ranged | xargs -r kill -9 2>/dev/null; sleep 1; i=$((i + 1))
 	done
+	umount "$B/state/lib/storage-pools/small/containers" 2>/dev/null
+	umount "$B/small27" 2>/dev/null
 	rm -rf "$B"
 	for c in /sys/fs/cgroup/*/"$U"; do rmdir "$c" 2>/dev/null; done
 	case "${FUSE_MODE:--}" in -) ;; *) chmod "$FUSE_MODE" /dev/fuse ;; esac
@@ -213,6 +227,10 @@ for h in /sys/fs/cgroup/*/$U; do echo \$\$ >"\$h/cgroup.procs" 2>/dev/null; done
 exec unshare --user --map-root-user --map-auto --mount --pid --fork --propagation private sh $B/ns.sh
 EOF
 chown -R "$U:$U" "$B"
+# T-2078 (clause 27): a file system of 8 MiB, made before incusd starts, so
+# that the mount namespace of incusd has the same one.
+mkdir -p "$B/small27" &&
+	mount -t tmpfs -o "size=8m,mode=0711,uid=$(id -u "$U"),gid=$(id -g "$U")" tmpfs "$B/small27"
 
 RI() { runuser -u "$U" -- env INCUS_DIR="$B/state/lib" incus "$@" </dev/null; }
 # podvm as the user, with the incusd of the user.
@@ -727,6 +745,36 @@ awk '/^  truth/ {for (i = 1; i <= NF; i++) if ($i == "cpu") t = $(i+1) / 100}
 c26 "^  oom      [0-9.]+ [0-9]+ [1-9][0-9]* 137$" "a command over --memory gave no OOM kill or no 137"
 c26 "^  forged   [0-9.]+ [0-9]+ 0 4$" "a command that forged the usage file changed the values or the exit code"
 c26 "^  forced   podvm inspect: kill26: a usage value is a dash: .*forced stop.* - - - -" "a forced stop did not give dashes with the reason"
+
+# ---- clause 27 ----------------------------------------------------------
+echo ""; echo "== 27. the room of the pool" >>"$REPORT"
+{
+RI storage create small dir 2>&1 | sed 's/^/  pool     /'
+# The containers of the pool on the tmpfs, in incusd's namespace and here.
+IPID=$(pgrep -u "$U" -f "incusd --group root" | head -1)
+nsenter -t "$IPID" -m mount --bind "$B/small27" /var/lib/incus/storage-pools/small/containers 2>&1 | sed 's/^/  mount    /'
+mount --bind "$B/small27" "$B/state/lib/storage-pools/small/containers" 2>&1 | sed 's/^/  mount    /'
+echo "  free     $(df -k --output=avail "$B/state/lib/storage-pools/small/containers" | tail -1) KiB"
+RI profile device set default root pool=small 2>&1 | sed 's/^/  profile  /'
+for f in $(RI image list --format csv -c f 2>/dev/null); do RI image delete "$f" >/dev/null 2>&1; done
+echo "  images   $(RI image list --format csv -c f 2>/dev/null | grep -c .) before"
+out=$(T "$OCI" true </dev/null 2>&1); rc=$?
+echo "  exit     $rc"
+echo "$out" | sed 's/^/  stderr   /'
+echo "  images   $(RI image list --format csv -c f 2>/dev/null | grep -c .) after"
+echo "  stays    $(RI list --format csv -c n 2>/dev/null | grep -c .)"
+RI profile device set default root pool=default 2>&1 | sed 's/^/  profile  /'
+nsenter -t "$IPID" -m umount /var/lib/incus/storage-pools/small/containers 2>&1 | sed 's/^/  umount   /'
+umount "$B/state/lib/storage-pools/small/containers" 2>&1 | sed 's/^/  umount   /'
+RI storage delete small 2>&1 | sed 's/^/  pool     /'
+} >"$WORK/c27.txt" 2>&1
+cat "$WORK/c27.txt" >>"$REPORT"
+c27() { grep -Eq "$1" "$WORK/c27.txt" || { note "27: $2"; fail=1; }; }
+c27 "^  exit     125$" "a run on a pool with no room did not exit 125"
+c27 "^  stderr   podvm run: incus tier: the storage pool \`small\` at .*/storage-pools/small/containers has [0-9.]+ [KM]iB free and the root of the instance needs at least [0-9.]+ MiB" "no line that names the pool, its free space and the need"
+c27 "^  images   0 after$" "an image was imported into a pool with no room"
+c27 "^  stays    0$" "an instance stayed"
+[ "$(grep -c '^  stderr' "$WORK/c27.txt")" -eq 1 ] || { note "27: more than one line on stderr"; fail=1; }
 
 # ---- clause 9 -----------------------------------------------------------
 left_i=$(RI list --format csv -c n 2>&1 | grep -c .)

@@ -714,10 +714,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2075](cli.md) | P2 | S | none | cli | done | Each `exec` rewrites `/etc/hosts` and drops the lines of `--add-host` and `--hostname` |
 | [T-2076](machine.md) | P1 | M | none | machine | done | `inspect` of a stopped instance of the incus tier gives a dash for the CPU time, the peak memory and the OOM kills |
 | [T-2077](machine.md) | P1 | M | none | machine | done | Under `--memory`, the init of an incus instance can end with no exit file: `inspect` gives no exit code |
+| [T-2078](machine.md) | P1 | M | none | machine | partial | On the incus tier, a full storage pool gives "the response body is larger than allowed" with no word of the cause |
 
 ## Counts
 
-648 entries: 23 open, 44 partial, 5 blocked, 576 done.
+649 entries: 23 open, 45 partial, 5 blocked, 576 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -727,10 +728,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 20 | 0 | 261 | 284 |
+| P1 | 3 | 21 | 0 | 261 | 285 |
 | P2 | 15 | 19 | 4 | 195 | 233 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 23 | 44 | 5 | 576 | 648 |
+| **All** | 23 | 45 | 5 | 576 | 649 |
 
 ## Work order
 

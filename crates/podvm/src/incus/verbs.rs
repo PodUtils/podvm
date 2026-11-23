@@ -135,8 +135,10 @@ pub(super) async fn detached(c: &Client, job: &Job<'_>, image: &str, d: &Detach)
     }
     new.config.insert(LABEL.into(), "1".into());
     new.config.insert(IMAGE_KEY.into(), d.image.clone());
-    if let Err(e) = super::net::create(c, &new, job.net_none, job.channel.as_ref()).await {
-        return fail(super::run::ids_hint(e, d.init_image));
+    if let Err((e, t)) = super::net::create(c, &new, job.net_none, job.channel.as_ref()).await {
+        // T-2078: where the transport failed, the free space of the pool.
+        let hint = super::space::after_failure(c, job.rootfs, false, t).await;
+        return super::run::fail_twice(job.verb, (super::run::ids_hint(e, d.init_image), hint));
     }
     let cmd = super::Cmd {
         argv: job.argv.clone(),

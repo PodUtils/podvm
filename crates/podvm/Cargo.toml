@@ -51,6 +51,8 @@ pod-manual = { git = "https://github.com/PodUtils/podcrates", tag = "v0.82.0" }
 # host's proxy through `pod-proxy`.
 pod-broker = { git = "https://github.com/PodUtils/podcrates", tag = "v0.82.0" }
 pod-proxy = { git = "https://github.com/PodUtils/podcrates", tag = "v0.82.0" }
+# TODO/machine.md T-2078: the free space of a storage pool of incusd.
+pod-hostprobe = { git = "https://github.com/PodUtils/podcrates", tag = "v0.82.0" }
 # TODO/deps.md T-2050 (PodUtils/podvm#611): the open of a volume under
 # `--podvm-volume-base` with no symbolic link (`userns/host.rs`).
 pod-beneath = { git = "https://github.com/PodUtils/podcrates", tag = "v0.82.0" }
