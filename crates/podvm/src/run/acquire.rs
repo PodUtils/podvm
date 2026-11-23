@@ -86,6 +86,11 @@ pub(super) fn with_opened(
 ) -> podvm_supervise::table::Hardening {
     podvm_supervise::table::Hardening {
         opened: opened.words(),
+        // T-2075: `exec` writes the `/etc/hosts` of the run.
+        hosts: Some(podvm_supervise::table::Hosts {
+            name: o.name.clone(),
+            added: o.ask.add_hosts.clone(),
+        }),
         ..super::report::with_detached_path(o.hardening.clone(), o.detach)
     }
 }

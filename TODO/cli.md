@@ -6801,8 +6801,8 @@ Fix the two P1 findings and the P2 findings that the lead marked "fix"; give OR-
 | --- | --- | --- | --- | --- |
 | OR-B38-01, `exec -it CTR sh` takes no input after the first chunk | P1 | fix | [T-2071](cli.md) | done |
 | OR-B38-02, a foreground `run` reports the owner of the store for a name collision or a corrupt `containers.json` | P2 | fix | [T-2073](cli.md) | done |
-| OR-B38-03, each `exec` rewrites `/etc/hosts` and drops `--add-host`; `run -d --hostname hx` maps 127.0.0.1 to the name of the container | P2 | fix | - | open |
-| OR-B38-04, `run -d --rm` keeps the container after its end | P2 | fix | - | open |
+| OR-B38-03, each `exec` rewrites `/etc/hosts` and drops `--add-host`; `run -d --hostname hx` maps 127.0.0.1 to the name of the container | P2 | fix | [T-2075](cli.md) | done |
+| OR-B38-04, `run -d --rm` keeps the container after its end | P2 | fix | [T-2074](cli.md) | done |
 | OR-B38-05, a killed `pull` or `load` leaves a `.partial` in `store/staging` that no verb removes or counts | P2 | T-2069 | [T-2069](image.md) | open |
 | OR-B38-06, `-v DIR:/etc` and `-v DIR:/dev` write podvm's fixups into DIR | P1 (lead) | fix | [T-2072](cli.md) | done |
 | OR-B38-07, `cp -r` onto an existing copy of a tree with symbolic links fails half way ("is a symlink; writing through one is refused") | P2 | known gap | - | open |
@@ -6916,3 +6916,69 @@ Each failure gives one true line (`AGENTS.md`, 2b): the line of the owner only w
 ## Done
 
 **Done (2026-11-23).** The cause: `run::foreground::record::owner_refusal` (T-1851) gave its line for each failure of `podvm_supervise::create` where `containers.json` or the store root belonged to another uid, and did not look at the failure. Under a store root of root with mode 777, the user namespace of a foreground run shows root as uid 65534 and podvm as uid 0, so each failure named the owner. The fix: the line of the owner comes only where that file denies this process the access that the record needs (`access(2)`: read of `containers.json`, write and search of the root, as the table is replaced by a rename there); else the caller prints the failure of the record. `podvm_supervise::Error` from a failure of `pod-supervise` adds the remedy to the refusal of a table that does not parse: "; move it aside to start an empty table (podvm then knows no container of it)" (`TABLE_REMEDY`). The unit test `the_owner_is_the_cause_only_where_it_denies_the_access` holds the rule for each uid and each refused access; `a_table_that_does_not_parse_names_the_remedy` (`podvm-supervise`) holds the remedy for an empty, a cut, a non-JSON table and one with no version; the integration test `a_failed_record_of_a_foreground_run_names_its_cause` (`crates/podvm/tests/record_failure.rs`) gives the store root to uid 65534 with mode 777 as root and checks the line of a name in use and of three bad tables (125, one line, no owner). As root with a store root of uid 65534 and mode 777, the binary of the pass gives the line of the owner for a name in use, and the new binary "--name \"dupy\": the run could not be recorded: the name \"dupy\" is already used by a container".
+
+# T-2074: `run -d --rm` keeps the container after its end
+
+**Source:** the seventh outside pass (T-2070), OR-B38-04 (P2)
+**Category:** cli
+**Milestone:** none
+**Priority:** P2
+**Effort:** S
+**Status:** done
+
+## Problem
+
+`id=$(podvm run --rm -d IMAGE sh -c 'sleep 2; echo bye'); sleep 4; podvm ps -a` lists the container `Exited (0)`; `logs` works; the run exits 0 with no line. Docker removes the container at its end.
+
+## Premise
+
+`pod-supervise` removes the record and the directory of a container after the end of its run where the record has `rm` (`pod_supervise::auto_remove`, PodUtils/podvm#568); podvm did not set it.
+
+## Approach
+
+Set `rm` of the record for `--rm` of `run -d` and `create`, and put the tree of the container aside after the removal.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test -p podvm --test detached_rm`: `run -d --rm` (with and without `wait`) and `create --rm` with `start` leave no record and no tree of the container after the end, as root and as uid 1000; the reproducer of the pass on the new release binary.
+
+## Done
+
+**Done (2026-11-23).** The cause: `run -d` (`crates/podvm/src/run/foreground.rs`) and `create` (`crates/podvm/src/lifecycle.rs`) parsed `--rm` and did not give it to the record. The fix: both call `lifecycle::rm_at_end`, which sets `rm` of the record (`podvm_supervise::auto_remove`, over `pod_supervise::auto_remove`) before the start. The launcher of `pod-supervise` removes the record and the directory of the container after it writes the end and answers each waiter (so `wait` gets the code), and podvm's part of the launcher puts the tree of the container aside when it drops what it kept (`launcher::Discard`, last of `Kept`), as `podvm rm` does. The parity row of `--rm` says so. The integration test `rm_of_a_detached_run_removes_the_container_at_its_end` (`crates/podvm/tests/detached_rm.rs`) holds the rule for `run -d --rm`, `run -d --rm` with `wait` (the code 3) and `create --rm` with `start`: `ps -a` does not list the container after its end, and the store holds no more trees than before. It passes as root and as uid 1000. As uid 1000 with `alpine:3.20`: on the binary of the pass the container stays `Exited (0)`; on the new binary `ps -a` does not list it 4 s after, its directory and its tree are gone, `wait` of `run -d --rm --name rmw ... exit 3` prints 3, and `create --rm` with `start` leaves no record.
+
+# T-2075: Each `exec` rewrites `/etc/hosts` and drops the lines of `--add-host` and `--hostname`
+
+**Source:** the seventh outside pass (T-2070), OR-B38-03 (P2)
+**Category:** cli
+**Milestone:** none
+**Priority:** P2
+**Effort:** S
+**Status:** done
+
+## Problem
+
+`run -d --name ah --add-host a:1.1.1.1 IMAGE sh -c 'cat /etc/hosts; sleep 3; cat /etc/hosts; ...'` with an `exec ah true` in between: the first `cat` shows `1.1.1.1 a`, the second only the lines of localhost and `127.0.0.1 localhost ah`. `exec ah cat /etc/hosts` never shows it. With `run -d --hostname hx`, `exec` shows 127.0.0.1 mapped to the name of the container and not to `hx`.
+
+## Premise
+
+The completion of `exec` rewrites `/etc/hosts` from its own inputs: the name that the caller typed and the `--add-host` of `exec`.
+
+## Approach
+
+`exec` writes the content of the run: the record keeps the parts of `/etc/hosts` of the run.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test -p podvm --test exec_hosts`: three `exec` into a `run -d --hostname hx --add-host a.example:192.0.2.1` container each read both lines, as root and as uid 1000; a table test of the parts that `exec` gives the completion; the reproducer of the pass on the new release binary.
+
+## Done
+
+**Done (2026-11-23).** The cause: `exec::enter` gave the completion the name that the caller typed (`ask.container_name = target`) and the `--add-host` of `exec`, and `pod_rootfs` rewrites `/etc/hosts` from them, so the lines of the run went, for each process of the container. The run writes them right: `run -d --hostname hx` has `127.0.0.1 hx`; the pass saw the file after an `exec`. The fix: the record of a run keeps the parts of its `/etc/hosts` (`Hardening::hosts`: the name on the line of 127.0.0.1 and each `NAME:ADDRESS` of `--add-host` and `--hostname`), and `exec::ns::hosts_of` gives them to the completion of `exec`, with the `--add-host` of `exec` after them; a record of an older podvm keeps the old rule. The unit test `exec_writes_the_hosts_of_the_run` holds the rule for a record with and without the parts and an `exec` with and without `--add-host`; the integration test `exec_keeps_the_hosts_of_the_run` (`crates/podvm/tests/exec_hosts.rs`) passes as root and as uid 1000. As uid 1000 with `alpine:3.20`, `run -d --hostname hx --add-host a:1.1.1.1` and an `exec ah2 true`: the payload's second `cat` and `exec ah2 cat /etc/hosts` show `1.1.1.1 a` and `127.0.0.1 hx` (before: neither).

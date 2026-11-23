@@ -96,9 +96,11 @@ pub fn create(args: &[String]) -> i32 {
                 detached_drive(p.userland.as_ref()),
             ) {
                 Ok(c) => {
-                    let kept = podvm_supervise::set_wall(&s, &c.id, p.wall_ms).and_then(|_| {
-                        podvm_supervise::set_hardening(&s, &c.id, p.hardening.clone())
-                    });
+                    let kept = podvm_supervise::set_wall(&s, &c.id, p.wall_ms)
+                        .and_then(|_| {
+                            podvm_supervise::set_hardening(&s, &c.id, p.hardening.clone())
+                        })
+                        .and_then(|_| rm_at_end(&s, &c.id, p.rm)); // T-2074
                     if let Err(e) = kept {
                         let _ = podvm_supervise::remove(&s, &c.id, true);
                         let _ = std::fs::remove_file(&p.memo_host_path);
@@ -451,5 +453,17 @@ pub(super) fn usage(error: bool, text: &str) -> i32 {
     } else {
         println!("{text}");
         0
+    }
+}
+
+/// TODO/cli.md T-2074 (OR-B38-04): `--rm` of `run -d` and `create`: the
+/// launcher removes the container, its record and its tree after the end of
+/// its run, as docker does. Before, podvm accepted the flag and kept the
+/// container.
+pub(crate) fn rm_at_end(s: &podvm_image::Store, id: &str, rm: bool) -> podvm_supervise::Result<()> {
+    if rm {
+        podvm_supervise::auto_remove(s, id)
+    } else {
+        Ok(())
     }
 }

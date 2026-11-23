@@ -93,3 +93,73 @@ pub(crate) fn spawn_joined(
     }
     spawned
 }
+
+/// OR-B38-03 of the seventh outside pass (TODO/cli.md T-2075): the parts of
+/// `/etc/hosts` that the completion of `exec` writes. The completion
+/// rewrites the file, so `exec` gives it the parts of the run (its name and
+/// each `--add-host` and `--hostname`), and its own `--add-host` after
+/// them. Before, each `exec` wrote the name that the caller typed and its
+/// own `--add-host` alone, and dropped those of the run. A record of an
+/// older podvm keeps that rule.
+pub(super) fn hosts_of(
+    ask: &mut crate::complete::Ask,
+    target: &str,
+    hardening: &podvm_supervise::table::Hardening,
+) {
+    match &hardening.hosts {
+        Some(h) => {
+            ask.container_name = h.name.clone();
+            let mine = std::mem::take(&mut ask.add_hosts);
+            ask.add_hosts = h.added.clone();
+            ask.add_hosts
+                .extend(mine.into_iter().filter(|m| !h.added.contains(m)));
+        }
+        None => ask.container_name = Some(target.to_string()),
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn exec_writes_the_hosts_of_the_run() {
+    use podvm_supervise::table::{Hardening, Hosts};
+    let run = Hosts {
+        name: Some("ah".into()),
+        added: vec!["a:192.0.2.1".into(), "hx:127.0.0.1".into()],
+    };
+    // (the record, the `--add-host` of exec, the name and the hosts written)
+    type Case<'a> = (Option<Hosts>, Vec<&'a str>, Option<&'a str>, Vec<&'a str>);
+    let cases: [Case; 4] = [
+        (
+            Some(run.clone()),
+            vec![],
+            Some("ah"),
+            vec!["a:192.0.2.1", "hx:127.0.0.1"],
+        ),
+        (
+            Some(run.clone()),
+            vec!["b:192.0.2.2", "a:192.0.2.1"],
+            Some("ah"),
+            vec!["a:192.0.2.1", "hx:127.0.0.1", "b:192.0.2.2"],
+        ),
+        (Some(Hosts::default()), vec![], None, vec![]),
+        (
+            None,
+            vec!["b:192.0.2.2"],
+            Some("typed"),
+            vec!["b:192.0.2.2"],
+        ),
+    ];
+    for (hosts, mine, name, want) in cases {
+        let mut ask = crate::complete::Ask {
+            add_hosts: mine.iter().map(|s| s.to_string()).collect(),
+            ..Default::default()
+        };
+        let h = Hardening {
+            hosts: hosts.clone(),
+            ..Default::default()
+        };
+        hosts_of(&mut ask, "typed", &h);
+        assert_eq!(ask.container_name.as_deref(), name, "{hosts:?}");
+        assert_eq!(ask.add_hosts, want, "{hosts:?} {mine:?}");
+    }
+}

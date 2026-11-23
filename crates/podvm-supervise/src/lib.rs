@@ -251,6 +251,17 @@ pub fn wait(store: &Store, want: &str, timeout_ms: u64) -> Result<(Container, Op
     Ok(pod_supervise::wait(&settings(store), want, timeout_ms)?)
 }
 
+/// OR-B38-04 of the seventh outside pass (TODO/cli.md T-2074): `--rm` of
+/// `run -d` and `create`. The launcher removes the record and the directory
+/// of the container after the end of its run and the answer of each waiter
+/// (`pod_supervise::auto_remove`, PodUtils/podvm#568), and podvm's part of
+/// the launcher puts its tree aside after that (`launcher::Discard`). Set it
+/// before the start.
+pub fn auto_remove(store: &Store, want: &str) -> Result<()> {
+    pod_supervise::auto_remove::<Detail>(&settings(store), want)?;
+    Ok(())
+}
+
 /// Remove a container's record and its own directory.
 ///
 /// TODO/image.md T-1709: the container's own tree goes with its record. A

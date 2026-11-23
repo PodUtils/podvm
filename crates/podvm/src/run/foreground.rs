@@ -100,7 +100,8 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
             }
         };
         let kept = podvm_supervise::set_wall(&store, &c.id, p.wall_ms)
-            .and_then(|_| podvm_supervise::set_hardening(&store, &c.id, p.hardening.clone()));
+            .and_then(|_| podvm_supervise::set_hardening(&store, &c.id, p.hardening.clone()))
+            .and_then(|_| crate::lifecycle::rm_at_end(&store, &c.id, p.rm)); // T-2074
         if let Err(e) = kept {
             eprintln!("podvm run: {e}");
             let _ = podvm_supervise::remove(&store, &c.id, true);

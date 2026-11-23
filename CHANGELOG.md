@@ -43,6 +43,8 @@ They describe their recorded revision, not the current build.
 - `exec -it CTR sh` (and `sh -i`, `set -m`) into a `run -d` container of a caller with no root takes each line typed: the payload no longer shares podvm's session, so a job-control shell cannot take the caller's terminal from the relay of the pty (T-2071, OR-B38-01 of the seventh outside pass; also in `v0.2.0-beta.37`).
 - A foreground run of a caller with no root writes no fixup of podvm (`passwd`, `hosts`, `resolv.conf`, the CA bundle, the device stand-ins) through a volume into the caller's directory: `-v DIR:/etc` and `-v DIR:/dev` leave DIR as it was, and `--verbose` names each fixup that a volume covers (T-2072, OR-B38-06).
 - A foreground `run` whose record fails gives its cause (a name in use, a container table that does not parse) and no longer the owner of a store root of another uid that it may write; the refusal of a `containers.json` that does not parse says to move it aside (T-2073, OR-B38-02).
+- `--rm` of `run -d` and of `create` removes the container, its record and its tree at the end of its run, as docker does; `wait` still gets the code (T-2074, OR-B38-04). Before, podvm took the flag and kept the container.
+- `exec` into a running container keeps the `/etc/hosts` of the run: the lines of `--add-host` and of `--hostname` stay, for `exec` and for the payload (T-2075, OR-B38-03).
 
 ## 0.2.0-beta.37 (2026-11-21)
 

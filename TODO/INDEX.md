@@ -710,10 +710,12 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2071](cli.md) | P1 | S | none | cli | done | `exec -it CTR sh`: a job-control shell takes the caller's terminal, and the relay gets no more input |
 | [T-2072](cli.md) | P1 | S | none | cli | done | `-v DIR:/etc` and `-v DIR:/dev` write podvm's fixups into DIR |
 | [T-2073](cli.md) | P2 | S | none | cli | done | A foreground `run` reports the owner of the store for each failure of its record |
+| [T-2074](cli.md) | P2 | S | none | cli | done | `run -d --rm` keeps the container after its end |
+| [T-2075](cli.md) | P2 | S | none | cli | done | Each `exec` rewrites `/etc/hosts` and drops the lines of `--add-host` and `--hostname` |
 
 ## Counts
 
-644 entries: 23 open, 44 partial, 5 blocked, 572 done.
+646 entries: 23 open, 44 partial, 5 blocked, 574 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -724,9 +726,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 20 | 0 | 259 | 282 |
-| P2 | 15 | 19 | 4 | 193 | 231 |
+| P2 | 15 | 19 | 4 | 195 | 233 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 23 | 44 | 5 | 572 | 644 |
+| **All** | 23 | 44 | 5 | 574 | 646 |
 
 ## Work order
 

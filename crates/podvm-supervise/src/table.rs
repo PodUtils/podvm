@@ -90,6 +90,21 @@ pub struct Hardening {
     /// opens nothing.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub opened: Vec<String>,
+    /// What the run wrote into `/etc/hosts` (TODO/cli.md T-2075): `exec`
+    /// writes the same. `None` for a record of an older podvm.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hosts: Option<Hosts>,
+}
+
+/// The parts of `/etc/hosts` of a run (OR-B38-03 of the seventh outside
+/// pass, TODO/cli.md T-2075): the name on the line of 127.0.0.1, and each
+/// `NAME:ADDRESS` of `--add-host` and of `--hostname`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Hosts {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub added: Vec<String>,
 }
 
 impl Hardening {

@@ -4708,6 +4708,7 @@ The work of T-2068 found two faults of the staging files of the store, outside i
 
 1. `Store::stage` names a staging file `{hint}.{pid}.{seq}.partial`. A pid is not unique across PID namespaces (AGENTS.md 2b): two writers in two PID namespaces can make the same name. The exclusive create refuses the second writer, so the store stays safe, but the refusal calls the clash a defect, which is not true.
 2. `Store::put_bytes` drops the lock of its staging file before the rename. In that window the sweep of the strays can take the lock and remove the file, and the rename then fails.
+3. OR-B38-05 of the seventh outside pass (T-2070, P2): a `pull` or a `load` that a SIGKILL ends leaves its `.partial` file in `store/staging` (40 to 71 MiB measured). No verb removes it or counts it: `system df` gives Reclaimable 0 B, and `system prune` and `image prune` leave it. Its name holds a pid (item 1).
 
 ## Premise
 
@@ -4723,4 +4724,4 @@ Name a staging file with an id that is unique across PID namespaces (for example
 
 ## Prove
 
-A table test: two writers with the same pid and sequence (a test seam) get two names, or a refusal that names the clash; `put_bytes` holds its lock through the rename (a test that runs the sweep in the window).
+A table test: two writers with the same pid and sequence (a test seam) get two names, or a refusal that names the clash; `put_bytes` holds its lock through the rename (a test that runs the sweep in the window). A `.partial` that no process holds is removed by the sweep and counted by `system df` (a test that leaves one with no lock).

@@ -32,8 +32,32 @@ struct Kept {
     _held: podvm_image::store::Lock,
     _root: RootDir,
     _child: podvm_enter::Child,
-    // TODO/enter.md T-2002: last, after the end of each process of the run.
+    // TODO/enter.md T-2002: after the end of each process of the run.
     _init: Option<Box<dyn std::any::Any>>,
+    // TODO/cli.md T-2074: last, after each descriptor of the tree closed.
+    _discard: Option<Discard>,
+}
+
+/// TODO/cli.md T-2074 (OR-B38-04): `--rm` of `run -d`. `pod_supervise`
+/// removes the record and the directory of the container before it drops
+/// `Payload::keep`; the drop puts the tree of the container aside, as
+/// `podvm rm` does (`crate::remove`). A record that stays (the removal
+/// failed) keeps its tree.
+struct Discard {
+    store: std::path::PathBuf,
+    id: String,
+    rootfs: String,
+}
+
+impl Drop for Discard {
+    fn drop(&mut self) {
+        let Ok(s) = Store::open(&self.store) else {
+            return;
+        };
+        if crate::get(&s, &self.id).is_err_and(|e| e.is_callers()) {
+            let _ = podvm_extract::tree::discard(&s, &self.rootfs);
+        }
+    }
 }
 
 /// TODO/cli.md T-1825: `pod_supervise` drops `Payload::keep` after it
@@ -297,6 +321,11 @@ fn enter_in_launcher(
             _root: root,
             _child: child,
             _init: init,
+            _discard: container.rm.then(|| Discard {
+                store: store.root().to_path_buf(),
+                id: container.id.clone(),
+                rootfs: container.rootfs.clone(),
+            }),
         }),
     })
 }

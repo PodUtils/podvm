@@ -296,7 +296,7 @@ pub(super) fn enter(
     // reason: a fresh chroot re-entry is a fresh payload, and the `/dev/null` a
     // previous one turned into a file is still a file.
     let mut ask = o.ask.clone();
-    ask.container_name = Some(target.to_string());
+    super::ns::hosts_of(&mut ask, target, &container.of.hardening); // T-2075
     let mut completion = match crate::complete::prepare("exec", rootfs, &ask, &mut banner) {
         Ok(r) => r,
         Err(code) => return code,
