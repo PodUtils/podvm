@@ -538,6 +538,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #642 | [gh action] requested | closed (gate 44862250138 on 721ce66 passed) | the gate of 721ce66, the head that changes three integration tests to the behaviour of T-2060 to T-2062 |
 | #643 | COORD-227: pod-extract refuses a layer whose PAX record SCHILY.acl.access holds a newline (to podcrates) | open | T-2065 |
 | #644 | COORD-228: a PAX value with a newline (SCHILY.acl.access): the fix is in pod-extract of podcrates (to podrunner) | open | T-2065 |
+| #645 | COORD-229: podvm took v0.81.0 and v0.82.0 (to podcrates) | open | T-2066, T-2051, T-2046, T-2065, T-2062 |
 
 ## Messages whose title does not start with COORD-NNN
 
