@@ -9,17 +9,19 @@ start.
 
 646 entries: 23 open, 44 partial, 5 blocked, 574 done.
 
-The state on 2026-11-21 (`docs/HANDOFF.md` has the detail):
+The state on 2026-11-23 (`docs/HANDOFF.md` has the detail):
 
-* (2026-11-23) After `v0.2.0-beta.37`, `main` carries podcrates `v0.81.0`
-  (T-2066, `51c16c5`) and the size ceiling of 9 500 000 bytes (call C29,
-  `4d8da41`); podcrates `v0.82.0` (T-2066); the work of `wip/oq-run`
-  (T-2052 to T-2055, OQ-05, OQ-07, OQ-08 partial and OQ-11), and T-2067.
-* (2026-11-23) The seventh outside pass (on `4887fb72`): T-2070 holds its
-  18 findings; both P1 findings are done (T-2071, T-2072), and the P2
-  findings OR-B38-02, -03 and -04 (T-2073 to T-2075). OR-B38-05 is in
-  T-2069; the rest are lines of "Known gaps" of the next release.
-* The newest release is `v0.2.0-beta.37` (2026-11-21, release run
+* The newest release is `v0.2.0-beta.38` (2026-11-23, release run
+  45212007696 on `2ae4b41`): podcrates `v0.81.0` and `v0.82.0` (T-2066:
+  the ACLs of a layer, T-2065; 126 for E2BIG, T-2062; the bounded monitor
+  connect, T-2051), the size ceiling of 9 500 000 bytes (call C29), a load
+  of 85 layers (T-2068), the fixes of the sixth outside pass (T-2052 to
+  T-2055, T-2060 to T-2064) and of the seventh (T-2070: T-2071 to T-2075).
+  Its gate: the gate 45181778611, `arm.yml` 45181795967 and the nightly
+  trial 45181788743 on `2ae4b41`, `workloads.yml` 45167359347, the
+  integration tests as uid 1000 (36 test binaries), the seventh outside
+  pass. Before it:
+* `v0.2.0-beta.37` (2026-11-21, release run
   44846783317 on `c92ac65`): systemd as PID 1 on each route with
   `--podvm-init=image` (T-2002), the saved state of a machine guest
   (T-2008, T-2048), the faults of the sixth outside pass (T-2040 to

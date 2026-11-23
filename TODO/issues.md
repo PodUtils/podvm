@@ -533,7 +533,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #637 | [gh action] requested | closed (on 4dc5744: gate 44849108235, arm 44849112350, workloads 44849118194 and kvm 44849121664 init passed) | the gate, arm, workloads and kvm.yml init runs of 4dc5744, the take of podcrates v0.80.0 (T-2050) |
 | #638 | [gh action] requested | closed (kvm 44854125431 job mem on 8de9873 passed: the curve of T-2047) | the job mem of kvm.yml (experiment 470) on 8de9873: the memory of a guest for an initrd of N bytes (T-2047) |
 | #639 | COORD-225: pod-enter reads E2BIG at execve as "not found" (127); it is "found, not invocable" (126) (to podcrates) | open | T-2062 |
-| #640 | COORD-226: on podvm's main, for the next release: typed inspect JSON, exit codes, exec into an exited container, the memory rule (to podrunner) | open | T-2047, T-2060, T-2061, T-2062, T-2064 |
+| #640 | COORD-226: on podvm's main, for the next release: typed inspect JSON, exit codes, exec into an exited container, the memory rule (to podrunner) | closed (released in `v0.2.0-beta.38`, release run 45212007696; #648 names the tag) | T-2047, T-2060, T-2061, T-2062, T-2064 |
 | #641 | [gh action] requested | closed (on cb8bbf4: arm 44859012273 and workloads 44859015855 passed; gate 44859009048 failed on three integration tests that held the behaviour before T-2060 to T-2062, changed in the next commit) | the gate, arm and workloads runs of cb8bbf4, after the fixes of the sixth outside pass for the CLI (T-2047, T-2060 to T-2064) |
 | #642 | [gh action] requested | closed (gate 44862250138 on 721ce66 passed) | the gate of 721ce66, the head that changes three integration tests to the behaviour of T-2060 to T-2062 |
 | #643 | COORD-227: pod-extract refuses a layer whose PAX record SCHILY.acl.access holds a newline (to podcrates) | open | T-2065 |
@@ -541,6 +541,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #645 | COORD-229: podvm took v0.81.0 and v0.82.0 (to podcrates) | open | T-2066, T-2051, T-2046, T-2065, T-2062 |
 | #646 | COORD-230: pod-enter's PID-namespace init and join relay show podvm's argv and environment to the payload (to podcrates) | open | T-2054 |
 | #647 | COORD-231: the answer to PodUtils/podrunner#344: podvm load of an image of 85 layers is fixed on main (to podrunner) | open | T-2068 |
+| #648 | COORD-232: v0.2.0-beta.38 is out (to podrunner) | open | T-1949, T-2065, T-2066, T-2068, T-2070 |
 
 ## Messages whose title does not start with COORD-NNN
 
