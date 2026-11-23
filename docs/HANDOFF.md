@@ -83,18 +83,19 @@ step below is done.
   the last `CpuSeconds`, `PeakMemoryBytes` and `OomKills` (T-2076,
   `a4b75950`, `bafd6dec`; experiment 434 clause 26); answer #649
   (COORD-233). #650 (COORD-234) asks podcrates for one reader of the usage
-  of a cgroup. The work found T-2077 (P1, open): under `--memory` the init
-  of an instance can end with no exit file (2 of 12 runs, also with
-  beta.38), so `inspect` gives no exit code.
+  of a cgroup. The work found T-2077 (P1, done in `4ab994b9`): under
+  `--memory` the OOM killer of the instance took PID 1 (12 of 44 runs, also
+  with beta.38); PID 1 now sets -1000, or the command gets 1000 where the
+  kernel refuses -1000; 24 of 24 runs keep the exit code. #649 says so.
 * #631, #633, #639, #643, #644 and #645 are closed (podcrates#254 lists the
   take; podrunner closed podrunner#339).
 
 ## Next steps, in order
 
 1. Start the session (`AGENTS.md`, section 8), with the watcher.
-2. podrunner first: T-2077 (the lost exit code under `--memory` on the
-   incus tier), then the next beta for #649 (T-2076); watch #583, #585,
-   #593, #596, #599, #605, #636, #647, #648 and #649.
+2. podrunner first: the next beta carries T-2076 and T-2077 for #649
+   (the beta gate of `docs/maintenance.md`); watch #583, #585, #593, #596,
+   #599, #605, #636, #648 and #649.
 3. podcrates: watch #602, #604, #584, #646 and #650.
 4. T-2069 (the staging files of the store), then the open rows of T-2070.
 5. T-2050 remainder: a machine run with the store's static QEMU. T-2048
@@ -148,6 +149,10 @@ step below is done.
   HEAD:main` from it, then tell the agent that `main` moved. The prebuilt
   `podvm-gate` finds the root of the repository from its own path: copy it
   into the target directory of the worktree.
+* `podvm-image` `clock::tests::an_age_is_worded_the_way_docker_words_it`
+  reads the clock twice and failed once on a loaded host ("2 seconds ago"
+  for "1 second ago", 2026-11-23); it passes alone. A test of an age gives
+  the clock as an input.
 * Two agents that each need cargo run one after the other: the second
   waits for a marker file that the lead makes when the first ends.
 * A subagent in a worktree under `.claude/worktrees/` cannot run cargo
