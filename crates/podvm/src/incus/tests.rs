@@ -274,7 +274,8 @@ fn a_run_imports_creates_pushes_starts_execs_and_deletes() {
     let d = scratch("run");
     std::fs::create_dir_all(d.join("root/bin")).unwrap();
     std::fs::write(d.join("root/bin/sh"), b"#!sh").unwrap();
-    let sock = d.join("unix.socket");
+    let sd = crate::test_socket::SocketDir::new("t1718");
+    let sock = sd.join("unix.socket");
     let seen = stand_in(&sock);
     // SAFETY: only this test reads PODVM_INCUS_SOCKET.
     unsafe { std::env::set_var("PODVM_INCUS_SOCKET", &sock) };

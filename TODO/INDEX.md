@@ -685,7 +685,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2041](machine.md) | P1 | M | none | machine | done | On the machine tier, a SIGTERM, SIGINT or SIGHUP to a foreground run ends podvm and does not reach the payload |
 | [T-2042](machine.md) | P1 | M | none | machine | done | After `run -d --podvm-tier=machine`, `inspect`, `kill`, `wait` and the filters of `ps` do not find the container |
 | [T-2043](cli.md) | P1 | S | none | cli | done | `exec -t` gives the command no terminal and does not refuse |
-| [T-2044](cli.md) | P2 | M | none | cli | open | The faults of the sixth outside pass (2026-11-20, the gate of the next beta) |
+| [T-2044](cli.md) | P2 | M | none | cli | partial | The faults of the sixth outside pass (2026-11-20, the gate of the next beta) |
 | [T-2045](enter.md) | P1 | M | none | enter | done | On the userland rung, a link to the host path of the rootfs with `..` reads host files |
 | [T-2046](cli.md) | P1 | S | none | cli | done | `logs` loads the whole log into memory and has no bound of bytes |
 | [T-2047](machine.md) | P2 | M | none | machine | done | The memory that a guest of the machine tier needs for an initrd of N bytes, as a curve |
@@ -703,10 +703,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2064](cli.md) | P3 | S | none | cli | done | The sixth outside pass, OQ-13: texts of the manual and of messages |
 | [T-2065](image.md) | P1 | S | none | image | done | A layer whose PAX record `SCHILY.acl.access` holds a newline is refused whole |
 | [T-2066](deps.md) | P2 | L | none | deps | partial | Take podcrates `v0.81.0`: the warm line with a bounded connect, the static QEMU 11.1.3, the streamed log reads, one atomic replace of a file |
+| [T-2067](gate.md) | P2 | S | none | gate | done | Tests of `podvm` and the machine tier fail with a long `TMPDIR`: a probe in the working directory, socket paths longer than `sun_path` |
 
 ## Counts
 
-637 entries: 23 open, 42 partial, 5 blocked, 567 done.
+638 entries: 22 open, 43 partial, 5 blocked, 568 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -717,9 +718,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 19 | 0 | 256 | 278 |
-| P2 | 15 | 18 | 4 | 191 | 228 |
+| P2 | 14 | 19 | 4 | 192 | 229 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 23 | 42 | 5 | 567 | 637 |
+| **All** | 22 | 43 | 5 | 568 | 638 |
 
 ## Work order
 

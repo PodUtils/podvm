@@ -58,7 +58,7 @@ fn report_has_every_field() {
 
 #[test]
 fn report_written_on_refusal() {
-    let dir = std::env::temp_dir().join(format!("podvm-report-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("podvm-report-{}", podvm_supervise::new_id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("r.json");
@@ -145,7 +145,7 @@ fn each_record_validates_against_the_schema_of_its_version() {
 /// empty where the parse did not reach the image.
 #[test]
 fn report_refusal_holds_no_value_of_e() {
-    let dir = std::env::temp_dir().join(format!("podvm-t1802-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("podvm-t1802-{}", podvm_supervise::new_id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("r.json");
@@ -193,28 +193,32 @@ fn report_refusal_holds_no_value_of_e() {
 /// the image is the payload's, and the value of `--name` is a name.
 #[test]
 fn report_path_is_the_parsers() {
+    // The parser probes the directory of the path with a file of its own:
+    // a directory of this test, not the working directory, which the
+    // caller (uid 1000) may not write.
+    let dir = std::env::temp_dir().join(format!("podvm-t1801-{}", podvm_supervise::new_id()));
+    std::fs::create_dir(&dir).unwrap();
+    let r = dir.join("r.json");
+    let r = r.to_str().unwrap();
     let path = |a: &[&str]| {
         let _ = take_path();
         let _ = crate::run::parse::parse("run", &v(a));
         take_path()
     };
-    assert_eq!(
-        path(&["--report", "r.json", "img", "true"]),
-        Some("r.json".into())
-    );
-    assert_eq!(
-        path(&["--report=r.json", "img", "true"]),
-        Some("r.json".into())
-    );
+    assert_eq!(path(&["--report", r, "img", "true"]), Some(r.into()));
+    let eq = format!("--report={r}");
+    assert_eq!(path(&[&eq, "img", "true"]), Some(r.into()));
     assert_eq!(path(&["img", "true", "--report", "important.txt"]), None);
     assert_eq!(path(&["--name", "--report", "img", "cmd"]), None);
     assert_eq!(path(&["img", "--", "--report", "x"]), None);
     assert_eq!(path(&["img"]), None);
     // A refusal after the flag keeps the path, so the refusal is reported.
     assert_eq!(
-        path(&["--report", "r.json", "--no-such-flag", "img"]),
-        Some("r.json".into())
+        path(&["--report", r, "--no-such-flag", "img"]),
+        Some(r.into())
     );
+    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0, "no file stays");
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 /// T-1969: `oom_kills` is an optional field of layout 1: absent where the

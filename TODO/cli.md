@@ -6452,7 +6452,7 @@ As uid 1000: `exec -t NAME tty` prints a `/dev/pts/N` path and exits 0 on the na
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -6473,6 +6473,24 @@ Work each by its class: OQ-06 with the fields of `inspect` (T-2001 OP-06), OQ-07
 ## Prove
 
 `sh scripts/dev/checks.sh` passes with a test of the class of each fixed finding; each other finding is a line in "Known gaps" of the release.
+
+## Done
+
+**Partial (2026-11-23).** The state of OQ-05 to OQ-13, with the merge of the branch `wip/oq-run` on `main`:
+
+| Finding | Entry | State |
+| --- | --- | --- |
+| OQ-05, Ctrl-C of `run -it` | [T-2052](cli.md) | done: the interrupt and quit keys go to each process of the payload's tree in its process group |
+| OQ-06, `inspect --format` | [T-2060](cli.md) | done |
+| OQ-07, the banner and `.Exec.Shares` | [T-2053](cli.md) | done: one table `podvm_probe::isolation` |
+| OQ-08, podvm's argv, environment and descriptors in the payload | [T-2054](enter.md) | partial: titles and an empty environment, no lock and no host path of the loader family where a PID namespace holds the tree; the rest is in T-2054, with an ask to podcrates |
+| OQ-09, docker differences | [T-2061](cli.md) | done |
+| OQ-10, exit codes | [T-2062](cli.md) | done |
+| OQ-11, `--podvm-volume-base` on the loader family | [T-2055](enter.md) | done: the manual held the rule; a test holds it |
+| OQ-12, `memo-*.tmp` after a SIGKILL | [T-2063](cli.md) | done |
+| OQ-13, texts | [T-2064](cli.md) | done |
+
+Left: the remainder of OQ-08 is a line in "Known gaps" of the next release, then this entry is done.
 
 # T-2046: `logs` loads the whole log into memory and has no bound of bytes
 

@@ -373,10 +373,14 @@ fn the_serial_wait_fails_fast_where_the_emulator_died() {
 
 #[test]
 fn the_serial_wait_accepts_a_bound_socket() {
-    let dir = std::env::temp_dir().join(format!("podvm-machine-ssh-accept-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "podvm-machine-ssh-accept-{}",
+        podvm_supervise::new_id()
+    ));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    let sock = dir.join("serial.sock");
+    let sd = crate::test_socket::SocketDir::new("serial");
+    let sock = sd.join("serial.sock");
     let log = dir.join("qemu.log");
     let _listener = std::os::unix::net::UnixListener::bind(&sock).unwrap();
     let mut child = std::process::Command::new("/bin/sleep")

@@ -116,7 +116,8 @@ fn the_wait_for_a_loaded_guest_ends_only_when_it_runs() {
         (vec!["inmigrate"], Err("qmp")),
     ] {
         let d = scratch("running");
-        let sock = d.join("qmp");
+        let sd = crate::test_socket::SocketDir::new("t2008");
+        let sock = sd.join("qmp");
         let l = UnixListener::bind(&sock).unwrap();
         let script = statuses.clone();
         let server = std::thread::spawn(move || {

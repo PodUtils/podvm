@@ -5885,3 +5885,36 @@ Each of the issues 510 to 566 has the label `confirmed` and an entry, or is clos
 ## Done
 
 **Done (2026-11-17).** Each of the 57 reports 510 to 566 is reproduced as uid 1000 with the binary of `main`, or traced in the code where it needs a guest: 40 confirmed, 11 in part, 517 and 564 by design (517 is in no document), 545 is a relay of stdin with no `-i`, and 560 depends on the network (its risk is in the code). Each maps to T-1948 or T-1951 to T-1954; 564 is closed with its reason.
+
+# T-2067: Tests of `podvm` and the machine tier fail with a long `TMPDIR`: a probe in the working directory, socket paths longer than `sun_path`
+
+**Source:** the integration tests as uid 1000 of 2026-11-21 (the method of `docs/HANDOFF.md`), on the branch `wip/oq-run`, and their run again on 2026-11-23 with a `TMPDIR` of 112 bytes
+**Category:** gate
+**Milestone:** none
+**Priority:** P2
+**Effort:** S
+**Status:** done
+
+## Problem
+
+As uid 1000 with `TMPDIR` in a new directory under `/var/tmp`, two unit tests of `crates/podvm` fail. `run::report::tests::report_path_is_the_parsers` gives `--report r.json`: the parser probes the directory of the path with a file of its own (`run/parse/access.rs`), and the working directory of the test (the crate directory, of root) takes no file. `incus::logs::tests::the_log_of_an_instance_stops_at_the_limit` binds the unix socket of its stand-in at `$TMPDIR/podvm-t2046-<64 hex digits>/unix.socket`, which is longer than the 108 bytes of `sun_path`. With a `TMPDIR` of 112 bytes, four more unit tests fail at the bind of a socket (`a_run_imports_creates_pushes_starts_execs_and_deletes`, `a_save_leaves_a_whole_state_or_nothing`, `the_wait_for_a_loaded_guest_ends_only_when_it_runs`, `the_serial_wait_accepts_a_bound_socket`), and the integration test `report_paths_meaning` fails on the machine tier: the stand-in of QEMU says "AF_UNIX path too long" for the stderr socket of the run, which podvm puts under `TMPDIR`.
+
+## Premise
+
+A test that writes into the working directory depends on the caller. A socket path from `TMPDIR` has no bound: the length of `TMPDIR` is the caller's. podvm itself puts the sockets of a machine run under `TMPDIR` (`machine/guest/stderr.rs`, so that a deep store does not pass `sun_path`), with no second path where `TMPDIR` is deep. Some of these tests also made their directory from the pid alone, which is not unique across PID namespaces (`AGENTS.md`, rule 2b).
+
+## Approach
+
+The report test uses a new directory of its own under the temporary directory. Each stand-in with a unix socket takes one helper that makes a new directory under `/tmp`, checks that the socket path fits `sun_path`, and removes the directory at the drop. podvm puts the sockets of a machine run under `/tmp` where the path under `TMPDIR` does not fit.
+
+## Decision
+
+2026-11-23, the session's call. The socket directory of a test is under `/tmp`, not `TMPDIR`. Its name starts with `podvm-`, so the check of `gate.yml` for left directories (T-1859) counts it. The second path of podvm is `/tmp`: the name of the socket holds 16 hex digits of the nonce of the run, as under `TMPDIR`.
+
+## Prove
+
+As uid 1000 with a `TMPDIR` of 112 bytes, the test binaries of `podvm` and `podvm-supervise` pass; `cargo test --workspace` passes.
+
+## Done
+
+**Done (2026-11-23).** `run/report/tests.rs`: `report_path_is_the_parsers` gives a path in a new directory (`podvm-t1801-<id>`) and checks that the probe leaves no file there; `report_written_on_refusal` and `report_refusal_holds_no_value_of_e` name their directory with `podvm_supervise::new_id`, not the pid. `crates/podvm/src/test_socket.rs` (new): `SocketDir` makes `/tmp/podvm-TAG-<16 hex>`, mode 0700, from a new directory (`create_dir` refuses one that exists), asserts that each socket path in it is under 108 bytes, and removes it at the drop; the stand-ins of the six unit tests above take it. `machine/guest/stderr.rs`: `socket_in` gives `/tmp` where the chardev socket of the run under `TMPDIR` would pass `sun_path`; the table test `the_sockets_of_a_run_fit_sun_path` holds the bound for the stderr, chardev and terminal sockets. Measured on the cloud host on 2026-11-23, as uid 1000 (`setpriv`) with a `TMPDIR` of 112 bytes under `/var/tmp`: before, 4 failures in the unit tests of `podvm` (575 passed) and 1 in `report_paths_meaning`; after, the 31 test binaries of `podvm` and `podvm-supervise` pass, 651 tests and no failure, and no directory `podvm-*` stays in `/tmp` or in `TMPDIR`.

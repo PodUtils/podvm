@@ -56,8 +56,7 @@ fn stand_in(sock: &std::path::Path) {
 
 #[test]
 fn the_log_of_an_instance_stops_at_the_limit() {
-    let d = std::env::temp_dir().join(format!("podvm-t2046-{}", podvm_supervise::new_id()));
-    std::fs::create_dir_all(&d).unwrap();
+    let d = crate::test_socket::SocketDir::new("t2046");
     let sock = d.join("unix.socket");
     stand_in(&sock);
     let c = Client::new(Settings::new(&sock));
@@ -112,5 +111,4 @@ fn the_log_of_an_instance_stops_at_the_limit() {
         matches!(&e, super::Fault::Incus(t) if t.contains("not an instance of podvm")),
         "{e:?}"
     );
-    let _ = std::fs::remove_dir_all(&d);
 }

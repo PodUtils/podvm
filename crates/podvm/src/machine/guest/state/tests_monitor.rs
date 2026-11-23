@@ -223,7 +223,8 @@ fn a_save_leaves_a_whole_state_or_nothing() {
         let f = files(&d, "sha256:aa", "print");
         // The record of an older state must not stay beside a new file.
         put(&f, "older", b"older state");
-        let sock = d.join("qmp");
+        let sd = crate::test_socket::SocketDir::new("t2048");
+        let sock = sd.join("qmp");
         let (server, release) = monitor(&sock, peer);
         // T-2048: each wait of a save has a bound, also where the emulator
         // takes no client: the save ends, or the test fails. The bound of

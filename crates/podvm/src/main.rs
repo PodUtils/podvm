@@ -38,6 +38,8 @@ mod run;
 mod runsc;
 mod sandprobe;
 mod system;
+#[cfg(test)]
+mod test_socket; // TODO/gate.md T-2067
 mod tier;
 mod userns; // TODO/probe.md T-1909
 mod version;

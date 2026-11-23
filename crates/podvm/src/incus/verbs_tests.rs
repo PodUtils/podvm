@@ -69,9 +69,7 @@ fn stand_in(sock: &std::path::Path) -> Seen {
 
 #[test]
 fn incus_verbs_discard_and_rm_name_what_stays() {
-    let d = std::env::temp_dir().join(format!("podvm-t1846-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&d);
-    std::fs::create_dir_all(&d).unwrap();
+    let d = crate::test_socket::SocketDir::new("t1846");
     let sock = d.join("unix.socket");
     let seen = stand_in(&sock);
     let c = Client::new(Settings::new(sock));
@@ -104,7 +102,6 @@ fn incus_verbs_discard_and_rm_name_what_stays() {
     assert_eq!(rows.len(), 1, "{rows:?}");
     assert_eq!(rows[0][0], "inc1");
     assert_eq!(rows[0][4], "Up");
-    let _ = std::fs::remove_dir_all(&d);
 }
 
 /// PodUtils/podrunner#316 ask 1 (TODO/machine.md T-1996): the init of the

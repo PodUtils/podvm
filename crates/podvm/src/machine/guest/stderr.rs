@@ -16,7 +16,24 @@ use std::time::{Duration, Instant};
 /// The socket of a run, under the temporary directory: a path under a
 /// deep store can pass the 108 bytes of `sun_path`.
 pub fn socket_path(nonce: &str) -> PathBuf {
-    std::env::temp_dir().join(format!("podvm-guest-{}.err", &nonce[..nonce.len().min(16)]))
+    socket_in(&std::env::temp_dir(), nonce)
+}
+
+/// The length of `sun_path`, with its NUL.
+const SUN_PATH: usize = 108;
+
+/// [`socket_path`] under `tmp`, or under `/tmp` where a socket of the run
+/// under `tmp` passes `sun_path` (TODO/gate.md T-2067: a long `TMPDIR`).
+/// The longest socket of a run is the chardev one, `.chd/s` in place of
+/// `.err` (`channel::socket_path`).
+fn socket_in(tmp: &Path, nonce: &str) -> PathBuf {
+    let name = format!("podvm-guest-{}.err", &nonce[..nonce.len().min(16)]);
+    let p = tmp.join(&name);
+    if p.as_os_str().len() + ".chd/s".len() - ".err".len() < SUN_PATH {
+        p
+    } else {
+        Path::new("/tmp").join(name)
+    }
 }
 
 /// The emulator's arguments for the second port.
@@ -69,4 +86,34 @@ pub fn pump(
         }
         let _ = std::fs::remove_file(&sock);
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// TODO/gate.md T-2067: each socket of a run fits `sun_path`; a
+    /// `TMPDIR` that is too long gives `/tmp`.
+    #[test]
+    fn the_sockets_of_a_run_fit_sun_path() {
+        let nonce = "0123456789abcdef0123";
+        let at = |n: usize| PathBuf::from(format!("/{}", "d".repeat(n - 1)));
+        // (the length of the temporary directory, the parent of the socket)
+        let cases: &[(usize, Option<usize>)] =
+            &[(4, Some(4)), (72, Some(72)), (73, None), (200, None)];
+        for &(n, want) in cases {
+            let p = socket_in(&at(n), nonce);
+            let parent = p.parent().unwrap().to_path_buf();
+            assert_eq!(parent, want.map_or(PathBuf::from("/tmp"), at), "{n}");
+            assert!(p.ends_with("podvm-guest-0123456789abcdef.err"), "{n}");
+            let chardev = crate::machine::guest::channel::socket_path(&p);
+            assert!(chardev.as_os_str().len() < SUN_PATH, "{n}");
+            assert!(
+                crate::machine::guest::tty::socket_path(&p)
+                    .as_os_str()
+                    .len()
+                    < SUN_PATH
+            );
+        }
+    }
 }
