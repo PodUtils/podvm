@@ -8,6 +8,66 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+## 0.2.0-beta.38 (2026-11-23)
+
+### Known gaps: what the checks of 0.2.0-beta.38 prove, and what stays open, 2026-11-23
+
+Record: T-1949, T-2048, T-2054, T-2065, T-2066, T-2068, T-2069, T-2070.
+Deployed: version 0.2.0-beta.38.
+
+What the checks of this beta prove: the gate, `arm.yml`, the integration
+tests as uid 1000, `workloads.yml`, the nightly trial, `kvm.yml` (job
+`init`, on the take of podcrates `v0.82.0` and on the fixes of the sixth
+outside pass), and the seventh outside pass with the binary and `podvm man`
+only (T-2070), whose two P1 faults and three P2 faults are fixed (T-2071 to
+T-2075). Experiment 465 did not run on this beta (the QEMU of the cloud
+host crashes under TCG with four vCPUs, T-2016).
+
+Each open fault that a user can meet:
+
+- `run -it sh` and `exec -it CTR sh` have no job control ("can't access
+  tty; job control turned off"): the pty is not the controlling terminal of
+  the payload (T-2070, OR-B38-17; #584, COORD-188, asks pod-enter for it).
+- On the namespace rung, pod-enter's init of a PID namespace and the relay
+  of an `exec` join stay dumpable, and the relay of `exec -t` as uid 0 keeps
+  podvm's argv (T-2054, OQ-08; #646 asks podcrates).
+- A killed `pull` or `load` leaves a `.partial` file in `store/staging` that
+  no verb removes and that `system df` does not count (T-2069, OR-B38-05).
+- `cp -r` onto an existing copy of a tree with symbolic links stops half way
+  (T-2070, OR-B38-07).
+- `login` prints "Login Succeeded" for a registry that it did not contact;
+  the registry checks the login at the next pull (T-2070, OR-B38-08).
+- `probe` describes the process that probes (mount only, no PID or user
+  isolation, no /proc), not the namespace rung that `run` enters; `run
+  --verbose` and `system info` name the entered mechanism (T-2070,
+  OR-B38-10).
+- docker differences: `--env-file` refuses a line with no `=` and keeps a
+  UTF-8 BOM; `run -d IMAGE /nonexistent` exits 125 (docker: 127); `run` with
+  no `-i` passes stdin; `run -it` with a stdin that is no terminal is
+  accepted; `cp` makes missing parents of a file; `--tmpfs P:mode=` drops
+  the mode; `-h` is the help of each verb, not `--hostname` (T-2070,
+  OR-B38-09, 11 to 14, 16).
+- Some texts are wrong or odd: `cp` names paths of the store, `system df
+  --verbose`, `podvm help run`, `rmi -f` with stopped containers, `pull -a`
+  stops at a schema-1 tag, the `/proc/mounts` of `--read-only` (T-2070,
+  OR-B38-14, OR-B38-18).
+- With `-v DIR:/etc`, the payload gets no `hosts`, `hostname` or
+  `resolv.conf` of podvm: podvm writes no file into a volume, and docker
+  binds its own files over such a volume (T-2072, `docs/limits.md`).
+- The image of the incus tier keeps only `security.capability` and `user.*`
+  extended attributes, so the ACLs of a layer do not reach an incus
+  instance; a layer with GNU sparse files is refused (T-2065).
+- `load` of an image of 85 layers is measured with small layers only; the
+  hosted image of podrunner (about 16 GiB) is not measured here (T-2068).
+- A SIGTERM that comes during the save of the state of a machine guest
+  waits for the end of the save: at most about 7 minutes, an estimate from
+  the bounds (T-2048).
+
+### Changed: podcrates v0.81.0 and v0.82.0, a load of many layers, the faults of the sixth and seventh outside passes, 2026-11-23
+
+Record: T-2046, T-2047, T-2050, T-2051, T-2052, T-2053, T-2054, T-2055, T-2060, T-2061, T-2062, T-2063, T-2064, T-2065, T-2066, T-2067, T-2068, T-2071, T-2072, T-2073, T-2074, T-2075.
+Deployed: version 0.2.0-beta.38.
+
 - On the machine tier, podvm sizes the memory of a guest with no
   `--podvm-mem` from 13/4 of its initrd and 512 MiB, not three times and
   512 MiB: under KVM an initrd of 2055 MiB needs 6656 MiB, one step under
