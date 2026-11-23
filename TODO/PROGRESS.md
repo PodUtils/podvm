@@ -15,6 +15,10 @@ The state on 2026-11-21 (`docs/HANDOFF.md` has the detail):
   (T-2066, `51c16c5`) and the size ceiling of 9 500 000 bytes (call C29,
   `4d8da41`); podcrates `v0.82.0` (T-2066); the work of `wip/oq-run`
   (T-2052 to T-2055, OQ-05, OQ-07, OQ-08 partial and OQ-11), and T-2067.
+* (2026-11-23) The seventh outside pass (on `4887fb72`): T-2070 holds its
+  18 findings; both P1 findings are done (T-2071, T-2072), and the P2
+  findings OR-B38-02, -03 and -04 (T-2073 to T-2075). OR-B38-05 is in
+  T-2069; the rest are lines of "Known gaps" of the next release.
 * The newest release is `v0.2.0-beta.37` (2026-11-21, release run
   44846783317 on `c92ac65`): systemd as PID 1 on each route with
   `--podvm-init=image` (T-2002), the saved state of a machine guest
@@ -119,8 +123,10 @@ status with `podvm-count` in the same commit as the work.
    T-1998; then the asks of
    githome and cfb for their CI, then the items below. A quality item
    that a podrunner unit meets counts as an ask of podrunner.
-0a. The gate of the next beta (2026-11-20): the P2 and P3 findings of the
-   sixth outside pass, [T-2044](cli.md); its P0 and P1 findings are done.
+0a. The gate of the next beta (2026-11-23): the findings of the seventh
+   outside pass that stay open, [T-2070](cli.md) (its P1 findings are
+   done); the P2 and P3 findings of the sixth outside pass,
+   [T-2044](cli.md).
 0. Quality first (the owner's ruling, 2026-11-17; `docs/methodology/quality.md`):
    each beta passes the gate of `docs/maintenance.md`, "Releases". Verify and
    work the reports of the external
