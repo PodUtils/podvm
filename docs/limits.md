@@ -282,7 +282,7 @@ kernel named by `PODVM_MACHINE_KERNEL_ARM64`, runs under TCG on an x86_64
 host, and has no `-t`, 9p volume or podvm in the guest (T-1890).
 The machine tier needs `qemu-system-x86_64` on the host; `podvm doctor`
 checks it. Where the host has none, `run --podvm-tier=machine`, `podvm
-windows` and `run windows:NAME` fetch a pinned static QEMU 11.0.0 and its
+windows` and `run windows:NAME` fetch a pinned static QEMU 11.1.3 and its
 firmware into the store (T-1875); `podvm machine ssh` and `podvm doctor`
 look on PATH only. `--podvm-mem` sizes the virtual machine, as QEMU's `-m` does,
 and the guest kernel keeps a part of it: `MemTotal` is 85 % of 256M,
@@ -339,9 +339,9 @@ owners that the image intended, and is the init of the instance. The
 command is not PID 1, except with `--podvm-init=image`. `run -d` and `create` keep the instance, and `ps`,
 `start`, `stop`, `rm`, `logs` and `exec` with the tier act on it; incusd
 keeps its state, and podvm keeps no record of it (T-1722). `logs -f`
-follows the log, and `logs --limit-bytes N` writes its first N bytes; the
-API of incus gives the log file whole, so podvm holds it in memory, 64 MiB
-at most, and refuses a larger log (T-2046). `inspect` gives the state, and `tier = incus` in
+follows the log, and `logs --limit-bytes N` writes its first N bytes;
+podvm reads the log file in pieces of 64 KiB from the offset that it
+wrote last, so a log of any size is read (T-2046). `inspect` gives the state, and `tier = incus` in
 `$store/config` selects the tier with no flag where an incusd answers;
 `-v` is a disk device of the instance (T-1722), and `--podvm-mem` and `--podvm-qemu-arg` are refused by
 name, and the instance has no network

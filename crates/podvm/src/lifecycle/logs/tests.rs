@@ -111,18 +111,20 @@ fn limit_bytes_composes_with_each_flag_of_logs() {
     }
 }
 
-/// The help names the bound of the buffer, the range of the flag and the
-/// bound of the incus tier.
+/// The help names the bound of the buffer and the range of the flag. The
+/// incus tier reads in pieces too, so the help names no bound of the size
+/// of a log (podcrates `v0.81.0`, PodUtils/podvm#631).
 #[test]
 fn the_help_states_the_bounds() {
     for want in [
         "--limit-bytes N",
         "64 KiB",
-        "64 MiB",
+        "of any size, read\n                   in pieces of 64 KiB",
         &LIMIT_BYTES_MAX.to_string(),
     ] {
         assert!(LOGS_USAGE.contains(want), "{want}");
     }
+    assert!(!LOGS_USAGE.contains("MiB"), "a bound of the size of a log");
 }
 
 /// The copy of a log for each `--tail` and `--limit-bytes`: the bytes of

@@ -1,5 +1,6 @@
-//! TODO/machine.md T-2008 and T-2048: the save against a stand-in of the
-//! monitor of an emulator that takes one client at a time, as QEMU does.
+//! TODO/machine.md T-2008, T-2048 and T-2051: the save
+//! (`pod_guest::warm::line::save`) against a stand-in of the monitor of an
+//! emulator that takes one client at a time, as QEMU does.
 
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixListener;
@@ -24,13 +25,14 @@ enum Peer {
     Leaves,
     /// The guest does not go on after the save.
     NoCont,
-    /// The first `query-migrate` gets its answer after the read bound of
-    /// the monitor, on the same connection (the lock of the emulator,
-    /// T-2008); a second client is taken only when the first one closed,
-    /// as QEMU does (T-2048).
+    /// The first `query-migrate` of a migration gets its answer after the
+    /// read bound of the monitor (`ANSWER_WAIT`, 5 s), on the same
+    /// connection (the lock of the emulator, T-2008). A second client is
+    /// taken only when the first one closed, as QEMU does (T-2048).
     Late,
-    /// After the first `query-migrate` the emulator answers nothing and
-    /// takes no client, and its queue of connections is full (T-2048).
+    /// At the first `query-migrate` of a migration the emulator answers
+    /// nothing and takes no client, and its queue of connections is full
+    /// (T-2048).
     Hangs,
 }
 
@@ -50,13 +52,14 @@ fn qemu_listener(sock: &Path) -> UnixListener {
 }
 
 /// A monitor on `sock` that answers as `peer` says, one client at a time,
-/// and gives the requests that it read. A monitor that hangs holds until
-/// the sender gives a word or goes.
+/// and gives the requests that it read and the count of the clients that
+/// it took. A monitor that hangs holds until the sender gives a word or
+/// goes.
 fn monitor(
     sock: &Path,
     peer: Peer,
 ) -> (
-    std::thread::JoinHandle<Vec<String>>,
+    std::thread::JoinHandle<(Vec<String>, usize)>,
     std::sync::mpsc::Sender<()>,
 ) {
     let l = qemu_listener(sock);
@@ -66,9 +69,11 @@ fn monitor(
         let mut seen = Vec::new();
         let mut status = "none".to_string();
         let mut late = peer == Peer::Late;
-        let mut again = false;
+        let mut migrating = false;
+        let mut clients = 0;
         'conn: loop {
             let (s, _) = l.accept().unwrap();
+            clients += 1;
             let mut w = s.try_clone().unwrap();
             // A client that closed in the queue is dropped, as QEMU does.
             if w.write_all(b"{\"QMP\": {\"version\": {}}}\n").is_err() {
@@ -83,8 +88,9 @@ fn monitor(
                     "migrate" => {
                         let uri = v["arguments"]["uri"].as_str().unwrap();
                         if peer == Peer::Leaves {
-                            return seen;
+                            return (seen, clients);
                         }
+                        migrating = true;
                         let path = uri
                             .strip_prefix("file:")
                             .map(str::to_string)
@@ -105,21 +111,20 @@ fn monitor(
                             status = "completed".to_string();
                         }
                     }
-                    "query-migrate" if late => {
+                    "query-migrate" if late && migrating => {
                         // The answer comes after the bound of the reader,
                         // on this connection; the next client waits.
                         late = false;
-                        again = true;
                         std::thread::sleep(std::time::Duration::from_millis(5600));
                         answer = serde_json::json!({"return": {"status": status}});
                     }
-                    "query-migrate" if peer == Peer::Hangs => {
+                    "query-migrate" if peer == Peer::Hangs && migrating => {
                         // Two connections that nobody takes fill the queue.
                         let _full: Vec<_> = (0..2)
                             .filter_map(|_| std::os::unix::net::UnixStream::connect(&own).ok())
                             .collect();
                         let _ = held.recv();
-                        return seen;
+                        return (seen, clients);
                     }
                     "query-migrate" => {
                         answer = serde_json::json!({"return": {"status": status,
@@ -135,13 +140,9 @@ fn monitor(
                     break;
                 }
             }
-            // The client of the late answer closed: take the next one.
-            if std::mem::take(&mut again) {
-                continue 'conn;
-            }
             break;
         }
-        seen
+        (seen, clients)
     });
     (server, release)
 }
@@ -182,7 +183,7 @@ fn a_save_leaves_a_whole_state_or_nothing() {
             false,
             true,
             Transport::File,
-            "the disk is full",
+            "the save failed: the disk is full",
         ),
         (
             Peer::Empty,
@@ -215,7 +216,7 @@ fn a_save_leaves_a_whole_state_or_nothing() {
             false,
             false,
             Transport::File,
-            "no connection within",
+            "the save did not end within 6s",
         ),
     ] {
         let d = scratch("save");
@@ -225,22 +226,24 @@ fn a_save_leaves_a_whole_state_or_nothing() {
         let sock = d.join("qmp");
         let (server, release) = monitor(&sock, peer);
         // T-2048: each wait of a save has a bound, also where the emulator
-        // takes no client: the save ends, or the test fails.
-        let bounds = Bounds {
-            save: Duration::from_secs(if peer == Peer::Hangs { 6 } else { 30 }),
-            connect: Duration::from_secs(2),
-        };
+        // takes no client: the save ends, or the test fails. The bound of
+        // a stuck save: the migration, `migrate_cancel` and `cont` (5 s
+        // each), and a margin.
+        let wait = Duration::from_secs(if peer == Peer::Hangs { 6 } else { 30 });
         let (tx, rx) = std::sync::mpsc::channel();
         let (s2, f2) = (sock.clone(), f.clone());
         std::thread::spawn(move || {
-            let _ = tx.send(save_within(&s2, &f2, "print", 3072, first, "u1", bounds));
+            let _ = tx.send(save_within(&s2, &f2, "print", 3072, first, "u1", wait));
         });
-        let most = bounds.save + bounds.connect + Duration::from_secs(15);
+        let most = wait + Duration::from_secs(25);
         let (saved, runs) = rx
             .recv_timeout(most)
             .unwrap_or_else(|_| panic!("{peer:?}: the save did not end in {most:?}"));
         drop(release);
-        let seen = server.join().unwrap();
+        let (seen, clients) = server.join().unwrap();
+        // T-2048: QEMU serves one client at a time, and the save opens one
+        // connection.
+        assert_eq!(clients, 1, "{peer:?}: {seen:?}");
         assert_eq!(saved.is_ok(), want_ok, "{saved:?}");
         assert_eq!(runs.is_ok(), want_runs, "{runs:?}");
         if let Err(why) = &runs {
@@ -261,6 +264,7 @@ fn a_save_leaves_a_whole_state_or_nothing() {
                 assert_eq!(s.bytes, 5);
                 assert_eq!(std::fs::read(&f.state).unwrap(), b"STATE");
                 let meta = valid(&f, "print").expect("the record of the new state");
+                assert_eq!(s.transport, transport);
                 assert_eq!((meta.mem_mib, meta.transport), (3072, transport));
             }
             Err(e) => {
@@ -268,9 +272,9 @@ fn a_save_leaves_a_whole_state_or_nothing() {
                 // Each failed migration names its transport, and the second
                 // path after the first one.
                 assert!(e.contains("through file"), "no transport in {e:?}");
+                assert!(e.contains("MiB free"), "no free space in {e:?}");
                 if peer == Peer::Fails {
-                    assert!(e.contains("then through pipe"), "{e:?}");
-                    assert!(e.contains("MiB written"), "no size in {e:?}");
+                    assert!(e.contains("; through a pipe: "), "{e:?}");
                 }
             }
         }

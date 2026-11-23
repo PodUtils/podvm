@@ -31,6 +31,11 @@ fn the_sweep_keeps_the_last_states_of_an_image_and_no_old_partial_file() {
         old(&f.meta, 100 * (i as u64 + 1));
         same_image.push(f);
     }
+    // A state of the layout before T-2051: its record is JSON.
+    let old_layout = dir.join("state-aa-000000000000000000000000.json");
+    std::fs::write(&old_layout, b"{}").unwrap();
+    std::fs::write(old_layout.with_extension("vm"), b"state").unwrap();
+    old(&old_layout, 10_000);
     let other_image = files(&d, "sha256:bb", "one");
     put(&other_image, "one", b"state");
     old(&other_image.meta, 10_000);
@@ -67,6 +72,10 @@ fn the_sweep_keeps_the_last_states_of_an_image_and_no_old_partial_file() {
         other_image.state.exists(),
         "the state of another image went"
     );
+    assert!(
+        !old_layout.exists() && !old_layout.with_extension("vm").exists(),
+        "a state of the old layout stays"
+    );
     // KEEP is 2: this state and the one that was used last.
     assert!(same_image[0].state.exists() && same_image[0].meta.exists());
     for f in &same_image[1..] {
@@ -85,24 +94,6 @@ fn the_sweep_keeps_the_last_states_of_an_image_and_no_old_partial_file() {
     );
     assert!(!same_image[0].state.exists());
     let _ = std::fs::remove_dir_all(&d);
-}
-
-#[test]
-fn a_path_goes_into_a_uri_whole() {
-    let odd = "/s/it's a path";
-    assert_eq!(Transport::File.save_uri(odd), "file:/s/it's a path");
-    assert_eq!(Transport::File.load_uri(odd), "file:/s/it's a path");
-    assert_eq!(
-        Transport::Pipe.save_uri(odd),
-        "exec:cat > '/s/it'\\''s a path'"
-    );
-    assert_eq!(
-        Transport::Pipe.load_uri(odd),
-        "exec:cat '/s/it'\\''s a path'"
-    );
-    for t in [Transport::File, Transport::Pipe] {
-        assert_eq!(Transport::of(t.word()), Some(t));
-    }
 }
 
 /// The wait for a loaded guest: it starts a guest that was saved stopped,
@@ -227,63 +218,32 @@ fn the_script_of_the_guest_and_the_job_of_a_run_are_two_texts() {
 }
 
 /// TODO/machine.md T-2008: a failure of the save names its cause. A
-/// request with no answer within the bound of the monitor is not a refusal
-/// and not an end of the connection: the line says what the emulator does
-/// then. A failed migration gives the text of the emulator, and each
-/// reason for which the emulator blocks a migration (a CPU feature of
-/// `-cpu host` under KVM).
+/// request with no answer within its bound is not a refusal and not an end
+/// of the connection: the line says what the emulator does then. The text
+/// of `pod_guest` (the request, the text of the emulator) stays whole.
 #[test]
 fn a_failure_of_the_save_names_the_request_and_the_reason() {
     use pod_core::{Class, Failure, Stage};
-    for (class, text, want, not) in [
+    for (class, text, lock) in [
         (
             Class::Timeout,
-            "qmp read: Resource temporarily unavailable (os error 11)",
-            "gave no answer to query-migrate",
-            "query-migrate: qmp",
+            "the save did not end within 180s: qmp: no answer to {\"execute\":\"query-migrate\"} within 175.0s",
+            true,
         ),
         (
             Class::Protocol,
-            "qmp refused x: {\"error\": {\"desc\": \"no\"}}",
-            "query-migrate: qmp refused",
-            "gave no answer",
+            "the save failed: Unable to write to file: No space left on device",
+            false,
         ),
         (
             Class::Unavailable,
-            "qmp closed the connection",
-            "query-migrate: qmp closed",
-            "gave no answer",
+            "the emulator cannot save this guest: \"State blocked by non-migratable CPU device (invtsc flag)\"",
+            false,
         ),
+        (Class::Unavailable, "qmp closed the connection", false),
     ] {
-        let line = super::save::asked("query-migrate", &Failure::new(Stage::Host, class, text));
-        assert!(line.contains(want), "{want:?} is not in {line:?}");
-        assert!(!line.contains(not), "{not:?} is in {line:?}");
-        assert!(
-            line.contains(text),
-            "the text of the monitor is not in {line:?}"
-        );
-    }
-    for (line, status, want) in [
-        (
-            r#"{"return":{"status":"failed","error-desc":"Unable to write to file: No space left on device"}}"#,
-            "failed",
-            "No space left on device",
-        ),
-        (
-            r#"{"return":{"status":"failed","blocked-reasons":["State blocked by non-migratable CPU device (invtsc flag)","9p is mounted"]}}"#,
-            "failed",
-            "the emulator blocks a migration: State blocked by non-migratable CPU device (invtsc flag); 9p is mounted",
-        ),
-        (
-            r#"{"return":{"status":"failed"}}"#,
-            "failed",
-            "the emulator gave no reason",
-        ),
-        (r#"{"return":{"status":"active","ram":{"transferred":1}}}"#, "active", ""),
-        ("no json", "", "the emulator gave no reason"),
-    ] {
-        let (got, why) = super::save::migration(line);
-        assert_eq!(got, status, "{line}");
-        assert!(why.contains(want), "{want:?} is not in {why:?}");
+        let line = super::save::explain(&Failure::new(Stage::Host, class, text));
+        assert!(line.contains(text), "the text of the crate is not in {line:?}");
+        assert_eq!(line.contains("holds its lock"), lock, "{line:?}");
     }
 }

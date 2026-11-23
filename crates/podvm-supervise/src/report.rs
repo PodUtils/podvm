@@ -42,20 +42,11 @@ pub fn finish(path: &Path, c: &Container) -> Result<(), String> {
         r["max_rss_kib"] = e.max_rss_kib.into();
     }
     let body = serde_json::to_string_pretty(&r).map_err(|e| e.to_string())? + "\n";
-    let dir = path
-        .parent()
-        .filter(|d| !d.as_os_str().is_empty())
-        .unwrap_or(Path::new("."));
-    let name = path
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let tmp = dir.join(format!(".{name}.{}.end.tmp", std::process::id()));
-    std::fs::write(&tmp, body).map_err(|e| format!("{}: {e}", tmp.display()))?;
-    std::fs::rename(&tmp, path).map_err(|e| {
-        let _ = std::fs::remove_file(&tmp);
-        format!("{}: {e}", path.display())
-    })
+    // The one atomic replace of a file (TODO/deps.md T-2066): its error
+    // names the step and the path.
+    pod_core::files::replace(path, body.as_bytes(), pod_core::files::Mode::Exact(0o644))
+        .map(drop)
+        .map_err(|e| e.to_string())
 }
 
 /// The count `oom_kill` of `memory.events` of the cgroup `dir`, or `None`

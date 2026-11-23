@@ -1,13 +1,15 @@
 //! TODO/machine.md T-1875: the emulator, `qemu-img` and the firmware that
 //! podvm fetches into its store when the host has none.
 //!
-//! The store copy is the static QEMU 11.0.0 of the release `11.0.0.1` of
-//! hermeticbuild/qemu-prebuilt (the service `hermeticbuild-qemu` of
-//! `pod-services`, podcrates `v0.80.0`, T-1013): musl, static-pie, no
-//! `PT_INTERP`. It holds the QEMU commit `2865bf1c` (the fix of the
+//! The store copy is the static QEMU 11.1.3 of the release `qemu-11.1.3`
+//! of PodUtils/static-pkgs (the service `static-pkgs-qemu` of
+//! `pod-services`, podcrates `v0.81.0`, T-1014): musl, static-pie, no
+//! `PT_INTERP`. It holds the QEMU commits `2865bf1c` (the fix of the
 //! use-after-free of `address_space_translate_for_iotlb`, a SIGSEGV at the
-//! boot of a guest with four vCPUs under TCG, PodUtils/podvm#618). Each
-//! archive keeps the installed layout (`./bin/NAME`, `./share/qemu/...`).
+//! boot of a guest with four vCPUs under TCG, PodUtils/podvm#618) and
+//! `9d378cab` (the migration of an NVMe device, so a warm start of a
+//! Windows guest saves its root disk, T-1874). Each archive keeps the
+//! installed layout (`./bin/NAME`, `./share/qemu/...`).
 //! podvm checks the size and the sha256 of each archive before it reads a
 //! byte of it, then the size and the sha256 of each member that it takes.
 //!
@@ -21,10 +23,10 @@
 use std::path::{Path, PathBuf};
 
 /// The version of QEMU in the store.
-pub const QEMU_VERSION: &str = "11.0.0";
+pub const QEMU_VERSION: &str = "11.1.3";
 
-/// The release of hermeticbuild/qemu-prebuilt that holds [`QEMU_VERSION`].
-pub const RELEASE: &str = "11.0.0.1";
+/// The release of PodUtils/static-pkgs that holds [`QEMU_VERSION`].
+pub const RELEASE: &str = "qemu-11.1.3";
 
 /// Where one file of the store goes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,14 +76,14 @@ pub struct Archive {
 }
 
 #[cfg(test)]
-const RELEASES: &str = "https://github.com/hermeticbuild/qemu-prebuilt/releases/download/11.0.0.1/";
+const RELEASES: &str = "https://github.com/PodUtils/static-pkgs/releases/download/qemu-11.1.3/";
 
 macro_rules! archive {
     ($name:literal, $size:literal, $sha:literal, $members:expr) => {
         Archive {
             name: $name,
             url: concat!(
-                "https://github.com/hermeticbuild/qemu-prebuilt/releases/download/11.0.0.1/",
+                "https://github.com/PodUtils/static-pkgs/releases/download/qemu-11.1.3/",
                 $name
             ),
             size: $size,
@@ -102,38 +104,39 @@ macro_rules! share {
     };
 }
 
-/// The archives of the store, pinned 2026-11-20. The size and the sha256
+/// The archives of the store, pinned 2026-11-21. The size and the sha256
 /// of each archive, and the member, the size and the sha256 of each
-/// program, are the facts of the service `hermeticbuild-qemu` of
+/// program, are the facts of the service `static-pkgs-qemu` of
 /// `pod-services` (a test of podvm compares them). The sha256 of each file
-/// of the data were measured on the members of the data archive.
+/// of the data were measured on the members of the data archive (the same
+/// files as in the data of QEMU 11.0.0).
 pub const ARCHIVES: &[Archive] = &[
     archive!(
-        "qemu-system-bin-linux-amd64-x86_64-softmmu-11.0.0.1.tar.gz",
-        5_818_414,
-        "31399af8d874176f104679c6aae8c8741bcd86283dbc8de1fce8a140f67f1448",
+        "qemu-system-x86_64-11.1.3-linux-amd64.tar.gz",
+        6_814_799,
+        "368da02758b8b474448a7a37fed601256ec9cd7e11c09656dbb85276e778c888",
         &[Member {
             path: "./bin/qemu-system-x86_64",
-            size: 31_204_448,
-            sha256: "4168a4bbd65eaea98ffd4ba4754146cf694e361148e84b7ad3d6eb4adcd981ac",
+            size: 33_571_760,
+            sha256: "5b5c3a2c181ae3381d1881d615ab923ec1ae35188d0274246ef14863b71c14d4",
             dest: Dest::Bin,
         }]
     ),
     archive!(
-        "qemu-img-linux-amd64-11.0.0.1.tar.gz",
-        1_513_590,
-        "4cab6e3f186ec6c500dd340f84b794f8320e3d58a2b2b9d2f835416589279d3e",
+        "qemu-img-11.1.3-linux-amd64.tar.gz",
+        1_430_921,
+        "cffa14e62afc745f5487beb70b5caa6a4814853f5bba92a03e3eeddab53c43a5",
         &[Member {
             path: "./bin/qemu-img",
-            size: 3_376_704,
-            sha256: "8708058aab6cc2937cfa82901406fd92ad435612db0f9d97d13e887e3dd8b60a",
+            size: 3_209_680,
+            sha256: "e88a84357dd7f86d2f6dd7159deff4a929c6d9f030b691f378d9a59c0b7cc0ea",
             dest: Dest::Bin,
         }]
     ),
     archive!(
-        "qemu-system-data-linux-amd64-11.0.0.1.tar.gz",
-        18_190_583,
-        "27e5a04a32d56783ebf8277140ec52304dd2376f97a1c01c36982bd228f37cfc",
+        "qemu-data-11.1.3-linux-amd64.tar.gz",
+        18_171_081,
+        "b11bff496ff7e345c9e4931306ccc3074e55d5eeb62d4a25f9efb70a3500f66e",
         &[
             share!(
                 "bios-256k.bin",
@@ -324,7 +327,7 @@ mod tests {
             assert!(a.size > 0 && hex64(a.sha256), "{}", a.name);
             assert!(a.url.starts_with(RELEASES), "{}", a.url);
             assert!(a.url.ends_with(a.name) && a.name.ends_with(".tar.gz"));
-            assert!(a.name.contains(RELEASE), "{}", a.name);
+            assert!(a.name.contains(QEMU_VERSION), "{}", a.name);
             assert!(!a.members.is_empty(), "{}", a.name);
             for m in a.members {
                 assert!(names.insert(m.name()), "{} twice", m.name());
@@ -336,7 +339,7 @@ mod tests {
                 assert_eq!(m.path, format!("{dir}{}", m.name()), "{}", m.path);
             }
         }
-        let root = Path::new("/store/tools/qemu-11.0.0");
+        let root = Path::new("/store/tools/qemu-11.1.3");
         let paths: Vec<PathBuf> = members().map(|m| m.path_in(root)).collect();
         for want in [
             bin(root, "qemu-system-x86_64"),

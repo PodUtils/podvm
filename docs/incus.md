@@ -132,9 +132,9 @@ podvm's container table belongs to a launcher, and its reconcile calls a
 running record with no launcher dead. Clause 12 of experiment 434 runs each
 verb against the incusd of route A. `logs -f` follows `/.podvm/log` until
 the instance stops, and `logs --limit-bytes N` stops after its first N bytes
-(T-2046, clause 25). incus gives the file whole (`GET .../files`), and
-pod-incus reads that answer whole, 64 MiB at most: podvm holds the log in
-memory and refuses a larger one. and `inspect` gives the state of an instance as JSON
+(T-2046, clause 25). Each read is a ranged `GET .../files` from the
+offset that podvm wrote last, which pod-incus copies in pieces of 64 KiB
+to stdout (`Client::get_file_to`), so a log of any size is read. `inspect` gives the state of an instance as JSON
 or through `--format` (`.Name`, `.Status`, `.ExitCode`, `.EnteredRung`).
 
 ## The tier by configuration (T-1722)

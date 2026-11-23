@@ -81,11 +81,11 @@ impl Held {
 }
 
 /// Write the state under a name of its own, then give it the name `file`:
-/// a reader finds the whole text or no file.
+/// a reader finds the whole text or no file (`pod_core::files::replace`,
+/// TODO/deps.md T-2066).
 pub(super) fn write(file: &Path, held: &Held) -> std::io::Result<()> {
-    let part = file.with_extension("part");
-    std::fs::write(&part, held.text())?;
-    std::fs::rename(&part, file)
+    use pod_core::files::{replace, Mode};
+    replace(file, held.text().as_bytes(), Mode::Exact(0o644)).map(drop)
 }
 
 /// `guest-init --hold FILE`: 0 where the init is up, 1 where its boot

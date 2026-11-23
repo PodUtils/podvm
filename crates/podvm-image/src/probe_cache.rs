@@ -188,10 +188,13 @@ pub fn resolve(store: &Store) -> Probe {
 /// ⛔ Written to a staging name and renamed over the cache, so a process killed
 /// mid-write leaves the previous answer rather than a truncated document that
 /// would then fail to parse on every run.
+/// The one atomic replace of a file: `pod_core::files::replace`
+/// (TODO/deps.md T-2066).
 fn write(path: &std::path::Path, document: &str) -> Result<()> {
-    let tmp = path.with_extension(format!("json.{}", std::process::id()));
-    std::fs::write(&tmp, document).map_err(|e| Error::io(tmp.display().to_string(), e))?;
-    std::fs::rename(&tmp, path).map_err(|e| Error::io(path.display().to_string(), e))
+    use pod_core::files::{replace, Mode};
+    replace(path, document.as_bytes(), Mode::Exact(0o644))
+        .map(drop)
+        .map_err(|e| Error::io(path.display().to_string(), e))
 }
 
 /// The `cache_key` object of a document, as a [`ConfinementKey`].

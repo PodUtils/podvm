@@ -6,7 +6,10 @@ use std::time::{Duration, SystemTime};
 
 use podvm_image::store::Lock;
 
-use super::{Transport, BAD_HOLDS, KEEP, SCHEMA, STRIKES};
+use podvm_windows::warm::line;
+
+use super::save::NOTE_MEM;
+use super::{Transport, BAD_HOLDS, KEEP, STRIKES};
 
 /// The files of one state in the store.
 #[derive(Debug, Clone)]
@@ -24,6 +27,12 @@ pub(super) fn prefix(digest: &str) -> String {
     format!("state-{}-", digest.trim_start_matches("sha256:"))
 }
 
+/// The extension of the record of a state. `json` is the record of the
+/// layout before T-2051: the sweep takes it as a record, so it removes the
+/// states of that layout as other old states.
+const RECORD: &str = "record";
+const OLD_RECORD: &str = "json";
+
 /// The hex digits of the digest of a fingerprint in the name of a state.
 const KEY_DIGITS: usize = 24;
 
@@ -37,80 +46,38 @@ pub fn files(store_root: &Path, digest: &str, fingerprint: &str) -> Files {
     ));
     Files {
         state: base.with_extension("vm"),
-        meta: base.with_extension("json"),
+        meta: base.with_extension(RECORD),
         lock: base.with_extension("lock"),
         bad: base.with_extension("bad"),
         nonce: nonce.chars().take(32).collect(),
     }
 }
 
-/// What the sidecar of a state says.
+/// What the record of a state says (`pod_guest::warm::line::Record`,
+/// T-2051), as a run reads it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Meta {
-    pub fingerprint: String,
     pub mem_mib: u64,
     pub bytes: u64,
     pub transport: Transport,
 }
 
-impl Meta {
-    pub fn text(&self) -> String {
-        serde_json::json!({
-            "schema": SCHEMA,
-            "fingerprint": self.fingerprint,
-            "mem_mib": self.mem_mib,
-            "bytes": self.bytes,
-            "transport": self.transport.word(),
-        })
-        .to_string()
-    }
-
-    /// Read a sidecar. An error is what is wrong: the state is then no
-    /// state, and the run saves a new one.
-    pub fn parse(text: &str) -> Result<Meta, String> {
-        let v: serde_json::Value =
-            serde_json::from_str(text).map_err(|e| format!("no JSON: {e}"))?;
-        if v["schema"].as_str() != Some(SCHEMA) {
-            return Err(format!("the schema is not {SCHEMA}"));
-        }
-        let mem_mib = v["mem_mib"].as_u64().filter(|m| *m > 0 && *m <= 1 << 24);
-        Ok(Meta {
-            fingerprint: v["fingerprint"]
-                .as_str()
-                .ok_or("no fingerprint")?
-                .to_string(),
-            mem_mib: mem_mib.ok_or("no memory size")?,
-            bytes: v["bytes"].as_u64().filter(|b| *b > 0).ok_or("no length")?,
-            transport: v["transport"]
-                .as_str()
-                .and_then(Transport::of)
-                .ok_or("no transport")?,
-        })
-    }
-}
-
-/// The state of `f` where it is whole and is the one of `fingerprint`.
+/// The state of `f` where it is whole and is the one of `fingerprint`
+/// (`pod_guest::warm::line::check`), with the memory of its guest. An error
+/// is what is wrong: the state is then no state, and the run saves a new
+/// one.
 pub(super) fn valid(f: &Files, fingerprint: &str) -> Result<Meta, String> {
-    let text = std::fs::read_to_string(&f.meta).map_err(|e| e.to_string())?;
-    let meta = Meta::parse(&text)?;
-    if meta.fingerprint != fingerprint {
-        let (a, b) = (meta.fingerprint.lines(), fingerprint.lines());
-        let differs = a.zip(b).find(|(x, y)| x != y);
-        return Err(match differs {
-            Some((saved, now)) => format!("saved under {saved:?}, and this run has {now:?}"),
-            None => "saved under another fingerprint".to_string(),
-        });
-    }
-    let len = std::fs::metadata(&f.state)
-        .map_err(|e| e.to_string())?
-        .len();
-    if len != meta.bytes {
-        return Err(format!(
-            "the file has {len} bytes, and its record {}",
-            meta.bytes
-        ));
-    }
-    Ok(meta)
+    let r = line::check(&f.state, &f.meta, fingerprint).map_err(|e| e.to_string())?;
+    let mem_mib = r
+        .note(NOTE_MEM)
+        .and_then(|m| m.parse::<u64>().ok())
+        .filter(|m| *m > 0 && *m <= 1 << 24)
+        .ok_or_else(|| format!("{}: no memory size", f.meta.display()))?;
+    Ok(Meta {
+        mem_mib,
+        bytes: r.bytes,
+        transport: r.transport,
+    })
 }
 
 /// The count and the last reason of the marker of a failed state, where
@@ -241,14 +208,15 @@ pub(super) fn sweep(dir: &Path, f: &Files) {
         // The lock of a state that went: old, and with no record beside it.
         let orphan = name.ends_with(".lock")
             && !name.starts_with(&own)
-            && !p.with_extension("json").exists()
+            && !p.with_extension(RECORD).exists()
+            && !p.with_extension(OLD_RECORD).exists()
             && age(&p) > BAD_HOLDS;
         if orphan || (partial && (name.starts_with(&own) || age(&p) > BAD_HOLDS)) {
             let _ = std::fs::remove_file(&p);
         } else if !partial
             && name.starts_with(&image)
             && !name.starts_with(&own)
-            && name.ends_with(".json")
+            && (name.ends_with(&format!(".{RECORD}")) || name.ends_with(&format!(".{OLD_RECORD}")))
         {
             metas.push((age(&p), p));
         }
@@ -256,7 +224,7 @@ pub(super) fn sweep(dir: &Path, f: &Files) {
     metas.sort();
     // This state is one of the kept ones.
     for (_, meta) in metas.into_iter().skip(KEEP - 1) {
-        for ext in ["vm", "json", "bad", "lock"] {
+        for ext in ["vm", RECORD, OLD_RECORD, "bad", "lock"] {
             let _ = std::fs::remove_file(meta.with_extension(ext));
         }
     }

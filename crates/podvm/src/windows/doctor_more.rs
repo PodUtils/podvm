@@ -164,8 +164,9 @@ mod tests {
         }
     }
 
-    /// T-1874, podcrates@T-1035: a warm start from QEMU 11.1, not from 11.0
-    /// (the static QEMU 11.0.0 of the store runs each guest from a cold boot).
+    /// T-1874, podcrates@T-1035: a warm start from QEMU 11.1, not from 11.0.
+    /// The static QEMU 11.1.3 of the store (podcrates `v0.81.0`, T-2066)
+    /// passes the check.
     #[test]
     fn a_warm_start_needs_qemu_11_1() {
         for (line, warm) in [
@@ -178,6 +179,14 @@ mod tests {
             ("QEMU emulator version 11.0.5", Some(false)),
             ("QEMU emulator version 11.1.0", Some(true)),
             ("QEMU emulator version 11.1.3 (v11.1.3)", Some(true)),
+            (
+                format!(
+                    "QEMU emulator version {}",
+                    podvm_windows::tools::QEMU_VERSION
+                )
+                .as_str(),
+                Some(true),
+            ),
             ("QEMU emulator version 12", Some(true)),
             ("QEMU emulator version 12.0.0", Some(true)),
             ("qemu-system-x86_64: no version", None),
