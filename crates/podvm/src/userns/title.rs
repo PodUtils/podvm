@@ -4,11 +4,7 @@
 
 use std::sync::atomic::{AtomicI32, Ordering};
 
-/// The command line of pid 1 of the PID namespace of a run, and of the
-/// init and the relays of pod-enter there (TODO/enter.md T-2054).
-pub const TITLE_INIT: &str = "podvm-init";
-/// The command line of pid 2, which runs the rest of podvm.
-pub const TITLE_RUN: &str = "podvm-run";
+pub use podvm_enter::{TITLE_EXEC, TITLE_INIT, TITLE_RUN};
 /// The errno of a refused title of pid 2, 0 where it took (T-2054).
 pub(super) static HIDDEN: AtomicI32 = AtomicI32::new(0);
 

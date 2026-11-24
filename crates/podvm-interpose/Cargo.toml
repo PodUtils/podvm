@@ -21,7 +21,7 @@ path = "src/lib.rs"
 # TODO/deps.md T-2050 (PodUtils/podvm#611): the open of a volume under
 # `PODVM_VOLUME_BASE`. With the feature `libc` off: this object exports
 # `syscall` itself, so the crate takes the raw calls of `raw_calls`.
-pod-beneath = { git = "https://github.com/PodUtils/podcrates", tag = "v0.82.0", default-features = false }
+pod-beneath = { git = "https://github.com/PodUtils/podcrates", tag = "v0.82.1", default-features = false }
 
 [profile.release]
 lto = true

@@ -13,12 +13,26 @@
 
 pub use pod_enter::{
     abi, binfmt, block_forwarded, check_exec, check_exec_argv, check_exec_guest, check_workdir,
-    chroot_landed, entered_rung, entered_word, exit_status, fuse, ns_setup_step, ns_tmp_target,
-    plan, run, run_ladder, run_namespace, run_selected, run_userland, spawn, spawn_joined,
-    spawn_ladder, spawn_namespace, spawn_selected, spawn_userland, status, Bounded, Child, Error,
-    Fds, Names, NsMount, Plan, Program, Result, RootDir, VolumeBind, DEVPTS_FLAGS, DEVPTS_OPTIONS,
-    ENTERED_RUNG, WAIT_FORWARDED,
+    chroot_landed, entered_rung, entered_word, exit_status, fuse, joinable, ns_setup_step,
+    ns_tmp_target, plan, run, run_ladder, run_namespace, run_selected, run_userland, spawn,
+    spawn_joined, spawn_ladder, spawn_namespace, spawn_selected, spawn_userland, status, Bounded,
+    Child, Error, Fds, Member, Names, NsMount, Plan, Program, Result, RootDir, VolumeBind,
+    DEVPTS_FLAGS, DEVPTS_OPTIONS, ENTERED_RUNG, WAIT_FORWARDED,
 };
+
+/// The title and the empty environment of a process of podvm in the PID
+/// namespace of a payload (TODO/enter.md T-2054): `pod_enter::title`, the
+/// one copy of podvm's former `title.rs` (podcrates `v0.82.1`, PodUtils/podvm#646).
+pub use pod_enter::title;
+
+/// The command line of each process of podvm in the PID namespace of a
+/// payload (TODO/enter.md T-2054): pid 1 of podvm's user namespace and the
+/// init of `Plan::pid_namespace` ...
+pub const TITLE_INIT: &str = "podvm-init";
+/// ... pid 2 of podvm's user namespace, which runs the rest of podvm ...
+pub const TITLE_RUN: &str = "podvm-run";
+/// ... and the process of a join of `exec` and the relay of pod-enter's join.
+pub const TITLE_EXEC: &str = "podvm-exec";
 
 // docker's codes, from the one file that holds them (TODO/cli.md T-0802).
 pub use podvm_probe::exit::{EXIT_CANNOT_INVOKE, EXIT_NOT_FOUND, EXIT_RUNTIME_ERROR};
@@ -134,7 +148,6 @@ pub fn ns_fallback_line(cause: &str) -> String {
 /// The launch ladder with podvm's names.
 /// The spec of `--podvm-confine` (TODO/enter.md T-1658).
 pub mod confine;
-pub mod title; // TODO/enter.md T-2054
 
 /// The wait of the payload, with `podvm:` before each line (TODO/cli.md T-2064).
 mod wait;

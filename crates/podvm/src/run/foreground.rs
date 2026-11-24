@@ -251,6 +251,7 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
         // TODO/enter.md T-1927: the ids of `--user` or the image's `USER`.
         userns_ids: podvm_supervise::table::userns_ids_of(&p.env),
         pid_namespace: false, // podcrates `v0.65.0`; T-1930 sets it for `run -d`
+        relay_title: None,    // podcrates `v0.82.1`: no init and no relay here
     };
     // ⭐ T-0204 and T-0211. The lock is handed to the payload immediately
     // before the fork that leads to its exec, and to nothing else.

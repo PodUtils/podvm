@@ -209,6 +209,7 @@ fn the_first_program_takes_the_rule_of_exec() {
         volumes: Vec::new(),
         userns_ids: None,
         pid_namespace: false,
+        relay_title: None,
     };
     let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     let ld = "/lib64/ld-linux-x86-64.so.2";

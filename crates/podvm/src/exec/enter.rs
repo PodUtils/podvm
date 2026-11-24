@@ -330,9 +330,14 @@ pub(super) fn enter(
     }
     // T-2043: a pty as `run -t` gives (of the devpts of a joined run), or a
     // refusal by name (T-0503).
-    let joined = joins_the_run(state, &container.rung, container.pid).then_some(container.pid);
+    // podcrates@T-1113: the devpts of the payload where the init does not
+    // open to this process.
+    let joined = joins_the_run(state, &container.rung, container.pid)
+        .then_some(container.pid)
+        .flatten()
+        .map(super::ns::pid_of_run);
     let ptmx = podvm_probe::probes::ptmx_usable(&findings);
-    let term = match super::tty::open(o.tty, ptmx, joined.flatten(), &mut err) {
+    let term = match super::tty::open(o.tty, ptmx, joined, &mut err) {
         Ok(t) => t,
         Err(c) => return c,
     };
@@ -426,6 +431,8 @@ pub(super) fn enter(
             .collect(),
         userns_ids: None,     // podcrates `v0.62.0`; T-1927 fills it for `run -d`
         pid_namespace: false, // podcrates `v0.65.0`; T-1930 sets it for `run -d`
+        // T-2054: the relay of a join of the run (PodUtils/podvm#646).
+        relay_title: Some(podvm_enter::TITLE_EXEC.into()),
     };
     if let Err(c) = serve_devices(&mut plan, &mut err) {
         return c;
@@ -460,7 +467,7 @@ pub(super) fn enter(
             let joined = joins_the_run(state, &container.rung, container.pid)
                 .then_some(container.pid)
                 .flatten()
-                .and_then(|p| crate::userns::joined_pidfd().or_else(|| super::ns::pidfd_open(p)));
+                .and_then(|p| crate::userns::joined_pidfd().or_else(|| super::ns::pidfd_of_run(p)));
             let wait = |c: podvm_enter::Child, err: &mut dyn Write| {
                 super::tty::on_spawn(c.pid); // T-2043: the interrupt key
                 podvm_enter::wait_forwarding(&c, err)

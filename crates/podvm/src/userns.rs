@@ -82,11 +82,12 @@ pub mod sigrelay;
 mod sweep; // PodUtils/podvm#535
 mod title; // TODO/enter.md T-2054
 pub use host::{bind_devices, bind_onto, bind_volumes, check_volume_under_base, host_pid};
-pub use join::{joined_pidfd, rejoin};
+pub(crate) use join::target;
+pub use join::{joined_pid, joined_pidfd, joined_root, rejoin};
 pub use range::{again_in_range, available as range_available, cp_in_range, enter_alone};
 pub use sweep::sweep;
 use title::HIDDEN;
-pub use title::{shown_line, TITLE_INIT, TITLE_RUN};
+pub use title::{shown_line, TITLE_EXEC, TITLE_INIT, TITLE_RUN};
 
 static CHILD: AtomicI32 = AtomicI32::new(0);
 static ACTIVE: AtomicBool = AtomicBool::new(false);
@@ -100,14 +101,6 @@ pub fn owns_uts() -> bool {
 /// True where this process joined the namespaces of a run (T-1910).
 pub fn joined() -> bool {
     join::JOINED.load(Ordering::Relaxed)
-}
-
-/// `/proc/PID/root` of the payload (a host pid) of the run whose PID
-/// namespace this process joined, or `None`: the `/proc` of the run is in
-/// its mount namespace only, which this process did not join (T-2052).
-pub fn joined_root() -> Option<std::path::PathBuf> {
-    let pid = join::JOIN_PID.load(Ordering::Relaxed);
-    (pid > 0).then(|| std::path::PathBuf::from(format!("/proc/{pid}/root")))
 }
 
 /// True in pid 2, where this process owns the UTS namespace.

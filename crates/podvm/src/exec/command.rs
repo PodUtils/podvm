@@ -442,6 +442,7 @@ pub fn exec(args: &[String]) -> i32 {
         volumes: Vec::new(),  // T-1920: `exec` joins the mounts of the run
         userns_ids: None,     // podcrates `v0.62.0`; T-1927 fills it for `run -d`
         pid_namespace: false, // podcrates `v0.65.0`; T-1930 sets it for `run -d`
+        relay_title: None,    // podcrates `v0.82.1`: no init and no relay here
     };
     if let Err(c) = serve_devices(&mut plan, &mut err) {
         drop(memo);

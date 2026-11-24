@@ -16,22 +16,21 @@ pub(crate) fn join_uts(pidfd: &std::os::fd::OwnedFd) {
     unsafe { setns(pidfd.as_raw_fd(), CLONE_NEWUTS) };
 }
 
-/// A pidfd of `pid` (Linux 5.3), or `None`.
-pub(crate) fn pidfd_open(pid: i64) -> Option<std::os::fd::OwnedFd> {
-    use std::os::fd::FromRawFd;
-    unsafe extern "C" {
-        fn syscall(n: std::ffi::c_long, ...) -> std::ffi::c_long;
-    }
-    const SYS_PIDFD_OPEN: std::ffi::c_long = 434;
-    // SAFETY: pidfd_open takes a pid and flags and returns a descriptor.
-    let fd = unsafe {
-        syscall(
-            SYS_PIDFD_OPEN,
-            pid as std::ffi::c_long,
-            0 as std::ffi::c_long,
-        )
-    };
-    (fd >= 0).then(|| unsafe { std::os::fd::OwnedFd::from_raw_fd(fd as i32) })
+/// A pidfd of the process of the run `pid` (a host pid) that a join
+/// opens (Linux 5.3), or `None`: the payload of the run where the init of
+/// its PID namespace does not open to this process (podcrates@T-1113,
+/// `userns::target`), else `pid`.
+pub(crate) fn pidfd_of_run(pid: i64) -> Option<std::os::fd::OwnedFd> {
+    crate::userns::target(pid).map(|(_, fd)| fd)
+}
+
+/// The host pid of the process of the run `pid` whose `/proc/PID` this
+/// process reads (`/proc/PID/root/dev` of `exec -t`): the one whose PID
+/// namespace this process joined (T-1910; a host pid names nothing for
+/// `pidfd_open` there), else as [`pidfd_of_run`].
+pub(crate) fn pid_of_run(pid: i64) -> i64 {
+    crate::userns::joined_pid()
+        .unwrap_or_else(|| crate::userns::target(pid).map_or(pid, |(p, _)| p))
 }
 
 /// Join the mount namespace of the payload `pid`; false where it is
@@ -43,7 +42,7 @@ pub(crate) fn join_mounts(pid: Option<i64>) -> bool {
     }
     const CLONE_NEWNS: i32 = 0x0002_0000;
     crate::userns::rejoin(pid); // TODO/enter.md T-1910: `cp`
-    let Some(fd) = crate::userns::joined_pidfd().or_else(|| pid.and_then(pidfd_open)) else {
+    let Some(fd) = crate::userns::joined_pidfd().or_else(|| pid.and_then(pidfd_of_run)) else {
         return false;
     };
     // SAFETY: a pidfd and a namespace type; podvm cp runs on one thread.
@@ -75,10 +74,9 @@ pub(super) fn not_running(name: &str, state: podvm_supervise::table::State) -> O
 
 /// `pod_enter::spawn_joined` of the payload of `pidfd`. TODO/enter.md
 /// T-2054 (OQ-08): the relay that pod-enter leaves in the PID namespace of
-/// the run is a fork of this process, so this process takes a title and no
-/// environment for the fork (`podvm_enter::title`), and its own back after
-/// it. With the threads of `-t` the title is refused, and the relay shows
-/// podvm's command line as before.
+/// the run is a fork of this process; it sets `Plan::relay_title` and an
+/// empty environment itself, with one thread (also with the threads of
+/// `-t`), and is not dumpable (podcrates `v0.82.1`, PodUtils/podvm#646).
 pub(crate) fn spawn_joined(
     root: &podvm_enter::RootDir,
     plan: &podvm_enter::Plan,
@@ -86,12 +84,7 @@ pub(crate) fn spawn_joined(
     err: &mut dyn std::io::Write,
 ) -> podvm_enter::Result<podvm_enter::Child> {
     use std::os::fd::AsRawFd;
-    let hidden = podvm_enter::title::hide("podvm-exec");
-    let spawned = podvm_enter::spawn_joined(root, plan, pidfd.as_raw_fd() as i64, err);
-    if let Ok(saved) = &hidden {
-        let _ = podvm_enter::title::restore(saved);
-    }
-    spawned
+    podvm_enter::spawn_joined(root, plan, pidfd.as_raw_fd() as i64, err)
 }
 
 /// OR-B38-03 of the seventh outside pass (TODO/cli.md T-2075): the parts of

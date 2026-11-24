@@ -9,6 +9,28 @@ fn findings_with(rows: Vec<(&'static str, Outcome)>) -> Findings {
     }
 }
 
+/// The plan of each test of this file: `program` on the root of the test.
+fn plan_of(program: &str) -> Plan {
+    Plan {
+        argv: vec![program.to_string()],
+        env: Vec::new(),
+        working_dir: "/".to_string(),
+        fds: podvm_enter::Fds::default(),
+        banner: String::new(),
+        path_dirs: vec!["/bin".to_string()],
+        names: podvm_enter::NAMES,
+        limits: Vec::new(),
+        no_new_privs: false,
+        die_with_parent: false,
+        confine: None,
+        hostname: None,
+        volumes: Vec::new(),
+        userns_ids: None,     // podcrates `v0.62.0`; T-1927 fills it for `run -d`
+        pid_namespace: false, // podcrates `v0.65.0`; T-1930 sets it for `run -d`
+        relay_title: None,    // podcrates `v0.82.1`: no init and no relay here
+    }
+}
+
 /// Unset and empty mean the default entry: the ladder only engages on a
 /// request, and no request is the common case.
 #[test]
@@ -141,23 +163,7 @@ fn a_forced_rundir_over_a_missing_payload_names_it() {
     let store = std::env::temp_dir().join(format!("podvm-ladder-store-mp-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&store);
     let root = RootDir::open(dir.to_str().unwrap()).expect("a temp dir opens");
-    let plan = Plan {
-        argv: vec!["true".to_string()],
-        env: Vec::new(),
-        working_dir: "/".to_string(),
-        fds: podvm_enter::Fds::default(),
-        banner: String::new(),
-        path_dirs: vec!["/bin".to_string()],
-        names: podvm_enter::NAMES,
-        limits: Vec::new(),
-        no_new_privs: false,
-        die_with_parent: false,
-        confine: None,
-        hostname: None,
-        volumes: Vec::new(),
-        userns_ids: None,     // podcrates `v0.62.0`; T-1927 fills it for `run -d`
-        pid_namespace: false, // podcrates `v0.65.0`; T-1930 sets it for `run -d`
-    };
+    let plan = plan_of("true");
     let mut sink = Vec::new();
     let usable = findings_with(vec![("chroot(/tmp)", Outcome::ok())]);
     let e = enter_forced(
@@ -211,23 +217,7 @@ fn a_forced_tmpfs_over_a_missing_payload_names_it() {
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let root = RootDir::open(dir.to_str().unwrap()).expect("a temp dir opens");
-    let plan = Plan {
-        argv: vec!["true".to_string()],
-        env: Vec::new(),
-        working_dir: "/".to_string(),
-        fds: podvm_enter::Fds::default(),
-        banner: String::new(),
-        path_dirs: vec!["/bin".to_string()],
-        names: podvm_enter::NAMES,
-        limits: Vec::new(),
-        no_new_privs: false,
-        die_with_parent: false,
-        confine: None,
-        hostname: None,
-        volumes: Vec::new(),
-        userns_ids: None,     // podcrates `v0.62.0`; T-1927 fills it for `run -d`
-        pid_namespace: false, // podcrates `v0.65.0`; T-1930 sets it for `run -d`
-    };
+    let plan = plan_of("true");
     let mut sink = Vec::new();
     let usable = findings_with(vec![
         ("chroot(/tmp)", Outcome::ok()),
@@ -265,23 +255,7 @@ fn a_forced_fuse_over_a_missing_payload_names_it() {
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let root = RootDir::open(dir.to_str().unwrap()).expect("a temp dir opens");
-    let plan = Plan {
-        argv: vec!["true".to_string()],
-        env: Vec::new(),
-        working_dir: "/".to_string(),
-        fds: podvm_enter::Fds::default(),
-        banner: String::new(),
-        path_dirs: vec!["/bin".to_string()],
-        names: podvm_enter::NAMES,
-        limits: Vec::new(),
-        no_new_privs: false,
-        die_with_parent: false,
-        confine: None,
-        hostname: None,
-        volumes: Vec::new(),
-        userns_ids: None,     // podcrates `v0.62.0`; T-1927 fills it for `run -d`
-        pid_namespace: false, // podcrates `v0.65.0`; T-1930 sets it for `run -d`
-    };
+    let plan = plan_of("true");
     let mut sink = Vec::new();
     let usable = findings_with(vec![
         ("chroot(/tmp)", Outcome::ok()),
@@ -320,23 +294,7 @@ fn a_forced_fuse_rung_without_chroot_names_the_denial() {
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let root = RootDir::open(dir.to_str().unwrap()).expect("a temp dir opens");
-    let plan = Plan {
-        argv: vec!["true".to_string()],
-        env: Vec::new(),
-        working_dir: "/".to_string(),
-        fds: podvm_enter::Fds::default(),
-        banner: String::new(),
-        path_dirs: vec!["/bin".to_string()],
-        names: podvm_enter::NAMES,
-        limits: Vec::new(),
-        no_new_privs: false,
-        die_with_parent: false,
-        confine: None,
-        hostname: None,
-        volumes: Vec::new(),
-        userns_ids: None,     // podcrates `v0.62.0`; T-1927 fills it for `run -d`
-        pid_namespace: false, // podcrates `v0.65.0`; T-1930 sets it for `run -d`
-    };
+    let plan = plan_of("true");
     let mut sink = Vec::new();
     let denied = findings_with(vec![(
         "chroot(/tmp)",
@@ -374,23 +332,7 @@ fn a_forced_memfd_over_a_missing_payload_names_it() {
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join("bin")).unwrap();
     let root = RootDir::open(dir.to_str().unwrap()).expect("a temp dir opens");
-    let plan = Plan {
-        argv: vec!["absent".to_string()],
-        env: Vec::new(),
-        working_dir: "/".to_string(),
-        fds: podvm_enter::Fds::default(),
-        banner: String::new(),
-        path_dirs: vec!["/bin".to_string()],
-        names: podvm_enter::NAMES,
-        limits: Vec::new(),
-        no_new_privs: false,
-        die_with_parent: false,
-        confine: None,
-        hostname: None,
-        volumes: Vec::new(),
-        userns_ids: None,     // podcrates `v0.62.0`; T-1927 fills it for `run -d`
-        pid_namespace: false, // podcrates `v0.65.0`; T-1930 sets it for `run -d`
-    };
+    let plan = plan_of("absent");
     let mut sink = Vec::new();
     let store = store_dir("m");
     let e = enter_forced(
@@ -425,23 +367,7 @@ fn a_forced_memfd_over_a_script_refuses_naming_both() {
     std::fs::create_dir_all(dir.join("bin")).unwrap();
     std::fs::write(dir.join("bin/run.sh"), b"#!/bin/sh\necho hi\n").unwrap();
     let root = RootDir::open(dir.to_str().unwrap()).expect("a temp dir opens");
-    let plan = Plan {
-        argv: vec!["run.sh".to_string()],
-        env: Vec::new(),
-        working_dir: "/".to_string(),
-        fds: podvm_enter::Fds::default(),
-        banner: String::new(),
-        path_dirs: vec!["/bin".to_string()],
-        names: podvm_enter::NAMES,
-        limits: Vec::new(),
-        no_new_privs: false,
-        die_with_parent: false,
-        confine: None,
-        hostname: None,
-        volumes: Vec::new(),
-        userns_ids: None,     // podcrates `v0.62.0`; T-1927 fills it for `run -d`
-        pid_namespace: false, // podcrates `v0.65.0`; T-1930 sets it for `run -d`
-    };
+    let plan = plan_of("run.sh");
     let mut sink = Vec::new();
     let store = store_dir("s");
     let e = enter_forced(

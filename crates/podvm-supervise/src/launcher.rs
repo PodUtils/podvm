@@ -216,6 +216,10 @@ fn enter_in_launcher(
         // COORD-167), so that a payload sees and signals only its own
         // processes.
         pid_namespace: container.rung == "namespace" && container.userland_exec.is_empty(),
+        // TODO/enter.md T-2054 (PodUtils/podvm#646, podcrates `v0.82.1`):
+        // the init of the PID namespace is a fork of this launcher; it sets
+        // this title and an empty environment itself, and is not dumpable.
+        relay_title: Some(podvm_enter::TITLE_INIT.into()),
     };
 
     // ⭐ TODO/image.md T-0204 and T-0211. The image lock is taken here and
@@ -256,26 +260,9 @@ fn enter_in_launcher(
     } else if container.userland_exec.is_empty() {
         let findings = podvm_probe::run();
         let selection = podvm_probe::select::Selection::choose(&findings);
-        // TODO/enter.md T-2054 (OQ-08): the init of the PID namespace is a
-        // fork of this launcher, and the payload reads its `/proc/1`: it
-        // takes a title and no environment, and the launcher its own back.
-        let hidden = plan
-            .pid_namespace
-            .then(|| podvm_enter::title::hide("podvm-init"));
-        if let Some(Err(e)) = &hidden {
-            // The log is the stderr of the payload: a lost line stops no run.
-            writeln!(
-                log,
-                "podvm: the payload can read the command line and the environment of \
-                 podvm in /proc/1: {e} (TODO/enter.md T-2054)"
-            )
-            .unwrap_or(());
-        }
-        let spawned = podvm_enter::spawn_selected(&root, &plan, selection.rung, log);
-        if let Some(Ok(saved)) = &hidden {
-            let _ = podvm_enter::title::restore(saved);
-        }
-        spawned.map_err(|e| e.to_string())?
+        // TODO/enter.md T-2054: the init of the PID namespace takes its
+        // title (`Plan::relay_title`) in pod-enter, with one thread.
+        podvm_enter::spawn_selected(&root, &plan, selection.rung, log).map_err(|e| e.to_string())?
     } else {
         // ⭐ TODO/enter.md T-1653: the volumes of the record join the root
         // pair, so a working directory in a volume resolves in the volume.
