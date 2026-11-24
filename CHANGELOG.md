@@ -8,10 +8,56 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+## 0.2.0-beta.40 (2026-11-24)
+
+### Known gaps: what the checks of 0.2.0-beta.40 prove, and what stays open, 2026-11-24
+
+Record: T-1949, T-2054, T-2070, T-2078, T-2079, T-2085, T-2087.
+Deployed: version 0.2.0-beta.40.
+
+What the checks of this beta prove: the gate, `arm.yml`, the nightly
+trial, the integration tests as uid 1000, `workloads.yml`, experiment 434
+(the incus tier, with the new case of clause 27), experiment 471 on a
+hosted ubuntu-24.04 runner with cgroup v2 and AppArmor (T-2086), and the
+ninth outside pass with the binary and `podvm man` only (T-2087), whose
+three P1 faults are fixed.
+
+Each open fault that a user can meet:
+
+- The incus tier: the import expands the hard links of an image (busybox
+  takes 420 MiB in each instance); a payload can remove its own log
+  (`logs` then gives a 404 of incusd); `exec -w` to a missing directory
+  runs in `/`; `--podvm-init=image` of an image with no init gives a raw
+  error of incusd and leaves the instance; `wait` and `kill` have no path
+  of the tier; an instance that was created and not started reads
+  `Stopped` (T-2079, OR-B39-08, 09, 11, 17; T-2087, OR-B40-04, 18).
+- The incus tier: an image that an older podvm imported has no record of
+  its need, so its run is not checked against the room of the pool
+  (T-2078).
+- Each call to incusd after the first of a verb has no time bound
+  (#653 asks podcrates; T-2080).
+- The native tiers: the edits of a payload to `/etc/hosts` go at the next
+  `exec`; `run -it sh` and `exec -it CTR sh` have no job control; a
+  foreground run on the namespace rung reaps no orphan until it ends
+  (T-2079, OR-B39-15; T-2070, OR-B38-17; T-2087, OR-B40-05, 13).
+- docker differences and texts of the outside passes: `login` contacts no
+  registry, `--env-file` refuses a line with no `=`, `run -d IMAGE
+  /nonexistent` exits 125, `rm -f` of a missing container exits 1, a name
+  in use exits 1 from `create` and 125 from `run`, `run --rm` keeps the
+  extracted tree of the image, `--network host`, `--format '{{json .}}'`,
+  `table` and `index` are refused, a payload argument that is not UTF-8 is
+  refused, `cp` refuses `..` and an absolute link of the container, `run
+  -u` keeps the caller's privileges with no line, `--init` and `top` give
+  a reason that is false on the namespace rung, and `doctor` calls the
+  machine tier refused where `run` fetches its own QEMU (T-2070, T-2079,
+  T-2087, OR-B40-06 to 17, and the P3 items of the ninth pass).
+- A SIGTERM during the save of the state of a machine guest waits for the
+  end of the save: at most about 7 minutes, an estimate (T-2048).
+
 ### Fixed: the three P1 faults of the ninth outside pass, and the pool for an image that incus has, 2026-11-24
 
 Record: T-2087, T-2078; T-2079 (OR-B39-13).
-Deployed: not deployed; on main, for the next beta after 0.2.0-beta.39.
+Deployed: version 0.2.0-beta.40.
 
 - `rmi` of one name of an image that a running container uses removes
   that name ("Untagged:"), where another name keeps the image, as docker
@@ -33,7 +79,7 @@ Deployed: not deployed; on main, for the next beta after 0.2.0-beta.39.
 ### Fixed: a killed pull or load no longer leaves its staging file, 2026-11-24
 
 Record: T-2069; T-2070 (OR-B38-05).
-Deployed: not deployed; on main, for the next beta after 0.2.0-beta.39.
+Deployed: version 0.2.0-beta.40.
 
 - A `pull`, `load` or `import` that a SIGKILL ends leaves its staging
   file under `store/staging` for at most 10 s: the next command after that
@@ -45,7 +91,7 @@ Deployed: not deployed; on main, for the next beta after 0.2.0-beta.39.
 ### Fixed: the usage of an ended incus instance on a host with AppArmor and cgroup v2, 2026-11-24
 
 Record: T-2086; PodUtils/podrunner#350.
-Deployed: not deployed; on main, for the next beta after 0.2.0-beta.39.
+Deployed: version 0.2.0-beta.40.
 
 - On a host with AppArmor (a hosted ubuntu-24.04 runner with incus of
   apt), `inspect --podvm-tier=incus` of a stopped instance gave a dash for
@@ -62,7 +108,7 @@ Deployed: not deployed; on main, for the next beta after 0.2.0-beta.39.
 ### Fixed: the import of a large image keeps at most one full copy beside the upload on the incus tier, 2026-11-24
 
 Record: T-2085, T-2078; PodUtils/podrunner#347 (ask 1).
-Deployed: not deployed; on main, for the next beta after 0.2.0-beta.39.
+Deployed: version 0.2.0-beta.40.
 
 - `create` and `run` of the incus tier extract the tree of the image only
   for an import. After the upload, and also after a failed import, podvm
@@ -83,7 +129,7 @@ Deployed: not deployed; on main, for the next beta after 0.2.0-beta.39.
 ### Changed: podcrates `v0.82.1`, the processes of podvm in the PID namespace of a run, 2026-11-24
 
 Record: T-2084, T-2054, T-2076.
-Deployed: not deployed; on main, for the next beta after 0.2.0-beta.39.
+Deployed: version 0.2.0-beta.40.
 
 - The init of `run -d` on the namespace rung and the relay of `exec` are
   not dumpable, and the payload cannot read their memory, their
@@ -100,7 +146,7 @@ Deployed: not deployed; on main, for the next beta after 0.2.0-beta.39.
 ### Fixed: the boot of `--podvm-init=image` on the incus tier, 2026-11-24
 
 Record: T-2083.
-Deployed: not deployed; on main, for the next beta after 0.2.0-beta.39.
+Deployed: version 0.2.0-beta.40.
 
 - `run -d --podvm-tier=incus --podvm-init=image` asks `systemctl
   is-system-running` again while it gives `offline`, `unknown`,
