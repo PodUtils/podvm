@@ -8,6 +8,53 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+## 0.2.0-beta.39 (2026-11-24)
+
+### Known gaps: what the checks of 0.2.0-beta.39 prove, and what stays open, 2026-11-24
+
+Record: T-1949, T-2054, T-2069, T-2070, T-2076, T-2077, T-2078, T-2079.
+Deployed: version 0.2.0-beta.39.
+
+What the checks of this beta prove: the gate, `arm.yml`, the integration
+tests as uid 1000, `workloads.yml`, the nightly trial, experiment 434 (the
+incus tier, with the new clauses 26 to 30), and the eighth outside pass with
+the binary and `podvm man` only (T-2079), whose four P1 faults are fixed
+(T-2080, T-2081, and the rule of `cp`), with seven of its P2 faults.
+
+Each open fault that a user can meet:
+
+- The incus tier: the import expands the hard links of an image (busybox
+  takes 420 MiB in each instance); a payload can remove its own log
+  (`logs` then gives a 404 of incusd); `exec -w` to a missing directory
+  runs in `/`; `--podvm-init=image` of an image with no init gives a raw
+  error of incusd and leaves the instance; the pool is not checked for an
+  image that incus already has (T-2079, OR-B39-08, 09, 11, 13, 17; T-2078).
+- The incus tier keeps three copies of a large image on one file system
+  during `create` (the unpacked tree of the store, the upload of incusd, the
+  root of the instance): a host needs room for about three times the tree
+  (PodUtils/podrunner#347, ask 1).
+- Each call to incusd after the first of a verb has no time bound
+  (#653 asks podcrates; T-2080).
+- The native tiers: the edits of a payload to `/etc/hosts` go at the next
+  `exec`; `run -it sh` and `exec -it CTR sh` have no job control (T-2079,
+  OR-B39-15; T-2070, OR-B38-17).
+- A killed `pull` or `load` leaves a `.partial` file in `store/staging`
+  (T-2069).
+- On the namespace rung, pod-enter's init and join relay stay dumpable
+  until podvm takes podcrates `v0.82.1` (#646; T-2054).
+- docker differences and texts of the seventh and eighth outside passes:
+  `login` contacts no registry, `probe` describes the probing process,
+  `--env-file` refuses a line with no `=`, `run -d IMAGE /nonexistent`
+  exits 125, `--tmpfs P:mode=` drops the mode, `rm -f` of a missing
+  container exits 1 (T-2070, T-2079, OR-B38-08 to 18, OR-B39-19).
+- A SIGTERM during the save of the state of a machine guest waits for the
+  end of the save: at most about 7 minutes, an estimate (T-2048).
+
+### Changed: the incus tier (the use after the end, the exit code under --memory, a full pool, 126 and 127, signals, one import), the rule of cp, 2026-11-24
+
+Record: T-2076, T-2077, T-2078, T-2079, T-2080, T-2081, T-2082.
+Deployed: version 0.2.0-beta.39.
+
 - `podvm cp` puts a copy where `docker cp` puts it, in each direction and
   from an image: a directory onto an existing directory goes into it as
   DEST/basename(SRC) (before, its contents merged into DEST); `SRC/.`
