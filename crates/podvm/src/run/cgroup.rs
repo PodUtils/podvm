@@ -265,7 +265,7 @@ pub fn oom_kills() -> Option<u64> {
         .ok()
         .and_then(|l| l.as_ref().map(|l| l.0.clone()));
     match leaf {
-        Some(leaf) => podvm_supervise::report::oom_kills_of(&leaf),
+        Some(leaf) => pod_hostprobe::usage::oom_kills_of(&leaf),
         None => GUEST_OOM.get().copied(),
     }
 }
@@ -288,8 +288,8 @@ extern "C" fn release() {
     if pid != std::process::id() {
         return;
     }
-    let events = std::fs::read_to_string(leaf.join("memory.events")).unwrap_or_default();
-    if let Some(n) = podvm_supervise::report::oom_kills_in(&events).filter(|n| *n > 0) {
+    // The reader is `pod_hostprobe::usage` (podcrates `v0.82.1`).
+    if let Some(n) = pod_hostprobe::usage::oom_kills_of(&leaf).filter(|n| *n > 0) {
         eprintln!(
             "podvm: the run passed its --memory: the OOM killer of the kernel ended {n} \
              process(es) of it ({}: oom_kill {n}) (TODO/cli.md T-1747)",

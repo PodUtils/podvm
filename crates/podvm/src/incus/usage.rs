@@ -5,7 +5,8 @@
 //! stop.
 //!
 //! The init (`guest-hold --run`, PID 1 of the instance) opens the files of
-//! the instance's cgroup before the command starts ([`Meter::open`]). When
+//! the instance's cgroup before the command starts ([`Meter::open`], the
+//! meter of `pod_hostprobe::usage`, podcrates `v0.82.1`). When
 //! the command ended, it ends each other process of the instance
 //! ([`end_tree`]), takes back its own root ([`Anchor`]), reads the files and
 //! writes [`USAGE`] ([`seal`]). Only then does PID 1 end, and the instance
@@ -19,8 +20,10 @@
 
 use std::ffi::{c_char, c_ulong};
 use std::fs::File;
-use std::io::{Read, Seek};
+use std::path::Path;
 use std::time::{Duration, Instant};
+
+use pod_hostprobe::usage;
 
 /// The usage of the instance at the end of its command, written by its init.
 pub const USAGE: &str = "/.podvm/usage";
@@ -30,8 +33,6 @@ const DIR: &str = "/.podvm";
 const MOUNT: &str = "/.podvm/.meter";
 /// The most bytes of [`USAGE`] that a reader takes.
 pub const MAX: usize = 4096;
-/// The most bytes of a file of a cgroup that the init reads.
-const MAX_CGROUP_FILE: u64 = 64 * 1024;
 /// The time that PID 1 gives the processes it killed to go.
 pub const END_WAIT: Duration = Duration::from_secs(5);
 
@@ -43,6 +44,17 @@ pub struct Measure {
     pub peak_bytes: Option<u64>,
     pub oom_kills: Option<u64>,
     pub why: Vec<String>,
+}
+
+impl From<usage::Usage> for Measure {
+    fn from(u: usage::Usage) -> Measure {
+        Measure {
+            cpu_usec: u.cpu_usec,
+            peak_bytes: u.peak_bytes,
+            oom_kills: u.oom_kills,
+            why: u.why,
+        }
+    }
 }
 
 impl Measure {
@@ -109,42 +121,10 @@ impl Measure {
     }
 }
 
-/// The CPU time in microseconds of the text of `cpu.stat` (cgroup v2).
-pub fn cpu_usec_v2(text: &str) -> Option<u64> {
-    text.lines()
-        .find_map(|l| l.strip_prefix("usage_usec "))
-        .and_then(|n| n.trim().parse().ok())
-}
-
-/// The CPU time in microseconds of the text of `cpuacct.usage` (cgroup v1,
-/// nanoseconds).
-pub fn cpu_usec_v1(text: &str) -> Option<u64> {
-    text.trim().parse::<u64>().ok().map(|ns| ns / 1000)
-}
-
-/// The bytes of the text of `memory.peak` (v2) or
-/// `memory.max_usage_in_bytes` (v1).
-pub fn bytes(text: &str) -> Option<u64> {
-    text.trim().parse().ok()
-}
-
-/// Where the CPU time comes from.
-enum Cpu {
-    /// `cpu.stat` of cgroup v2.
-    V2(File),
-    /// `cpuacct.usage` of cgroup v1.
-    V1(File),
-}
-
 /// The files of the cgroup of the instance, opened before the command
-/// starts.
-#[derive(Default)]
-pub struct Meter {
-    cpu: Option<Cpu>,
-    peak: Option<File>,
-    oom: Option<File>,
-    why: Vec<String>,
-}
+/// starts (`pod_hostprobe::usage::Meter`).
+#[derive(Debug, Default)]
+pub struct Meter(usage::Meter);
 
 unsafe extern "C" {
     fn mount(
@@ -197,122 +177,48 @@ fn with_mount<T>(fstype: &str, opts: Option<&str>, f: impl FnOnce() -> T) -> Res
     Ok(out)
 }
 
-fn open_in(name: &str) -> Result<File, String> {
-    let p = format!("{MOUNT}/{name}");
-    File::open(&p).map_err(|e| format!("{name}: {e}"))
-}
-
 impl Meter {
     /// Open the files of the cgroup of the instance, as its init sees it
-    /// (the root of its cgroup namespace). cgroup v2 serves where its
-    /// memory controller is there; else cgroup v1 (`memory` and
-    /// `cpuacct`). The `cpu.stat` of a cgroup v2 with no controllers is
-    /// that of the host on a host with both versions: it is not taken.
+    /// (the root of its cgroup namespace), by the rule of
+    /// `pod_hostprobe::usage`: cgroup2 serves where its memory controller is
+    /// there (`memory.events`; Linux 5.8 to 5.18 give no `memory.peak`, and
+    /// the peak is `None` with its reason), else cgroup v1 (`memory` and
+    /// `cpuacct`). The `cpu.stat` of a cgroup2 with no controllers is that
+    /// of the host on a host with both versions: it is not taken. Each
+    /// hierarchy is mounted at [`MOUNT`] in turn; the open files keep it.
     pub fn open() -> Meter {
-        let mut m = Meter::default();
+        let mut m = usage::Meter::default();
         if let Err(e) = std::fs::create_dir_all(MOUNT) {
-            m.why.push(format!("{MOUNT}: {e}"));
-            return m;
+            m.note(format!("{MOUNT}: {e}"));
+            return Meter(m);
         }
-        let v2 = with_mount("cgroup2", None, || {
-            let peak = open_in("memory.peak")?;
-            Ok::<_, String>((peak, open_in("cpu.stat"), open_in("memory.events")))
-        });
-        match v2 {
-            Ok(Ok((peak, cpu, oom))) => {
-                m.peak = Some(peak);
-                match cpu {
-                    Ok(f) => m.cpu = Some(Cpu::V2(f)),
-                    Err(e) => m.why.push(format!("cgroup2: {e}")),
-                }
-                match oom {
-                    Ok(f) => m.oom = Some(f),
-                    Err(e) => m.why.push(format!("cgroup2: {e}")),
-                }
-            }
+        let at = Path::new(MOUNT);
+        match with_mount("cgroup2", None, || usage::Meter::v2(at)) {
+            Ok(Ok(v2)) => m = v2,
             v2 => {
-                let v2_why = match v2 {
-                    Ok(Err(e)) => format!("cgroup2: {e}"),
+                m.note(match v2 {
+                    Ok(Err(f)) => f.chain(),
                     Err(e) => e,
                     Ok(Ok(_)) => String::new(),
-                };
-                let mem = with_mount("cgroup", Some("memory"), || {
-                    (
-                        open_in("memory.max_usage_in_bytes"),
-                        open_in("memory.oom_control"),
-                    )
                 });
-                let cpu = with_mount("cgroup", Some("cpuacct"), || open_in("cpuacct.usage"))
-                    .or_else(|_| {
-                        with_mount("cgroup", Some("cpu,cpuacct"), || open_in("cpuacct.usage"))
-                    });
-                match mem {
-                    Ok((peak, oom)) => {
-                        match peak {
-                            Ok(f) => m.peak = Some(f),
-                            Err(e) => m.why.push(format!("cgroup v1: {e}")),
-                        }
-                        match oom {
-                            Ok(f) => m.oom = Some(f),
-                            Err(e) => m.why.push(format!("cgroup v1: {e}")),
-                        }
-                    }
-                    Err(e) => m.why.push(format!("{v2_why}; {e}")),
+                if let Err(e) = with_mount("cgroup", Some("memory"), || m.v1_memory(at)) {
+                    m.note(format!("cgroup v1: {e}"));
                 }
-                match cpu {
-                    Ok(Ok(f)) => m.cpu = Some(Cpu::V1(f)),
-                    Ok(Err(e)) => m.why.push(format!("cgroup v1: {e}")),
-                    Err(e) => m.why.push(format!("{v2_why}; {e}")),
+                let cpu = with_mount("cgroup", Some("cpuacct"), || m.v1_cpu(at))
+                    .or_else(|_| with_mount("cgroup", Some("cpu,cpuacct"), || m.v1_cpu(at)));
+                if let Err(e) = cpu {
+                    m.note(format!("cgroup v1: {e}"));
                 }
             }
         }
         let _ = std::fs::remove_dir(MOUNT);
-        m
+        Meter(m)
     }
 
     /// The values of the files now.
     pub fn read(&mut self) -> Measure {
-        let mut why = std::mem::take(&mut self.why);
-        let mut get = |f: &mut File, name: &str| -> Option<String> {
-            match reread(f) {
-                Ok(t) => Some(t),
-                Err(e) => {
-                    why.push(format!("{name}: {e}"));
-                    None
-                }
-            }
-        };
-        let cpu_usec = match &mut self.cpu {
-            Some(Cpu::V2(f)) => get(f, "cpu.stat").and_then(|t| cpu_usec_v2(&t)),
-            Some(Cpu::V1(f)) => get(f, "cpuacct.usage").and_then(|t| cpu_usec_v1(&t)),
-            None => None,
-        };
-        let peak_bytes = self
-            .peak
-            .as_mut()
-            .and_then(|f| get(f, "the peak memory"))
-            .and_then(|t| bytes(&t));
-        let oom_kills = self
-            .oom
-            .as_mut()
-            .and_then(|f| get(f, "the OOM events"))
-            .and_then(|t| podvm_supervise::report::oom_kills_in(&t));
-        Measure {
-            cpu_usec,
-            peak_bytes,
-            oom_kills,
-            why,
-        }
+        self.0.read().into()
     }
-}
-
-/// The text of an open file of a cgroup from its start: the kernel makes
-/// the text again at each read from offset 0.
-fn reread(f: &mut File) -> std::io::Result<String> {
-    f.rewind()?;
-    let mut s = String::new();
-    f.take(MAX_CGROUP_FILE).read_to_string(&mut s)?;
-    Ok(s)
 }
 
 /// The root of the init when it started. A command with root in the

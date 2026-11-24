@@ -4,6 +4,7 @@
 //! same values, so the order of the two does not matter.
 
 use crate::Container;
+use pod_hostprobe::usage::oom_kills_of;
 use pod_supervise::end::Reason;
 use std::path::Path;
 
@@ -32,6 +33,7 @@ pub fn finish(path: &Path, c: &Container) -> Result<(), String> {
     r["ended"] = c.finished_at.clone().into();
     // PodUtils/podrunner#296 ask 6 (TODO/supervise.md T-1969): the OOM
     // kills of the leaf of the run, where the run has one.
+    // The reader is `pod_hostprobe::usage` (podcrates `v0.82.1`).
     if let Some(n) = own_leaf().and_then(|l| oom_kills_of(&l)) {
         r["oom_kills"] = n.into();
     }
@@ -49,21 +51,6 @@ pub fn finish(path: &Path, c: &Container) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// The count `oom_kill` of `memory.events` of the cgroup `dir`, or `None`
-/// where the file or the line is not there.
-pub fn oom_kills_of(dir: &Path) -> Option<u64> {
-    oom_kills_in(&std::fs::read_to_string(dir.join("memory.events")).ok()?)
-}
-
-/// The count of the line `oom_kill N` of the text of `memory.events`
-/// (cgroup v2) or `memory.oom_control` (cgroup v1), or `None` where the
-/// line is not there or N is not a count (TODO/machine.md T-2076).
-pub fn oom_kills_in(text: &str) -> Option<u64> {
-    text.lines()
-        .find_map(|l| l.strip_prefix("oom_kill "))
-        .and_then(|n| n.trim().parse().ok())
-}
-
 /// The cgroup of this process where it is a leaf of podvm (`podvm-ID`,
 /// TODO/cli.md T-1747), else `None`: a cgroup of another owner has no
 /// count of this run.
@@ -73,24 +60,4 @@ pub fn own_leaf() -> Option<std::path::PathBuf> {
     let leaf = Path::new("/sys/fs/cgroup").join(rel.trim_start_matches('/'));
     let name = leaf.file_name()?.to_str()?;
     (name.starts_with("podvm-") && !rel.contains("..")).then_some(leaf)
-}
-
-#[cfg(test)]
-mod tests {
-    /// T-1969: the count of `oom_kill`, and none where the line is not there.
-    #[test]
-    fn the_oom_count_comes_from_memory_events() {
-        let d = std::env::temp_dir().join(format!("podvm-oom-{}", std::process::id()));
-        std::fs::create_dir_all(&d).unwrap();
-        assert_eq!(super::oom_kills_of(&d), None);
-        std::fs::write(
-            d.join("memory.events"),
-            "low 0\nhigh 0\nmax 4\noom 2\noom_kill 2\n",
-        )
-        .unwrap();
-        assert_eq!(super::oom_kills_of(&d), Some(2));
-        std::fs::write(d.join("memory.events"), "low 0\n").unwrap();
-        assert_eq!(super::oom_kills_of(&d), None);
-        let _ = std::fs::remove_dir_all(&d);
-    }
 }

@@ -152,9 +152,10 @@ or through `--format` (`.Name`, `.Status`, `.ExitCode`, `.EnteredRung`,
 The usage of a stopped instance (T-2076, PodUtils/podrunner#345): incusd
 gives the CPU time and the memory only while an instance runs, and the
 cgroup of the instance goes at the stop. So the init, as PID 1, opens the
-files of the instance's cgroup before the command starts (cgroup v2 where
-its memory controller is there, else the v1 hierarchies `memory` and
-`cpuacct`). When the command ended, the init sends SIGKILL to each other
+files of the instance's cgroup before the command starts (the meter of
+`pod_hostprobe::usage`: cgroup v2 where its memory controller is there,
+else the v1 hierarchies `memory` and `cpuacct`; on Linux 5.8 to 5.18 the
+cgroup v2 has no `memory.peak`, and the peak is a dash with its reason). When the command ended, the init sends SIGKILL to each other
 process of the instance and reaps them, takes back its own root, reads the
 files, and replaces `/.podvm/usage` atomically (it first takes away a
 mount, a link or a directory that the command left at the path). Then PID 1

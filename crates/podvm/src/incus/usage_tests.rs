@@ -2,7 +2,7 @@
 //! stopped instance and the files of a cgroup, against one table each.
 
 use super::inspect::usage_of_file;
-use super::usage::{bytes, cpu_usec_v1, cpu_usec_v2, Measure, MAX};
+use super::usage::{Measure, MAX};
 use pod_incus::{FileContent, FileKind};
 
 /// A case, the answer of incusd, CpuSeconds, PeakMemoryBytes, OomKills
@@ -183,51 +183,4 @@ fn the_usage_file_reads_back() {
     assert_eq!(back.why, vec!["a?[2Jb".to_string()]);
     let none = Measure::parse(&Measure::default().to_json()).unwrap();
     assert_eq!(none, Measure::default());
-}
-
-/// The texts of the files of a cgroup, v2 and v1: one rule for each file.
-#[test]
-fn the_files_of_a_cgroup_give_their_counts() {
-    let oom = podvm_supervise::report::oom_kills_in;
-    // (file, text, value)
-    let rows: &[(&str, &str, Option<u64>)] = &[
-        (
-            "cpu.stat",
-            "usage_usec 2300123\nuser_usec 2000000\nsystem_usec 300123\n",
-            Some(2_300_123),
-        ),
-        ("cpu.stat", "user_usec 1\n", None),
-        ("cpu.stat", "usage_usec x\n", None),
-        ("cpu.stat", "", None),
-        ("cpuacct.usage", "2300123456\n", Some(2_300_123)),
-        ("cpuacct.usage", "0\n", Some(0)),
-        ("cpuacct.usage", "-5\n", None),
-        ("memory.peak", "67108864\n", Some(67_108_864)),
-        ("memory.peak", "max\n", None),
-        (
-            "memory.events",
-            "low 0\nhigh 0\nmax 9\noom 2\noom_kill 2\noom_group_kill 0\n",
-            Some(2),
-        ),
-        ("memory.events", "low 0\n", None),
-        (
-            "memory.oom_control",
-            "oom_kill_disable 0\nunder_oom 0\noom_kill 3\n",
-            Some(3),
-        ),
-        (
-            "memory.oom_control",
-            "oom_kill_disable 0\nunder_oom 0\n",
-            None,
-        ),
-    ];
-    for (file, text, want) in rows {
-        let got = match *file {
-            "cpu.stat" => cpu_usec_v2(text),
-            "cpuacct.usage" => cpu_usec_v1(text),
-            "memory.peak" => bytes(text),
-            _ => oom(text),
-        };
-        assert_eq!(got, *want, "{file}: {text:?}");
-    }
 }
