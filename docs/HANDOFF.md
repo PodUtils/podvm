@@ -81,18 +81,18 @@ handoffs of the sessions before 2026-11-23 are in git: `git show
 ## Next steps, in order
 
 1. Start the session (`AGENTS.md`, section 8), with the watcher.
-2. podrunner first: T-2086 (PodUtils/podrunner#350, COORD-128: on a hosted
-   runner with cgroup v2, `inspect` of an ended incus instance gives no
-   `PeakMemoryBytes` and 0 `OomKills` for an OOM kill of a child). The
-   cloud host has cgroup v1, so reproduce it on a hosted runner (a job of
-   `kvm.yml` or a new workflow with incus of apt). Answer it by a COORD
-   issue `(to podrunner)`.
+2. Done (2026-11-24): T-2086 (podrunner#350). The AppArmor profile of
+   incus refused the init's mount of the cgroup; the init now takes the
+   cgroup mounts of the instance (`88e1a0d`). Proof: `kvm.yml` job
+   `incus` (experiment 471, new) run 45384508724. Answered by #660
+   (COORD-244); the mount reader is asked of podcrates by #659 (COORD-243).
 3. The next beta (`0.2.0-beta.40`) behind the full beta gate, with
-   T-2083, T-2084, T-2085 and T-2086: name the tag on #655 and #658 and in
+   T-2083, T-2084, T-2085 and T-2086: name the tag on #655, #658 and #660 and in
    a COORD "beta.40 is out" to podrunner.
 4. Watch #583, #585, #593, #596, #599, #605, #636, #648, #649, #652, #654,
-   #655, #658 (podrunner) and #602, #604, #584, #651, #653, #657
-   (podcrates); take the next podcrates tag that has #651, #653 or #657.
+   #655, #658, #660 (podrunner) and #602, #604, #584, #651, #653, #657,
+   #659 (podcrates); take the next podcrates tag that has #651, #653, #657
+   or #659.
 5. T-2085 remainder (a run on the hosted runner; the stream of the layers
    when podcrates gives it), T-2078 remainder (a check of the pool for an
    image that incus has), T-2069 (the staging files of the store), the
@@ -105,7 +105,11 @@ handoffs of the sessions before 2026-11-23 are in git: `git show
 
 ## Rules learned
 
-* `podvm-count --set T-NNNN STATUS` sets a status; with no argument it
+* The cloud host's incusd has no AppArmor: a fault of the incus tier that
+  AppArmor makes shows only on a hosted runner. The job `incus` of
+  `kvm.yml` (`only: incus`, about 4 min) runs experiment 471 against the
+  system incusd of apt there (T-2086).
+* `podvm-count --set T-NNNN STATUS` sets a status in `TODO/INDEX.md` and the entry; the counts line of `TODO/PROGRESS.md` is a copy by hand of the counts that it prints. With no argument it
   only writes the counts. A new entry needs its row in `TODO/INDEX.md` by
   hand.
 * In a Python script, read a file before you open it for writing: an

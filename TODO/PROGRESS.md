@@ -7,7 +7,7 @@ start.
 
 ## State
 
-657 entries: 24 open, 47 partial, 5 blocked, 581 done.
+657 entries: 23 open, 47 partial, 5 blocked, 582 done.
 
 The state on 2026-11-24 (`docs/HANDOFF.md` has the detail):
 
@@ -15,8 +15,8 @@ The state on 2026-11-24 (`docs/HANDOFF.md` has the detail):
   (T-2084: a non-dumpable init and join relay, `pod_hostprobe::usage`),
   the readiness of an init on the incus tier (T-2083, podrunner#349), an
   import of a large image with one tree and a gzip upload (T-2085,
-  podrunner#347). Open first: T-2086 (podrunner#350, the use of an ended
-  incus instance on cgroup v2).
+  podrunner#347), the record of the stop on a host with AppArmor and
+  cgroup v2 (T-2086, podrunner#350; #660, COORD-244).
 * The newest release is `v0.2.0-beta.39` (2026-11-24, release run
   45353882402 on `a43c9476`): the incus tier for podrunner (the use after
   the end, T-2076; the exit code under `--memory`, T-2077; a full pool,

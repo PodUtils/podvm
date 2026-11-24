@@ -553,6 +553,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #657 | COORD-241: a stream of the layers of an image as one tar, and a writer of gzip members (to podcrates) | open | T-2085 |
 | #658 | COORD-242: the answer to PodUtils/podrunner#347: an import of a large image keeps one tree and a gzip upload on the incus tier (to podrunner) | open | T-2085, T-2082 |
 | #659 | COORD-243: pod_hostprobe::usage: open the meter from the cgroup mounts of mountinfo, where a mount of cgroup is refused (to podcrates) | open | T-2086 |
+| #660 | COORD-244: the answer to PodUtils/podrunner#350: on a host with AppArmor the init could not mount the cgroup; the record of the stop now holds on cgroup v2 (to podrunner) | open | T-2086 |
 
 ## Messages whose title does not start with COORD-NNN
 

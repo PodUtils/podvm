@@ -1,0 +1,45 @@
+== conditions
+date      2026-11-24T11:31:38Z
+kernel    Linux 7.0.0-1017-azure
+cgroup    cgroup2fs
+apparmor  Y
+incus     Client version: 6.0.0 Server version: 6.0.0
+podvm     podvm 0.2.0-beta.39
+cpus      4
+OCI       mirror.gcr.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+
+== a running instance (recorded)
+running   Running 0.754 - 0 -
+
+== 1. a load that ends by itself
+truth     held 67108864 cpu 1322
+usage     13.270 136134656 0 0
+record    {"cpu_usec":13270171,"oom_kills":0,"peak_bytes":136134656,"v":1,"why":["the mount at /.podvm/.meter: mount -t cgroup2: Permission denied (os error 13)","the mount at /.podvm/.meter: cgroup v1: mount -t cgroup -o memory: Permission denied (os error 13)","the mount at /.podvm/.meter: cgroup v1: mount -t cgroup -o cpu,cpuacct: Permission denied (os error 13)","the mount at /.podvm/.meter: cpu_usec: no cgroup file is open","the mount at /.podvm/.meter: peak_bytes: no cgroup file is open","the mount at /.podvm/.meter: oom_kills: no cgroup file is open"]}
+
+== 2. an OOM kill of a child under --memory 256m
+usage     0.160 268435456 1 0
+record    {"cpu_usec":159534,"oom_kills":1,"peak_bytes":268435456,"v":1,"why":["the mount at /.podvm/.meter: mount -t cgroup2: Permission denied (os error 13)","the mount at /.podvm/.meter: cgroup v1: mount -t cgroup -o memory: Permission denied (os error 13)","the mount at /.podvm/.meter: cgroup v1: mount -t cgroup -o cpu,cpuacct: Permission denied (os error 13)","the mount at /.podvm/.meter: cpu_usec: no cgroup file is open","the mount at /.podvm/.meter: peak_bytes: no cgroup file is open","the mount at /.podvm/.meter: oom_kills: no cgroup file is open"]}
+
+== the kernel log (recorded)
+kernel    [  191.536715] audit: type=1400 audit(1795519898.240:138): apparmor="DENIED" operation="capable" class="cap" profile="unprivileged_userns" pid=7229 comm="exe" capability=21  capname="sys_admin"
+kernel    [  191.537590] audit: type=1400 audit(1795519898.241:140): apparmor="DENIED" operation="capable" class="cap" profile="unprivileged_userns" pid=7230 comm="exe" capability=21  capname="sys_admin"
+kernel    [  205.445583] audit: type=1400 audit(1795519912.148:152): apparmor="DENIED" operation="mount" class="mount" info="failed flags match" error=-13 profile="incus-use471_</var/lib/incus>" name="/.podvm/.meter/" pid=7484 comm="podvm" fstype="cgroup2" srcname="cgroup2" flags="rw, nosuid, nodev, noexec"
+kernel    [  205.445609] audit: type=1400 audit(1795519912.148:153): apparmor="DENIED" operation="mount" class="mount" info="failed flags match" error=-13 profile="incus-use471_</var/lib/incus>" name="/.podvm/.meter/" pid=7484 comm="podvm" fstype="cgroup" srcname="cgroup" flags="rw, nosuid, nodev, noexec"
+kernel    [  205.445643] audit: type=1400 audit(1795519912.148:154): apparmor="DENIED" operation="mount" class="mount" info="failed flags match" error=-13 profile="incus-use471_</var/lib/incus>" name="/.podvm/.meter/" pid=7484 comm="podvm" fstype="cgroup" srcname="cgroup" flags="rw, nosuid, nodev, noexec"
+kernel    [  205.446580] audit: type=1400 audit(1795519912.148:155): apparmor="DENIED" operation="mount" class="mount" info="failed flags match" error=-13 profile="incus-use471_</var/lib/incus>" name="/.podvm/.meter/" pid=7484 comm="podvm" fstype="cgroup" srcname="cgroup" flags="rw, nosuid, nodev, noexec"
+kernel    [  211.964171] audit: type=1400 audit(1795519918.667:160): apparmor="DENIED" operation="mount" class="mount" info="failed flags match" error=-13 profile="incus-oom471_</var/lib/incus>" name="/.podvm/.meter/" pid=7661 comm="podvm" fstype="cgroup2" srcname="cgroup2" flags="rw, nosuid, nodev, noexec"
+kernel    [  211.964242] audit: type=1400 audit(1795519918.667:161): apparmor="DENIED" operation="mount" class="mount" info="failed flags match" error=-13 profile="incus-oom471_</var/lib/incus>" name="/.podvm/.meter/" pid=7661 comm="podvm" fstype="cgroup" srcname="cgroup" flags="rw, nosuid, nodev, noexec"
+kernel    [  211.964367] audit: type=1400 audit(1795519918.667:162): apparmor="DENIED" operation="mount" class="mount" info="failed flags match" error=-13 profile="incus-oom471_</var/lib/incus>" name="/.podvm/.meter/" pid=7661 comm="podvm" fstype="cgroup" srcname="cgroup" flags="rw, nosuid, nodev, noexec"
+kernel    [  211.964437] audit: type=1400 audit(1795519918.667:163): apparmor="DENIED" operation="mount" class="mount" info="failed flags match" error=-13 profile="incus-oom471_</var/lib/incus>" name="/.podvm/.meter/" pid=7661 comm="podvm" fstype="cgroup" srcname="cgroup" flags="rw, nosuid, nodev, noexec"
+kernel    [  241.473023] dd invoked oom-killer: gfp_mask=0xcc0(GFP_KERNEL), order=0, oom_score_adj=1000
+kernel    [  241.476769] oom-kill:constraint=CONSTRAINT_MEMCG,nodemask=(null),cpuset=lxc.payload.oom471,mems_allowed=0,oom_memcg=/lxc.payload.oom471,task_memcg=/lxc.payload.oom471,task=dd,pid=7692,uid=1000000
+kernel    [  241.476820] Memory cgroup out of memory: Killed process 7692 (dd) total-vm:1050196kB, anon-rss:260588kB, file-rss:1364kB, shmem-rss:0kB, UID:1000000 pgtables:556kB oom_score_adj:1000
+stays     0
+compare   cpu 13.270 of 13.22 s, peak 136134656 of 67108864 to 268435456 bytes: close
+THE RECORD OF THE STOP HOLDS ON CGROUP V2
+
+(Copied from the log of kvm.yml run 45384508724, job "incus tier on cgroup
+v2 (experiment 471)", on 88e1a0d. The run before the fix, kvm.yml run
+45381917515 on 4102518, gave "usage - - - 0" for both cases, a record with
+null values and the reasons "mount -t cgroup2: Permission denied", and
+the same AppArmor denials.)

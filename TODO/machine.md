@@ -6827,7 +6827,7 @@ with no tree, by podcrates (the COORD draft).
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -6863,7 +6863,12 @@ Then fix the read or the meter, and add the case to experiment 434.
 
 ## Decision
 
--
+(2026-11-24, a call of the session) The proof on the hosted runner is
+experiment 471, not experiment 434: 434 is the lane of route A (an incusd
+as root of a user namespace, with a cgroup v1 directory for each
+controller), and podrunner's hosted runner runs the system incusd of apt,
+which 471 uses. 434 stays the proof on the cloud host (cgroup v1), and
+passes with the change.
 
 ## Prove
 
@@ -6871,3 +6876,7 @@ Then fix the read or the meter, and add the case to experiment 434.
 runner with cgroup v2 (a job of a workflow), with clause 26 extended by the
 two cases of the problem: `PeakMemoryBytes` near the truth, and
 `OomKills` 1 for the OOM kill of a child.
+
+## Done
+
+**Done (2026-11-24).** The cause: on a hosted `ubuntu-24.04` runner (Linux 7.0, cgroup v2, incus 6.0.0 of apt), the AppArmor profile of incus allows a cgroup mount only under `/sys/fs/cgroup`. The init's mount at `/.podvm/.meter` failed with EACCES for cgroup2 and for each cgroup v1 hierarchy, and `/.podvm/usage` held each value as null with these reasons. podrunner's CPU time came from its sample of a running instance (incusd's state), up to one read before the stop: 6 s against 6.92 s of the shell. Measured in `kvm.yml` 45381917515 (job `incus`, new; experiment 471, new) on `4102518`: `usage - - - 0` for both cases, and the kernel log `apparmor="DENIED" operation="mount" ... name="/.podvm/.meter/" fstype="cgroup2"` under the profile `incus-use471_`. The fix (`88e1a0d`): `incus::usage::Meter::open` also opens the meter of the cgroup mounts that LXC made in the cgroup namespace of the instance (`incus::usage::mounts::Mounted`: a `cgroup2` or `cgroup` mount of mountinfo whose root is `/`, the octal escapes undone, the last line of a kind, `statfs(2)` of each mount point as the check), and takes the meter that reads more values (`incus::usage::better`; the init's own mount on a tie). The reasons of the failed mount stay in the record. Table tests `the_cgroup_mounts_of_the_instance_come_from_mountinfo` and `the_meter_that_reads_more_values_serves` (`crates/podvm/src/incus/usage_tests.rs`). Proof: `kvm.yml` 45384508724 on `88e1a0d`, experiment 471, "THE RECORD OF THE STOP HOLDS ON CGROUP V2" (`experiments/results/incus-usage-v2.txt`): a load of 64 MiB and four busy processes, which the shell counted at 13.22 s, gives `13.270 136134656 0 0`; podrunner's payload under `--memory 256m` (the kernel kills the child `dd` in `/lxc.payload.oom471`) gives `0.160 268435456 1 0`; the client of incus reads the same values from `/.podvm/usage`; a running instance gives `Running 0.754 - 0 -` (incusd 6.0 gives no peak on cgroup v2). Experiment 434 on the cloud host (cgroup v1, route A) passes with the change, "THE INCUS TIER RUNS"; clause 26 gives `3.375 135958528 0 0` and `0.447 33554432 1 137`. The answers to the three asks: (1) yes, on the fix; (2) the count is `oom_kill` of `memory.events` of the cgroup of the instance, which counts a kill of any process of the instance; (3) the peak is the high mark of the kernel for that cgroup (`memory.peak`, or `memory.max_usage_in_bytes` of cgroup v1), not a sample; it includes the page cache and the kernel memory that the cgroup is charged. The mount reader is asked of podcrates as #659 (COORD-243).
