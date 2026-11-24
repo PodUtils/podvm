@@ -2006,6 +2006,8 @@ As uid 1000: 10 `run -d IMAGE /bin/true` give 10 `Exited (0)` and `wait` gives 0
 
 **Partial (2026-11-17).** `store/blobs.rs`: the sweep keeps a young unlocked `.partial` (test `the_sweep_keeps_a_young_unlocked_partial`); `exec_probe.rs`: the probe runs in a directory of its own. Measured as uid 1000 with mirror.gcr.io/library/alpine:3.20: 10 `run -d ... /bin/true` give 10 `Exited (0)` (before: 6 of 10 `Dead`), and `wait` gives 0; 12 parallel `run --rm` exit 0 in each of two rounds (before: 6 of 12 failed). 475: `interpose::MemoGuard` removes the memo of a run that `prepare` refuses after it made the memo; three refused `run --rm --strict=all` leave no `memo-*.tmp` (before: one each). COORD-181 (#568) asks podcrates for the lock of the table's writer and a probe name that does not repeat. Remaining: those podcrates items, at their tag.
 
+**Checked (2026-11-24, 0.2.0-beta.40), as uid 1000.** 472 (8 of 8 `Exited (0)`), 475 (3 refused runs leave no memo) and 501 (12 parallel `run --rm`, twice) give the documented result, and each issue is closed. The podcrates items of COORD-181 (#568) stay.
+
 # T-1958: The donor study: confinement and policy
 
 **Source:** PodUtils/podvm#575, the donor study of 2026-11-17

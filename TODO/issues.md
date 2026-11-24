@@ -365,15 +365,15 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #469 | COORD-176: pod-enter: a new devpts instance and /dev/ptmx on the namespace rung, so that openpty works in a unit (podvm T-1934, PodUtils/podrunner#216) (to podcrates) | closed (podcrates@T-864 and @T-868 in podcrates `v0.70.0`, PodUtils/podcrates#222, taken in `6b5a6cb`; T-1934 done) | T-1934 |
 | #470 | COORD-177: the answers to PodUtils/podrunner#216 (no pty: namespace rung) and #189 (raw renameat2 on the userland rung) (to podrunner) | open | T-1934, T-1935 |
 | #471 | COORD-178: the answer to PodUtils/podnet#649: what the gates of podvm prove, and the gap that real tools found (to podnet) | closed (podnet read the answer, PodUtils/podnet#649 state of 2026-11-18 10:40 (UTC)) | T-1936 |
-| #472 | `run -d` of a payload that exits immediately is recorded `Dead` with no exit code, and `wait` refuses | open | T-1938 |
+| #472 | `run -d` of a payload that exits immediately is recorded `Dead` with no exit code, and `wait` refuses | closed (T-1938, 24dbea39: 8 detached `/bin/true` give 8 `Exited (0)` and `wait` gives 0; checked 2026-11-24 on 0.2.0-beta.40) | T-2090 |
 | #473 | `--device` opens the host file but the payload never sees it; reads get `ENOENT` and writes land in the image | open | T-1939 |
-| #474 | `run -d --rm` leaves the container record and its rootfs behind | open | T-1939 |
-| #475 | Every refused `run --strict=all` leaves a zero-byte `memo-*.tmp` file in the store | open | T-1938 |
-| #476 | `images --filter` ignores the filter for the `windows:dos` record | open | T-1940 |
-| #477 | `load` rejects a valid OCI-layout tarball that contains directory entries | open | T-1940 |
+| #474 | `run -d --rm` leaves the container record and its rootfs behind | closed (T-2074, 160c5567, CHANGELOG 0.2.0-beta.38, test `detached_rm`; checked 2026-11-24 on 0.2.0-beta.40) | T-2074 |
+| #475 | Every refused `run --strict=all` leaves a zero-byte `memo-*.tmp` file in the store | closed (T-1938, 6d2f6e77 (`MemoGuard`); checked 2026-11-24 on 0.2.0-beta.40: 3 refused `run --strict=all` leave no `memo-*.tmp`) | T-2090 |
+| #476 | `images --filter` ignores the filter for the `windows:dos` record | closed (T-1940, 14ce28be; checked 2026-11-24 on 0.2.0-beta.40 with `windows:dos`: `--filter name=zzz` and `label=zzz` list no row) | T-2090 |
+| #477 | `load` rejects a valid OCI-layout tarball that contains directory entries | closed (T-1940, d4e216cb; checked 2026-11-24 on 0.2.0-beta.40: both re-packed tarballs load) | T-2090 |
 | #478 | `man` silently ignores `--json` or `--roff` when `--llms` is also given | open | T-1937 |
 | #479 | `doctor --strict=false` still enables strict, and `--strict=0` reports an internal podvm bug | open | T-1937 |
-| #480 | `--add-host NAME:host-gateway` writes the literal string `host-gateway` as an IP address | open | T-1940 |
+| #480 | `--add-host NAME:host-gateway` writes the literal string `host-gateway` as an IP address | closed (T-1940, d4e216cb; checked 2026-11-24 on 0.2.0-beta.40: `/etc/hosts` holds `127.0.0.1 bar` and `::1 six`) | T-2090 |
 | #481 | The built-in `machine` profile always refuses on a host with the default `RLIMIT_FSIZE` | open | T-1941 |
 | #482 | `run --profile NAME IMAGE CMD` silently treats IMAGE as the command when the profile names an image | open | T-1937 |
 | #483 | `abi`, `df`, `prune`, and `install-names` are listed as Native top-level verbs but exit 125 | open | T-1937 |
@@ -383,7 +383,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #487 | `image <unknown>` says "not implemented yet" instead of "not a subverb" | open | T-1937 |
 | #488 | `--` works as an option terminator in `run` but is rejected by `exec`, `pull`, and `images` | open | T-1937 |
 | #489 | `exec --platform` is accepted but has no effect on a container | open | T-1937 |
-| #490 | `verify` reports a mismatched blob, but `pull` says "Already exists" and does not repair it | open | T-1940 |
+| #490 | `verify` reports a mismatched blob, but `pull` says "Already exists" and does not repair it | closed (T-1940, cd725444; checked 2026-11-24 on 0.2.0-beta.40: after a corrupt blob `pull` repairs it and `verify` gives 0 mismatches) | T-2090 |
 | #491 | `doctor` ends with an unexplained `profile: refused` line | open | T-1937 |
 | #492 | `--tls-verify=B` never consumes its value, so TLS verification cannot be disabled | open | T-1943 |
 | #493 | `notebook --cycles N` silently clamps N above 1000 to 1000 | open | T-1943 |
@@ -394,7 +394,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #498 | `cp` to an image mutates only the extracted cache; `extract --force` and `save` lose the change | open | T-1944 |
 | #499 | `--podvm-confine` help omits the implicit `/proc`, device, and TCP grants | open | T-1943 |
 | #500 | `login` with a missing or empty password prints the whole usage instead of naming the missing input | open | T-1943 |
-| #501 | Concurrent `podvm run` fails with `containers.json: No such file or directory` | open | T-1938 |
+| #501 | Concurrent `podvm run` fails with `containers.json: No such file or directory` | closed (T-1938, 24dbea39; checked 2026-11-24 on 0.2.0-beta.40: 12 parallel `run --rm` exit 0, twice) | T-2090 |
 | #502 | `remote ssh forward exec` discards the target's exit code | open | T-1944 |
 | #503 | `import` records an image from a tar with an absolute hardlink that `extract` refuses | open | T-1944 |
 | #504 | `compare --strict` treats an empty reason as an explanation | open | T-1943 |
@@ -405,10 +405,10 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #509 | COORD-179: the answer to PodUtils/podrunner#277: exec --env-file and --podvm-volume-base are in 0.2.0-beta.32 (to podrunner) | open | T-1945 |
 | #510 | `podvm exec` joins a container's namespaces or shares the host PID table, while its help and `.Exec.Mode` say fresh chroot, filesystem only | open | T-1948 |
 | #511 | Machine-tier records ignore `PODVM_STORE`: `ps` lists them from `$HOME`, while `inspect` and `wait` cannot find them | open | T-1954 |
-| #512 | `-w /tmp/<new dir>` always fails with ENOENT after podvm creates the directory | open | T-1953 |
+| #512 | `-w /tmp/<new dir>` always fails with ENOENT after podvm creates the directory | closed (checked 2026-11-24 on 0.2.0-beta.40: `run -w /tmp/newdir` prints `/tmp/newdir`) | T-2090 |
 | #513 | A `--report` path that cannot be written runs the payload first, then returns 125 in place of its exit code | open | T-1951 |
 | #514 | `podvm inspect` with more than one container prints several JSON arrays, so its output is not valid JSON | open | T-1951 |
-| #515 | `podvm import` refuses a compressed file with a raw tar error, not the named refusal the help promises | open | T-1952 |
+| #515 | `podvm import` refuses a compressed file with a raw tar error, not the named refusal the help promises | closed (T-1952, 3fe8f731; checked 2026-11-24 on 0.2.0-beta.40: gzip, xz and bzip2 are named) | T-2090 |
 | #516 | A normal `tar -C DIR -cf bundle.tar .` is refused by `--podvm-sealed` and blamed on `..` or a leading `/` | open | T-1954 |
 | #517 | A sealed bundle with an empty or missing `argv` exits 0 and runs nothing | open | T-1951 |
 | #518 | `podvm man --roff` and `--llms` print every usage line twice, as `Usage: podvm run usage: podvm run ...` | open | T-1951 |
@@ -416,20 +416,20 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #520 | `podvm --help` omits the working verbs `port` and `logout`, and the unknown-command refusal points at it | open | T-1951 |
 | #521 | `system abi` exits 2 for an unreadable file, a code the published exit table does not contain | open | T-1951 |
 | #522 | `podvm save -o FILE` prints the file name on stdout, which the help reserves for the tarball | open | T-1951 |
-| #523 | `podvm inspect NAME` returns the image when a container and an image share the name, while every other verb returns the container | open | T-1952 |
+| #523 | `podvm inspect NAME` returns the image when a container and an image share the name, while every other verb returns the container | closed (T-1951, c1c6bb67; checked 2026-11-24 on 0.2.0-beta.40: `inspect NAME` gives the container) | T-2090 |
 | #524 | The digest `inspect` prints is not accepted by `inspect`, `rmi`, `tag` or `cp`, and two printed fields are not selectable by `--format` | open | T-1951 |
-| #525 | `import` accepts a rootfs tar whose hard link precedes its target, then every `extract` and `run` fails with a false "already extracted" message | open | T-1952 |
-| #526 | `system df` counts one extracted rootfs once per record, and its reclaimed figures do not match the disk | open | T-1952 |
-| #527 | A pull killed with SIGTERM leaves zero-byte `.partial` files and blobs no image names, and no verb reclaims them | open | T-1952 |
-| #528 | `pull --platform linux/amd64/v3` stores a platform the index does not offer, and the tag then refuses `extract` | open | T-1952 |
+| #525 | `import` accepts a rootfs tar whose hard link precedes its target, then every `extract` and `run` fails with a false "already extracted" message | closed (T-1952, 3fe8f731; checked 2026-11-24 on 0.2.0-beta.40: `import` refuses a hard link that comes before its target) | T-2090 |
+| #526 | `system df` counts one extracted rootfs once per record, and its reclaimed figures do not match the disk | closed (T-1952, acbde2b9; checked 2026-11-24 on 0.2.0-beta.40: `system df` counts one extraction once) | T-2090 |
+| #527 | A pull killed with SIGTERM leaves zero-byte `.partial` files and blobs no image names, and no verb reclaims them | closed (T-1952, 0623f987; checked 2026-11-24 on 0.2.0-beta.40: `image prune` removes an old blob that no record names) | T-2090 |
+| #528 | `pull --platform linux/amd64/v3` stores a platform the index does not offer, and the tag then refuses `extract` | closed (T-1952, 97e2737e; checked 2026-11-24 on 0.2.0-beta.40: `linux/arm64` and `linux/arm64/v8` make one record) | T-2090 |
 | #529 | Refusals for `--tmpfs` name `-v` and print an internal store path the caller never passed | open | T-1952 |
 | #530 | The syscall tier's `uname -v` contains an internal task reference: `podvm syscall tier (TODO/enter.md T-1657)` | open | T-1951 |
 | #531 | `podvm version --verbose` reports `commit:` as a build error string instead of a commit | open | T-1951 |
 | #532 | Five command groups print help and exit 0 for a bare name, three exit 125, and the exit table names only the first behavior | open | T-1951 |
 | #533 | `run --help` says a `-w` or a first program inside a volume is refused, but both work | open | T-1951 |
-| #534 | A foreground run piped into `head` dies of SIGPIPE and leaves a permanent `Created` record and its tree | open | T-1953 |
-| #535 | A direct SIGINT to `podvm run` is ignored, although the help says SIGINT is forwarded | open | T-1953 |
-| #536 | A symlink at `containers/<id>/log` makes the launcher append the payload output to a file outside the store | open | T-1953 |
+| #534 | A foreground run piped into `head` dies of SIGPIPE and leaves a permanent `Created` record and its tree | closed (T-1953, b756b83f; checked 2026-11-24 on 0.2.0-beta.40: `yes` piped into `head -1` exits 141 and leaves no record) | T-2090 |
+| #535 | A direct SIGINT to `podvm run` is ignored, although the help says SIGINT is forwarded | closed (T-1953, e506a379; checked 2026-11-24 on 0.2.0-beta.40: a SIGINT to podvm alone ran the trap of the payload (exit 7)) | T-2090 |
+| #536 | A symlink at `containers/<id>/log` makes the launcher append the payload output to a file outside the store | closed (podcrates 75d5cdfe (COORD-182 #569) in v0.82.1: the log opens with `O_NOFOLLOW`; checked 2026-11-24 on 0.2.0-beta.40: `start` gives ELOOP and the target file keeps its bytes) | T-2090 |
 | #537 | The machine tier replaces non-UTF-8 stdout bytes with U+FFFD and appends a newline | open | T-1954 |
 | #538 | A sealed bundle with `./` members and a directory entry never returns: the guest channel fails to unpack and podvm hangs | open | T-1954 |
 | #539 | `stop` on a machine guest powers the VM off with QMP quit, so the payload never gets SIGTERM and no exit code is recorded | open | T-1954 |
@@ -437,28 +437,28 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #541 | `podvm exec` on a machine-tier container enters the running guest, while the help and limits say a guest exec is refused | open | T-1951 |
 | #542 | The machine-tier `--device` refusal also says `-v` needs the chroot tier, but `-v` works on the machine tier | open | T-1951 |
 | #543 | `docs/limits.md` says an arm64 guest is refused before boot and also that it runs with `qemu-system-aarch64` | open | T-1951 |
-| #544 | Pulling `linux/arm64` and `linux/arm64/v8` creates two records for one manifest | open | T-1952 |
+| #544 | Pulling `linux/arm64` and `linux/arm64/v8` creates two records for one manifest | closed (T-1952, 97e2737e; checked 2026-11-24 on 0.2.0-beta.40: `linux/arm64` and `linux/arm64/v8` make one record) | T-2090 |
 | #545 | `podvm run -t` writes a NUL byte to stdout before the payload output | open | T-1951 |
 | #546 | The probe, README, architecture, SECURITY, the limits page and the banner disagree with the run about user, PID and UTS namespaces and `/proc` | open | T-1951 |
 | #547 | An image with no `/tmp` downgrades the namespace rung to chroot, and the report still says `namespace` | open | T-1953 |
-| #548 | `podvm rmi TAG` refuses to remove the tag whenever any container references the image | open | T-1952 |
-| #549 | `system install-names` creates the `podman` link and then exits 125 because it refused the `docker` name | open | T-1953 |
-| #550 | `podvm logs -f` stops following after `restart` and exits 0 while the new run is still writing | open | T-1953 |
+| #548 | `podvm rmi TAG` refuses to remove the tag whenever any container references the image | closed (T-1952, 86b5e758; checked 2026-11-24 on 0.2.0-beta.40: `rmi TAG` of an image with a container is an untag) | T-2090 |
+| #549 | `system install-names` creates the `podman` link and then exits 125 because it refused the `docker` name | closed (T-1953, be808de7; checked 2026-11-24 on 0.2.0-beta.40 against a daemon stand-in: exit 125 and no link) | T-2090 |
+| #550 | `podvm logs -f` stops following after `restart` and exits 0 while the new run is still writing | closed (checked 2026-11-24 on 0.2.0-beta.40: `logs -f` follows the second run after `restart` and prints both runs) | T-2090 |
 | #551 | `--tmpfs P` is listed in the payload's `/proc/mounts` as the host's ext4 root, and `/tmp` appears twice | open | T-1952 |
-| #552 | `--env-file` reads a file the caller cannot read, because the run is root of a user namespace | open | T-1953 |
-| #553 | `--unsafe-host-paths` is accepted and does nothing on the namespace rung | open | T-1953 |
-| #554 | `create --podvm-tier=emulate` refuses with a chroot-denied message that is false on this host and never names the tier | open | T-1953 |
-| #555 | `cp` drops a trailing slash on a missing destination and creates a file where a directory was implied | open | T-1952 |
+| #552 | `--env-file` reads a file the caller cannot read, because the run is root of a user namespace | closed (T-1953, 92791551; checked 2026-11-24 on 0.2.0-beta.40: a mode-000 env file is refused before the payload) | T-2090 |
+| #553 | `--unsafe-host-paths` is accepted and does nothing on the namespace rung | closed (T-1953, be808de7; checked 2026-11-24 on 0.2.0-beta.40: the flag is refused by name) | T-2090 |
+| #554 | `create --podvm-tier=emulate` refuses with a chroot-denied message that is false on this host and never names the tier | closed (T-1953, ffd8d060; checked 2026-11-24 on 0.2.0-beta.40: the refusal names the emulate tier) | T-2090 |
+| #555 | `cp` drops a trailing slash on a missing destination and creates a file where a directory was implied | closed (T-1952, 006f4609; checked 2026-11-24 on 0.2.0-beta.40: `cp F CTR:/nodir/` names a directory and refuses) | T-2090 |
 | #556 | `-v` is a real bind mount, `/proc/mounts` lists it, and `mountinfo` exposes the host path, while the help says it is not a mount | open | T-1951 |
-| #557 | `--strict=all` refuses every run on this host because the mtab fixup says `/proc` is not mounted, and it is | open | T-1953 |
+| #557 | `--strict=all` refuses every run on this host because the mtab fixup says `/proc` is not mounted, and it is | closed (T-2053, f82fc429; checked 2026-11-24 on 0.2.0-beta.40: `run --strict=all alpine` exits 0) | T-2053 |
 | #558 | The probe cache key is namespace-local, so `--cached` alternates "served" and "the confinement changed", and every pull re-probes | open | T-1953 |
 | #559 | `podvm login` prints `Login Succeeded` for a registry that is not listening | open | T-1951 |
 | #560 | The source fixup leaves `http://security.ubuntu.com` although it answers HTTPS, and names the redirect target in the error | open | T-1953 |
-| #561 | `podvm probe` leaves `/tmp/execprobe`, and every later probe skips the exec row because the file exists | open | T-1953 |
-| #562 | SIGHUP to a foreground run leaves the payload and `podvm --podvm-ns-reaper` running, and `--rm` does not remove the Dead record | open | T-1953 |
-| #563 | `cp` resolves a container/image name collision to the image and writes into the shared base image | open | T-1952 |
+| #561 | `podvm probe` leaves `/tmp/execprobe`, and every later probe skips the exec row because the file exists | closed (checked 2026-11-24 on 0.2.0-beta.40: `probe` leaves no `/tmp/execprobe` and measures the row where the file exists) | T-2090 |
+| #562 | SIGHUP to a foreground run leaves the payload and `podvm --podvm-ns-reaper` running, and `--rm` does not remove the Dead record | closed (T-2001 OP-05, e864b314 (podcrates v0.79.0), CHANGELOG 0.2.0-beta.37; checked 2026-11-24 on 0.2.0-beta.40: a SIGHUP reaches the payload, no process and no record stay) | T-2001 |
+| #563 | `cp` resolves a container/image name collision to the image and writes into the shared base image | closed (T-1952, 2bb384d7; checked 2026-11-24 on 0.2.0-beta.40: `cp` into an image is refused and `cp` into the container of a shared name writes the container) | T-2090 |
 | #564 | Under a low `RLIMIT_NOFILE`, a run prints that its record is not live, exits 0, and leaves no record | closed (by design: the record lands at the end of the run, T-1950) | T-1950 |
-| #565 | `-v` with a file, FIFO or device host path fails with `bind: Not a directory` and names the guest path | open | T-1953 |
+| #565 | `-v` with a file, FIFO or device host path fails with `bind: Not a directory` and names the guest path | closed (T-1953, be808de7; checked 2026-11-24 on 0.2.0-beta.40: a `-v` of two kinds names both paths and kinds) | T-2090 |
 | #566 | SIGTERM to a foreground Windows/DOS guest kills podvm and leaves QEMU running, and Ctrl-C to the group does not stop it | open | T-1953 |
 | #567 | COORD-180: podvm called beta.31 ready and an outside tester confirmed 37 faults in one hour; what podvm changes (to all) | open | T-1946, T-1947, T-1948, T-1949 |
 | #568 | COORD-181: five faults of the external QA of podvm that are in crates of podcrates: the table's temp file, the exec probe's name, a helper's ServerURL, run -d --rm, a -v source with no link (to podcrates) | closed (podcrates@T-872 to @T-876 in podcrates `v0.70.0`, PodUtils/podcrates#222, taken in `6b5a6cb`) | T-1938, T-1939, T-1944, T-1945 |
