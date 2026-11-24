@@ -161,6 +161,10 @@ step below is done.
   reads the clock twice and failed once on a loaded host ("2 seconds ago"
   for "1 second ago", 2026-11-23); it passes alone. A test of an age gives
   the clock as an input.
+* The record gate reads each `T-NNNN` of four digits as a podvm entry, also
+  after `podcrates@`: write "podcrates task 1124" or name the issue.
+* In the PID namespace of a run, a host pid names nothing for `pidfd_open`:
+  a join uses the pid and the pidfd that it kept (T-2084).
 * Two agents that each need cargo run one after the other: the second
   waits for a marker file that the lead makes when the first ends.
 * A subagent in a worktree under `.claude/worktrees/` cannot run cargo
