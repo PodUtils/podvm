@@ -403,30 +403,44 @@ pub(crate) fn extract_now(
     record: &podvm_image::Record,
     loud: bool,
 ) -> std::result::Result<(), i32> {
+    extract_lined(store, record, loud).map_err(|(line, code)| {
+        eprintln!("podvm {verb}: {line}");
+        code
+    })
+}
+
+/// [`extract_now`], with the line of a failure given back, not printed
+/// (TODO/machine.md T-2085: the incus tier prints it with its own prefix).
+/// The lines of the layers and the warnings go to stderr as before.
+pub(crate) fn extract_lined(
+    store: &podvm_image::Store,
+    record: &podvm_image::Record,
+    loud: bool,
+) -> std::result::Result<(), (String, i32)> {
     // ⛔ Every caller reads `is_extracted` before it calls this, and two of
     // them that read it together both extract the same tree. Measured
     // 2026-11-14: eight `podvm create` at once of a never-extracted image,
     // `v0.2.0-beta.16` created 12 of 48 containers over six rounds. The lock is
     // taken here, and the question is asked again under it, so the second
     // caller finds the tree of the first and does nothing.
-    let _extracting = store.hold_extract(record).map_err(|e| {
-        eprintln!("podvm {verb}: {e}");
-        e.exit_code()
-    })?;
+    let _extracting = store
+        .hold_extract(record)
+        .map_err(|e| (e.to_string(), e.exit_code()))?;
     if podvm_extract::is_extracted(store, &record.manifest_digest) {
         return Ok(());
     }
     let d = podvm_image::digest::Digest::parse(&record.manifest_digest).map_err(|e| {
-        eprintln!("podvm {verb}: {e}");
-        podvm_image::Error::from(e).exit_code()
+        let e = podvm_image::Error::from(e);
+        (e.to_string(), e.exit_code())
     })?;
-    let bytes = store.read_blob(&d).map_err(|e| {
-        eprintln!("podvm {verb}: {e}");
-        e.exit_code()
-    })?;
+    let bytes = store
+        .read_blob(&d)
+        .map_err(|e| (e.to_string(), e.exit_code()))?;
     let manifest: podvm_image::oci::Manifest = serde_json::from_slice(&bytes).map_err(|e| {
-        eprintln!("podvm {verb}: the manifest does not parse: {e}");
-        podvm_image::error::EXIT_RUNTIME_ERROR
+        (
+            format!("the manifest does not parse: {e}"),
+            podvm_image::error::EXIT_RUNTIME_ERROR,
+        )
     })?;
     // TODO/gate.md T-1852 (`img.load-run-quiet`): the line of each layer
     // is progress, which a quiet run does not print; `--verbose` prints it.
@@ -437,10 +451,7 @@ pub(crate) fn extract_now(
     if loud || done.is_err() {
         let _ = err.write_all(&layers);
     }
-    let done = done.map_err(|e| {
-        let _ = writeln!(err, "podvm {verb}: {e}");
-        podvm_image::error::EXIT_RUNTIME_ERROR
-    })?;
+    let done = done.map_err(|e| (e.to_string(), podvm_image::error::EXIT_RUNTIME_ERROR))?;
     // TODO/probe.md T-1909: in the user namespace of a run, an id that the
     // map does not hold stays the caller's, as outside it; the sidecar
     // keeps the intended ids, and a quiet run says nothing.

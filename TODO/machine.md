@@ -6290,6 +6290,17 @@ The pass also notes that the line of the check names a path of the host
 (the directory of the pool); that stays, as it is the place that the user
 frees.
 
+Amended (2026-11-24, [T-2085](machine.md), PodUtils/podrunner#347 ask 1).
+Decision (3) changes with the copies of an import: the root of the
+instance needs the bytes of the tree; a plain upload needs the bytes of
+the tree too (twice on one file system, as before); a gzip upload has no
+lower bound before it is written, and its estimate (the bytes of the
+layers) adds to the estimate of the warning only; where the import removes
+the store's tree from the file system of the pool before the create, the
+lower bound of the root is 0. The line after a failure with no tree in the
+store (incus had the image) gives the need as a dash. `space_tests` has
+the table of the loads with these cases.
+
 # T-2080: On the incus tier, an exit of 126 or 127 is a refusal of incusd, and a signal leaves the instance running
 
 **Source:** the eighth outside pass (T-2079): OR-B39-01, OR-B39-03, and the P2 findings OR-B39-05, 06, 07, 09, 10, 12, 16 and 18
@@ -6675,3 +6686,136 @@ is degraded; failed units: fail349.service`, exit 0, and the command saw
 `degraded`. `PODVM_INIT_BOOT_TIMEOUT=abc`: one line, exit 125, no
 instance. The unmodified `ubi9/ubi-init` on the btrfs pool: exit 0 (the
 first poll gave the error of the bus, then "running").
+
+# T-2085: On the incus tier, an import of a large image keeps three copies of its tree on one file system
+
+**Source:** PodUtils/podrunner#347 ask 1 (COORD-125 of podrunner, a report of a member of the team), podrunner's run `hosted-measure.yml` 45313526131, podvm 0.2.0-beta.38, incusd 6.0.0 with a btrfs pool on a hosted runner
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+On a hosted runner, `podvm create --podvm-tier=incus` of a snapshot of 85
+layers (17.0 GB of blobs, a tree of about 57 GB) on one btrfs (a loop file
+of 125.7 GB) that held the podvm store, `/var/lib/incus` and a btrfs pool
+needed about 188 GB: the blobs (17), podvm's tree in the store (57),
+incusd's upload in its images (57) and the image volume in the pool (57).
+The runner has about 136 GB. The ask: an import that keeps at most two
+copies.
+
+## Premise
+
+`run::machine::prepare_image` extracted the tree for each tier before the
+run; `incus::import::ensure_image` streamed the unified tarball of that
+tree to incusd (T-1997: no tarball file), and the tree stayed in the store
+after the import. incusd keeps the upload as a file in `INCUS_DIR/images`
+and unpacks it into the pool at the first create from the image, not at
+the import (measured below: the pool grows after the import ends).
+
+## Approach
+
+Measure the peak of the disk use (`df` each 0.2 s) on a small scale: a
+private root incusd 6.0.0 with its `INCUS_DIR`, the store and a btrfs pool
+on one loop-backed btrfs, and `golang:1.24-alpine` (a tree of 292 MB, 80
+MB of blobs). Three designs: (a) a stream of the layers to incusd with no
+tree (flatten the layers: whiteouts, opaque directories, hard links across
+layers, the attributes); (b) the tree only for an import, removed after
+the upload; (c) the root of the instance as a snapshot of a store
+subvolume on one btrfs.
+
+## Decision
+
+(b), with a gzip upload where incusd's images lack room. Why not (a) now:
+incusd unpacks the upload at the create, after the import, so with (b) the
+tree is gone before the pool grows, and the peak of (a) and of (b) is the
+same: the blobs, the upload and one tree. (a) saves the time of one
+extraction, but it is a second writer of the semantics of pod-extract
+(the containment of each path is pod-extract's today, and incusd unpacks
+as root), and podcrates has no capability to flatten layers to one stream
+(pod-extract and pod-oci at `v0.82.1`). It is the next step, by a COORD
+issue to podcrates. (c) depends on the driver and on one file system.
+With (b) alone the peak is two full copies (114 GB with the blobs: 131 GB),
+over the 125.7 GB of the loop file of the report, so the upload is gzip
+there.
+
+1. `prepare_image` does not extract for the incus tier. `ensure_image`
+   asks `import::Tree` for the tree under the lock of the import (T-2081),
+   only where incusd lacks the alias. A run of an image that incus has
+   needs no tree; the check of an absolute program (T-1823) runs only
+   where the tree is there, and podvm in the instance gives the same 127.
+2. After the import, also after a failed import, the tree that the import
+   extracted goes: the run gives back its own hold, takes
+   `Store::try_hold_tree_alone` (the exclusive hold of each record of that
+   manifest and its extraction lock, under the index lock), puts the tree
+   aside with one rename (`podvm_extract::put_aside`, prefix `.trash-`),
+   and removes it after the locks. Where another process holds the image
+   (a run, a copy, an extraction), the tree stays. A tree that was in the
+   store before the import stays.
+3. The upload is gzip (`incus::gzip::Members`) where incusd's images have
+   less than three times the tree free, or where podvm cannot read their
+   free space; else plain (no CPU). Each block of 2 MiB is one gzip
+   member, up to eight threads compress one batch, and the members go out
+   in order: the bytes do not depend on the threads, so the SHA-256 of the
+   stream (the fingerprint of T-2081) stays. SIGPIPE stays ignored (T-2082).
+4. The check of T-2078 counts the new copies (amended there).
+5. The writer of gzip and a stream of the layers are not specific to
+   podvm: the COORD draft to podcrates asks for both.
+
+## Prove
+
+`cargo test -p podvm --bin podvm incus::` (the members: each size and
+each count of threads gives the input back with the same bytes, and a
+reader that goes gives EPIPE; the tree of an import against a stand-in
+incusd: made for an import only, removed after it and after a refused
+import, kept where it was there, plain where the images have room; the
+table of the loads). `cargo test -p podvm-image tree_alone` (each holder
+of the tree refuses, a fill and another image do not), `cargo test -p
+podvm-extract put_aside`. The peak before and after on a private incusd,
+and the image volumes of the old path and of the new paths compared by
+path, type, mode, owner, size, SHA-256 and attributes. Experiment 434
+clause 31.
+
+## Done
+
+Partial (2026-11-24). Measured on the cloud host (a private root incusd 6.0.0,
+`INCUS_DIR`, the store and a btrfs pool on one loop-backed btrfs,
+`golang:1.24-alpine`, a tree of 292 MB, 80 MB of blobs; the peak is over
+the use after the pull):
+
+| btrfs | binary | upload | exit | peak over the blobs |
+| --- | --- | --- | --- | --- |
+| 4 GB | before (`fa528278`) | plain, 271 MB | 0 | 852 MiB (tree, upload, volume) |
+| 4 GB | after | plain, 271 MB | 0 | 565 MiB (upload, volume) |
+| 1000 MB (817 MB free) | before | plain | 125 at the create (incusd's pool full) | 838 MiB |
+| 1000 MB | after | gzip, 101 MB | 0 | 394 MiB (gzip upload, volume) |
+
+The create with the fix took 18.9 s on the small btrfs (gzip on 4 CPUs)
+and 9.2 s plain on the large one; before, 9.4 s. The image volumes of the
+old path, of the plain path and of the gzip path have the same 16,716
+entries with the same mode, owner, size, SHA-256 and attributes; only
+`/.podvm/podvm` differs (the binary). A run with no tree in the store took
+the image from incus and ran `go version`; `/no/such` gave 127 from podvm
+in the instance. For the report's image the estimate is: blobs 17 GB, the
+tree 57 GB during the upload with the gzip of about 21 GB (the ratio 2.7
+of the measure; an estimate), then the volume 57 GB with the upload: a
+peak of about 95 GB, where 188 GB were needed. The gzip runs at about 90
+MB/s on 4 CPUs (an estimate from the time of the upload): about 11 min
+for 57 GB (an estimate).
+
+Experiment 434 (`PODVM_434_MIRROR=1`, the incusd of route A,
+`experiments/results/incus-tier.txt`): each clause matches but clause 23
+(the metrics of incusd, the known fault of T-2076). Clause 31: the import
+leaves 0 trees, a run from incus extracts none, a native run extracts 1,
+and an import from that tree keeps it. Clause 21 (a tree that was there):
+a growth of 2.37 times the tree, as before. Clause 27: the same refusal
+(16.2 MiB on a pool of 8 MiB). `cargo test --workspace --no-fail-fast`:
+1,162 passed, 0 failed (97 test binaries). `cargo check --target
+aarch64-unknown-linux-musl --workspace` passes. The release `podvm` is
+9,197,784 bytes (9,152,728 before).
+
+Remaining: (1) a run on the hosted runner of PodUtils/podrunner#347 with
+the next beta after 0.2.0-beta.39; (2) design (a), a stream of the layers
+with no tree, by podcrates (the COORD draft).

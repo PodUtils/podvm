@@ -5,7 +5,9 @@
 //! 1. The image: podvm's extracted rootfs as an incus unified tarball
 //!    ([`super::image`]) with podvm itself at `/.podvm/podvm`, imported
 //!    one time for each manifest digest and podvm build under the alias
-//!    `podvm-HEX16-PODVM16-vN` (TODO/machine.md T-1722).
+//!    `podvm-HEX16-PODVM16-vN` (TODO/machine.md T-1722). The tree is made
+//!    for the import only, the upload is gzip, and the tree that the
+//!    import made goes after it (TODO/machine.md T-2085).
 //! 2. The instance: from that alias, with podvm itself as its init
 //!    (`lxc.init.cmd = /.podvm/podvm guest-hold`), so an image with no
 //!    `sleep` and no shell still starts.
@@ -47,9 +49,26 @@ pub struct Job<'a> {
     pub channel: Option<(PathBuf, u16)>,
     /// The store of the image: the lock of its import (T-2081).
     pub store: Option<&'a podvm_image::Store>,
+    /// TODO/machine.md T-2085: the tree of the image in the store, made
+    /// for an import only and removed after it. `None`: the tree is at
+    /// `rootfs` and stays.
+    pub tree: Option<&'a dyn super::import::Tree>,
+    /// What the import measured (T-2085), for the lines after a failure.
+    pub plan: std::sync::OnceLock<super::space::Plan>,
     /// `--name` of a run in the foreground: the name of its instance
     /// (TODO/machine.md T-2080, OR-B39-07).
     pub name: Option<String>,
+}
+
+impl Job<'_> {
+    /// The plan of the import, else of the tree where it is there
+    /// (T-2085).
+    pub fn plan(&self) -> Option<super::space::Plan> {
+        self.plan
+            .get()
+            .copied()
+            .or_else(|| super::space::plan_of(self.rootfs))
+    }
 }
 
 /// The limits of `job` on `new`: each key goes into the configuration,
@@ -383,7 +402,7 @@ async fn run_in(
             // is another one's; the instance of a name of podvm may be
             // half made.
             let mine = job.name.is_none() || !e.contains("already exists");
-            let hint = super::space::after_failure(c, job.rootfs, false, t).await;
+            let hint = super::space::after_failure(c, job.plan().as_ref(), false, t).await;
             return Err((fail_twice(job.verb, (e, hint)), mine));
         }
         let step = async {

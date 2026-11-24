@@ -145,6 +145,8 @@ fn a_run_imports_creates_pushes_starts_execs_and_deletes() {
         net_none: false,
         channel: None,
         store: None,
+        tree: None,
+        plan: std::sync::OnceLock::new(),
         name: None,
     });
     unsafe { std::env::remove_var("PODVM_INCUS_SOCKET") };
@@ -238,7 +240,18 @@ fn an_upload_that_incusd_cuts_gives_a_line_not_a_sigpipe() {
     use std::io::Read;
     let d = scratch("cut");
     std::fs::create_dir_all(d.join("root/bin")).unwrap();
-    std::fs::write(d.join("root/bin/big"), vec![7u8; 4 << 20]).unwrap();
+    // T-2085: bytes that the gzip of the upload cannot shrink, so that the
+    // upload is longer than the buffers of the socket.
+    let mut x = 0x9e37_79b9_7f4a_7c15u64;
+    let big: Vec<u8> = (0..4 << 20)
+        .map(|_| {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            x as u8
+        })
+        .collect();
+    std::fs::write(d.join("root/bin/big"), big).unwrap();
     let sd = crate::test_socket::SocketDir::new("t2082");
     let sock = sd.join("unix.socket");
     let l = UnixListener::bind(&sock).unwrap();
@@ -287,6 +300,8 @@ fn an_upload_that_incusd_cuts_gives_a_line_not_a_sigpipe() {
         net_none: false,
         channel: None,
         store: None,
+        tree: None,
+        plan: std::sync::OnceLock::new(),
         name: None,
     };
     let rt = tokio::runtime::Builder::new_current_thread()

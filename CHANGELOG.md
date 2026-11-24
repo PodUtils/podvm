@@ -8,6 +8,27 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: the import of a large image keeps at most one full copy beside the upload on the incus tier, 2026-11-24
+
+Record: T-2085, T-2078; PodUtils/podrunner#347 (ask 1).
+Deployed: not deployed; on main, for the next beta after 0.2.0-beta.39.
+
+- `create` and `run` of the incus tier extract the tree of the image only
+  for an import. After the upload, and also after a failed import, podvm
+  removes the tree that the import extracted, where no other process of
+  the store uses the image. A tree that was in the store before stays.
+- Where incusd's images have less than three times the tree free, the
+  upload is gzip: incusd keeps about a third of the tree. Before, one
+  file system that held the store, incusd's images and the pool needed
+  three copies of the tree (blobs 17 GB + 3 x 57 GB for an image of 85
+  layers). Measured with a tree of 292 MB on a btrfs of 1000 MB: before,
+  `create` failed with exit 125 at 838 MiB; now it passes at 394 MiB.
+- The check of the room of a pool of the driver `dir` (T-2078) counts the
+  new copies.
+- A run of an image that incus has needs no tree in the store, so an
+  absolute program that the image lacks is no longer refused before the
+  start: podvm in the instance gives the same exit 127.
+
 ### Changed: podcrates `v0.82.1`, the processes of podvm in the PID namespace of a run, 2026-11-24
 
 Record: T-2084, T-2054, T-2076.

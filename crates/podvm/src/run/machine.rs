@@ -30,8 +30,11 @@ pub(super) struct Prepared {
     pub(super) env: Vec<String>,
     pub(super) workdir: String,
     pub(super) stdin: Option<Vec<u8>>,
-    /// Held while the run uses the rootfs.
-    _held: podvm_image::store::Lock,
+    /// Held while the run uses the rootfs; the incus tier gives it back
+    /// before it removes the tree that its import made (T-2085).
+    pub(super) held: std::sync::Mutex<Option<podvm_image::store::Lock>>,
+    pub(super) record: podvm_image::Record,
+    pub(super) loud: bool,
 }
 
 pub(super) fn prepare_image(
@@ -49,7 +52,10 @@ pub(super) fn prepare_image(
         eprintln!("podvm {verb}: {e}");
         podvm_image::error::EXIT_RUNTIME_ERROR
     })?;
-    if !podvm_extract::is_extracted(store, &record.manifest_digest) {
+    // TODO/machine.md T-2085 (PodUtils/podrunner#347 ask 1): the incus tier
+    // extracts the tree only for an import (`run/incus_tree.rs`); a run of
+    // an image that incus has needs no tree.
+    if tier != "incus" && !podvm_extract::is_extracted(store, &record.manifest_digest) {
         extract_now(verb, store, &record, o.ask.verbose)?;
     }
     let (rootfs, _) = podvm_extract::paths(store, &record.manifest_digest);
@@ -64,8 +70,11 @@ pub(super) fn prepare_image(
     // TODO/machine.md T-1823: an absolute program that the tree lacks
     // refuses before the boot with docker's 127, not with a line of the
     // guest shell. Each link resolves inside the tree, as in the guest.
+    // T-2085: with no tree (the incus tier), podvm in the instance names a
+    // program that is not there, with the same 127.
     let maps = podvm_enter::userland::Maps::of_root(&rootfs.to_string_lossy());
     if let Some(prog) = argv.first().filter(|p| p.starts_with('/'))
+        && podvm_extract::is_extracted(store, &record.manifest_digest)
         && podvm_enter::confine::host_resolved(&maps, prog).is_none()
     {
         eprintln!("podvm {verb}: {tier} tier: exec: {prog:?}: no such file in the image");
@@ -99,7 +108,9 @@ pub(super) fn prepare_image(
         env,
         workdir,
         stdin,
-        _held: held,
+        held: std::sync::Mutex::new(Some(held)),
+        record,
+        loud: o.ask.verbose,
     })
 }
 
@@ -415,6 +426,12 @@ pub(super) fn incus_tier(
         Err(c) => return c,
     };
     note_guest_run("incus", o, &p);
+    let tree = super::incus_tree::IncusTree {
+        store,
+        held: &p.held,
+        record: &p.record,
+        loud: p.loud,
+    };
     crate::incus::run::run(&crate::incus::run::Job {
         verb,
         rootfs: &p.rootfs,
@@ -442,6 +459,8 @@ pub(super) fn incus_tier(
         // TODO/machine.md T-2080: the import of the image takes a lock of
         // the store, and `--name` names an instance in the foreground.
         store: Some(store),
+        tree: Some(&tree), // T-2085
+        plan: std::sync::OnceLock::new(),
         name: (verb == "run" && !o.detach)
             .then(|| o.name.clone())
             .flatten(),

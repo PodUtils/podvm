@@ -92,7 +92,9 @@
 #      alpine with a layer whose /usr/bin/capfile carries
 #      security.capability (cap_net_raw+ep) as a PAX record; a user that is
 #      not root cannot set it on the tree, the sidecar names it, and the
-#      root of an instance of the incus tier has it.
+#      root of an instance of the incus tier has it. (T-2085: the import
+#      removes the tree that it made, and the sidecar with it, so the
+#      line of the sidecar is a record, not a clause.)
 #  23. The OOM kills in the run report (T-1969, PodUtils/podrunner#296
 #      ask 6): `run --rm --memory 32m --report R` of a command that holds
 #      200 MB ends with 137, and R has `oom_kills` 1 or more; the report
@@ -157,6 +159,15 @@
 #      trap writes `trapped`), podvm says "forwarded SIGTERM to the payload
 #      in the instance", exits with the code of the command (143), and no
 #      instance stays (before: exit 143 with the instance left RUNNING).
+#  31. The tree of an import (T-2085, PodUtils/podrunner#347 ask 1): with
+#      the image of clause 1 removed from incusd and its tree removed from
+#      the store, a run imports it ("imported now") and leaves no tree in
+#      the store; a second run takes it from incus and extracts no tree; a
+#      native run extracts the tree again; a run after the image is removed
+#      from incusd again imports it from that tree, and the tree stays (a
+#      tree that the import did not make is not the import's to remove).
+#      (Before: each incus run extracted the tree and kept it, beside the
+#      upload and the root of the instance: three copies at the peak.)
 #
 # Exit: 0 every clause matched, 1 a clause disagreed, 2 the lane could not
 # run (not root, no user namespaces, no package).
@@ -855,6 +866,30 @@ c30 "^  exit     143$" "podvm did not exit with the code of the command"
 c30 "^  stdout   trapped$" "the command did not get the signal"
 c30 "^  stderr   podvm run: forwarded SIGTERM to the payload in the instance podvm-" "no line that names the forward"
 c30 "^  stays    0$" "the instance stayed"
+
+# ---- clause 31 ----------------------------------------------------------
+trees() { ls "$B/store/rootfs" 2>/dev/null | grep -c '^sha256_'; }
+drop_images() { for f in $(RI image list --format csv -c f 2>/dev/null); do RI image delete "$f" >/dev/null 2>&1; done; }
+{
+echo ""; echo "== 31. the tree of an import"
+drop_images
+rm -rf "$B"/store/rootfs/sha256_*
+echo "  before   $(trees) trees, $(RI image list --format csv -c f 2>/dev/null | grep -c .) images"
+out=$(T "$OCI" true </dev/null 2>&1); echo "  import   rc $? $(printf '%s' "$out" | grep -o 'imported now\|from incus' | head -1), $(trees) trees"
+out=$(T "$OCI" true </dev/null 2>&1); echo "  cached   rc $? $(printf '%s' "$out" | grep -o 'imported now\|from incus' | head -1), $(trees) trees"
+P run --rm "$OCI" true </dev/null >/dev/null 2>&1; echo "  native   rc $?, $(trees) trees"
+drop_images
+out=$(T "$OCI" true </dev/null 2>&1); echo "  again    rc $? $(printf '%s' "$out" | grep -o 'imported now\|from incus' | head -1), $(trees) trees"
+echo "  stays    $(RI list --format csv -c n 2>/dev/null | grep -c .)"
+} >"$WORK/c31.txt" 2>&1
+cat "$WORK/c31.txt" >>"$REPORT"
+c31() { grep -Eq "$1" "$WORK/c31.txt" || { note "31: $2"; fail=1; }; }
+c31 "^  before   0 trees, 0 images$" "the tree or the image of clause 1 did not go"
+c31 "^  import   rc 0 imported now, 0 trees$" "the import left its tree in the store"
+c31 "^  cached   rc 0 from incus, 0 trees$" "a run of an image that incus has extracted a tree"
+c31 "^  native   rc 0, 1 trees$" "a native run did not extract the tree again"
+c31 "^  again    rc 0 imported now, 1 trees$" "an import removed a tree that it did not make"
+c31 "^  stays    0$" "an instance stayed"
 
 # ---- clause 9 -----------------------------------------------------------
 left_i=$(RI list --format csv -c n 2>&1 | grep -c .)

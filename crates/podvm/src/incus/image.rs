@@ -63,16 +63,17 @@ pub fn intended(sidecar: &str) -> HashMap<String, (u64, u64, u32)> {
 #[cfg(test)]
 pub fn unified_tarball(rootfs: &Path, out: &Path, podvm: &[u8]) -> Result<(), String> {
     let f = std::fs::File::create(out).map_err(|e| format!("{}: {e}", out.display()))?;
-    unified_tarball_to(rootfs, f, podvm)
+    unified_tarball_to(rootfs, f, podvm).map(drop)
 }
 
 /// [`unified_tarball`] into `w`: a pipe to the import of incusd, so that
-/// no tarball file lies in the store (TODO/machine.md T-1997).
+/// no tarball file lies in the store (TODO/machine.md T-1997). It gives
+/// `w` back, flushed, so that a gzip writer can end its stream (T-2085).
 pub fn unified_tarball_to<W: std::io::Write>(
     rootfs: &Path,
     w: W,
     podvm: &[u8],
-) -> Result<(), String> {
+) -> Result<W, String> {
     let sidecar = rootfs.with_file_name(".meta.jsonl");
     let text = std::fs::read_to_string(&sidecar).unwrap_or_default();
     let meant = intended(&text);
@@ -117,7 +118,8 @@ pub fn unified_tarball_to<W: std::io::Write>(
             .map_err(err)?;
     }
     b.into_inner()
-        .and_then(|mut w| std::io::Write::flush(&mut w))
+        .and_then(|w| w.into_inner().map_err(|e| e.into_error()))
+        .and_then(|mut w| std::io::Write::flush(&mut w).map(|()| w))
         .map_err(err)
 }
 

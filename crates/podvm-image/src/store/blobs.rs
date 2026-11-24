@@ -271,6 +271,41 @@ impl Store {
             Err(e) => Err(e),
         }
     }
+
+    /// TODO/machine.md T-2085 (PodUtils/podrunner#347 ask 1): the locks of
+    /// a removal of the tree of `manifest_digest` where no other process
+    /// uses it: the exclusive [`Store::hold`] of each record that names
+    /// that tree, and its exclusive extraction lock. `None` where another
+    /// process holds one of them. The caller drops its own hold first: a
+    /// shared lock of this process on another descriptor refuses the
+    /// exclusive one too.
+    ///
+    /// ⛔ I4: the index lock is taken first and dropped at the end, as in
+    /// [`Store::hold`], so no hold starts between the check of the records
+    /// and the locks.
+    pub fn try_hold_tree_alone(&self, manifest_digest: &str) -> Result<Option<Vec<Lock>>> {
+        let _index = self.lock()?;
+        let mut held = Vec::new();
+        let named: Vec<Record> = self
+            .list()?
+            .into_iter()
+            .filter(|r| r.manifest_digest == manifest_digest)
+            .collect();
+        let Some(first) = named.first() else {
+            return Ok(Some(held));
+        };
+        for path in named
+            .iter()
+            .map(|r| self.image_lock_path(r))
+            .chain(std::iter::once(self.image_extract_lock_path(first)))
+        {
+            match try_lock_at(&path?, sys::LOCK_EX)? {
+                Some(l) => held.push(l),
+                None => return Ok(None),
+            }
+        }
+        Ok(Some(held))
+    }
 }
 
 /// The age after which an unlocked staging file is abandoned.

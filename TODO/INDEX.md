@@ -721,10 +721,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2082](machine.md) | P1 | S | none | machine | done | On the incus tier, an upload of the image that incusd cuts ends podvm with SIGPIPE and no line |
 | [T-2083](machine.md) | P1 | S | none | machine | done | On the incus tier, `--podvm-init=image` takes "offline" of systemd as final and removes the instance |
 | [T-2084](deps.md) | P2 | M | none | deps | done | Take podcrates `v0.82.1`: the title and the dump flag of the init and the relay of pod-enter, the join of the payload, the meter of a cgroup |
+| [T-2085](machine.md) | P1 | M | none | machine | partial | On the incus tier, an import of a large image keeps three copies of its tree on one file system |
 
 ## Counts
 
-655 entries: 23 open, 46 partial, 5 blocked, 581 done.
+656 entries: 23 open, 47 partial, 5 blocked, 581 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -734,10 +735,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 22 | 0 | 265 | 290 |
+| P1 | 3 | 23 | 0 | 265 | 291 |
 | P2 | 15 | 19 | 4 | 196 | 234 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 23 | 46 | 5 | 581 | 655 |
+| **All** | 23 | 47 | 5 | 581 | 656 |
 
 ## Work order
 

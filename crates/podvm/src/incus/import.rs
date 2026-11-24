@@ -1,6 +1,15 @@
 //! The image of a run of the incus tier in incusd: imported now where its
 //! alias is not there (TODO/machine.md T-1718, T-1997, T-2078), one import
 //! of an alias at a time in a store (TODO/machine.md T-2081, OR-B39-02).
+//!
+//! TODO/machine.md T-2085 (PodUtils/podrunner#347 ask 1): an import of a
+//! large image kept three copies of its tree on one file system: podvm's
+//! tree in the store, incusd's upload in its images, and the image volume
+//! in the pool. Now podvm extracts the tree only for an import ([`Tree`]),
+//! sends the upload as gzip ([`super::gzip`]), and removes the tree that it
+//! extracted after the upload, before the create: at most one full copy
+//! and the gzip of the upload are on the disk at one time, beside the
+//! blobs.
 
 use pod_incus::{Client, ImageData, ImageImport, Payload};
 
@@ -52,6 +61,20 @@ async fn import_lock(
             Err(e) => return Err((format!("the lock of the import of {alias}: {e}"), None)),
         }
     }
+}
+
+/// TODO/machine.md T-2085: the tree of the image in the store, for an
+/// import only.
+pub trait Tree {
+    /// The tree at `Job::rootfs`: `Ok(true)` where this call extracted it
+    /// now. The error is one line.
+    fn ensure(&self) -> Result<bool, String>;
+    /// The bytes of the compressed layers: the estimate of the upload.
+    fn layer_bytes(&self) -> u64;
+    /// After the import: remove the tree that [`Tree::ensure`] extracted
+    /// now, where no other process uses the image. A line where the removal
+    /// failed.
+    fn release(&self) -> Option<String>;
 }
 
 /// A writer that counts the SHA-256 of the bytes that went through it:
@@ -135,9 +158,50 @@ pub(super) async fn ensure_image(
     if there(c.alias(&name).await)? {
         return Ok((name, true));
     }
+    // T-2085: the tree is made now, under the lock of the import, and only
+    // for an import.
+    let fresh = match job.tree {
+        Some(t) => t.ensure().map_err(|e| (e, None))?,
+        None => false,
+    };
+    let done = upload(c, job, storage, &name, me, fresh).await;
+    // T-2085: the tree that this import made goes after the import, also
+    // after a failure (it holds the disk that the failure lacked); a later
+    // import or native run extracts it again.
+    if fresh && let Some(w) = job.tree.and_then(|t| t.release()) {
+        eprintln!("podvm {}: incus tier: {w}", job.verb);
+    }
+    done
+}
+
+/// The import of the tree of `job` under the alias `name`: the check of
+/// the room, then the upload as gzip (T-2085). `fresh`: the import removes
+/// the tree after the upload.
+async fn upload(
+    c: &Client,
+    job: &Job<'_>,
+    storage: &str,
+    name: &str,
+    me: Vec<u8>,
+    fresh: bool,
+) -> Result<(String, bool), Fault> {
+    let name = name.to_string();
+    let tree = super::space::need_of(job.rootfs, me.len() as u64);
+    // T-2085: gzip where incusd's images lack room for the plain upload.
+    let images = super::space::incus_dir(&c.settings().socket)
+        .and_then(|d| super::space::room_at(&d.join("images")));
+    let plan = super::space::Plan {
+        tree,
+        upload: job.tree.map_or(0, |t| t.layer_bytes()),
+        gzip: super::gzip::wanted(images.map(|r| r.bytes), tree.bytes),
+        freed: fresh
+            .then(|| std::fs::metadata(job.rootfs).ok())
+            .flatten()
+            .map(|m| std::os::unix::fs::MetadataExt::dev(&m)),
+    };
+    let _ = job.plan.set(plan);
     if let Some(t) = super::space::Target::find(c, storage).await {
-        let need = super::space::need_of(job.rootfs, me.len() as u64);
-        for w in t.check(need, true).map_err(|e| (e, None))? {
+        for w in t.check(&plan, true).map_err(|e| (e, None))? {
             eprintln!("podvm {}: incus tier: {w}", job.verb);
         }
     }
@@ -151,12 +215,19 @@ pub(super) async fn ensure_image(
         inner: w,
         sum: sum.clone(),
     };
+    // T-2085: gzip where incusd's images lack room, so that incusd keeps
+    // about a third of the tree there; the hash is that of the bytes that
+    // incusd reads.
+    let out = super::gzip::Upload::new(hashing, plan.gzip);
     let writer = std::thread::spawn(move || {
         // T-2080: a reader that went gives EPIPE here, not a SIGPIPE that
         // ends podvm.
         let mut old = 0u64;
         let _ = podvm_probe::sys::sigblock(1 << (13 - 1), &mut old);
-        unified_tarball_to(&rootfs, hashing, &me)
+        let out = unified_tarball_to(&rootfs, out, &me)?;
+        out.finish()
+            .map(drop)
+            .map_err(|e| format!("the end of the upload of the unified tarball: {e}"))
     });
     let reader = tokio::fs::File::from_std(std::fs::File::from(std::os::fd::OwnedFd::from(r)));
     let mut import = ImageImport::new(ImageData::Unified(Payload::new(reader, None)));
@@ -166,7 +237,7 @@ pub(super) async fn ensure_image(
     // podvm still writes; with SIGPIPE ignored the write gives EPIPE and
     // the error below, not a SIGPIPE that ends podvm with no line (141).
     let done = {
-        let _quiet = super::space::NoSigpipe::now();
+        let _quiet = super::cut::NoSigpipe::now();
         c.import_image(import).await
     };
     // The writer ends at the end of the tree, or with EPIPE where incusd
@@ -195,12 +266,10 @@ pub(super) async fn ensure_image(
             AfterImport::Failed => {}
         }
         let t = super::space::transport(&e);
-        let hint = match super::space::after_failure(c, job.rootfs, true, t).await {
+        let hint = match super::space::after_failure(c, Some(&plan), true, t).await {
             Some(h) => Some(h),
-            None if super::space::cut(&e) => super::space::after_cut(c, job.rootfs, true).await,
-            None if super::space::no_space(&e) => {
-                super::space::after_cut(c, job.rootfs, false).await
-            }
+            None if super::cut::cut(&e) => super::cut::after_cut(c, Some(&plan), true).await,
+            None if super::cut::no_space(&e) => super::cut::after_cut(c, Some(&plan), false).await,
             None => None,
         };
         return Err((e.to_string(), hint));

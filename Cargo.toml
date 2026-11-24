@@ -100,3 +100,15 @@ opt-level = "z"
 codegen-units = 1
 strip = "symbols"
 panic = "abort"
+
+# TODO/machine.md T-2085: a test of the import of incus hashes the test
+# binary itself (about 200 MB) twice and compresses it as gzip; with no
+# optimization that took about 7 s for each import.
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+
+[profile.dev.package.crc32fast]
+opt-level = 3
+
+[profile.dev.package.sha2]
+opt-level = 3

@@ -280,6 +280,30 @@ files with capabilities. Three changes serve it on the incus tier.
   use of the store and of incusd by 2.38 times the tree, and no file stays
   in `store/incus`. A tarball file would add the tree once more (about 3.4
   times).
+* **At most one full copy beside the upload (T-2085).** An import of an
+  image of 85 layers (17.0 GB of blobs, a tree of 56.9 GB) on one btrfs
+  that held the store, `/var/lib/incus` and the pool kept three copies of
+  the tree at the peak: podvm's tree in the store, incusd's upload in its
+  images, and the image volume in the pool (PodUtils/podrunner#347 ask 1).
+  Now the incus tier extracts the tree only for an import (a run of an
+  image that incus has needs no tree); it removes the tree that the import
+  extracted after the upload and before the create (also after a failed
+  import), where no other process of the store holds the image; and where
+  incusd's images have less than three times the tree free, the upload is
+  gzip (`incus/gzip.rs`: blocks of 2 MiB, one gzip member each, compressed
+  by up to eight threads; the bytes do not depend on the count of
+  threads). A tree that was in the store before the import stays. Measured
+  on a btrfs of 1000 MB (817 MB free) with the store, `INCUS_DIR` and a
+  btrfs pool, `golang:1.24-alpine` (a tree of 292 MB, 80 MB of blobs):
+  before, `create` failed with exit 125 at a peak of 838 MiB over the
+  blobs; after, it passes at a peak of 394 MiB (the upload is 101 MiB of
+  gzip; the tree is gone). On a btrfs of 4 GB the upload stays plain: 565
+  MiB after, 852 MiB before. The image volumes of the old path, the plain
+  path and the gzip path have the same 16,716 entries, modes, owners,
+  bytes and attributes. Experiment 434 clause 31 checks the tree. A native
+  run after the import extracts the tree again. With no tree, `run` does
+  not refuse an absolute program that the image lacks before the start
+  (T-1823): podvm in the instance gives the same exit 127.
 * **Capabilities (T-1999).** The tarball carries the extended attributes of
   the image as PAX records (`incus/xattrs.rs`): `security.capability` and
   `user.*` of the tree, and each attribute of the sidecar that
@@ -304,7 +328,12 @@ it wrote, so after the failure the pool has its space again.
   the free space of the pool of the `root` disk of the default profile (its
   `containers` directory, where the root of an instance goes) and of
   incusd's images: the bytes of each file of the tree and one inode for
-  each entry, twice the bytes where both are on one file system. Where the
+  each entry for the root of the instance, and the bytes of the tree for a
+  plain upload (twice the bytes where both are on one file system). A gzip
+  upload (T-2085) has no lower bound before it is written: its estimate is
+  the bytes of the layers, for the warning only. Where the import removes
+  the store's tree from the file system of the pool before the create, the
+  root of the instance takes its place, and its lower bound is 0. Where the
   need is over the free space for a user (`f_bavail`) or over the free
   inodes, the run is refused with one line and exit 125; where it is over
   77 % of the free space (1.3 times the need, experiment 434 clause 21), a
@@ -312,7 +341,8 @@ it wrote, so after the failure the pool has its space again.
   refusal on a pool of 8 MiB.
 * **After a create or an import** that failed in its transport, one more
   line gives the free space and the need of the pool: each time for a
-  refusal by size, else where the image does not fit.
+  refusal by size, else where the image does not fit. Where podvm has no
+  tree of the image (incus had it, T-2085), the need is a dash.
 * The check needs a server whose drivers are all `dir`, and a pool whose
   `containers` directory podvm sees at `INCUS_DIR/storage-pools/NAME`. A
   pool with a `source` of an incusd in its own mount namespace (route A) is

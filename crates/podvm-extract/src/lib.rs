@@ -114,6 +114,33 @@ pub fn remove_extracted(store: &Store, digest: &str) -> Result<bool> {
     Ok(pod_extract::remove_tree(base)?)
 }
 
+/// TODO/machine.md T-2085 (PodUtils/podrunner#347 ask 1): put the
+/// extraction of `digest` aside with one rename, beside it under a name
+/// that starts with [`tree::TRASH`], so that no reader finds a part of it.
+/// The caller holds the locks of `Store::try_hold_tree_alone` across this
+/// call, and removes the path with [`remove_aside`] after them. `None`
+/// where there is no extraction.
+pub fn put_aside(store: &Store, digest: &str) -> Result<Option<PathBuf>> {
+    let p = place(store, digest);
+    let Some(base) = p.rootfs.parent() else {
+        return Ok(None);
+    };
+    if std::fs::symlink_metadata(base).is_err() {
+        return Ok(None);
+    }
+    let io =
+        |e: std::io::Error| Error::Image(podvm_image::Error::io(base.display().to_string(), e));
+    let aside = base.with_file_name(format!("{}{}", tree::TRASH, tree::new_id().map_err(io)?));
+    std::fs::rename(base, &aside).map_err(io)?;
+    Ok(Some(aside))
+}
+
+/// Remove a tree that [`put_aside`] put aside. The removal never follows a
+/// symlink out of it.
+pub fn remove_aside(path: &std::path::Path) -> Result<bool> {
+    Ok(pod_extract::remove_tree(path)?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -130,5 +157,30 @@ mod tests {
         // ⛔ A colon is not a portable path character and the digest carries
         // one.
         assert!(!rootfs.to_string_lossy().contains(':'));
+    }
+
+    /// TODO/machine.md T-2085: one rename puts the extraction aside, under
+    /// the trash prefix beside it, and the removal takes it away.
+    #[test]
+    fn an_extraction_put_aside_is_gone_with_one_rename() {
+        let d = std::env::temp_dir().join(format!("podvm-store-aside-{}", std::process::id()));
+        let s = Store::open(&d).unwrap();
+        assert!(put_aside(&s, "sha256:abc").unwrap().is_none(), "no tree");
+        let (rootfs, side) = paths(&s, "sha256:abc");
+        std::fs::create_dir_all(rootfs.join("etc")).unwrap();
+        std::fs::write(rootfs.join("etc/passwd"), b"root").unwrap();
+        std::fs::write(&side, b"{}").unwrap();
+        let aside = put_aside(&s, "sha256:abc").unwrap().expect("put aside");
+        assert!(
+            !rootfs.exists() && !side.exists(),
+            "the tree is gone at once"
+        );
+        assert_eq!(aside.parent(), rootfs.parent().and_then(|p| p.parent()));
+        let name = aside.file_name().unwrap().to_string_lossy().into_owned();
+        assert!(name.starts_with(tree::TRASH), "{name}");
+        assert!(aside.join("rootfs/etc/passwd").exists());
+        assert!(remove_aside(&aside).unwrap());
+        assert!(!aside.exists());
+        let _ = std::fs::remove_dir_all(&d);
     }
 }
