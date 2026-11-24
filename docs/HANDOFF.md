@@ -31,12 +31,13 @@ memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
   (COORD-246) tells podrunner.
 * podcrates `v0.83.0` is taken on `main` after the tag (T-2089, `a39f4c4f`;
   #663, COORD-247, tells podcrates).
-* The issue cleanup of 2026-11-24: four agents checked each open issue
-  against the code, the record and a run of the beta.40 binary; the record
-  closes 82 of 143 open rows (`TODO/issues.md`), and the plans of the
-  GitHub changes (comments, corrected bodies) are in the scratchpad of the
-  session, applied by step 3. The new entries are T-2088 (the QA faults of
-  beta.31 that stay open) and T-2090 (the QA reports that beta.40 passes).
+* The issue cleanup of 2026-11-24 is done: four agents checked each open
+  issue against the code, the record and a run of the beta.40 binary. 87
+  issues are closed with a comment of evidence; 56 stay open, each with a
+  body that says what is true now (the bot block stays under it). GitHub
+  and `TODO/issues.md` agree: 56 open in both. The new entries are T-2088
+  (the QA faults of beta.31 that stay open) and T-2090 (the QA reports that
+  beta.40 passes).
 * The cause of the stale issues: an issue maps to an umbrella entry (for
   example T-1951) that stayed partial while most of its findings were
   fixed; the sync bot keeps an issue open while its row says open, and the
@@ -54,13 +55,11 @@ memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
 
 1. Watch #662 (podrunner takes beta.40) and #663 (podcrates lists the
    take of `v0.83.0`); close each with that evidence.
-2. T-2078 remaining 1: `Client::image` and `storage_pool_resources` of
-   pod-incus as the second path beside the record of the need of an image.
-3. The GitHub half of the issue cleanup, if it is not done: the plans
-   `plan-A.json`, `plan-B.json` and `plan-C.json` (one object for each
-   issue: close with a comment, or a new body under which the bot block
-   stays). An issue that the record closed and GitHub keeps open closes at
-   the next push by the bot.
+2. T-2078 remaining 1: the resources of a pool through the API
+   (`storage_pool_resources`) for a driver other than `dir` (the size of
+   an image file is taken, `d8d400c3`).
+3. Sweep the 56 open issues at each session start (`AGENTS.md`, section 8
+   item 7), and map each new issue to the entry of its own finding.
 4. podrunner: #583 (T-1964 pool with a quota, T-1968), #596 and #599 (the
    hosted snapshot: T-1994, T-1996, T-1998, T-1999), #593 (T-1990,
    T-1991). Then T-2088 and the open rows of T-2070, T-2079, T-2087.
@@ -111,6 +110,12 @@ memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
   session writes the footer each time; it cannot make it stay.
 * Two watchers and a `--until` at 30 s spent the keyless reads of the
   forge in minutes (the rule is in `AGENTS.md`, section 9).
+* The bot issue-sync writes each body back with a new block at each push:
+  a body that a session writes while that run is in progress can be lost
+  (#546 and #567 were). Write bodies when no issue-sync run is in
+  progress, and read them back after the next one.
+* The GitHub write tool of a cloud session drops the footer of an issue
+  body (each body of 2026-11-24); the footer stays on a comment.
 * A job of a workflow can end at its time limit while its bootstrap waits
   for ziglang.org (6 to 15 min on 2026-11-24): a cancelled run is not a
   pass; read the step, and run the failed jobs again.
