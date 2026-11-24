@@ -82,12 +82,12 @@ interposer is the cost.
   podvm's `.meta.jsonl`.
 * **The command.** `lxc.init.cmd` takes no quoting, so it does not name
   the command. It names podvm itself (`/.podvm/podvm guest-hold`), which
-  podvm pushes into the instance before the start; the command runs by the
-  exec API with its argv as a list.
+  the imported image carries (T-1722); the command runs by the exec API
+  with its argv as a list.
 * **The network.** No network in the user's namespace without a relay
   (errand-box E-23). The first back end says so and refuses `-p`.
 * **The crate.** The client of the incus REST API over a unix socket is
-  generic: it goes to podcrates as a crate, by a COORD issue.
+  `pod-incus` of podcrates.
 
 ## What podvm has (T-1718)
 
@@ -116,13 +116,13 @@ of the import (`locks/incus-ALIAS.key.lock` of the store), and a race with
 another store on the same incusd ends in the image that is there (T-2081).
 The first answer of incusd has a bound of 30 s (T-2080).
 
-[Experiment 434](../experiments/434-incus-tier.sh) proves it against the
-incusd of route A ([its run](../experiments/results/incus-tier.txt)): each
-of its eleven clauses matches. The image carries podvm at `/.podvm/podvm`
-(T-1722), so a run pushes no binary: a run of `true` with the image in incus
-takes about 1.1 s with the release binary (median of 5, 2026-11-12). `create` and `exec` refuse the tier by name, and so do
-`--podvm-mem` and `--podvm-qemu-arg`. T-1722 has the rest of the verbs and
-the selection by the ladder.
+[Experiment 434](../experiments/434-incus-tier.sh) proves each clause of
+this page against the incusd of route A ([its run](../experiments/results/incus-tier.txt)).
+The image carries podvm at `/.podvm/podvm` (T-1722), so a run pushes no
+binary: a run of `true` with the image in incus takes about 1.1 s with the
+release binary (median of 5, 2026-11-12). `--podvm-mem` and
+`--podvm-qemu-arg` are refused by name. The verbs of an instance that stays
+and the selection by the ladder follow (T-1722).
 
 `-v HOST:GUEST[:ro]` is a `disk` device of the instance (T-1722, clause 11
 of experiment 434): a write in the instance lands in the host directory,
@@ -183,13 +183,13 @@ v1 (`memory.max_usage_in_bytes`) through the kernel; a command that traces
 PID 1 (`CAP_SYS_PTRACE` in the instance) can change any state of the init.
 
 PID 1 and the OOM killer (T-2077): under `--memory`, a command over the
-limit can cause two OOM events a few milliseconds apart. Before the fix,
-the second event came before the memory of the first victim was free, and
-the OOM killer of the instance took PID 1, the largest task that stayed.
-The instance then stopped with no exit file and no usage file (12 of 44
-runs on the cloud host). Now, before the command starts, the init sets its
-own `oom_score_adj` to -1000, and the command gets back the value that PID
-1 had. The kernel refuses -1000 in an instance of an incusd that has no
+limit can cause two OOM events a few milliseconds apart. The second event
+can come before the memory of the first victim is free. The OOM killer of
+the instance then takes PID 1, the largest task that stays, and the
+instance stops with no exit file and no usage file (12 of 44 runs on the
+cloud host, before the init set its score). So, before the command starts,
+the init sets its own `oom_score_adj` to -1000, and the command gets back
+the value that PID 1 had. The kernel refuses -1000 in an instance of an incusd that has no
 `CAP_SYS_RESOURCE` of the host (route A: EACCES). There, PID 1 keeps its
 value and the command gets 1000, so that the OOM killer takes each process
 of the command before PID 1, and the init writes the reason on the console
@@ -297,7 +297,7 @@ files with capabilities. Three changes serve it on the incus tier.
   that held the store, `/var/lib/incus` and the pool kept three copies of
   the tree at the peak: podvm's tree in the store, incusd's upload in its
   images, and the image volume in the pool (PodUtils/podrunner#347 ask 1).
-  Now the incus tier extracts the tree only for an import (a run of an
+  So the incus tier extracts the tree only for an import (a run of an
   image that incus has needs no tree); it removes the tree that the import
   extracted after the upload and before the create (also after a failed
   import), where no other process of the store holds the image; and where
@@ -358,8 +358,9 @@ it wrote, so after the failure the pool has its space again.
 * The check needs a server whose drivers are all `dir`, and a pool whose
   `containers` directory podvm sees at `INCUS_DIR/storage-pools/NAME`. A
   pool with a `source` of an incusd in its own mount namespace (route A) is
-  not checked. A run of an image that incus already has is not checked
-  before its create.
+  not checked. A run of an image that incus already has is checked before
+  its create against the need that the import wrote in the store; an image
+  that an older podvm imported has no such record and is not checked.
 
 ## What stays open
 

@@ -38,7 +38,7 @@ Read [the limits](docs/limits.md) before you select a path.
 
 ## Install
 
-Each release from `0.2.0-beta.25` carries `podvm-install.sh`. It finds the
+Each release carries `podvm-install.sh`. It finds the
 binary of your machine, checks it against the pins in the installer, and
 puts it into `~/.local/bin` (`--prefix DIR` sets another place). It needs
 no root and no compiler. A second run changes nothing. With
@@ -49,9 +49,9 @@ curl -fsSLO https://github.com/PodUtils/podvm/releases/download/TAG/podvm-instal
 sh podvm-install.sh
 ```
 
-Each release after `0.2.0-beta.28` carries `SHA256SUMS` and its keyless
+Each release carries `SHA256SUMS` and its keyless
 signature `SHA256SUMS.sigstore.json`. Where `cosign` is on `PATH`, the
-installer of such a release checks them before a download. To check the
+installer checks them before a download. To check the
 installer itself by hand before the first run:
 
 ```sh
@@ -160,8 +160,8 @@ Read the named refusal when a required mechanism is absent.
 
 The machine tier runs a disposable disk guest through an emulator
 (`qemu-system-x86_64`; KVM where `/dev/kvm` opens, else TCG). A host with
-no QEMU needs no install: podvm fetches a pinned static QEMU 11.0.0 and its
-firmware (24 MiB) into its store on the first run, and a QEMU of the host
+no QEMU needs no install: podvm fetches a pinned static QEMU 11.1.3 and its
+firmware into its store on the first run, and a QEMU of the host
 wins where it is present. `podvm pull windows:NAME` fetches a medium of
 the catalog from its vendor URL and checks its pinned sha256; podvm stores
 no Windows image of its own.
@@ -223,10 +223,10 @@ are an exec shim.
 The verifier requires `gh` and `cosign`.
 It checks the tag's workflow identity.
 `v0.1.0-beta.12` is the last podbox release, and `v0.2.0-beta.2` is the first podvm release.
-The tags `v0.1.0-beta.13` and `v0.2.0-beta.1` have no release, because their builds failed.
-Tags up to `v0.1.0-beta.13` keep the podbox identity: their releases carry `podbox-*` assets and are signed by the nightly workflow of `Azathothas/podbox`, and the verifier checks those tags against that identity.
-Each later tag carries the podvm identity, and its release has `podvm-*` assets; `podvm-verify` decides the identity from the tag.
-`Azathothas/podbox` redirects to this repository, so nobody may create a new repository of that name: it would break the redirect and the old identity with it.
+The tags `v0.1.0-beta.13` and `v0.2.0-beta.1` have no release.
+Tags up to `v0.1.0-beta.13` keep the podbox identity: `podbox-*` assets, signed by the nightly workflow of `Azathothas/podbox`.
+Each later tag has the podvm identity and `podvm-*` assets. `podvm-verify` decides the identity from the tag.
+`Azathothas/podbox` redirects to this repository, so nobody may create a repository of that name.
 
 ## Documents and evidence
 
