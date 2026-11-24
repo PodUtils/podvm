@@ -155,7 +155,19 @@ cgroup of the instance goes at the stop. So the init, as PID 1, opens the
 files of the instance's cgroup before the command starts (the meter of
 `pod_hostprobe::usage`: cgroup v2 where its memory controller is there,
 else the v1 hierarchies `memory` and `cpuacct`; on Linux 5.8 to 5.18 the
-cgroup v2 has no `memory.peak`, and the peak is a dash with its reason). When the command ended, the init sends SIGKILL to each other
+cgroup v2 has no `memory.peak`, and the peak is a dash with its reason).
+The init first mounts the cgroup file systems of the instance at
+`/.podvm/.meter`. The AppArmor profile of incus allows a cgroup mount only
+under `/sys/fs/cgroup`, so on a host with AppArmor (a hosted ubuntu-24.04
+runner with incus of apt) that mount fails with EACCES. There the init
+takes the cgroup mounts that LXC made in the cgroup namespace of the
+instance: a mount of mountinfo that shows the root of its hierarchy, with
+the file system type of its mount point checked (T-2086,
+PodUtils/podrunner#350; experiment 471 in the job `incus` of `kvm.yml`).
+The peak is the high mark of the kernel for the cgroup of the instance
+(`memory.peak` of cgroup v2, `memory.max_usage_in_bytes` of cgroup v1),
+not a sample, and the OOM kills are the `oom_kill` count of that cgroup,
+which also counts a kill of a child of the command. When the command ended, the init sends SIGKILL to each other
 process of the instance and reaps them, takes back its own root, reads the
 files, and replaces `/.podvm/usage` atomically (it first takes away a
 mount, a link or a directory that the command left at the path). Then PID 1

@@ -552,6 +552,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #656 | COORD-240: podvm took v0.82.1 (to podcrates) | closed (PodUtils/podcrates#257 lists the take of v0.82.1) | T-2084, T-2054, T-2076 |
 | #657 | COORD-241: a stream of the layers of an image as one tar, and a writer of gzip members (to podcrates) | open | T-2085 |
 | #658 | COORD-242: the answer to PodUtils/podrunner#347: an import of a large image keeps one tree and a gzip upload on the incus tier (to podrunner) | open | T-2085, T-2082 |
+| #659 | COORD-243: pod_hostprobe::usage: open the meter from the cgroup mounts of mountinfo, where a mount of cgroup is refused (to podcrates) | open | T-2086 |
 
 ## Messages whose title does not start with COORD-NNN
 
