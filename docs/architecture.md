@@ -71,8 +71,8 @@ An absent object becomes an empty placeholder, and the runtime then refuses the 
 
 It supplies path, ownership, identity, device, and proc compatibility.
 It cannot cover every syscall or static payload.
-The pair targets x86_64. The build embeds it only into an x86_64 binary;
-the aarch64 binary embeds no object and refuses a dynamic payload by name (T-1721).
+The pair targets x86_64 and aarch64. Each of those two binaries embeds the objects of its own machine (T-1721);
+a binary of another architecture embeds none and refuses a dynamic payload by name.
 The runtime checks payload and object architecture before use.
 
 ## Machine execution
@@ -91,9 +91,9 @@ For an OCI image, `run` with the machine tier boots a guest
 (`crates/podvm/src/machine/guest.rs`, T-1656): the image's rootfs is a
 cached `newc` base archive, a run archive adds `/podvm-init`, QEMU boots
 the pinned kernel, and the exit code comes back through console markers
-with a per-run nonce. The guest is linux/amd64, and an image of another
-architecture is refused before the boot (T-1889). `create` and `exec`
-assess the machine legs and exit 125.
+with a per-run nonce. The guest is linux/amd64, or linux/arm64 under TCG (T-1890); an image of
+another architecture is refused before the boot (T-1889). `create` assesses
+the profile and exits 125. `exec NAME` enters a guest of `run -d` (T-1750).
 The init mounts cgroup2 and brings `lo` up. `--podvm-net none`,
 `--podvm-channel`, `--podvm-sealed` and `--podvm-engine` change the guest
 (T-1751, T-1780); [the limits](limits.md#guests) state each one.
@@ -126,11 +126,11 @@ does not load gives a boot. On the incus tier, `run -d` and `create` with the fl
 `lxc.init.cmd` out, so that `/sbin/init` of the image is PID 1 of the
 instance; podvm waits for `systemctl is-system-running` and runs the
 command by the exec API (`crates/podvm/src/incus/systemd.rs`, T-1993). The
-userland rung has no route of its own yet: T-2005 waits for a UML kernel
+userland rung has no route of its own: T-2005 (blocked) waits for a UML kernel
 from podcrates. [The limits](limits.md#the-init-of-an-image)
 state what each place gives.
 
-Three commands boot a guest now:
+Three commands boot a guest:
 
 | Command | Guest |
 | --- | --- |

@@ -84,7 +84,7 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   the check and the call still moves them. A raw `syscall` instruction
   passes the interposer, as above.
 - Interposition covers cooperative library calls, without a security boundary.
-- The embedded interposer pair is x86_64, and only the x86_64 binary embeds it (T-1721). Other payload architectures need another execution path.
+- The embedded interposer pair is x86_64 and aarch64, and each of those two binaries embeds the objects of its own machine (T-1721). Other payload architectures need another execution path.
 - A foreign architecture needs the host interpreter support required by the selected path.
 - A pidfd addresses a direct child. The launcher, and podvm for a foreground
   run, is the child subreaper of the payload's tree and kills each
@@ -239,9 +239,8 @@ stays `done`: everything it claimed to deliver is delivered and its
 
 The source build produces separate `node`, `operator`, `proxy`, and `shell` executables.
 The remote CLI needs compatible helpers beside podvm, or on PATH named `podvm-ssh-node`, `podvm-ssh-operator` and `podvm-ssh-proxy` (T-1821): a plain `node` on PATH is Node.js, and podvm does not run it.
-Each release target since `v0.1.0-beta.10` carries the helper archive
-(T-1405 in [podssh](../TODO/podssh.md)). The `v0.1.0-beta.9` assets contain
-the CLI only.
+Each release target carries the helper archive (T-1405 in
+[podssh](../TODO/podssh.md)).
 
 The relay legs carry a 10 s bound on each connection, pings on each
 socket, and a 10 s write bound on the server of each session; a stalled
@@ -293,7 +292,7 @@ firmware into the store (T-1875); `podvm machine ssh` and `podvm doctor`
 look on PATH only. `--podvm-mem` sizes the virtual machine, as QEMU's `-m` does,
 and the guest kernel keeps a part of it: `MemTotal` is 85 % of 256M,
 92 % of 512M and 95 % of 1G (T-1849).
-`podvm machine ssh` and `podvm windows` boot a guest now
+`podvm machine ssh` and `podvm windows` boot a guest
 ([architecture](architecture.md)).
 
 The init of each guest mounts cgroup2 at `/sys/fs/cgroup`, and
@@ -369,21 +368,19 @@ of the image (T-1999). The instance does not honour `--podvm-confine`, `--user`,
 `--label`, `--timeout`, `-t`, `--device` or `--ports`, so the incus tier
 refuses each by name with exit 125 (T-1854).
 
-The owner lifted the KVM deferral on 2026-11-09 ([decisions](decisions.md)).
 A session can start a KVM guest where `/dev/kvm` exists, with a timeout,
-and no emulator may stay after the run. The cloud host has no `/dev/kvm`,
-so a cloud session runs guests under TCG. `kvm.yml` (T-1682) runs the KVM
-leg on a hosted runner.
+and no emulator may stay after the run ([decisions](decisions.md), 2026-11-09).
+The cloud host has no `/dev/kvm`, so a cloud session runs guests under TCG.
+`kvm.yml` (T-1682) runs the KVM leg on a hosted runner.
 
-The Windows guest has no network in the current driver.
-Today the operator gives the disk image (`PODVM_WINDOWS_IMAGE`, or
-`windows fetch --url`). The owner accepts the vendor terms
-([decisions](decisions.md), "Windows media"), so podvm will fetch and
-verify the pinned media itself; the work is in the record.
-T-1112 records the TCG, KVM, and DOS proofs separately.
-The 2026-09-30 KVM runs on the Windows base failed at setup or command
-shutdown. An earlier KVM success does not establish current reliability.
-The operator removed the ReactOS clause from T-1112 on 2026-10-02.
+A ValidationOS or DOS guest has no network (a mailbox run with `-nic none`).
+A desktop guest (`windows:11`, `10`, `2025`) has a user-mode NIC (T-1865).
+`podvm pull windows:NAME` fetches and verifies the pinned medium
+([decisions](decisions.md), "Windows media"). The operator can give an own
+disk image with `windows fetch --url`.
+T-1112 records the TCG, KVM, and DOS proofs separately. An earlier KVM
+success does not establish current reliability.
+[The earlier text](history/limits-before-2026-11-24.md) says that the Windows guest has no network.
 
 ## The init of an image
 
@@ -433,9 +430,8 @@ C26). Experiment 465 measures each line below as uid 1000.
   container that stays, refuses `--podvm-confine`, `--ulimit`,
   `--security-opt no-new-privileges` and `--device` by name with 125
   (T-2017): the supervisor of the init starts the init and the command
-  with no entry of pod-enter, and before 2026-11-20 it dropped each of
-  them with no line. The runsc tier and the machine tier are not measured
-  for these flags.
+  with no entry of pod-enter. The runsc tier and the machine tier are not
+  measured for these flags.
 - With `-t`, the command of a run with the init on the namespace rung
   gets a pty of the devpts instance of the init, as the leader of a
   session of its own: `tty` names `/dev/pts/N`, and job control works.
@@ -528,8 +524,8 @@ C26). Experiment 465 measures each line below as uid 1000.
 
 ## Network lab
 
-`podvm lab scenarios` lists 27 scenarios of `pod-netlab` (podcrates
-`v0.50.0`); sand-net listed 39 (TODO/net.md T-1847). These 12 are absent,
+`podvm lab scenarios` lists 27 scenarios of `pod-netlab` (checked at
+podcrates `v0.82.1`); sand-net listed 39 (TODO/net.md T-1847). These 12 are absent,
 as each needs a knob of issue 180 (`--vpn`, `--killswitch`, `--vpn-down`,
 `--uplink warp`, `--cfrs-pod`) and a WireGuard server, a live uplink or
 `podnet pod`, so none is an offline lab (podcrates@T-348): `vpn-full`,
