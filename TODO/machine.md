@@ -6280,3 +6280,310 @@ then podvm takes them and reads the pool through the API. (2) A check
 before the create of an image that incus already has, with the size of the
 image from incusd. (3) A run on the hosted runner of PodUtils/podrunner#346
 with the next beta after 0.2.0-beta.38.
+
+OR-B39-13 of the eighth outside pass (T-2079, 2026-11-24) is remaining
+(2): on a full pool, a run of an image that incus already has gets incusd's
+raw 500 "run out of disk space", as the check runs only before an import.
+The pass also notes that the line of the check names a path of the host
+(the directory of the pool); that stays, as it is the place that the user
+frees.
+
+# T-2080: On the incus tier, an exit of 126 or 127 is a refusal of incusd, and a signal leaves the instance running
+
+**Source:** the eighth outside pass (T-2079): OR-B39-01, OR-B39-03, and the P2 findings OR-B39-05, 06, 07, 09, 10, 12, 16 and 18
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** done
+
+## Problem
+
+On the incus tier (podvm 0.2.0-beta.38, incusd 6.0.0):
+
+* OR-B39-01: a foreground `run` or an `exec` whose command ends with 127
+  or 126 gives `incus refused the call (400, error_code 400): Command not
+  found` (or `Command not executable`), exit 125, and the output of the
+  command is lost. A program that is not there gives the same line.
+* OR-B39-03: SIGINT, SIGTERM or SIGHUP to a foreground `run --rm` ends
+  podvm with 130, 143 or 129, and the instance stays RUNNING.
+* OR-B39-05: `exec -i` drops stdin; `exec` lacks the `-e` of the run.
+* OR-B39-06: a foreground run gives its output at the end, stderr after
+  stdout.
+* OR-B39-07: `run -d --rm` keeps the stopped instance; a foreground
+  `--name` is ignored (no check of a name in use).
+* OR-B39-09: `run -w /nonexistent` runs in `/` with exit 0.
+* OR-B39-10: a socket that takes the connection and never answers holds
+  each verb with no bound.
+* OR-B39-12: after a failed create, a line says that the instance stays
+  although the delete answered 404; the line starts `incus tier;`.
+* OR-B39-16: an image of another architecture gives `Command not
+  executable` with no word of the architecture.
+* OR-B39-18: `container ls --podvm-tier incus` gives "a bug in podvm".
+
+## Premise
+
+The causes (beta.38, `b6a198f3`):
+
+* OR-B39-01: `incus/run.rs` `run_in` and `incus/verbs.rs` `exec` used
+  `pod_incus::Client::exec_recorded`. incusd 6.0 ends an operation of exec
+  whose command ends with 127 (126) as a failure with the words "Command
+  not found" ("Command not executable"); the answer of its wait is an
+  envelope of type `error`, not the operation, so the crate gives an error
+  of incusd and drops the logs. The operation (`GET /1.0/operations/ID`)
+  still has `metadata.return` and the logs for some seconds (measured with
+  curl, 2026-11-24). incusd gives the same answer for a program that is not
+  there and for `exit 127` of a shell (measured: `return` 127 and empty
+  logs for both), so its answer cannot tell them apart.
+* OR-B39-03: nothing caught a signal: its default action ended podvm
+  before the delete of `run_async`.
+* OR-B39-05, 06: `exec_recorded` takes no stdin and gives the output at the
+  end.
+* OR-B39-09: incusd runs a command in `/` where the `cwd` of the exec is
+  missing, with no error (measured).
+* OR-B39-10: `pod_incus::Settings` has a bound of the connection and of a
+  wait, not of an answer.
+* OR-B39-12: `verbs::discard` named each error of the delete, a 404 too,
+  and gave its text with a leading `; ` that `run_async` put after `incus
+  tier`.
+* OR-B39-18: `lifecycle::container_group` sent `ls` to the parser of `ps`
+  with no look at `--podvm-tier incus`, which `main` intercepts for `ps`.
+
+## Approach
+
+Run the command with the websockets of the exec API
+(`pod_incus::Client::exec_attached`), and podvm in the image as the start
+of the command of a foreground run.
+
+## Decision
+
+(1) `incus::attach` (new): stdout and stderr go to podvm's own as each
+message comes, stdin goes in, and the exit code of a failed wait with the
+two words is the `return` of the operation, read after the wait
+(`code_of_failure`; the words give 127 or 126 where the operation is gone).
+(2) A foreground run and an `exec` block the signals of
+`pod_enter::WAIT_FORWARDED` before each thread of the run starts, and read
+them from a signalfd in the runtime. The first one goes to the command by
+the control socket, with the line "forwarded SIGTERM to the payload in the
+instance NAME"; a second one, or 10 s with no end, sends SIGKILL. The run
+then deletes its instance. The exit code is the one of the command, else
+128 + N. A signal before the command starts ends podvm with 128 + N, after
+the delete of what the run made. A write to a pipe whose reader went gives
+EPIPE (SIGPIPE is blocked in the thread), and the command gets SIGPIPE, as
+a command that writes to that pipe itself does; before, SIGPIPE ended podvm
+and left the instance (measured with `| head -2`). (3) The command of a
+foreground run is `/.podvm/podvm guest-exec --cwd DIR -- ARGV`
+(`incus::guest_exec`, new): podvm in the image (the build of the alias, so
+always this one) makes the working directory where it is missing, as docker
+does, searches `PATH`, and names the cause of a start that fails: docker's
+`"X": executable file not found in $PATH` (127), a missing interpreter or
+loader (127), no permission (126), an ELF of another architecture with the
+two architectures (126). Then it replaces itself with the command
+(`execve`): the pid, the streams and the signals are those of the command.
+`exec` into an instance runs the argv as before (an instance of an older
+podvm has no `guest-exec`); after an end of 126 or 127 with no output it
+says that incusd gives the same end for a program that is not there. (4)
+`exec` takes the environment and the working directory of the command of
+the run (`/.podvm/cmd`), under its own `-e` and `-w`, and reads the piped
+stdin with `-i`. (5) `run -d --rm` and `create --rm` make an ephemeral
+instance. A foreground `--name` names the instance, after the check that no
+instance has the name (docker's refusal, exit 125); a run that did not make
+the instance does not delete it. (6) The first `GET /1.0` of each verb has
+a bound of 30 s. (7) A 404 of the delete is an instance that is not there.
+(8) `container ls|ps|rm|start|stop|logs|inspect` pass through the incus
+intercept. (9) The asks to pod-incus (the exit code of the failed wait in
+`exec_recorded` and `Attached::wait`, and a bound of each answer) are a
+COORD issue to podcrates.
+
+## Prove
+
+`cargo test -p podvm --bin podvm incus` (`attach_tests`: one table of the
+ends of a command against a stand-in incusd that speaks the websockets:
+exit 7 with stdin, exit 127 through the failed wait, a trap of the first
+signal, SIGKILL after a second; the words of a failed exec; the start of a
+command by podvm in the image). Experiment 434 clauses 28 and 30. The
+reproducers of the pass on a private incusd, on beta.38 and on the new
+binary.
+
+## Done
+
+**Done (2026-11-24).** Reproduced on beta.38 (`b6a198f3`) against a
+private root incusd 6.0.0 (`INCUS_DIR` of its own, a pool `dir`): `run --rm
+alpine:3.20 sh -c 'echo before; exit 127'`, `nosuchcmd` and `exit 126` each
+gave "incus refused the call (400, error_code 400): Command not found" (or
+"not executable") and exit 125 with no output; SIGTERM 5 s into `run --rm
+... sh -c 'echo started; sleep 60'` gave 143 with the instance RUNNING and
+no `started`; `ps --podvm-tier incus` on a socket that never answers still
+waited at 45 s; `run ... seq 1000000 | head -2` left the instance (SIGPIPE).
+With the fix, on the same incusd: `before` and 127; `podvm: exec:
+"nosuchcmd": executable file not found in $PATH` and 127; 126 with the
+output; `/etc/passwd` gives "permission denied" and 126; `--platform
+linux/arm64` gives `/bin/true: exec format error: the file is an ELF for
+aarch64, and this machine runs x86_64; ...` and 126; `-w /nonexist/deep`
+gives `/nonexist/deep`; stdout `out`, then 1 s later stderr `err`, as they
+come; SIGINT, SIGTERM and SIGHUP give "forwarded SIG... to the payload in
+the instance NAME", 130, 143 and 129, and no instance stays; a trap of
+SIGTERM that exits 0 gives 0; a command that ignores SIGTERM gets SIGKILL
+after 10 s (137), or at once after a second signal (137, 2 s); `| head -2`
+gives 141 and no instance stays; `exec -i` gives `STDIN-DATA`; `exec` of
+an instance of `run -d -e FOO=bar -w /tmp` gives `FOO=[bar] /tmp`, and
+`-e FOO=over -w /` gives `FOO=[over] /`; `exec ... exit 127` gives `x` and
+127; `exec ... nosuch` gives 127 and the line of a silent end; `container
+ls --podvm-tier incus` lists the instance; `run -d --rm --name rr1 ... echo
+x` leaves no instance; a foreground `--name e1` of a running `e1` gives the
+line of a name in use and 125 and `e1` stays; the socket that never
+answers gives the line of the bound after 30 s, exit 125.
+
+Experiment 434 (`PODVM_434_MIRROR=1`, the incusd of route A,
+`experiments/results/incus-tier.txt`): "THE INCUS TIER RUNS", each clause,
+clause 23 too. Clause 28: `before` and 127, the line of a program that is
+not there and 127, 126, `exec` 127 with its output. Clause 30: `trapped`,
+the line of the forward, 143, no instance. Clause 7: a run of `true` with
+the image in incus takes 781 ms (median of 5). `cargo test -p podvm --bin
+podvm incus`: 38 passed (`attach_tests` 3, `run_tests` 1, `verbs_tests`).
+The test totals and the size are in T-2079. The COORD issue to podcrates
+(the exit code of the failed wait in pod-incus, a bound of each answer) is
+drafted for the lead.
+
+# T-2081: Parallel first runs of one image on the incus tier race on its import
+
+**Source:** the eighth outside pass (T-2079): OR-B39-02
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+Six `podvm run --rm --podvm-tier incus busybox:1.36 ...` at once, of an
+image in the store of podvm and not yet in incusd: one run passes; the
+others end with `POST /1.0/images: incus refused the call (500): Image with
+same fingerprint already exists`, or `POST /1.0/images/aliases ... (409):
+Alias "podvm-..." already exists`, exit 125.
+
+## Premise
+
+`incus/run.rs` `ensure_image` read the alias, and imported the image where
+the alias was not there, with no lock: each run of the six read "no alias"
+and imported. The tarball of a run holds the time of its start in
+`metadata.yaml`, so two imports in one second have one fingerprint (incusd
+refuses the second: 500) and two in two seconds make two images, whose
+second alias incusd refuses (409).
+
+## Approach
+
+A lock of the import of an alias in the store of podvm, and a second look
+after a failed import.
+
+## Decision
+
+(1) `podvm_image::Store::try_lock_key` (new): an exclusive `flock` of
+`locks/KEY.key.lock`, tried once; a key holds only letters, digits and
+`-`. (2) `ensure_image` reads the alias, then takes the lock of
+`incus-ALIAS` (a pause of 200 ms between tries, one line where it waits,
+and a bound of 30 min, after which it refuses by name), reads the alias
+again, and imports only where it is still not there. A holder that ends
+frees the lock (the kernel ends the `flock`). (3) A run of another store on
+the same incusd has no common lock: after a failed import, the alias is
+read again (another podvm made it: success), and where incusd answered
+"Image with same fingerprint already exists", podvm makes the alias to the
+fingerprint of the bytes that it sent (the SHA-256 of the stream, counted
+as the writer writes it), and takes an alias that another podvm made in
+the meantime as a success. (4) The writer of the tarball blocks SIGPIPE in
+its thread: a reader that went gives EPIPE, not a SIGPIPE that ends podvm.
+
+## Prove
+
+`cargo test -p podvm --bin podvm incus` (`the_class_of_a_failed_import`: one
+table of `after_import`). Experiment 434 clause 29. Six parallel first runs
+on a private incusd, on beta.38 and on the new binary; two stores at once on
+one incusd.
+
+## Done
+
+**Done (2026-11-24).** Reproduced on beta.38 against the private incusd:
+six parallel first runs of `busybox:1.36`: one passed, five gave "incus
+refused the call (500, error_code 500): Image with same fingerprint already
+exists", exit 125. With the fix: six of six give their line and exit 0;
+five say "another podvm of this store imports the image ...; this run
+waits for it"; incusd has one image of the alias. Two stores at once on the
+same incusd (three runs each of `alpine:3.19`): six of six exit 0, one
+image. Experiment 434 clause 29: six of six exit 0 with their line, one
+image, no instance. `cargo test -p podvm --bin podvm incus`
+(`the_class_of_a_failed_import`), `cargo test -p podvm-image key_lock`
+(`a_key_lock_is_exclusive_and_takes_only_a_plain_key`). The SHA-256 of the
+stream costs one pass over the bytes of an import, in the thread of the
+writer.
+
+# T-2082: On the incus tier, an upload of the image that incusd cuts ends podvm with SIGPIPE and no line
+
+**Source:** PodUtils/podrunner#347 ask 2 (COORD-125 of podrunner, a report of a member of the team), podrunner's run `hosted-measure.yml` 45313526131, podvm 0.2.0-beta.38
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+During `podvm create --podvm-tier=incus` of a large image on a hosted
+runner (a btrfs pool that filled), incusd closed the socket during the
+upload of the image, and podvm ended with exit 141 (SIGPIPE) and no line;
+its last line was `podvm: 290 entries were not materialised (Char,
+Block)`. Ask 1 of the issue (fewer copies of the image during the import)
+is not this entry.
+
+## Premise
+
+podvm sets SIGPIPE to its default action at its start (T-1769), so a write
+to a socket that the peer closed ends the process. The upload of
+`incus/import.rs` (`pod_incus::Client::import_image`, a chunked body from a
+pipe) writes to the socket of incusd in the thread of the runtime. incusd
+6.0 writes the upload to `INCUS_DIR/images` first; where that disk is full
+it logs `Store image POST data to disk: ... no space left on device`,
+answers 500 and closes the connection. The check of T-2078 runs only where
+each driver is `dir`, so it gave no line on the btrfs pool.
+
+## Approach
+
+Reproduce on the cloud host: a second private root incusd 6.0.0 whose
+`INCUS_DIR/images` is a tmpfs of 120 MiB (made before its start), a btrfs
+pool `bt` of 300 MiB as the root disk of the default profile, and
+`golang:1.24-bookworm` (823 MiB of tree).
+
+## Decision
+
+(1) SIGPIPE is ignored while the upload runs (`space::NoSigpipe`, which
+gives back the action before it): the write gives EPIPE, and pod-incus then
+reads the answer of incusd where it sent one. (2) An import that fails with
+"no space left on device" in incusd's error, or with EPIPE or a reset of
+the connection, gets one more line for each driver: what incusd does, the
+free space of `INCUS_DIR/images` with the need of the upload, and the free
+space of the mount of the pool of the default profile where podvm can read
+it (`space::after_cut`). (3) The writer thread of the tarball already
+blocks SIGPIPE (T-2081). (4) Where incusd sends no answer before it closes,
+podvm cannot read it: the COORD draft to podcrates asks pod-incus to read
+the answer after a failed write of the body.
+
+## Prove
+
+`cargo test -p podvm --bin podvm incus`
+(`an_upload_that_incusd_cuts_gives_a_line_not_a_sigpipe`: a stand-in that
+closes the connection after the head of `POST /1.0/images`). The
+reproduction on the private incusd, on beta.38 and on the new binary.
+
+## Done
+
+**Done (2026-11-24).** On beta.38: `create --name big1 --podvm-tier incus
+golang:1.24-bookworm true` on the second incusd ended with 141 and no line;
+incusd logged `Store image POST data to disk: write
+.../images/incus_build_.../incus_post_...: no space left on device`. With
+the fix, four runs of four: `podvm create: incus tier: POST /1.0/images:
+incus refused the call (500, error_code 500): write
+.../images/incus_build_.../incus_post_...: no space left on device`; with
+the line of (2) (the last build, one run), then `incusd has no room for the upload of the image; incusd's images at
+.../images have 120.0 MiB free, and the upload needs at least 823.2 MiB;
+the storage pool `bt` at .../storage-pools/bt has 219.0 MiB free`, exit 125,
+no image and no instance left. The stand-in test pins the line of a cut
+with no answer. The test totals and the size are in T-2079.

@@ -299,6 +299,27 @@ impl Store {
         &self.root
     }
 
+    /// TODO/machine.md T-2081 (OR-B39-02): the exclusive lock of `key`,
+    /// tried once: `None` while another process holds it. The file is
+    /// `locks/KEY.key.lock`. A key holds only ASCII letters, digits and
+    /// `-` (an alias of an image of incus), at most 128 bytes; another key
+    /// is refused, so that no key names a path outside `locks/`.
+    pub fn try_lock_key(&self, key: &str) -> Result<Option<Lock>> {
+        if key.is_empty()
+            || key.len() > 128
+            || !key.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        {
+            return Err(Error::Store(format!(
+                "the lock key {key:?} holds a byte other than a letter, a digit or '-', or \
+                 is empty or longer than 128 bytes"
+            )));
+        }
+        try_lock_at(
+            &self.root.join(LOCKS).join(format!("{key}.key.lock")),
+            sys::LOCK_EX,
+        )
+    }
+
     fn index_path(&self) -> PathBuf {
         self.root.join(INDEX_FILE)
     }

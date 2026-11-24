@@ -139,6 +139,24 @@
 #      (On a full pool incusd 6.0 puts the stderr of tar, one line for each
 #      file, into its error: 108 MB for 400 000 files, over the bound of
 #      the client, measured on 2026-11-23.)
+#  28. The end of a command with 127 and 126 (T-2080, OR-B39-01 of the
+#      eighth outside pass): a run of `echo before; exit 127` gives
+#      `before` and exit 127; a program that is not there gives 127 and
+#      docker's line "executable file not found in $PATH"; `exit 126`
+#      gives 126; `exec` of `exit 127` in the instance of clause 12 gives
+#      127 (before: "incus refused the call (400): Command not found",
+#      exit 125, and no output).
+#  29. Six runs at once of an image that incusd does not have (T-2081,
+#      OR-B39-02): after clause 27 removed the image of clause 1 from
+#      incusd, six parallel runs of it each give their own line and exit 0,
+#      incusd has one image of its alias after them, and no instance stays
+#      (before: one run passed, the others "Image with same fingerprint
+#      already exists" or a 409 of the alias, exit 125).
+#  30. A signal to a run in the foreground (T-2080, OR-B39-03): SIGTERM to
+#      `run --rm` of a command that traps it reaches the command (its
+#      trap writes `trapped`), podvm says "forwarded SIGTERM to the payload
+#      in the instance", exits with the code of the command (143), and no
+#      instance stays (before: exit 143 with the instance left RUNNING).
 #
 # Exit: 0 every clause matched, 1 a clause disagreed, 2 the lane could not
 # run (not root, no user namespaces, no package).
@@ -775,6 +793,68 @@ c27 "^  stderr   podvm run: incus tier: the storage pool \`small\` at .*/storage
 c27 "^  images   0 after$" "an image was imported into a pool with no room"
 c27 "^  stays    0$" "an instance stayed"
 [ "$(grep -c '^  stderr' "$WORK/c27.txt")" -eq 1 ] || { note "27: more than one line on stderr"; fail=1; }
+
+# ---- clause 28 ----------------------------------------------------------
+{
+echo ""; echo "== 28. the end of a command with 127 and 126"
+x=$(T "$OCI" sh -c 'echo before; exit 127' </dev/null 2>/dev/null); echo "  exit 127     exit=$? $x"
+x=$(T "$OCI" nosuchcmd434 </dev/null 2>&1 | grep -v "incus tier: incusd"); echo "  not there    exit=$? $x"
+T "$OCI" nosuchcmd434 </dev/null >/dev/null 2>&1; echo "  not there rc $?"
+T "$OCI" sh -c 'exit 126' </dev/null >/dev/null 2>&1; echo "  exit 126     exit=$?"
+P run -d --name end434 --podvm-tier=incus "$OCI" sleep 300 </dev/null >/dev/null 2>&1
+x=$(P exec --podvm-tier=incus end434 sh -c 'echo in-exec; exit 127' 2>/dev/null); echo "  exec 127     exit=$? $x"
+I rm -f end434 >/dev/null 2>&1
+} >"$WORK/c28.txt" 2>&1
+cat "$WORK/c28.txt" >>"$REPORT"
+c28() { grep -Eq "$1" "$WORK/c28.txt" || { note "28: $2"; fail=1; }; }
+c28 "^  exit 127     exit=127 before$" "exit 127 did not give its output and 127"
+c28 "^  not there .*executable file not found in \\\$PATH" "no line for a program that is not there"
+c28 "^  not there rc 127$" "a program that is not there did not give 127"
+c28 "^  exit 126     exit=126$" "exit 126 did not give 126"
+c28 "^  exec 127     exit=127 in-exec$" "exec of exit 127 did not give its output and 127"
+
+# ---- clause 29 ----------------------------------------------------------
+n=1; while [ "$n" -le 6 ]; do
+	(T "$OCI" sh -c "echo par434-$n" </dev/null >"$WORK/c29.$n.out" 2>"$WORK/c29.$n.err"; echo $? >"$WORK/c29.$n.rc") &
+	n=$((n + 1))
+done
+wait
+{
+echo ""; echo "== 29. six runs at once of an image that incusd does not have"
+n=1; while [ "$n" -le 6 ]; do
+	echo "  run $n  exit=$(cat "$WORK/c29.$n.rc") $(cat "$WORK/c29.$n.out")"
+	grep -v "incus tier: incusd" "$WORK/c29.$n.err" | sed "s/^/  run $n  stderr  /"
+	n=$((n + 1))
+done
+echo "  images   $(RI image list --format csv -c f 2>/dev/null | grep -c .)"
+echo "  stays    $(RI list --format csv -c n 2>/dev/null | grep -c .)"
+} >"$WORK/c29.txt" 2>&1
+cat "$WORK/c29.txt" >>"$REPORT"
+n=1; while [ "$n" -le 6 ]; do
+	grep -q "^  run $n  exit=0 par434-$n$" "$WORK/c29.txt" || { note "29: run $n did not give its line and 0"; fail=1; }
+	n=$((n + 1))
+done
+grep -q "^  images   1$" "$WORK/c29.txt" || { note "29: not one image in incusd after the runs"; fail=1; }
+grep -q "^  stays    0$" "$WORK/c29.txt" || { note "29: an instance stayed"; fail=1; }
+
+# ---- clause 30 ----------------------------------------------------------
+(T "$OCI" sh -c 'trap "echo trapped; exit 143" TERM; echo started434; while :; do sleep 1; done' </dev/null >"$WORK/c30.out" 2>"$WORK/c30.err"; echo $? >"$WORK/c30.rc") &
+i=0; while [ "$i" -lt 60 ] && ! grep -q started434 "$WORK/c30.out" 2>/dev/null; do sleep 1; i=$((i + 1)); done
+pkill -TERM -f "^$B/podvm run --podvm-tier=incus .*started434" 2>/dev/null
+wait
+{
+echo ""; echo "== 30. a signal to a run in the foreground"
+echo "  exit     $(cat "$WORK/c30.rc" 2>/dev/null)"
+sed 's/^/  stdout   /' "$WORK/c30.out"
+grep -v "incus tier: incusd" "$WORK/c30.err" | sed 's/^/  stderr   /'
+echo "  stays    $(RI list --format csv -c n 2>/dev/null | grep -c .)"
+} >"$WORK/c30.txt" 2>&1
+cat "$WORK/c30.txt" >>"$REPORT"
+c30() { grep -Eq "$1" "$WORK/c30.txt" || { note "30: $2"; fail=1; }; }
+c30 "^  exit     143$" "podvm did not exit with the code of the command"
+c30 "^  stdout   trapped$" "the command did not get the signal"
+c30 "^  stderr   podvm run: forwarded SIGTERM to the payload in the instance podvm-" "no line that names the forward"
+c30 "^  stays    0$" "the instance stayed"
 
 # ---- clause 9 -----------------------------------------------------------
 left_i=$(RI list --format csv -c n 2>&1 | grep -c .)

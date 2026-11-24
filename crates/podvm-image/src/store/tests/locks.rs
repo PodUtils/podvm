@@ -467,3 +467,30 @@ fn fd_of(path: &Path) -> i64 {
     );
     found[0]
 }
+
+/// TODO/machine.md T-2081 (OR-B39-02): the lock of a key is exclusive while
+/// it is held, free after, and a key that could name another path is
+/// refused.
+#[test]
+fn a_key_lock_is_exclusive_and_takes_only_a_plain_key() {
+    let _serialised = STORE_TESTS.lock().unwrap_or_else(|e| e.into_inner());
+    let s = scratch("keylock");
+    let held = s.try_lock_key("incus-podvm-ab12-v3").unwrap();
+    assert!(held.is_some(), "the first try takes it");
+    assert!(
+        s.try_lock_key("incus-podvm-ab12-v3").unwrap().is_none(),
+        "a second holder waits"
+    );
+    assert!(
+        s.try_lock_key("incus-other").unwrap().is_some(),
+        "another key is free"
+    );
+    drop(held);
+    assert!(
+        s.try_lock_key("incus-podvm-ab12-v3").unwrap().is_some(),
+        "free after the drop"
+    );
+    for bad in ["", "../x", "a/b", "a b", "\u{e9}", &"a".repeat(129)] {
+        assert!(s.try_lock_key(bad).is_err(), "{bad:?}");
+    }
+}

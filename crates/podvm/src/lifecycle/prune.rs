@@ -25,6 +25,19 @@ usage: podvm container ls | ps | rm | prune | start | stop | restart | kill | wa
 /// `podvm container SUBVERB ...`: each subverb is the top-level verb.
 pub fn container_group(args: &[String]) -> i32 {
     let rest = if args.len() > 1 { &args[1..] } else { &[] };
+    // TODO/machine.md T-2080 (OR-B39-18): the verbs of an instance of incus
+    // take `--podvm-tier incus` here as at the top.
+    let verb = match args.first().map(String::as_str) {
+        Some("ls" | "list" | "ps") => Some("ps"),
+        Some("rm" | "remove") => Some("rm"),
+        v @ Some("start" | "stop" | "logs" | "inspect") => v,
+        _ => None,
+    };
+    if verb.is_some()
+        && let Some(code) = crate::incus::intercept(verb, rest)
+    {
+        return code;
+    }
     match args.first().map(String::as_str) {
         Some("prune") => prune(rest),
         Some("ls" | "list" | "ps") => ps(rest),

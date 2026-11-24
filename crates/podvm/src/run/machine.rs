@@ -437,7 +437,14 @@ pub(super) fn incus_tier(
             image: o.image.clone().unwrap_or_default(),
             stdin: o.interactive,
             init_image: o.init_image, // T-1993
+            rm: o.rm,                 // T-2080
         }),
+        // TODO/machine.md T-2080: the import of the image takes a lock of
+        // the store, and `--name` names an instance in the foreground.
+        store: Some(store),
+        name: (verb == "run" && !o.detach)
+            .then(|| o.name.clone())
+            .flatten(),
         // TODO/machine.md T-1779: no NIC, and the channel as a proxy device.
         net_none: o.net_none,
         channel: o.channel.clone(),

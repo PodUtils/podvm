@@ -29,6 +29,36 @@ They describe their recorded revision, not the current build.
   the only line was "the response body is larger than allowed" (T-2078,
   PodUtils/podrunner#346).
 
+- On the incus tier, a command that ends with 126 or 127 gives its exit
+  code and its output; before, `run` and `exec` gave "incus refused the
+  call (400): Command not found", exit 125, and lost the output. A program
+  that is not there gives docker's line "executable file not found in
+  $PATH" and 127; an image of another architecture names both
+  architectures (T-2080).
+- On the incus tier, a SIGINT, SIGTERM or SIGHUP to a foreground `run` goes
+  to the command ("forwarded SIGTERM to the payload in the instance"); a
+  second signal or 10 s with no end sends SIGKILL, and the instance of the
+  run is deleted. Before, podvm ended and the instance stayed running
+  (T-2080).
+- On the incus tier, a foreground `run` gives stdout and stderr as they
+  come; `exec -i` gives stdin to the command, and `exec` has the
+  environment and the working directory of the run; `run -w DIR` makes a
+  missing DIR, as docker does; `run -d --rm` removes the instance when it
+  stops; a foreground `--name` names the instance and refuses a name in use;
+  the first call to an incusd that does not answer ends after 30 s;
+  `container ls --podvm-tier incus` works as `ps` (T-2080).
+- On the incus tier, parallel first runs of one image import it once: a run
+  waits for the import of another run of the store, and a race with another
+  store ends in the image that is there. Before, all runs but one ended with
+  "Image with same fingerprint already exists" or a 409 of the alias
+  (T-2081).
+
+- On the incus tier, an import that incusd cuts (a full disk) gives
+  incusd's error ("no space left on device") and the free space of incusd's
+  images and of the pool with the need of the image, for each driver;
+  before, podvm ended with SIGPIPE (exit 141) and no line (T-2082,
+  PodUtils/podrunner#347).
+
 ## 0.2.0-beta.38 (2026-11-23)
 
 ### Known gaps: what the checks of 0.2.0-beta.38 prove, and what stays open, 2026-11-23

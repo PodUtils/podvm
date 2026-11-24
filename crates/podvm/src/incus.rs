@@ -2,8 +2,12 @@
 //! `docs/incus.md`: podvm drives an incusd over its REST API on a unix
 //! socket. `--podvm-tier=incus` selects it for `run`.
 
+pub(crate) mod attach; // TODO/machine.md T-2080
 pub(crate) mod config;
+pub(crate) mod exec; // TODO/machine.md T-2080
+pub(crate) mod guest_exec; // TODO/machine.md T-2080
 pub(crate) mod image;
+pub(crate) mod import; // TODO/machine.md T-2081
 pub(crate) mod inspect;
 pub(crate) mod logs; // TODO/cli.md T-2046
 pub(crate) mod net;
@@ -16,7 +20,11 @@ pub(crate) mod verbs;
 mod xattrs; // TODO/machine.md T-1999
 
 #[cfg(test)]
+mod attach_tests; // TODO/machine.md T-2080
+#[cfg(test)]
 mod oom_tests; // TODO/machine.md T-2077
+#[cfg(test)]
+mod run_tests; // TODO/machine.md T-2080
 #[cfg(test)]
 mod space_tests; // TODO/machine.md T-2078
 #[cfg(test)]

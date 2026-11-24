@@ -1,17 +1,13 @@
-//! TODO/machine.md T-1718: the HTTP parse, the image form, the command
-//! form, and one `run` against a stand-in incusd on a unix socket.
+//! TODO/machine.md T-1718: the HTTP parse, the image form and the command
+//! form; one `run` against a stand-in incusd is in `run_tests`.
 
-use std::io::{Read, Write};
-use std::os::unix::net::UnixListener;
+use std::io::Read;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-
-use serde_json::{json, Value};
 
 use super::image::{alias, intended, unified_tarball, IMAGE_FORMAT};
-use super::run::{command, env_map, Job};
+use super::run::env_map;
 
-fn scratch(name: &str) -> PathBuf {
+pub(super) fn scratch(name: &str) -> PathBuf {
     let d = std::env::temp_dir().join(format!("podvm-t1718-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&d);
     std::fs::create_dir_all(&d).unwrap();
@@ -33,12 +29,13 @@ fn the_alias_names_the_digest_and_the_format() {
 
 #[test]
 fn the_command_and_the_environment_take_the_incus_form() {
+    // TODO/machine.md T-2080: podvm in the image starts the argv, apart and
+    // unquoted, in the working directory of the run.
     let argv = vec!["cat".to_string(), "a b".to_string()];
-    assert_eq!(command(&argv, false), argv);
-    let with = command(&argv, true);
-    assert_eq!(with[0], "/bin/sh");
+    let with = super::guest_exec::wrap(&argv, "/w");
+    assert_eq!(with[0], "/.podvm/podvm");
     assert_eq!(
-        &with[4..],
+        &with[5..],
         argv.as_slice(),
         "the argv stays apart, unquoted"
     );
@@ -117,10 +114,16 @@ fn the_unified_tarball_carries_the_metadata_and_the_intended_owners() {
     let _ = std::fs::remove_dir_all(&d);
 }
 
-/// One request the stand-in got: the method, the path, and the body.
-type Seen = Arc<Mutex<Vec<(String, String, Vec<u8>)>>>;
-
 pub(super) fn read_request(s: &mut std::os::unix::net::UnixStream) -> (String, String, Vec<u8>) {
+    let (_, m, p, b) = read_request_head(s);
+    (m, p, b)
+}
+
+/// [`read_request`] with the head of the request (TODO/machine.md T-2080:
+/// the key of a websocket).
+pub(super) fn read_request_head(
+    s: &mut std::os::unix::net::UnixStream,
+) -> (String, String, String, Vec<u8>) {
     let mut raw = Vec::new();
     let mut b = [0u8; 65536];
     let end = loop {
@@ -166,7 +169,7 @@ pub(super) fn read_request(s: &mut std::os::unix::net::UnixStream) -> (String, S
             .unwrap()
             .replace("%2F", "/")
             .replace("%2f", "/");
-        return (method, path, body);
+        return (head, method, path, body);
     }
     while raw.len() < end + 4 + len {
         let n = s.read(&mut b).unwrap();
@@ -181,202 +184,8 @@ pub(super) fn read_request(s: &mut std::os::unix::net::UnixStream) -> (String, S
         .unwrap()
         .replace("%2F", "/")
         .replace("%2f", "/");
-    (method, path, raw[end + 4..end + 4 + len].to_vec())
-}
-
-/// The answer of the stand-in: a sync envelope, an async one, an error,
-/// or raw bytes (chunked, as incus sends a log).
-fn answer(method: &str, path: &str, inst: &str) -> (u16, Vec<u8>, bool) {
-    let sync = |m: Value| {
-        (
-            200,
-            json!({"type": "sync", "metadata": m})
-                .to_string()
-                .into_bytes(),
-            false,
-        )
-    };
-    let op = |id: &str| {
-        let v =
-            json!({"type": "async", "operation": format!("/1.0/operations/{id}"), "metadata": {}});
-        (202, v.to_string().into_bytes(), false)
-    };
-    let done = |m: Value| sync(json!({"status_code": 200, "metadata": m}));
-    let log = format!("/1.0/instances/{inst}/logs/exec-output/exec_1");
-    match (method, path) {
-        ("GET", "/1.0") => sync(json!({
-            "api_extensions": pod_incus::NEEDED,
-            "api_status": "stable",
-            "api_version": "1.0",
-            "auth": "trusted",
-            "public": false,
-            "auth_methods": [],
-            "config": {},
-            "environment": {"server_version": "6.0.0", "driver": "lxc", "server": "incus"},
-        })),
-        ("GET", p) if p.starts_with("/1.0/images/aliases/") => (
-            404,
-            br#"{"type":"error","error":"not found","error_code":404}"#.to_vec(),
-            false,
-        ),
-        ("POST", p) if p.starts_with("/1.0/images/aliases") => sync(json!({})),
-        ("POST", "/1.0/images") => op("import"),
-        ("GET", p) if p.starts_with("/1.0/operations/import/wait") => {
-            done(json!({"fingerprint": "f00d", "size": 1}))
-        }
-        ("POST", "/1.0/instances") => op("create"),
-        ("POST", p) if p.ends_with("/exec") => op("exec"),
-        ("GET", p) if p.starts_with("/1.0/operations/exec/wait") => done(json!({
-            "return": 7,
-            "output": {"1": format!("{log}.stdout"), "2": format!("{log}.stderr")},
-        })),
-        ("GET", p) if p.ends_with(".stdout") => (200, b"5\r\nhello\r\n0\r\n\r\n".to_vec(), true),
-        ("GET", p) if p.ends_with(".stderr") => (200, b"0\r\n\r\n".to_vec(), true),
-        ("DELETE", p) if p.contains("/logs/") => sync(json!({})),
-        ("GET", p) if p.starts_with("/1.0/operations/") => done(json!({})),
-        ("PUT", _) | ("DELETE", _) => op("state"),
-        _ => sync(json!({})),
-    }
-}
-
-fn stand_in(sock: &std::path::Path) -> Seen {
-    let l = UnixListener::bind(sock).unwrap();
-    let seen: Seen = Arc::default();
-    let log = seen.clone();
-    std::thread::spawn(move || {
-        let mut inst = String::new();
-        for s in l.incoming() {
-            let mut s = s.unwrap();
-            let (m, p, body) = read_request(&mut s);
-            if m == "POST" && p.ends_with("/exec") {
-                inst = p
-                    .trim_start_matches("/1.0/instances/")
-                    .trim_end_matches("/exec")
-                    .to_string();
-            }
-            let (status, out, chunked) = answer(&m, &p, &inst);
-            log.lock().unwrap().push((m, p, body));
-            let te = if chunked {
-                "Transfer-Encoding: chunked\r\n"
-            } else {
-                ""
-            };
-            let head = format!("HTTP/1.1 {status} X\r\n{te}Connection: close\r\n\r\n");
-            let _ = s.write_all(head.as_bytes());
-            let _ = s.write_all(&out);
-        }
-    });
-    seen
-}
-
-#[test]
-fn a_run_imports_creates_pushes_starts_execs_and_deletes() {
-    let d = scratch("run");
-    std::fs::create_dir_all(d.join("root/bin")).unwrap();
-    std::fs::write(d.join("root/bin/sh"), b"#!sh").unwrap();
-    let sd = crate::test_socket::SocketDir::new("t1718");
-    let sock = sd.join("unix.socket");
-    let seen = stand_in(&sock);
-    // SAFETY: only this test reads PODVM_INCUS_SOCKET.
-    unsafe { std::env::set_var("PODVM_INCUS_SOCKET", &sock) };
-    let code = super::run::run(&Job {
-        verb: "run",
-        rootfs: &d.join("root"),
-        digest: "sha256:00112233445566778899",
-        argv: vec!["echo".into(), "hello".into()],
-        env: vec!["PATH=/bin".into()],
-        workdir: "/".into(),
-        stdin: Some(b"in".to_vec()),
-        limits: vec![("limits.processes", "64".into())],
-        volumes: vec![
-            ("/h/ws".into(), "/workspace".into(), false),
-            ("/h/cfg".into(), "/cfg".into(), true),
-        ],
-        detach: None,
-        net_none: false,
-        channel: None,
-    });
-    unsafe { std::env::remove_var("PODVM_INCUS_SOCKET") };
-    assert_eq!(code, 7, "the exit code of the command");
-    let seen = seen.lock().unwrap().clone();
-    let calls: Vec<String> = seen.iter().map(|(m, p, _)| format!("{m} {p}|")).collect();
-    let at = |want: &str| {
-        calls
-            .iter()
-            .position(|c| c.starts_with(want))
-            .unwrap_or_else(|| panic!("{want} in {calls:#?}"))
-    };
-    let order = [
-        "POST /1.0/images",
-        "POST /1.0/images/aliases",
-        "POST /1.0/instances|",
-        "POST /1.0/instances/podvm-",
-        "PUT /1.0/instances/podvm-",
-        "DELETE /1.0/instances/podvm-",
-    ];
-    let pos: Vec<usize> = order.iter().map(|w| at(w)).collect();
-    assert!(pos.windows(2).all(|w| w[0] < w[1]), "{calls:#?}");
-    let body = |want: &str| -> Value {
-        let (_, _, b) = &seen[at(want)];
-        serde_json::from_slice(b).unwrap()
-    };
-    let create = body("POST /1.0/instances|");
-    assert_eq!(
-        create["config"]["raw.lxc"],
-        "lxc.init.cmd = /.podvm/podvm guest-hold"
-    );
-    // TODO/machine.md T-1897: a limit of the run is a key of the instance.
-    assert_eq!(create["config"]["limits.processes"], "64");
-    assert_eq!(body("POST /1.0/images/aliases")["target"], "f00d");
-    // TODO/machine.md T-1722: each -v is a disk device; :ro is read-only.
-    assert_eq!(
-        create["devices"],
-        json!({
-            "podvm-vol0": {"type": "disk", "source": "/h/ws", "path": "/workspace"},
-            "podvm-vol1": {"type": "disk", "source": "/h/cfg", "path": "/cfg", "readonly": "true"}
-        })
-    );
-    let exec = seen
-        .iter()
-        .find(|(m, p, _)| m == "POST" && p.ends_with("/exec"))
-        .map(|(_, _, b)| serde_json::from_slice::<Value>(b).unwrap())
-        .unwrap();
-    assert_eq!(
-        exec["command"],
-        json!([
-            "/bin/sh",
-            "-c",
-            "exec \"$@\" </.podvm/stdin",
-            "sh",
-            "echo",
-            "hello"
-        ])
-    );
-    assert_eq!(exec["environment"], json!({"PATH": "/bin"}));
-    assert_eq!(exec["record-output"], true);
-    assert!(
-        calls
-            .iter()
-            .any(|c| c.ends_with("files?path=/.podvm/stdin|")),
-        "{calls:#?}"
-    );
-    // TODO/machine.md T-1722: podvm is in the image, not pushed for a run.
-    assert!(
-        !calls
-            .iter()
-            .any(|c| c.ends_with("files?path=/.podvm/podvm|")),
-        "{calls:#?}"
-    );
-    let stdin = seen
-        .iter()
-        .find(|(_, p, _)| p.ends_with("path=/.podvm/stdin"))
-        .unwrap();
-    assert_eq!(stdin.2, b"in");
-    let tars = std::fs::read_dir(d.join("incus"))
-        .map(|r| r.count())
-        .unwrap_or(0);
-    assert_eq!(tars, 0, "the tarball of the import goes");
-    let _ = std::fs::remove_dir_all(&d);
+    let body = raw[end + 4..end + 4 + len].to_vec();
+    (head, method, path, body)
 }
 
 /// TODO/machine.md T-1722: the flag of the tier on a verb of an instance.
@@ -497,4 +306,36 @@ fn the_tarball_reads_a_file_and_a_directory_of_mode_0000() {
         std::fs::set_permissions(r.join(p), std::fs::Permissions::from_mode(0o700)).unwrap();
     }
     let _ = std::fs::remove_dir_all(&d);
+}
+
+/// TODO/machine.md T-2081 (OR-B39-02): the class of a failed import of an
+/// image, after a second look at its alias.
+#[test]
+fn the_class_of_a_failed_import() {
+    use super::import::{after_import, AfterImport, SAME_FINGERPRINT};
+    let same = format!("Failed: {SAME_FINGERPRINT}");
+    for (alias_there, words, fp, want) in [
+        (true, "anything", None, AfterImport::Aliased),
+        (true, same.as_str(), Some("ab"), AfterImport::Aliased),
+        (
+            false,
+            same.as_str(),
+            Some("ab"),
+            AfterImport::Alias("ab".into()),
+        ),
+        // The writer did not end: no fingerprint to name.
+        (false, same.as_str(), None, AfterImport::Failed),
+        (
+            false,
+            "run out of disk space",
+            Some("ab"),
+            AfterImport::Failed,
+        ),
+    ] {
+        assert_eq!(
+            after_import(alias_there, words, fp),
+            want,
+            "{alias_there} {words}"
+        );
+    }
 }

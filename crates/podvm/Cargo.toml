@@ -57,7 +57,7 @@ pod-hostprobe = { git = "https://github.com/PodUtils/podcrates", tag = "v0.82.0"
 # `--podvm-volume-base` with no symbolic link (`userns/host.rs`).
 pod-beneath = { git = "https://github.com/PodUtils/podcrates", tag = "v0.82.0" }
 pod-core = { git = "https://github.com/PodUtils/podcrates", tag = "v0.82.0", default-features = false, features = ["async"] }
-tokio = { version = "1", default-features = false, features = ["rt", "fs", "net", "io-util", "time"] }
+tokio = { version = "1", default-features = false, features = ["rt", "fs", "net", "io-util", "time", "macros"] }
 podvm-supervise = { path = "../podvm-supervise" }
 # ⭐ TODO/milestones.md T-1112. The disposable Windows guest. Its own crate
 # because the whole guest side is `cmd.exe` and a FAT mailbox and none of it

@@ -129,6 +129,7 @@ fn main() -> std::process::ExitCode {
         Some("guest-net") => exit(machine::guest::net::main(rest)), // in a guest, T-1656
         Some("guest-channel") => exit(machine::guest::channel::guest_main(rest)), // T-1751
         Some("guest-hold") => exit(incus::hold(rest)),              // an incus init, T-1718
+        Some(incus::guest_exec::VERB) => exit(incus::guest_exec::main(rest)), // T-2080
         Some(initns::VERB) => exit(initns::main(rest)),             // an init of the image, T-2002
         Some("guest-9p") => exit(machine::guest::vol::main(rest)),  // in a guest, T-1723
         Some("guest-job") => exit(machine::guest::job::guest_main(rest)), // in a guest, T-2008

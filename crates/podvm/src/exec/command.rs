@@ -70,7 +70,13 @@ pub fn exec(args: &[String]) -> i32 {
             return podvm_enter::EXIT_RUNTIME_ERROR;
         }
         let name = o.image.clone().unwrap_or_default();
-        return crate::incus::verbs::exec(&name, &o.command, &o.env, o.workdir.as_deref());
+        return crate::incus::exec::exec(
+            &name,
+            &o.command,
+            &o.env,
+            o.workdir.as_deref(),
+            o.interactive, // T-2080
+        );
     }
     if matches!(
         tier,

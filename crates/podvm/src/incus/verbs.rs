@@ -16,7 +16,7 @@
 
 use std::io::Write;
 
-use pod_incus::{Client, Exec, FileWrite, NewInstance, Payload, Settings, Source};
+use pod_incus::{Client, FileWrite, NewInstance, Payload, Settings, Source};
 use podvm_image::error::EXIT_RUNTIME_ERROR;
 
 use super::run::{job_devices, socket_path, Job};
@@ -38,6 +38,9 @@ pub struct Detach {
     pub stdin: bool,
     /// `--podvm-init=image`: the init of the image is PID 1 (T-1993).
     pub init_image: bool,
+    /// `--rm` (TODO/machine.md T-2080, OR-B39-07): an ephemeral instance,
+    /// which incusd removes when it stops.
+    pub rm: bool,
 }
 
 /// The arguments without `--podvm-tier=incus` (or `--podvm-tier incus`),
@@ -68,6 +71,28 @@ pub fn valid_name(n: &str) -> bool {
         && n.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
 }
 
+/// TODO/machine.md T-2080 (OR-B39-10): the bound of the first answer of
+/// incusd. A socket that takes the connection and never answers held
+/// podvm with no bound (90 s and more); each later call of the run has
+/// the bound of its own wait.
+pub const FIRST_ANSWER: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// `GET /1.0` within [`FIRST_ANSWER`].
+pub(crate) async fn first_answer(
+    c: &Client,
+    sock: &std::path::Path,
+) -> Result<pod_incus::Server, String> {
+    match tokio::time::timeout(FIRST_ANSWER, c.server()).await {
+        Ok(r) => r.map_err(|e| e.to_string()),
+        Err(_) => Err(format!(
+            "the socket {} took the connection and gave no answer to GET /1.0 within {} s: \
+             incusd hangs, or another program holds the socket (TODO/machine.md T-2080)",
+            sock.display(),
+            FIRST_ANSWER.as_secs()
+        )),
+    }
+}
+
 /// A client of the incusd of [`socket_path`], checked.
 pub(crate) async fn connect() -> Result<(Client, String), String> {
     let sock = socket_path();
@@ -81,7 +106,7 @@ pub(crate) async fn connect() -> Result<(Client, String), String> {
     let mut settings = Settings::new(sock.clone());
     settings.user_agent = format!("podvm/{}", env!("CARGO_PKG_VERSION"));
     let c = Client::new(settings);
-    let server = c.server().await.map_err(|e| e.to_string())?;
+    let server = first_answer(&c, &sock).await?;
     server.check().map_err(|e| e.to_string())?;
     Ok((c, server.environment.server_version.clone()))
 }
@@ -123,6 +148,7 @@ pub(super) async fn detached(c: &Client, job: &Job<'_>, image: &str, d: &Detach)
     };
     let mut new = NewInstance::container(&name, Source::Alias(image.to_string()));
     new.devices = job_devices(job);
+    new.ephemeral = d.rm; // T-2080
     if let Err(e) = super::run::apply_limits(c, &mut new, &job.limits).await {
         return fail(e); // T-1897, T-1964
     }
@@ -185,20 +211,20 @@ pub(super) async fn detached(c: &Client, job: &Job<'_>, image: &str, d: &Detach)
     {
         // TODO/machine.md T-1846: a failed start leaves no instance.
         let left = discard(c, &name).await;
-        return fail(format!("{e}{left}"));
+        return fail(with_left(e, &left));
     }
     if d.start
         && let Err(e) = super::run::size_held(c, &name, &job.limits).await
     {
         let left = discard(c, &name).await;
-        return fail(format!("{e}{left}"));
+        return fail(with_left(e, &left));
     }
     if d.start
         && d.init_image
         && let Err(e) = super::systemd::boot_then_run(c, &name).await
     {
         let left = discard(c, &name).await;
-        return fail(format!("{e}{left}"));
+        return fail(with_left(e, &left));
     }
     println!("{name}");
     0
@@ -392,60 +418,33 @@ pub(super) async fn one(c: &Client, verb: &str, name: &str, force: bool) -> Resu
     Ok(())
 }
 
-/// `exec --podvm-tier=incus NAME CMD...`: the command in the instance, its
-/// output and its exit code.
-pub fn exec(name: &str, argv: &[String], env: &[String], cwd: Option<&str>) -> i32 {
-    block_on("exec", async move {
-        let c = match connect().await {
-            Ok((c, _)) => c,
-            Err(e) => {
-                eprintln!("podvm exec: incus tier: {e}");
-                return EXIT_RUNTIME_ERROR;
-            }
-        };
-        match c.instance(name).await {
-            Ok(i) if ours(&i) && i.status == "Running" => {}
-            Ok(i) if ours(&i) => {
-                eprintln!("podvm exec: {name}: the instance is {}", i.status);
-                return EXIT_RUNTIME_ERROR;
-            }
-            Ok(_) => {
-                eprintln!("podvm exec: {name}: not an instance of podvm");
-                return EXIT_RUNTIME_ERROR;
-            }
-            Err(e) => {
-                eprintln!("podvm exec: {name}: {e}");
-                return EXIT_RUNTIME_ERROR;
-            }
-        }
-        let mut x = Exec::new(argv.to_vec());
-        x.environment = super::run::env_map(env);
-        x.cwd = cwd.unwrap_or("").to_string();
-        match c.exec_recorded(name, &x).await {
-            Ok(o) => {
-                let _ = std::io::stdout().write_all(&o.stdout);
-                let _ = std::io::stdout().flush();
-                let _ = std::io::stderr().write_all(&o.stderr);
-                o.exit_code
-            }
-            Err(e) => {
-                eprintln!("podvm exec: {name}: {e}");
-                EXIT_RUNTIME_ERROR
-            }
-        }
-    })
-}
-
 /// TODO/machine.md T-1846: stop and delete an instance after a failure.
 /// Empty where it went; else the text that names the instance that stays.
+/// A 404 of the delete (TODO/machine.md T-2080, OR-B39-12) is an instance
+/// that is not there: nothing stays.
 pub(super) async fn discard(c: &Client, name: &str) -> String {
     let _ = c
         .stop(name, true, Some(std::time::Duration::from_secs(10)))
         .await;
     match c.delete_instance(name).await {
         Ok(_) => String::new(),
+        Err(e) if gone(&e) => String::new(),
         Err(e) => {
-            format!("; the instance {name} stays ({e}): `incus delete --force {name}` removes it")
+            format!("the instance {name} stays ({e}): `incus delete --force {name}` removes it")
         }
+    }
+}
+
+/// An error of incusd that says that the instance is not there.
+pub(crate) fn gone(e: &pod_incus::Error) -> bool {
+    e.status() == Some(404)
+}
+
+/// The error `e` and the text of [`discard`], where one stays.
+pub(super) fn with_left(e: impl std::fmt::Display, left: &str) -> String {
+    if left.is_empty() {
+        e.to_string()
+    } else {
+        format!("{e}; {left}")
     }
 }

@@ -9,8 +9,10 @@
 //! 2. The instance: from that alias, with podvm itself as its init
 //!    (`lxc.init.cmd = /.podvm/podvm guest-hold`), so an image with no
 //!    `sleep` and no shell still starts.
-//! 3. The command: the exec API with `record-output`, so stdout and stderr
-//!    come back apart with the exit code. Piped stdin goes in as a file.
+//! 3. The command: the exec API with its websockets ([`super::attach`],
+//!    TODO/machine.md T-2080): stdout and stderr come apart as they come,
+//!    piped stdin goes in, a signal goes to the command, and podvm in the
+//!    image starts it ([`super::guest_exec`]).
 //! 4. The end: the instance is deleted, as under `--rm`.
 //!
 //! A `-v HOST:GUEST[:ro]` is a `disk` device of the instance
@@ -20,15 +22,10 @@
 //! The command is not PID 1 here (the hold is); the parity note says so.
 
 use std::collections::BTreeMap;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use pod_incus::{
-    Client, Exec, FileWrite, ImageData, ImageImport, NewInstance, Payload, Settings, Source,
-};
+use pod_incus::{Client, Exec, NewInstance, Settings, Source};
 use podvm_image::error::EXIT_RUNTIME_ERROR;
-
-use super::image::{alias, unified_tarball_to};
 
 pub struct Job<'a> {
     pub verb: &'a str,
@@ -48,6 +45,11 @@ pub struct Job<'a> {
     /// `--podvm-net none` and `--podvm-channel` ([`super::net`], T-1779).
     pub net_none: bool,
     pub channel: Option<(PathBuf, u16)>,
+    /// The store of the image: the lock of its import (T-2081).
+    pub store: Option<&'a podvm_image::Store>,
+    /// `--name` of a run in the foreground: the name of its instance
+    /// (TODO/machine.md T-2080, OR-B39-07).
+    pub name: Option<String>,
 }
 
 /// The limits of `job` on `new`: each key goes into the configuration,
@@ -218,85 +220,12 @@ pub fn socket_path() -> PathBuf {
 /// names more of the cause.
 pub(super) type Fault = (String, Option<String>);
 
-/// The alias of the image in incus: imported now where it is not there.
-/// Before an import (TODO/machine.md T-2078, PodUtils/podrunner#346), the
-/// need of the image is compared with the free space of the pool of the
-/// default profile and of incusd's images, where the server's pools are of
-/// the driver `dir`: a refusal by name where it cannot fit, a warning where
-/// it fits below the estimate. `storage` is the `environment.storage` of
-/// the server.
-async fn ensure_image(c: &Client, job: &Job<'_>, storage: &str) -> Result<(String, bool), Fault> {
-    let me = std::fs::read("/proc/self/exe").map_err(|e| (format!("/proc/self/exe: {e}"), None))?;
-    let name = alias(job.digest, &crate::machine::guest::kernel::sha256_hex(&me));
-    if c.alias(&name)
-        .await
-        .map_err(|e| (e.to_string(), None))?
-        .is_some()
-    {
-        return Ok((name, true));
-    }
-    if let Some(t) = super::space::Target::find(c, storage).await {
-        let need = super::space::need_of(job.rootfs, me.len() as u64);
-        for w in t.check(need, true).map_err(|e| (e, None))? {
-            eprintln!("podvm {}: incus tier: {w}", job.verb);
-        }
-    }
-    // TODO/machine.md T-1997 (PodUtils/podrunner#316): the tarball goes to
-    // incusd through a pipe, in chunks, as a thread writes it: no tarball
-    // file in the store beside the tree and the image of incusd.
-    let (r, w) = std::io::pipe().map_err(|e| (format!("a pipe for the import: {e}"), None))?;
-    let rootfs = job.rootfs.to_path_buf();
-    let writer = std::thread::spawn(move || unified_tarball_to(&rootfs, w, &me));
-    let reader = tokio::fs::File::from_std(std::fs::File::from(std::os::fd::OwnedFd::from(r)));
-    let mut import = ImageImport::new(ImageData::Unified(Payload::new(reader, None)));
-    import.aliases = vec![name.clone()];
-    let done = c.import_image(import).await;
-    // The writer ends at the end of the tree, or with EPIPE where incusd
-    // stopped reading; incusd's own error is the one that names the cause.
-    let wrote = writer
-        .join()
-        .unwrap_or_else(|_| Err("the writer of the tarball ended with a panic".into()));
-    if let Err(e) = done {
-        let t = super::space::transport(&e);
-        return Err((
-            e.to_string(),
-            super::space::after_failure(c, job.rootfs, true, t).await,
-        ));
-    }
-    wrote.map_err(|e| (e, None))?;
-    Ok((name, false))
-}
-
-/// A file or a directory in the instance, owned by 0 with `mode`.
-fn owned(mut w: FileWrite, mode: u32) -> FileWrite {
-    w.uid = Some(0);
-    w.gid = Some(0);
-    w.mode = Some(mode);
-    w
-}
-
 /// The environment as incus takes it.
 pub fn env_map(env: &[String]) -> BTreeMap<String, String> {
     env.iter()
         .filter_map(|e| e.split_once('='))
         .map(|(k, v)| (k.to_string(), v.to_string()))
         .collect()
-}
-
-/// The command as it runs: the argv, or, with stdin, through `/bin/sh`
-/// with the stdin file.
-pub fn command(argv: &[String], stdin: bool) -> Vec<String> {
-    if !stdin {
-        return argv.to_vec();
-    }
-    let mut v = vec![
-        "/bin/sh".to_string(),
-        "-c".to_string(),
-        "exec \"$@\" </.podvm/stdin".to_string(),
-        "sh".to_string(),
-    ];
-    v.extend(argv.iter().cloned());
-    v
 }
 
 pub fn run(job: &Job) -> i32 {
@@ -337,44 +266,88 @@ async fn run_async(job: &Job<'_>, sock: PathBuf) -> i32 {
         eprintln!("podvm {}: incus tier: {e}", job.verb);
         EXIT_RUNTIME_ERROR
     };
+    // TODO/machine.md T-2080 (OR-B39-07): `--name` of a run in the
+    // foreground names its instance; a name that incus does not take is
+    // refused before each call.
+    if let (None, Some(n)) = (&job.detach, &job.name)
+        && !super::verbs::valid_name(n)
+    {
+        eprintln!(
+            "podvm {}: --name {n:?}: incus takes a letter first, then letters, digits \
+             and '-', at most 63 (TODO/machine.md T-1722)",
+            job.verb
+        );
+        return podvm_image::error::EXIT_FLAG_ERROR;
+    }
+    // TODO/machine.md T-2080 (OR-B39-03): the signals of a run in the
+    // foreground go to its command; blocked here, before each thread of the
+    // run starts. Before the instance exists, a signal ends podvm.
+    let mut sig = (job.detach.is_none()).then(|| super::attach::Signals::open(job.verb));
     let mut settings = Settings::new(sock.clone());
     settings.user_agent = format!("podvm/{}", env!("CARGO_PKG_VERSION"));
     let c = Client::new(settings);
-    let server = match c.server().await {
-        Ok(s) => s,
-        Err(e) => return fail(e.to_string()),
+    let prepare = async {
+        let server = super::verbs::first_answer(&c, &sock)
+            .await
+            .map_err(|e| (e, None))?;
+        server.check().map_err(|e| (e.to_string(), None))?;
+        let (image, cached) =
+            super::import::ensure_image(&c, job, &server.environment.storage).await?;
+        Ok::<_, Fault>((server.environment.server_version, image, cached))
     };
-    if let Err(e) = server.check() {
-        return fail(e.to_string());
-    }
-    let (image, cached) = match ensure_image(&c, job, &server.environment.storage).await {
-        Ok(a) => a,
+    let prepared = match sig.as_mut() {
+        Some(sig) => tokio::select! {
+            r = prepare => r,
+            s = sig.next() => return super::attach::before_command(job.verb, s),
+        },
+        None => prepare.await,
+    };
+    let (version, image, cached) = match prepared {
+        Ok(p) => p,
         Err(f) => return fail_twice(job.verb, f),
     };
     eprintln!(
-        "podvm {}: incus tier: incusd {} at {}, image {image} {} (TODO/machine.md T-1718)",
+        "podvm {}: incus tier: incusd {version} at {}, image {image} {} (TODO/machine.md T-1718)",
         job.verb,
-        server.environment.server_version,
         sock.display(),
         if cached { "from incus" } else { "imported now" }
     );
-    if let Some(d) = &job.detach {
-        return super::verbs::detached(&c, job, &image, d).await;
-    }
-    let nonce =
-        crate::machine::guest::init::nonce().unwrap_or_else(|_| format!("{}", std::process::id()));
-    let inst = format!("podvm-{}", &nonce[..nonce.len().min(12)]);
-    let code = run_in(&c, job, &image, &inst).await;
+    let Some(sig) = sig.as_mut() else {
+        return match &job.detach {
+            Some(d) => super::verbs::detached(&c, job, &image, d).await,
+            None => fail("no reader of the signals".to_string()),
+        };
+    };
+    let inst = match &job.name {
+        Some(n) => n.clone(),
+        None => {
+            let nonce = crate::machine::guest::init::nonce()
+                .unwrap_or_else(|_| format!("{}", std::process::id()));
+            format!("podvm-{}", &nonce[..nonce.len().min(12)])
+        }
+    };
+    let (code, made) = run_in(&c, job, &image, &inst, sig).await;
     // As under --rm: the instance goes, whatever the command gave; one that
-    // stays is named (TODO/machine.md T-1846).
-    let left = super::verbs::discard(&c, &inst).await;
-    if !left.is_empty() {
-        eprintln!("podvm {}: incus tier{left}", job.verb);
+    // stays is named (TODO/machine.md T-1846). An instance of another run
+    // with the name of `--name` is not this run's (T-2080).
+    if made {
+        let left = super::verbs::discard(&c, &inst).await;
+        if !left.is_empty() {
+            eprintln!("podvm {}: incus tier: {left}", job.verb);
+        }
     }
     code
 }
 
-async fn run_in(c: &Client, job: &Job<'_>, image: &str, inst: &str) -> i32 {
+/// The command of `job` in a new instance `inst`: its exit code, and
+/// whether the instance may be this run's (the caller removes it).
+async fn run_in(
+    c: &Client,
+    job: &Job<'_>,
+    image: &str,
+    inst: &str,
+    sig: &mut super::attach::Signals,
+) -> (i32, bool) {
     let fail = |e: String| {
         eprintln!("podvm {}: incus tier: {e}", job.verb);
         EXIT_RUNTIME_ERROR
@@ -382,48 +355,60 @@ async fn run_in(c: &Client, job: &Job<'_>, image: &str, inst: &str) -> i32 {
     let mut new = NewInstance::container(inst, Source::Alias(image.to_string()));
     new.devices = job_devices(job);
     if let Err(e) = apply_limits(c, &mut new, &job.limits).await {
-        return fail(e);
+        return (fail(e), false);
     }
     new.config.insert(
         "raw.lxc".into(),
         "lxc.init.cmd = /.podvm/podvm guest-hold".into(),
     );
-    if let Err((e, t)) = super::net::create(c, &new, job.net_none, job.channel.as_ref()).await {
-        let hint = super::space::after_failure(c, job.rootfs, false, t).await;
-        return fail_twice(job.verb, (e, hint));
-    }
-    // podvm is in the image (T-1722): a run pushes only its stdin.
-    let mut pushes = Vec::new();
-    if let Some(b) = &job.stdin {
-        pushes.push((
-            super::STDIN,
-            owned(FileWrite::file(Payload::bytes(b.clone())), 0o600),
-        ));
-    }
-    for (path, w) in pushes {
-        if let Err(e) = c.put_file(inst, path, w).await {
-            return fail(e.to_string());
+    let setup = async {
+        // T-2080 (OR-B39-07): docker's refusal of a name in use, before the
+        // create; incusd's own 409 stays for a race.
+        if job.name.is_some() {
+            match c.instance(inst).await {
+                Ok(_) => {
+                    let e = format!(
+                        "the name {inst:?} is in use by an instance of incus: remove it \
+                         (`podvm rm -f --podvm-tier incus {inst}` for an instance of podvm), \
+                         or give another --name (TODO/machine.md T-2080)"
+                    );
+                    return Err((fail(e), false));
+                }
+                Err(e) if super::verbs::gone(&e) => {}
+                Err(e) => return Err((fail(e.to_string()), false)),
+            }
         }
-    }
-    if let Err(e) = super::net::push_port(c, inst, job.channel.as_ref()).await {
-        return fail(e);
-    }
-    if let Err(e) = c.start(inst).await {
-        return fail(e.to_string());
-    }
-    if let Err(e) = size_held(c, inst, &job.limits).await {
-        return fail(e); // T-1964
-    }
-    if let Err(e) = super::net::wait_ready(c, inst, job.channel.as_ref()).await {
-        return fail(e);
-    }
-    let mut exec = Exec::new(command(&job.argv, job.stdin.is_some()));
-    exec.environment = env_map(&job.env);
-    exec.cwd = job.workdir.clone();
-    let out = match c.exec_recorded(inst, &exec).await {
-        Ok(o) => o,
-        Err(e) => return fail(e.to_string()),
+        if let Err((e, t)) = super::net::create(c, &new, job.net_none, job.channel.as_ref()).await {
+            // T-2080: an instance of the name of `--name` that was there
+            // is another one's; the instance of a name of podvm may be
+            // half made.
+            let mine = job.name.is_none() || !e.contains("already exists");
+            let hint = super::space::after_failure(c, job.rootfs, false, t).await;
+            return Err((fail_twice(job.verb, (e, hint)), mine));
+        }
+        let step = async {
+            super::net::push_port(c, inst, job.channel.as_ref()).await?;
+            c.start(inst).await.map_err(|e| e.to_string())?;
+            size_held(c, inst, &job.limits).await?; // T-1964
+            super::net::wait_ready(c, inst, job.channel.as_ref()).await
+        };
+        step.await.map_err(|e| (fail(e), true))
     };
+    tokio::select! {
+        r = setup => if let Err((code, mine)) = r {
+            return (code, mine);
+        },
+        s = sig.next() => return (super::attach::before_command(job.verb, s), true),
+    }
+    // T-2080: podvm in the image starts the command in its working
+    // directory, which it makes where it is missing (OR-B39-09), and names
+    // the cause of a start that fails (OR-B39-01, OR-B39-16).
+    let mut exec = Exec::new(super::guest_exec::wrap(&job.argv, &job.workdir));
+    exec.environment = env_map(&job.env);
+    let input = job.stdin.as_deref().unwrap_or_default();
+    let (mut out, mut err) = (std::io::stdout(), std::io::stderr());
+    let r = super::attach::exec_streamed(c, job.verb, inst, &exec, input, sig, &mut out, &mut err)
+        .await;
     // TODO/supervise.md T-1969: the OOM kills of the instance go to the run
     // report, read before the instance goes. A metrics endpoint that fails
     // or names no sample leaves the optional field out, never a zero.
@@ -432,8 +417,8 @@ async fn run_in(c: &Client, job: &Job<'_>, image: &str, inst: &str) -> i32 {
     {
         crate::run::cgroup::set_guest_oom_kills(n);
     }
-    let _ = std::io::stdout().write_all(&out.stdout);
-    let _ = std::io::stdout().flush();
-    let _ = std::io::stderr().write_all(&out.stderr);
-    out.exit_code
+    match r {
+        Ok(o) => (o.code, true),
+        Err(e) => (fail(e), true),
+    }
 }

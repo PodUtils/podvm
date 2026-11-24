@@ -49,6 +49,11 @@ fn stand_in(sock: &std::path::Path) -> Seen {
                 ("GET", p) if p.starts_with("/1.0/operations/") => {
                     sync(json!({"status_code": 200, "metadata": {}}))
                 }
+                // T-2080 (OR-B39-12): an instance that is not there.
+                ("DELETE", p) if p.starts_with("/1.0/instances/gone1") => (
+                    404,
+                    json!({"type": "error", "error": "Instance not found", "error_code": 404}),
+                ),
                 ("DELETE", _) => (
                     400,
                     json!({"type": "error", "error": "Instance is busy", "error_code": 400}),
@@ -92,6 +97,11 @@ fn incus_verbs_discard_and_rm_name_what_stays() {
         "no DELETE: {:?}",
         seen.lock().unwrap()
     );
+    // TODO/machine.md T-2080 (OR-B39-12): a 404 of the delete is an
+    // instance that is not there: nothing stays, and no line says so.
+    assert_eq!(rt.block_on(super::verbs::discard(&c, "gone1")), "");
+    assert_eq!(super::verbs::with_left("e", ""), "e");
+    assert_eq!(super::verbs::with_left("e", "x stays"), "e; x stays");
     // rm of an ERROR instance names the state, not "runs".
     let e = rt
         .block_on(super::verbs::one(&c, "rm", "inc1", false))
@@ -121,4 +131,44 @@ fn the_init_of_the_image_gets_the_ids_and_the_fuse_of_the_snapshot() {
     let e = "Failed initializing instance: Not enough uid/gid available".to_string();
     assert!(crate::incus::run::ids_hint(e.clone(), true).contains("/etc/subuid"));
     assert_eq!(crate::incus::run::ids_hint(e.clone(), false), e);
+}
+
+/// TODO/machine.md T-2080 (OR-B39-05): `exec` takes the environment and the
+/// working directory of the run under its own; the line after a silent end
+/// of 126 or 127.
+#[test]
+fn exec_takes_the_environment_of_the_run_and_names_a_silent_127() {
+    use crate::incus::attach::Outcome;
+    use crate::incus::exec::{exec_env, silent_hint};
+    let run = crate::incus::Cmd {
+        argv: vec!["sleep".into()],
+        env: vec!["FOO=bar".into(), "PATH=/bin".into()],
+        cwd: "/tmp".into(),
+    };
+    let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+    for (run, env, cwd, foo, want_cwd) in [
+        (Some(&run), s(&[]), None, Some("bar"), "/tmp"),
+        (Some(&run), s(&["FOO=over"]), Some("/"), Some("over"), "/"),
+        (None, s(&["FOO=x"]), None, Some("x"), ""),
+        (None, s(&[]), None, None, ""),
+    ] {
+        let (m, c) = exec_env(run, &env, cwd);
+        assert_eq!(m.get("FOO").map(String::as_str), foo, "{env:?}");
+        assert_eq!(c, want_cwd, "{env:?}");
+        if run.is_some() {
+            assert_eq!(m.get("PATH").map(String::as_str), Some("/bin"));
+        }
+    }
+    for (code, wrote, has) in [
+        (127, 0, Some("Command not found")),
+        (126, 0, Some("Command not executable")),
+        (127, 3, None),
+        (1, 0, None),
+    ] {
+        let h = silent_hint(Outcome { code, wrote });
+        assert_eq!(h.is_some(), has.is_some(), "{code} {wrote}");
+        if let (Some(h), Some(w)) = (h, has) {
+            assert!(h.contains(w), "{h}");
+        }
+    }
 }

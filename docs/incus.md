@@ -98,12 +98,23 @@ interposer is the cost.
 1. imports the image one time for each manifest digest, under the alias
    `podvm-HEX16-vN`;
 2. creates an instance with `raw.lxc` `lxc.init.cmd = /.podvm/podvm
-   guest-hold`, and pushes podvm and the piped stdin into `/.podvm/`;
-3. starts it, and runs the command with the exec API and `record-output`,
-   with the environment and the working directory of the image and the
-   flags;
-4. writes the recorded stdout and stderr apart, exits with the exit code of
-   the command, and deletes the instance.
+   guest-hold` (podvm is in the image);
+3. starts it, and runs the command with the exec API and its websockets
+   (T-2080), with the environment and the working directory of the image
+   and the flags. podvm in the image (`podvm guest-exec`) makes the working
+   directory where it is missing, starts the command, and names the cause
+   of a start that fails (a program that is not there: exit 127; an ELF of
+   another architecture: the two architectures, exit 126);
+4. gives stdout and stderr apart as they come and the piped stdin to the
+   command, sends a SIGHUP, SIGINT or SIGTERM of podvm to the command by
+   the control socket (SIGKILL after a second signal or 10 s), exits with
+   the exit code of the command (also 126 and 127, which incusd 6.0 ends as
+   a failed operation), and deletes the instance.
+
+Two runs of one store import an image once: the second waits for the lock
+of the import (`locks/incus-ALIAS.key.lock` of the store), and a race with
+another store on the same incusd ends in the image that is there (T-2081).
+The first answer of incusd has a bound of 30 s (T-2080).
 
 [Experiment 434](../experiments/434-incus-tier.sh) proves it against the
 incusd of route A ([its run](../experiments/results/incus-tier.txt)): each

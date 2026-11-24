@@ -6984,3 +6984,88 @@ The completion of `exec` rewrites `/etc/hosts` from its own inputs: the name tha
 ## Done
 
 **Done (2026-11-23).** The cause: `exec::enter` gave the completion the name that the caller typed (`ask.container_name = target`) and the `--add-host` of `exec`, and `pod_rootfs` rewrites `/etc/hosts` from them, so the lines of the run went, for each process of the container. The run writes them right: `run -d --hostname hx` has `127.0.0.1 hx`; the pass saw the file after an `exec`. The fix: the record of a run keeps the parts of its `/etc/hosts` (`Hardening::hosts`: the name on the line of 127.0.0.1 and each `NAME:ADDRESS` of `--add-host` and `--hostname`), and `exec::ns::hosts_of` gives them to the completion of `exec`, with the `--add-host` of `exec` after them; a record of an older podvm keeps the old rule. The unit test `exec_writes_the_hosts_of_the_run` holds the rule for a record with and without the parts and an `exec` with and without `--add-host`; the integration test `exec_keeps_the_hosts_of_the_run` (`crates/podvm/tests/exec_hosts.rs`) passes as root and as uid 1000. As uid 1000 with `alpine:3.20`, `run -d --hostname hx --add-host a:1.1.1.1` and an `exec ah2 true`: the payload's second `cat` and `exec ah2 cat /etc/hosts` show `1.1.1.1 a` and `127.0.0.1 hx` (before: neither).
+
+# T-2079: The faults of the eighth outside pass (2026-11-24, the gate of 0.2.0-beta.39)
+
+**Source:** the eighth outside pass (2026-11-24, the gate of 0.2.0-beta.39): an agent with the release binary of `b6a198f3` (`--version` 0.2.0-beta.38) and `podvm man` only; the native surface as uid 1000, the incus tier as root against a private incusd 6.0.0 that the tester started (a pool `dir`; a second incusd with a pool of 40 MiB for the full pool)
+**Category:** cli
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+The pass found 19 findings, OR-B39-01 to OR-B39-19: four P1 (three of the
+incus tier, one of the native `cp -r`), twelve P2 and three P3. podrunner
+uses the incus tier, so its P1 findings come first. The rule of the gate: no
+P0 or P1 finding stays open (`docs/maintenance.md`, "Releases", step 4).
+
+## Premise
+
+Each P1 finding of the incus tier was reproduced on the release binary of
+beta.38 against a private incusd 6.0.0 on the cloud host (2026-11-24):
+OR-B39-01 (`sh -c 'echo before; exit 127'`: "incus refused the call (400,
+error_code 400): Command not found", exit 125, no `before`), OR-B39-02 (six
+parallel first runs of `busybox:1.36`: one passed, five "Image with same
+fingerprint already exists", exit 125), OR-B39-10 (`ps --podvm-tier incus`
+on a socket that takes the connection and never answers: still waiting at
+45 s). Each fault is old: the code of beta.38 has it since the entry that
+made the path (T-1718, T-1722).
+
+## Approach
+
+Fix the three P1 findings of the incus tier and the P2 findings of the
+incus tier that are small and safe in the same change (T-2080, T-2081);
+give OR-B39-04 (native `cp -r`) to a second agent after this one; give
+OR-B39-13 to T-2078; keep each other finding in the table below, as a line
+of "Known gaps" of the release.
+
+## Decision
+
+-
+
+## Prove
+
+`sh scripts/dev/checks.sh` passes with a test of the class of each fixed
+finding; the reproducer of each fixed P1 finding on a real incusd gives the
+docker result on the new release binary and the fault on beta.38;
+experiment 434 with clauses 28 to 30; each other finding is a line in
+"Known gaps" of the release.
+
+## Done
+
+**Partial (2026-11-24).** The state of each finding:
+
+| Finding | Sev | Triage | Entry | State |
+| --- | --- | --- | --- | --- |
+| OR-B39-01, incus: a command that ends with 126 or 127 gives "incus refused the call (400): Command not found / Command not executable", exit 125, and its output is lost (`run`, `exec`) | P1 | fix | [T-2080](machine.md) | done |
+| OR-B39-02, incus: parallel first runs of one image race on the import ("Image with same fingerprint already exists", a 409 of the alias) | P1 | fix | [T-2081](machine.md) | done |
+| OR-B39-03, incus: SIGINT, SIGTERM or SIGHUP to a foreground `run --rm` leaves the instance running | P1 | fix | [T-2080](machine.md) | done |
+| OR-B39-04, native: `cp -r SRC EXISTING_DIR` merges the contents of SRC into DEST (docker: DEST/basename(SRC)) | P1 | fix, a second agent | - | open |
+| OR-B39-05, incus: `exec` drops stdin and lacks the environment of the run | P2 | fix if cheap | [T-2080](machine.md) | done |
+| OR-B39-06, incus: a foreground `run` gives its output at the end, stderr after stdout | P2 | gap | [T-2080](machine.md) | done |
+| OR-B39-07, incus: `run -d --rm` keeps the stopped instance; a foreground `--name` is ignored | P2 | fix if cheap | [T-2080](machine.md) | done (a foreground run still keeps no record: the instance goes at its end, as under `--rm`) |
+| OR-B39-08, incus: the import expands hard links (busybox: 2.1 MiB stored, 420 MiB for each instance) | P2 | gap | - | open |
+| OR-B39-09, incus: `run -w /nonexistent` runs in `/` with exit 0 | P2 | fix if cheap | [T-2080](machine.md) | done for `run` (docker makes the directory); `exec -w` to a missing directory still runs in `/` (incusd) |
+| OR-B39-10, incus: a daemon that takes the connection and never answers holds podvm with no bound | P2 | fix if cheap | [T-2080](machine.md) | done for the first call of each verb (30 s); a bound of each call is asked of podcrates |
+| OR-B39-11, incus: `rm -rf /.podvm` in the payload deletes its log; `logs` gives a raw 404 | P2 | gap | - | open |
+| OR-B39-12, incus: after a failed create, "the instance stays" although the delete answered 404; `incus tier;` | P2 | fix | [T-2080](machine.md) | done |
+| OR-B39-13, incus: no check of the pool for an image that incus has; the line of the check names a host path | P2 | T-2078 | [T-2078](machine.md) | open |
+| OR-B39-14, native: `cp HOST ctr:/nonexistdir/f` makes the directory | P2 | known (OR-B38-14) | - | open |
+| OR-B39-15, native: the edits of a payload to `/etc/hosts` are lost at the next `exec` | P2 | gap | - | open |
+| OR-B39-16, incus: `--platform linux/arm64` on amd64 gives "Command not executable" with no word of the architecture | P2 | with OR-B39-01 | [T-2080](machine.md) | done for a foreground `run`; `run -d` writes the error of the start to the log |
+| OR-B39-17, incus: `--podvm-init=image` of an image with no init: a raw error of forkstart, the instance stays RUNNING | P3 | gap | - | open |
+| OR-B39-18, `container ls --podvm-tier incus` gives "a bug in podvm (T-0801)" | P3 | fix | [T-2080](machine.md) | done |
+| OR-B39-19, many small items (the list of the findings file) | P3 | gap | - | open |
+
+Proof of the fixes (2026-11-24, the tree of the commit of T-2080 and
+T-2081): `sh scripts/dev/checks.sh` passes; `cargo check --target
+aarch64-unknown-linux-musl --workspace` passes; `cargo test --workspace
+--no-fail-fast` gives 1154 passed, 0 failed, 1 ignored (96 test binaries).
+The release `podvm` is 9 148 632 bytes (the ceiling is 9 500 000).
+Experiment 434 (`PODVM_434_MIRROR=1`): "THE INCUS TIER RUNS", each clause,
+with the new clauses 28 (OR-B39-01), 29 (OR-B39-02) and 30 (OR-B39-03).
+The reproducers of the pass on a private incusd: T-2080 and T-2081.
+PodUtils/podrunner#347 ask 2, which came during this work, is T-2082.
+Left: the findings of the table that are open.
