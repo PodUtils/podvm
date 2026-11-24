@@ -26,6 +26,7 @@ files explain earlier states; they do not override `README.md`, `AGENTS.md`, or
 | [`containers-before-toolkit-6.txt`](containers-before-toolkit-6.txt) | Windows lane procedure before `wsl-toolkit` 6.0.0, kept verbatim |
 | [`progress-before-2026-09-28.txt`](progress-before-2026-09-28.txt) | Superseded session state and work order, kept verbatim |
 | [`progress-before-2026-11-10.txt`](progress-before-2026-11-10.txt) | `TODO/PROGRESS.md` at `2148874`, verbatim: the session layers, the CI remainder of 2026-10-01, the host failure, the publication of beta.10 to beta.12, the reconciliation and the work order before the rewrite of 2026-11-10 |
+| [`progress-state-before-2026-11-24.md`](progress-state-before-2026-11-24.md) | The state section of `TODO/PROGRESS.md` on 2026-11-24, verbatim: the per-release narrative of beta.31 to beta.39 with run numbers, and the list of podcrates takes |
 | [`resume-before-2026-11-10.txt`](resume-before-2026-11-10.txt) | `TODO/RESUME.md` at `2148874`, verbatim: the cold start of the 2026-10-02 session on the Windows host, with the KVM deferral |
 | [`progress-before-t1403.txt`](progress-before-t1403.txt) | Superseded lane, source-capture, and partial record displaced by the T-1403 relay landing, kept verbatim |
 | [`index-order-before-2026-09-28.txt`](index-order-before-2026-09-28.txt) | Superseded priority argument, kept verbatim |
