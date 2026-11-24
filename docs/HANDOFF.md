@@ -1,12 +1,13 @@
 # Handoff
 
-The state on 2026-11-23, 17:00 (UTC). `main` is at the commit that changes
-this file or later. `0.2.0-beta.38` is the last release (2026-11-23,
-release run 45212007696 on `2ae4b41`, podcrates `v0.82.0`). A fresh session
-with no memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md`
-and `docs/decisions.md`. The handoffs of the sessions before 2026-11-23 are
-in git: `git show 836c0799:docs/HANDOFF.md`. Remove this file when each
-step below is done.
+The state on 2026-11-24, 12:00 (UTC), at the end of a session. `main` is
+at the commit that changes this file or later. `0.2.0-beta.39` is the last
+release (2026-11-24, release run 45353882402 on `a43c9476`, podcrates
+`v0.82.0`). `main` carries podcrates `v0.82.1` and three fixes for
+podrunner after it (below). A fresh session with no memory reads this file
+first, then `AGENTS.md`, `TODO/PROGRESS.md` and `docs/decisions.md`. The
+handoffs of the sessions before 2026-11-23 are in git: `git show
+836c0799:docs/HANDOFF.md`. Remove this file when each step below is done.
 
 ## The rulings of 2026-11-18 that stay in force
 
@@ -24,94 +25,83 @@ step below is done.
 
 ## Where things are
 
-* podcrates is taken at `v0.82.0` (T-2066, `4fa56ec` to `a43e80cd`;
-  COORD-229, #645, names the take; podcrates#254 still listed "podvm: not
-  yet" at 2026-11-23 13:00). A podvm session can not write on
-  PodUtils/podcrates issues (its GitHub access reaches podvm only): each
-  take is a COORD issue of this repository.
+* podcrates is taken at `v0.82.1` (T-2084, `18160173` to `e7c19b16`;
+  #656, COORD-240, closed: PodUtils/podcrates#257 lists the take). A podvm
+  session can not write on PodUtils/podcrates issues (its GitHub access
+  reaches podvm only): each take is a COORD issue of this repository.
 * Each release publishes `ghcr.io/podutils/podvm:TAG` by the job `image`
-  of `release.yml` (`image.yml`, T-1992); `image.yml` can be dispatched
-  alone for a tag (`push: false` is the dry run).
-* The issue-sync bot of a push reopens or closes an issue as the record of
-  THAT commit says: a sync of an older commit can reopen an issue that a
-  newer record closed; the sync of the newer commit closes it again.
-  (2026-11-23) The issue events of 2026-11-18 to 2026-11-20 show the
-  pattern: a session closed #428, #471, #586, #589, #595, #597, #600 and
-  #601 on GitHub, the bot reopened each within minutes (the record still
-  said open), and a later sync or the session closed it again. So close an
-  issue in the record first: its row in `TODO/issues.md` and its line in
-  `TODO/github.txt`, in one commit on `main`, before or with the close on
-  GitHub.
+  of `release.yml` (`image.yml`, T-1992).
+* The issue-sync bot of a push sets the state of each issue from the
+  record of THAT commit (`TODO/issues.md`, `TODO/github.txt`): close an
+  issue in the record first, in one commit on `main`, before or with the
+  close on GitHub, or the bot reopens it. A peer's own bot does the same
+  on its side (podrunner#339 was reopened and closed again this way).
 * The pkgforge mirrors answer for podvm and podcrates reads, with some
   403s; retry. Release assets of another repository: the GitHub MCP tool.
-* The cloud host runs incus (route A): `PODVM_434_MIRROR=1 sh
-  experiments/434-incus-tier.sh` passes (public.ecr.aws answers 429 here,
-  so use the mirror switch). It has no `/dev/kvm` and no delegated
-  cgroup2 subtree: a machine guest runs under TCG
-  (`PODVM_MACHINE_ACCEL=tcg`), and the cgroup clauses go to `kvm.yml`
-  (job `cgroup`, experiment 459).
-* `docs/maintenance.md`, "Releases", is the gate of each beta (T-1949,
-  done): gate, `workloads.yml`, the uid-1000 tests, an outside pass with
-  the binary and `podvm man` only, `arm.yml`, the nightly trial, and an
-  entry "Known gaps" in the notes.
-* The uid-1000 integration tests: build the test binaries of `podvm` and
-  `podvm-supervise` (`cargo test --release --no-run --message-format=json`)
-  and run each with `setpriv --reuid 1000 --regid 1000 --clear-groups`, with
-  `HOME`, `TMPDIR` in a new directory of mode 777 under `/var/tmp` and
-  `CARGO_MANIFEST_DIR=$PWD/crates/podvm`. Build the interposer objects
-  first (`scripts/build-interpose.sh`).
+* The cloud host has cgroup v1 (hybrid), no `/dev/kvm`, and after a
+  restart of the container NO running system incusd. Experiment 434
+  (`PODVM_434_MIRROR=1 sh experiments/434-incus-tier.sh`) starts what it
+  needs; for a measurement by hand, start a private incusd
+  (`INCUS_DIR=DIR /usr/libexec/incus/incusd`) and point podvm at it with
+  `PODVM_INCUS_SOCKET`. Clause 23 of experiment 434 (the `oom_kills` of the
+  report of a foreground run, from incusd's metrics) fails now and then
+  (a known flake of incusd, T-2076).
+* `docs/maintenance.md`, "Releases", is the gate of each beta (T-1949):
+  gate, `workloads.yml`, the uid-1000 tests, an outside pass with the
+  binary and `podvm man` only, `arm.yml` and the nightly trial on the bump
+  commit, and an entry "Known gaps". A script for the uid-1000 tests:
+  build the test binaries of `podvm` and `podvm-supervise` (`cargo test
+  --release --no-run --message-format=json`) and run each with `setpriv
+  --reuid 1000 --regid 1000 --clear-groups`, `HOME` and `TMPDIR` in a new
+  directory of mode 777 under `/var/tmp`, `CARGO_MANIFEST_DIR=$PWD/crates/podvm`.
+* The size of the release `podvm` is 9 197 784 bytes at `cd51868e` (the
+  ceiling of call C29 is 9 500 000).
 
+## The sessions of 2026-11-23 and 2026-11-24
 
-## This session (2026-11-23)
-
-* Call C29 (`4d8da41`): the size ceiling is 9 500 000 bytes. The release
-  `podvm` of beta.38 is 9 046 232 bytes.
-* `wip/podcrates-081` and `wip/oq-run` are merged (`51c16c5`, `02c7c429`);
-  both branches stay on origin as history. podcrates `v0.82.0` is taken:
-  T-2065 (PAX ACLs, podrunner#339) and T-2062 (126 for E2BIG) are done.
-* podrunner#344 (COORD-122): `load` of 85 layers (T-2068, `4887fb72`);
-  answer #647. T-2069 (open) has two faults of the staging files and
-  OR-B38-05.
-* The seventh outside pass (T-2070) found 18 faults; the two P1 faults and
-  three P2 faults are fixed (T-2071 to T-2075); the rest are in "Known
-  gaps" of beta.38.
-* Released `0.2.0-beta.38`; #648 (COORD-232) names it to podrunner, #644
-  and #647 name the tag, #640 is closed.
-* COORD-230 (#646) asks podcrates for the title, the environment and the
-  dumpable flag of pod-enter's init and join relay (T-2054, OQ-08).
-* podrunner#345 (COORD-123): `inspect` of a stopped incus instance gives
-  the last `CpuSeconds`, `PeakMemoryBytes` and `OomKills` (T-2076,
-  `a4b75950`, `bafd6dec`; experiment 434 clause 26); answer #649
-  (COORD-233). #650 (COORD-234) asks podcrates for one reader of the usage
-  of a cgroup. The work found T-2077 (P1, done in `4ab994b9`): under
-  `--memory` the OOM killer of the instance took PID 1 (12 of 44 runs, also
-  with beta.38); PID 1 now sets -1000, or the command gets 1000 where the
-  kernel refuses -1000; 24 of 24 runs keep the exit code. #649 says so.
-* podrunner#346 (COORD-124): a full `dir` pool made incusd 6.0 answer with
-  the whole stderr of `tar` (108 MB for 400,000 files), over the 64 MiB
-  bound of pod-incus, so podvm said only "the response body is larger than
-  allowed". T-2078 (P1, partial, `abe21868`): the incus tier refuses an
-  image that cannot fit before the import, and names the free space after
-  such an answer; experiment 434 clause 27. Answer #652 (COORD-236); #651
-  (COORD-235) asks podcrates for a typed refusal with the status and the
-  head of the answer, and for the resources of a pool.
-* #631, #633, #639, #643, #644, #645 and #647 are closed (podcrates#254 lists the
-  take; podrunner closed podrunner#339).
+* Released `0.2.0-beta.38` (#648) and `0.2.0-beta.39` (#654), each behind
+  the beta gate with an outside pass: the seventh (T-2070: two P1 and three
+  P2 faults fixed, T-2071 to T-2075) and the eighth (T-2079: four P1 faults
+  fixed, T-2080, T-2081 and the rule of `cp`; seven P2 faults fixed). Call
+  C29: the size ceiling is 9 500 000 bytes.
+* podcrates `v0.81.0`, `v0.82.0` (#645) and `v0.82.1` (#656) are taken.
+* podrunner, each answered by a COORD issue: #339 (PAX ACLs, T-2065, closed),
+  #344 (85 layers, T-2068, closed), #345 (the use of a stopped incus
+  instance, T-2076; #649), #346 (a full pool, T-2078; #652), #347 (ask 2:
+  SIGPIPE, T-2082; ask 1: one tree and a gzip upload, T-2085; #658), #349
+  (the readiness of an init on the incus tier, T-2083; #655).
+* Asks to podcrates that stay open: #651 (an answer over the bound keeps
+  its status and head; the resources of a pool), #653 (the exit of an exec
+  that ends with 126 or 127, a bound of each answer, the answer after a
+  failed write), #657 (a stream of the layers as one tar, a writer of gzip
+  members), and the older #602, #604, #584.
+* After `0.2.0-beta.39`, `main` carries T-2083, T-2084 and T-2085; they
+  wait for the next beta.
 
 ## Next steps, in order
 
 1. Start the session (`AGENTS.md`, section 8), with the watcher.
-2. podrunner first: the next beta carries T-2076, T-2077 and T-2078 for
-   #649 and #652 (the beta gate of `docs/maintenance.md`); watch #583,
-   #585, #593, #596, #599, #605, #636, #648, #649 and #652.
-3. podcrates: watch #602, #604, #584, #646, #650 and #651.
-4. T-2069 (the staging files of the store), then the open rows of T-2070.
-5. T-2050 remainder: a machine run with the store's static QEMU. T-2048
-   remainder: a SIGTERM during a save waits for the save. Experiment 465 on
-   a host whose QEMU does not crash under TCG (T-2016), or under KVM.
-6. T-2002, T-2014, T-2015, then
-   [the hard problems](history/hard-problems-2026-11-20.md) and the work
-   order of `TODO/PROGRESS.md`.
+2. podrunner first: T-2086 (PodUtils/podrunner#350, COORD-128: on a hosted
+   runner with cgroup v2, `inspect` of an ended incus instance gives no
+   `PeakMemoryBytes` and 0 `OomKills` for an OOM kill of a child). The
+   cloud host has cgroup v1, so reproduce it on a hosted runner (a job of
+   `kvm.yml` or a new workflow with incus of apt). Answer it by a COORD
+   issue `(to podrunner)`.
+3. The next beta (`0.2.0-beta.40`) behind the full beta gate, with
+   T-2083, T-2084, T-2085 and T-2086: name the tag on #655 and #658 and in
+   a COORD "beta.40 is out" to podrunner.
+4. Watch #583, #585, #593, #596, #599, #605, #636, #648, #649, #652, #654,
+   #655, #658 (podrunner) and #602, #604, #584, #651, #653, #657
+   (podcrates); take the next podcrates tag that has #651, #653 or #657.
+5. T-2085 remainder (a run on the hosted runner; the stream of the layers
+   when podcrates gives it), T-2078 remainder (a check of the pool for an
+   image that incus has), T-2069 (the staging files of the store), the
+   open rows of T-2070 and T-2079, T-2054 (items 1, 2, 3 and 5 of OQ-08:
+   close as limits in `docs/limits.md`, or fix).
+6. T-2050 remainder (a machine run with the store's static QEMU), T-2048
+   remainder (a SIGTERM during a save), T-2016, T-2002, T-2014, T-2015,
+   then [the hard problems](history/hard-problems-2026-11-20.md) and the
+   work order of `TODO/PROGRESS.md`.
 
 ## Rules learned
 

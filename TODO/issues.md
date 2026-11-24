@@ -539,17 +539,19 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #643 | COORD-227: pod-extract refuses a layer whose PAX record SCHILY.acl.access holds a newline (to podcrates) | closed (podcrates v0.82.0 reads PAX SCHILY.acl.* records; taken in 0eb10b2a; PodUtils/podcrates#254 lists the take) | T-2065 |
 | #644 | COORD-228: a PAX value with a newline (SCHILY.acl.access): the fix is in pod-extract of podcrates (to podrunner) | closed (podrunner closed PodUtils/podrunner#339 after `v0.2.0-beta.38`) | T-2065 |
 | #645 | COORD-229: podvm took v0.81.0 and v0.82.0 (to podcrates) | closed (PodUtils/podcrates#254 lists the take of v0.81.0 and v0.82.0) | T-2066, T-2051, T-2046, T-2065, T-2062 |
-| #646 | COORD-230: pod-enter's PID-namespace init and join relay show podvm's argv and environment to the payload (to podcrates) | open | T-2054, T-2084 |
+| #646 | COORD-230: pod-enter's PID-namespace init and join relay show podvm's argv and environment to the payload (to podcrates) | closed (podcrates v0.82.1 has it; taken in 18160173 (#656); PodUtils/podcrates#257 lists the take) | T-2054, T-2084 |
 | #647 | COORD-231: the answer to PodUtils/podrunner#344: podvm load of an image of 85 layers is fixed on main (to podrunner) | closed (podrunner closed PodUtils/podrunner#344 after `v0.2.0-beta.38`) | T-2068 |
 | #648 | COORD-232: v0.2.0-beta.38 is out (to podrunner) | open | T-1949, T-2065, T-2066, T-2068, T-2070 |
 | #649 | COORD-233: the answer to PodUtils/podrunner#345: inspect of a stopped incus instance gives CpuSeconds, PeakMemoryBytes and OomKills on main (to podrunner) | open | T-2076, T-2077 |
-| #650 | COORD-234: a reader of the usage of a cgroup (CPU time, peak memory, OOM kills; v2 and v1) for pod-hostprobe::cgroup (to podcrates) | open | T-2076, T-2084 |
+| #650 | COORD-234: a reader of the usage of a cgroup (CPU time, peak memory, OOM kills; v2 and v1) for pod-hostprobe::cgroup (to podcrates) | closed (podcrates v0.82.1 has pod_hostprobe::usage; taken in 39a85246 (#656); PodUtils/podcrates#257 lists the take) | T-2076, T-2084 |
 | #651 | COORD-235: an answer over the bound keeps its status, its size, the bound and its head; the resources of a storage pool (to podcrates) | open | T-2078 |
 | #652 | COORD-236: the answer to PodUtils/podrunner#346: a full storage pool gave "the response body is larger than allowed"; podvm now refuses an image that cannot fit and names the free space (to podrunner) | open | T-2078 |
 | #653 | COORD-237: pod-incus: the exit code of an exec that ends with 126 or 127, a bound of each answer, the answer after a failed write (to podcrates) | open | T-2080, T-2082 |
 | #654 | COORD-238: v0.2.0-beta.39 is out (to podrunner) | open | T-1949, T-2076, T-2077, T-2078, T-2079, T-2080, T-2081, T-2082 |
 | #655 | COORD-239: the answer to PodUtils/podrunner#349: "offline" of systemd is not final for --podvm-init=image on the incus tier (to podrunner) | open | T-2083 |
-| #656 | COORD-240: podvm took v0.82.1 (to podcrates) | open | T-2084, T-2054, T-2076 |
+| #656 | COORD-240: podvm took v0.82.1 (to podcrates) | closed (PodUtils/podcrates#257 lists the take of v0.82.1) | T-2084, T-2054, T-2076 |
+| #657 | COORD-241: a stream of the layers of an image as one tar, and a writer of gzip members (to podcrates) | open | T-2085 |
+| #658 | COORD-242: the answer to PodUtils/podrunner#347: an import of a large image keeps one tree and a gzip upload on the incus tier (to podrunner) | open | T-2085, T-2082 |
 
 ## Messages whose title does not start with COORD-NNN
 

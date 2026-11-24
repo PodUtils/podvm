@@ -6819,3 +6819,55 @@ aarch64-unknown-linux-musl --workspace` passes. The release `podvm` is
 Remaining: (1) a run on the hosted runner of PodUtils/podrunner#347 with
 the next beta after 0.2.0-beta.39; (2) design (a), a stream of the layers
 with no tree, by podcrates (the COORD draft).
+
+# T-2086: On a hosted runner with cgroup v2, `inspect` of an ended incus instance gives no peak memory and no OOM kill of a child
+
+**Source:** PodUtils/podrunner#350 (COORD-128 of podrunner, a report of a member of the team), podrunner's run `runner-image.yml` 45359834173, podvm 0.2.0-beta.39, incus of apt, cgroup v2, a hosted `ubuntu-24.04` runner
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+On a hosted `ubuntu-24.04` runner (incus of apt, cgroup v2), after the
+command of `podvm run -d -i --podvm-tier=incus --podvm-net none ...` ends
+by itself: a load of four processes that burn CPU gives `CpuSeconds` 6
+(the shell's `times` counted 6.92 s), but `PeakMemoryBytes` is `-`
+("incusd gave no PeakMemoryBytes of the instance"); `dd` of 1 GiB under
+`--memory 256m` exits 0 after the kill of the child, `PeakMemoryBytes` is
+`-` and `OomKills` is 0. The cloud host of podvm has cgroup v1 (hybrid),
+where experiment 434 clause 26 gives each value (T-2076, T-2077).
+
+## Premise
+
+T-2076 measured only cgroup v1. podrunner asks: (1) check on a hosted
+runner that `/.podvm/usage` is written and read also after a short run
+that ends by itself; (2) count an OOM kill of a child of the command (not
+of the init) in `OomKills`; (3) say whether the peak is `memory.peak`
+(the highest memory of the instance) or a sample. The text "incusd gave
+no PeakMemoryBytes" is the line of a running instance, so the read of the
+file of a stopped instance may not take place, or the file may lack the
+peak under cgroup v2 (the view of cgroup2 in an instance of incus, the
+place of PID 1 in it, `memory.peak` at the root of a cgroup namespace;
+podcrates `v0.82.1` `pod_hostprobe::usage` takes cgroup2 where
+`memory.events` opens).
+
+## Approach
+
+Reproduce on cgroup v2: `kvm.yml` or a new job of a workflow on a hosted
+runner with incus of apt (the cloud host has cgroup v1), with
+`inspect --verbose` and the file `/.podvm/usage` pulled after the end.
+Then fix the read or the meter, and add the case to experiment 434.
+
+## Decision
+
+-
+
+## Prove
+
+`PODVM_434_MIRROR=1 sh experiments/434-incus-tier.sh` exits 0 on a hosted
+runner with cgroup v2 (a job of a workflow), with clause 26 extended by the
+two cases of the problem: `PeakMemoryBytes` near the truth, and
+`OomKills` 1 for the OOM kill of a child.
