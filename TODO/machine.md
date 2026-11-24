@@ -5299,6 +5299,8 @@ With `RLIMIT_FSIZE` under 1 GiB (the tester's host had 1,000,000,000 bytes), `ru
 
 T-1305 refuses a guest memory over the soft `RLIMIT_FSIZE`, because a memory image is a file. A plain boot (`-m`) has anonymous memory, and nothing saves a guest yet.
 
+**Checked (2026-11-24, 0.2.0-beta.40), as uid 1000.** `prlimit --fsize=1000000000 podvm run --profile machine IMAGE true` still refuses with the line of the Problem.
+
 ## Approach
 
 Either the two profiles take the soft ceiling where it is under their memory, or the check applies only where a memory image is written to a file. The second changes T-1305: a question for the owner.
@@ -5327,6 +5329,8 @@ Machine records ignore `PODVM_STORE`, and `inspect` and `wait` do not find them 
 ## Premise
 
 T-1950 traced each item in the code; a cloud session starts no guest.
+
+**Checked (2026-11-24, 0.2.0-beta.40), from the code (no guest started).** Each of 511, 516, 537, 538, 539 and 540 is open. 511: `machines::root()` is `machines` beside the catalog under `$HOME` unless `PODVM_MACHINES_DIR` is set; T-2042 made `inspect` and `wait` find a record by name or id. 516: `inside()` of `machine/guest/sealed.rs` refuses the `./` entry that `tar -C DIR -cf X .` writes. 538: `sealed.rs` has not changed since the report. 537: `machine/guest/drive.rs` splits the console by line and converts each line with `from_utf8_lossy`. 539: `stop_record()` of `windows/machine.rs` gives a Linux guest `system_powerdown` with no grace, then QMP `quit`. 540: `logs` reads `serial.log` only; `--tail` and `--limit-bytes` work since T-2046.
 
 ## Approach
 

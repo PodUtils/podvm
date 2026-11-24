@@ -5920,3 +5920,36 @@ As uid 1000 with a `TMPDIR` of 112 bytes, the test binaries of `podvm` and `podv
 ## Done
 
 **Done (2026-11-23).** `run/report/tests.rs`: `report_path_is_the_parsers` gives a path in a new directory (`podvm-t1801-<id>`) and checks that the probe leaves no file there; `report_written_on_refusal` and `report_refusal_holds_no_value_of_e` name their directory with `podvm_supervise::new_id`, not the pid. `crates/podvm/src/test_socket.rs` (new): `SocketDir` makes `/tmp/podvm-TAG-<16 hex>`, mode 0700, from a new directory (`create_dir` refuses one that exists), asserts that each socket path in it is under 108 bytes, and removes it at the drop; the stand-ins of the six unit tests above take it. `machine/guest/stderr.rs`: `socket_in` gives `/tmp` where the chardev socket of the run under `TMPDIR` would pass `sun_path`; the table test `the_sockets_of_a_run_fit_sun_path` holds the bound for the stderr, chardev and terminal sockets. Measured on the cloud host on 2026-11-23, as uid 1000 (`setpriv`) with a `TMPDIR` of 112 bytes under `/var/tmp`: before, 4 failures in the unit tests of `podvm` (575 passed) and 1 in `report_paths_meaning`; after, the 31 test binaries of `podvm` and `podvm-supervise` pass, 651 tests and no failure, and no directory `podvm-*` stays in `/tmp` or in `TMPDIR`.
+
+# T-2090: The external QA of `0.2.0-beta.31`: the reports that `0.2.0-beta.40` passes
+
+**Source:** the issues 472, 475, 476, 477, 480, 490, 501, 512, 515, 523, 525, 526, 527, 528, 534, 535, 536, 544, 548, 549, 550, 552, 553, 554, 555, 561, 563 and 565 of PodUtils/podvm, in the entries T-1938, T-1940, T-1952 and T-1953
+**Category:** gate
+**Milestone:** none
+**Priority:** P2
+**Effort:** S
+**Status:** done
+
+## Problem
+
+The entries T-1938, T-1940, T-1952 and T-1953 stay partial, because some of their findings are open. Their fixed findings kept their issues open on GitHub, and the bodies of those issues were out of date. A closed issue needs entries that are done.
+
+## Premise
+
+Each fix is in a commit of the record. The state of each issue is the state of the code of `0.2.0-beta.40`, not the state of the day of the report.
+
+## Approach
+
+Reproduce each issue as uid 1000 with the binary of `0.2.0-beta.40`, or read the fix in the code where a guest or a network is needed. Move each issue that passes to this entry. Keep each issue that fails in its entry, with a body that says what is true now.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000 with `0.2.0-beta.40`, the repro of each issue of this entry gives the documented result.
+
+## Done
+
+**Done (2026-11-24).** Each issue is measured as uid 1000 on `0.2.0-beta.40`; the fix is in the commit that the row of the issue in `TODO/issues.md` names. 472: 8 detached `/bin/true` give 8 `Exited (0)`, and `wait` gives 0 (24dbea39). 501: 12 parallel `run --rm` exit 0, twice (24dbea39). 475: 3 refused `run --strict=all` leave no `memo-*.tmp` (6d2f6e77). 476: with `windows:dos` pulled, `--filter name=zzz` and `--filter label=zzz` list no row (14ce28be). 477: both re-packed tarballs load (d4e216cb). 480: `/etc/hosts` holds `127.0.0.1 bar` and `::1 six` (d4e216cb). 490: after a corrupt blob, `pull` repairs it and `verify` gives 0 mismatches (cd725444). 512: `run -w /tmp/newdir` prints `/tmp/newdir`. 515: `import` names gzip, xz and bzip2. 523: `inspect NAME` gives the container. 525: `import` refuses a hard link that comes before its target. 526: `system df` counts one extraction once. 527: `image prune` removes an old blob that no record names. 528 and 544: `linux/arm64` and `linux/arm64/v8` make one record. 548: `rmi TAG` of an image with a container is an untag. 555: `cp F CTR:/nodir/` names a directory and refuses. 534: `yes` piped into `head -1` exits 141 and leaves no record. 535: a SIGINT to podvm alone runs the trap of the payload. 536: pod-supervise opens the log with `O_NOFOLLOW` (podcrates 75d5cdfe, COORD-182, in v0.82.1), `start` gives ELOOP and the target file keeps its bytes. 549: against a daemon stand-in, `install-names` exits 125 and makes no link. 550: `logs -f` follows the second run after `restart`. 552: a mode-000 env file is refused before the payload. 553: the flag is refused by name. 554: the refusal names the emulate tier. 561: `probe` leaves no `/tmp/execprobe` and measures the row where the file exists. 563: `cp` into an image is refused, and `cp` into the container of a shared name writes the container. 565: a `-v` of two kinds names both paths and kinds. The issues 474 (T-2074), 557 (T-2053) and 562 (T-2001) map to the entries that fixed them. Still open, with their entries: 473, 481, 511, 516, 529, 537, 538, 539, 540, 547, 551, 558, 560, 566.
