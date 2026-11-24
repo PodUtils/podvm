@@ -599,21 +599,21 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1934](enter.md) | P2 | S | none | enter | done | A unit on the namespace rung has no usable pty: no `/dev/ptmx`, and the host's `/dev/pts` |
 | [T-1935](enter.md) | P1 | M | none | enter | partial | `run -d` on the userland rung: a raw path call of a dynamic program reaches the host |
 | [T-1936](gate.md) | P1 | S | none | gate | done | A gate of the tools of a CI job: a raw syscall, a spawn, a pty, `uv` and `ruff` in a unit |
-| [T-1937](cli.md) | P2 | M | none | cli | partial | The external QA of `0.2.0-beta.31`: the argument checks of the CLI |
+| [T-1937](cli.md) | P2 | M | none | cli | done | The external QA of `0.2.0-beta.31`: the argument checks of the CLI |
 | [T-1938](supervise.md) | P1 | S | none | supervise | partial | The external QA of `0.2.0-beta.31`: two runs at once lose the table of containers or the exec probe |
 | [T-1939](enter.md) | P2 | M | none | enter | open | The external QA of `0.2.0-beta.31`: `--device` and `run -d --rm` |
 | [T-1940](image.md) | P2 | S | none | image | partial | The external QA of `0.2.0-beta.31`: `images --filter`, `load`, `verify` and `--add-host` |
 | [T-1941](machine.md) | P3 | S | none | machine | open | The built-in `machine` profile asks for 1 GiB, which a file-size ceiling under 1 GiB refuses |
 | [T-1942](gate.md) | P1 | M | none | gate | done | The external QA of `0.2.0-beta.31`: verify the second batch of reports |
-| [T-1943](cli.md) | P1 | M | none | cli | partial | The external QA of `0.2.0-beta.31`, second batch: panics, flags and messages |
-| [T-1944](cli.md) | P2 | M | none | cli | partial | The external QA of `0.2.0-beta.31`, second batch: `cp`, `import` and the helpers of credentials |
+| [T-1943](cli.md) | P1 | M | none | cli | done | The external QA of `0.2.0-beta.31`, second batch: panics, flags and messages |
+| [T-1944](cli.md) | P2 | M | none | cli | done | The external QA of `0.2.0-beta.31`, second batch: `cp`, `import` and the helpers of credentials |
 | [T-1945](cli.md) | P1 | M | none | cli | done | `exec --env-file`, and a `-v` source that is opened with no symbolic link (PodUtils/podrunner#277) |
 | [T-1946](gate.md) | P1 | M | none | gate | done | The contract of the CLI: one table-driven harness of each verb |
 | [T-1947](gate.md) | P1 | M | none | gate | partial | Fail safe at the edges: a panic hook, checked numbers, and the writes of the store |
-| [T-1948](gate.md) | P2 | M | none | gate | partial | Each banner and each inspect field says what the entered mechanism did |
+| [T-1948](gate.md) | P2 | M | none | gate | done | Each banner and each inspect field says what the entered mechanism did |
 | [T-1949](gate.md) | P1 | S | none | gate | done | The gate of a beta: workloads, the harness, an outside pass, and the known gaps |
 | [T-1950](gate.md) | P1 | M | none | gate | done | The external QA of `0.2.0-beta.31`: verify the third batch of reports |
-| [T-1951](cli.md) | P1 | M | none | cli | partial | The external QA of `0.2.0-beta.31`, third batch: the output contract |
+| [T-1951](cli.md) | P1 | M | none | cli | done | The external QA of `0.2.0-beta.31`, third batch: the output contract |
 | [T-1952](image.md) | P2 | M | none | image | partial | The external QA of `0.2.0-beta.31`, third batch: images, `import`, `cp` and the store |
 | [T-1953](enter.md) | P1 | M | none | enter | partial | The external QA of `0.2.0-beta.31`, third batch: signals, rungs and runs |
 | [T-1954](machine.md) | P2 | M | none | machine | open | The external QA of `0.2.0-beta.31`, third batch: the machine tier |
@@ -724,10 +724,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2085](machine.md) | P1 | M | none | machine | partial | On the incus tier, an import of a large image keeps three copies of its tree on one file system |
 | [T-2086](machine.md) | P1 | M | none | machine | done | On a hosted runner with cgroup v2, `inspect` of an ended incus instance gives no peak memory and no OOM kill of a child |
 | [T-2087](cli.md) | P1 | M | none | cli | partial | The faults of the ninth outside pass (2026-11-24, the gate of 0.2.0-beta.40) |
+| [T-2088](cli.md) | P2 | M | none | cli | open | The faults of the external QA of `0.2.0-beta.31` that stay open on `0.2.0-beta.40` |
 
 ## Counts
 
-658 entries: 22 open, 48 partial, 5 blocked, 583 done.
+659 entries: 23 open, 43 partial, 5 blocked, 588 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -737,10 +738,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 24 | 0 | 266 | 293 |
-| P2 | 14 | 19 | 4 | 197 | 234 |
+| P1 | 3 | 22 | 0 | 268 | 293 |
+| P2 | 15 | 16 | 4 | 200 | 235 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 22 | 48 | 5 | 583 | 658 |
+| **All** | 23 | 43 | 5 | 588 | 659 |
 
 ## Work order
 

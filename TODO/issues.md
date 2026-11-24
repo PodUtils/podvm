@@ -371,62 +371,62 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #475 | Every refused `run --strict=all` leaves a zero-byte `memo-*.tmp` file in the store | open | T-1938 |
 | #476 | `images --filter` ignores the filter for the `windows:dos` record | open | T-1940 |
 | #477 | `load` rejects a valid OCI-layout tarball that contains directory entries | open | T-1940 |
-| #478 | `man` silently ignores `--json` or `--roff` when `--llms` is also given | open | T-1937 |
-| #479 | `doctor --strict=false` still enables strict, and `--strict=0` reports an internal podvm bug | open | T-1937 |
+| #478 | `man` silently ignores `--json` or `--roff` when `--llms` is also given | closed (3d07d66b, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `man --json --llms` and `--roff --llms` exit 1 with one line) | T-1937 |
+| #479 | `doctor --strict=false` still enables strict, and `--strict=0` reports an internal podvm bug | closed (a3607943 and test `filter_tests` of `expand`, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `--strict=false` is no flag, `--strict=0` is refused by name) | T-1937 |
 | #480 | `--add-host NAME:host-gateway` writes the literal string `host-gateway` as an IP address | open | T-1940 |
 | #481 | The built-in `machine` profile always refuses on a host with the default `RLIMIT_FSIZE` | open | T-1941 |
-| #482 | `run --profile NAME IMAGE CMD` silently treats IMAGE as the command when the profile names an image | open | T-1937 |
-| #483 | `abi`, `df`, `prune`, and `install-names` are listed as Native top-level verbs but exit 125 | open | T-1937 |
-| #484 | Container names are not validated: empty, slash, space, and 300-character names are accepted | open | T-1937 |
-| #485 | `logout` help promises an idempotent logout, but a second logout exits 1 | open | T-1937 |
-| #486 | `logs` and `version` silently ignore extra positional arguments | open | T-1937 |
-| #487 | `image <unknown>` says "not implemented yet" instead of "not a subverb" | open | T-1937 |
-| #488 | `--` works as an option terminator in `run` but is rejected by `exec`, `pull`, and `images` | open | T-1937 |
-| #489 | `exec --platform` is accepted but has no effect on a container | open | T-1937 |
+| #482 | `run --profile NAME IMAGE CMD` silently treats IMAGE as the command when the profile names an image | closed (a4ef0d72 and test of `profile_operand`, CHANGELOG 0.2.0-beta.32) | T-1937 |
+| #483 | `abi`, `df`, `prune`, and `install-names` are listed as Native top-level verbs but exit 125 | closed (4278d4df, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `podvm man` lists `system abi`, `system df`, `image prune`, `system install-names`) | T-1937 |
+| #484 | Container names are not validated: empty, slash, space, and 300-character names are accepted | closed (24dbea39 and test of `name_arg`, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: an empty name, `a/b`, `a b` and 300 characters are refused) | T-1937 |
+| #485 | `logout` help promises an idempotent logout, but a second logout exits 1 | closed (95506f70, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: the help says that a logout of a server with none stored exits 1) | T-1937 |
+| #486 | `logs` and `version` silently ignore extra positional arguments | open | T-2088 |
+| #487 | `image <unknown>` says "not implemented yet" instead of "not a subverb" | closed (24dbea39, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `image bogus` exits 1 with `is not a subverb of the group`) | T-1937 |
+| #488 | `--` works as an option terminator in `run` but is rejected by `exec`, `pull`, and `images` | closed (9dadace5, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `exec -- NAME CMD` and `images -q -- NAME` work) | T-1937 |
+| #489 | `exec --platform` is accepted but has no effect on a container | closed (24dbea39, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `exec --platform linux/arm64` of an amd64 container exits 125 by name) | T-1937 |
 | #490 | `verify` reports a mismatched blob, but `pull` says "Already exists" and does not repair it | open | T-1940 |
-| #491 | `doctor` ends with an unexplained `profile: refused` line | open | T-1937 |
-| #492 | `--tls-verify=B` never consumes its value, so TLS verification cannot be disabled | open | T-1943 |
-| #493 | `notebook --cycles N` silently clamps N above 1000 to 1000 | open | T-1943 |
-| #494 | `notebook --restart-kernel-after CELL` accepts a cell past the end and silently does nothing | open | T-1943 |
-| #495 | `cp` from a container rewrites absolute symlink targets to the store's rootfs path | open | T-1944 |
-| #496 | Credential helpers receive `https://HOST/v2/`, not the configured server key | open | T-1944 |
-| #497 | `run --help` omits working flags that the parser accepts and the parity table lists | open | T-1943 |
-| #498 | `cp` to an image mutates only the extracted cache; `extract --force` and `save` lose the change | open | T-1944 |
-| #499 | `--podvm-confine` help omits the implicit `/proc`, device, and TCP grants | open | T-1943 |
-| #500 | `login` with a missing or empty password prints the whole usage instead of naming the missing input | open | T-1943 |
+| #491 | `doctor` ends with an unexplained `profile: refused` line | closed (24dbea39, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `doctor` ends with `machine profile: refused (the machine tier needs: ...)`) | T-1937 |
+| #492 | `--tls-verify=B` never consumes its value, so TLS verification cannot be disabled | closed (a3607943, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `pull --tls-verify=false IMG` parses the image) | T-1943 |
+| #493 | `notebook --cycles N` silently clamps N above 1000 to 1000 | closed (3b6a775d, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `notebook --cycles 5000` exits 125 by name) | T-1943 |
+| #494 | `notebook --restart-kernel-after CELL` accepts a cell past the end and silently does nothing | closed (3b6a775d and test `notebook/tests.rs`, CHANGELOG 0.2.0-beta.32) | T-1943 |
+| #495 | `cp` from a container rewrites absolute symlink targets to the store's rootfs path | open | T-2088 |
+| #496 | Credential helpers receive `https://HOST/v2/`, not the configured server key | closed (podcrates v0.70.0 (`helper_server`, PodUtils/podvm#568), taken in 6b5a6cb8; checked 2026-11-24 on 0.2.0-beta.40: a helper of credentials gets `ServerURL` 127.0.0.1:1) | T-1944 |
+| #497 | `run --help` omits working flags that the parser accepts and the parity table lists | closed (46cff004 (`tests/cli_contract.rs`: the help names each flag row), CHANGELOG 0.2.0-beta.32) | T-1943 |
+| #498 | `cp` to an image mutates only the extracted cache; `extract --force` and `save` lose the change | closed (2bb384d7, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `cp FILE IMAGE:/x` exits 1 by name) | T-1944 |
+| #499 | `--podvm-confine` help omits the implicit `/proc`, device, and TCP grants | closed (3d07d66b, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: the help of `--podvm-confine` names the grants and that TCP is not confined) | T-1943 |
+| #500 | `login` with a missing or empty password prints the whole usage instead of naming the missing input | closed (f0d23f78, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `login` names `-u USER` or the empty password) | T-1943 |
 | #501 | Concurrent `podvm run` fails with `containers.json: No such file or directory` | open | T-1938 |
-| #502 | `remote ssh forward exec` discards the target's exit code | open | T-1944 |
-| #503 | `import` records an image from a tar with an absolute hardlink that `extract` refuses | open | T-1944 |
-| #504 | `compare --strict` treats an empty reason as an explanation | open | T-1943 |
-| #505 | Any non-UTF-8 command-line argument panics podvm with SIGABRT | open | T-1943 |
-| #506 | `notebook --kill-after` panics on a large value instead of refusing it | open | T-1943 |
-| #507 | The image-`USER` warning says podvm runs as uid 0, but on the userland rung it runs as the caller's uid | open | T-1943 |
-| #508 | `--podvm-tier=syscall -u UID` says the identity is faked, but the payload runs as the caller | open | T-1943 |
+| #502 | `remote ssh forward exec` discards the target's exit code | open | T-2088 |
+| #503 | `import` records an image from a tar with an absolute hardlink that `extract` refuses | closed (3fe8f731, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `import` of a tar with an absolute hard link exits 1 by name) | T-1944 |
+| #504 | `compare --strict` treats an empty reason as an explanation | closed (3d07d66b and a test of `compare` in `podvm-probe` (`inside/tests.rs`), CHANGELOG 0.2.0-beta.32) | T-1943 |
+| #505 | Any non-UTF-8 command-line argument panics podvm with SIGABRT | closed (a3607943, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: an argument that is not UTF-8 exits 125 with one line) | T-1943 |
+| #506 | `notebook --kill-after` panics on a large value instead of refusing it | closed (3b6a775d, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `notebook --kill-after 99999999999999999999` exits 125 by name) | T-1943 |
+| #507 | The image-`USER` warning says podvm runs as uid 0, but on the userland rung it runs as the caller's uid | closed (6d2f6e77 (`interpose::own_uid`), CHANGELOG 0.2.0-beta.32) | T-1943 |
+| #508 | `--podvm-tier=syscall -u UID` says the identity is faked, but the payload runs as the caller | closed (6d2f6e77, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `--podvm-tier=syscall -u 1234` exits 125 by name) | T-1943 |
 | #509 | COORD-179: the answer to PodUtils/podrunner#277: exec --env-file and --podvm-volume-base are in 0.2.0-beta.32 (to podrunner) | open | T-1945 |
-| #510 | `podvm exec` joins a container's namespaces or shares the host PID table, while its help and `.Exec.Mode` say fresh chroot, filesystem only | open | T-1948 |
+| #510 | `podvm exec` joins a container's namespaces or shares the host PID table, while its help and `.Exec.Mode` say fresh chroot, filesystem only | open | T-2088 |
 | #511 | Machine-tier records ignore `PODVM_STORE`: `ps` lists them from `$HOME`, while `inspect` and `wait` cannot find them | open | T-1954 |
 | #512 | `-w /tmp/<new dir>` always fails with ENOENT after podvm creates the directory | open | T-1953 |
-| #513 | A `--report` path that cannot be written runs the payload first, then returns 125 in place of its exit code | open | T-1951 |
-| #514 | `podvm inspect` with more than one container prints several JSON arrays, so its output is not valid JSON | open | T-1951 |
+| #513 | A `--report` path that cannot be written runs the payload first, then returns 125 in place of its exit code | closed (92791551, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `--report /dev/full` and a missing directory exit 125 before the payload) | T-1951 |
+| #514 | `podvm inspect` with more than one container prints several JSON arrays, so its output is not valid JSON | closed (c1c6bb67, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `inspect A B` prints one JSON array) | T-1951 |
 | #515 | `podvm import` refuses a compressed file with a raw tar error, not the named refusal the help promises | open | T-1952 |
 | #516 | A normal `tar -C DIR -cf bundle.tar .` is refused by `--podvm-sealed` and blamed on `..` or a leading `/` | open | T-1954 |
-| #517 | A sealed bundle with an empty or missing `argv` exits 0 and runs nothing | open | T-1951 |
-| #518 | `podvm man --roff` and `--llms` print every usage line twice, as `Usage: podvm run usage: podvm run ...` | open | T-1951 |
-| #519 | Seven verbs exit 125 for a missing required argument, where the exit table says 1 | open | T-1951 |
-| #520 | `podvm --help` omits the working verbs `port` and `logout`, and the unknown-command refusal points at it | open | T-1951 |
-| #521 | `system abi` exits 2 for an unreadable file, a code the published exit table does not contain | open | T-1951 |
-| #522 | `podvm save -o FILE` prints the file name on stdout, which the help reserves for the tarball | open | T-1951 |
+| #517 | A sealed bundle with an empty or missing `argv` exits 0 and runs nothing | open | T-2088 |
+| #518 | `podvm man --roff` and `--llms` print every usage line twice, as `Usage: podvm run usage: podvm run ...` | closed (8321f0a8, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `man --roff` and `man --llms` have no doubled usage line) | T-1951 |
+| #519 | Seven verbs exit 125 for a missing required argument, where the exit table says 1 | open | T-2088 |
+| #520 | `podvm --help` omits the working verbs `port` and `logout`, and the unknown-command refusal points at it | closed (4278d4df, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `podvm --help` lists `port` and `logout`) | T-1951 |
+| #521 | `system abi` exits 2 for an unreadable file, a code the published exit table does not contain | closed (4278d4df, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: an unreadable file of `system abi` exits 125) | T-1951 |
+| #522 | `podvm save -o FILE` prints the file name on stdout, which the help reserves for the tarball | closed (4278d4df, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: `save -o FILE` prints nothing on stdout) | T-1951 |
 | #523 | `podvm inspect NAME` returns the image when a container and an image share the name, while every other verb returns the container | open | T-1952 |
-| #524 | The digest `inspect` prints is not accepted by `inspect`, `rmi`, `tag` or `cp`, and two printed fields are not selectable by `--format` | open | T-1951 |
+| #524 | The digest `inspect` prints is not accepted by `inspect`, `rmi`, `tag` or `cp`, and two printed fields are not selectable by `--format` | open | T-2088 |
 | #525 | `import` accepts a rootfs tar whose hard link precedes its target, then every `extract` and `run` fails with a false "already extracted" message | open | T-1952 |
 | #526 | `system df` counts one extracted rootfs once per record, and its reclaimed figures do not match the disk | open | T-1952 |
 | #527 | A pull killed with SIGTERM leaves zero-byte `.partial` files and blobs no image names, and no verb reclaims them | open | T-1952 |
 | #528 | `pull --platform linux/amd64/v3` stores a platform the index does not offer, and the tag then refuses `extract` | open | T-1952 |
 | #529 | Refusals for `--tmpfs` name `-v` and print an internal store path the caller never passed | open | T-1952 |
-| #530 | The syscall tier's `uname -v` contains an internal task reference: `podvm syscall tier (TODO/enter.md T-1657)` | open | T-1951 |
-| #531 | `podvm version --verbose` reports `commit:` as a build error string instead of a commit | open | T-1951 |
-| #532 | Five command groups print help and exit 0 for a bare name, three exit 125, and the exit table names only the first behavior | open | T-1951 |
-| #533 | `run --help` says a `-w` or a first program inside a volume is refused, but both work | open | T-1951 |
+| #530 | The syscall tier's `uname -v` contains an internal task reference: `podvm syscall tier (TODO/enter.md T-1657)` | closed (c1c6bb67; checked 2026-11-24 on 0.2.0-beta.40: `uname -v` of the syscall tier is `#1 SMP podvm syscall tier`) | T-1951 |
+| #531 | `podvm version --verbose` reports `commit:` as a build error string instead of a commit | open | T-2088 |
+| #532 | Five command groups print help and exit 0 for a bare name, three exit 125, and the exit table names only the first behavior | closed (c1c6bb67, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: bare `profile`, `lab` and `windows` exit 0) | T-1951 |
+| #533 | `run --help` says a `-w` or a first program inside a volume is refused, but both work | closed (c1c6bb67; checked 2026-11-24 on 0.2.0-beta.40: `-w` in a volume works and the help says so) | T-1951 |
 | #534 | A foreground run piped into `head` dies of SIGPIPE and leaves a permanent `Created` record and its tree | open | T-1953 |
 | #535 | A direct SIGINT to `podvm run` is ignored, although the help says SIGINT is forwarded | open | T-1953 |
 | #536 | A symlink at `containers/<id>/log` makes the launcher append the payload output to a file outside the store | open | T-1953 |
@@ -434,12 +434,12 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #538 | A sealed bundle with `./` members and a directory entry never returns: the guest channel fails to unpack and podvm hangs | open | T-1954 |
 | #539 | `stop` on a machine guest powers the VM off with QMP quit, so the payload never gets SIGTERM and no exit code is recorded | open | T-1954 |
 | #540 | `logs` on a machine-tier container drops payload stderr, and `--tail` is ignored | open | T-1954 |
-| #541 | `podvm exec` on a machine-tier container enters the running guest, while the help and limits say a guest exec is refused | open | T-1951 |
-| #542 | The machine-tier `--device` refusal also says `-v` needs the chroot tier, but `-v` works on the machine tier | open | T-1951 |
-| #543 | `docs/limits.md` says an arm64 guest is refused before boot and also that it runs with `qemu-system-aarch64` | open | T-1951 |
+| #541 | `podvm exec` on a machine-tier container enters the running guest, while the help and limits say a guest exec is refused | closed (95506f70; checked 2026-11-24 on 0.2.0-beta.40: the help of `exec` says that `exec NAME` enters a running guest) | T-1951 |
+| #542 | The machine-tier `--device` refusal also says `-v` needs the chroot tier, but `-v` works on the machine tier | closed (c1c6bb67; checked 2026-11-24 on 0.2.0-beta.40: the refusal of the machine tier names only `--device`) | T-1951 |
+| #543 | `docs/limits.md` says an arm64 guest is refused before boot and also that it runs with `qemu-system-aarch64` | closed (95506f70; checked 2026-11-24 on 0.2.0-beta.40: `docs/limits.md` says that an arm64 guest runs, and names its conditions) | T-1951 |
 | #544 | Pulling `linux/arm64` and `linux/arm64/v8` creates two records for one manifest | open | T-1952 |
-| #545 | `podvm run -t` writes a NUL byte to stdout before the payload output | open | T-1951 |
-| #546 | The probe, README, architecture, SECURITY, the limits page and the banner disagree with the run about user, PID and UTS namespaces and `/proc` | open | T-1951 |
+| #545 | `podvm run -t` writes a NUL byte to stdout before the payload output | closed (9da72a0d, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: under a pty, `run -t` prints `hi` with no NUL byte) | T-1951 |
+| #546 | The probe, README, architecture, SECURITY, the limits page and the banner disagree with the run about user, PID and UTS namespaces and `/proc` | open | T-2088 |
 | #547 | An image with no `/tmp` downgrades the namespace rung to chroot, and the report still says `namespace` | open | T-1953 |
 | #548 | `podvm rmi TAG` refuses to remove the tag whenever any container references the image | open | T-1952 |
 | #549 | `system install-names` creates the `podman` link and then exits 125 because it refused the `docker` name | open | T-1953 |
@@ -449,10 +449,10 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #553 | `--unsafe-host-paths` is accepted and does nothing on the namespace rung | open | T-1953 |
 | #554 | `create --podvm-tier=emulate` refuses with a chroot-denied message that is false on this host and never names the tier | open | T-1953 |
 | #555 | `cp` drops a trailing slash on a missing destination and creates a file where a directory was implied | open | T-1952 |
-| #556 | `-v` is a real bind mount, `/proc/mounts` lists it, and `mountinfo` exposes the host path, while the help says it is not a mount | open | T-1951 |
+| #556 | `-v` is a real bind mount, `/proc/mounts` lists it, and `mountinfo` exposes the host path, while the help says it is not a mount | closed (95506f70; checked 2026-11-24 on 0.2.0-beta.40: the help of `-v` says that it is a bind mount on the namespace rung that `/proc/mounts` lists) | T-1951 |
 | #557 | `--strict=all` refuses every run on this host because the mtab fixup says `/proc` is not mounted, and it is | open | T-1953 |
 | #558 | The probe cache key is namespace-local, so `--cached` alternates "served" and "the confinement changed", and every pull re-probes | open | T-1953 |
-| #559 | `podvm login` prints `Login Succeeded` for a registry that is not listening | open | T-1951 |
+| #559 | `podvm login` prints `Login Succeeded` for a registry that is not listening | closed (95506f70; checked 2026-11-24 on 0.2.0-beta.40: `login` keeps docker's `Login Succeeded` on stdout and says on stderr that the registry checks the login at the next pull (the choice of T-1951)) | T-1951 |
 | #560 | The source fixup leaves `http://security.ubuntu.com` although it answers HTTPS, and names the redirect target in the error | open | T-1953 |
 | #561 | `podvm probe` leaves `/tmp/execprobe`, and every later probe skips the exec row because the file exists | open | T-1953 |
 | #562 | SIGHUP to a foreground run leaves the payload and `podvm --podvm-ns-reaper` running, and `--rm` does not remove the Dead record | open | T-1953 |

@@ -5793,7 +5793,7 @@ The second path stays, also where the first path holds: a fallback that is never
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -5816,6 +5816,8 @@ The entered mechanism returns what it did (the uid of the payload, the preload, 
 As uid 1000: the repro of 507, 508 and 510 gives a banner or a field that matches `id` and `/proc/self/status` in the payload.
 
 ## Done
+
+**Done (2026-11-24).** #507 and #508 are fixed, and their issues are closed. The container form of #510 is fixed (T-2053): on 0.2.0-beta.40 `.Exec.Mode` is `join` and `.Exec.Shares` is `filesystem+user+pid+mount`. The image form of #510 moved to [T-2088](cli.md).
 
 **Partial (2026-11-17).** 508 and 507 (T-1943): the syscall tier refuses `-u` where it would fake nothing, and the warning of an image `USER` names the uid of the process. Remaining: 510 (`.Exec.Mode` of `exec` that joins namespaces), and the banners of the entry written from the entered mechanism.
 

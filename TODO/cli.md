@@ -6001,7 +6001,7 @@ The fixup stays on by default: a host that drops tcp/80 stalls apt for minutes, 
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -6036,6 +6036,8 @@ One small change for each item, with a test of its refusal. 485 keeps exit 1 (T-
 
 ## Done
 
+**Done (2026-11-24).** Measured 2026-11-24 on 0.2.0-beta.40 as uid 1000: #478, #479, #482, #483, #484, #485, #487, #488, #489 and #491 are fixed (the commits are in `TODO/issues.md`, the notes in CHANGELOG 0.2.0-beta.32), and their issues are closed. #486 (`lab profiles extra` and `lab scenarios extra` exit 0 and ignore the extra word) moved to [T-2088](cli.md).
+
 **Partial (2026-11-17).** 484: `--name` and `--name=` take docker's rule (`opts::name_arg`, `[a-zA-Z0-9][a-zA-Z0-9_.-]*`, at most 64 bytes), with a test. 486: `logs` refuses a second container and `version` an operand, with exit 1. 487: `image bogus` says "is not a subverb of the group" with the usage (which names `extract` now) and exit 1. 489: `exec --platform` of a container refuses a platform that is not the one of its image (`command::container_platform`), exit 125. 491: `doctor` prints `machine profile: refused (the machine tier needs: LEGS)`; experiment 364 reads the new label. Measured as uid 1000 with the binary of this commit. 485: the `logout` help says that a logout of a server with none stored exits 1 (T-0209 keeps the code). 478: `man --llms` with `--json`, `--roff` or a page is refused by name, exit 1. 488: `--` ends the options of each verb (`parity::expand`): `pull -- IMG`, `images -q -- NAME` and `exec -- NAME CMD` work; `run` and `create` keep their own reading, and a `--` of the payload after the image stays (a test pins each). 482: under a profile that names an image, a first operand that reads as an image reference is refused by name and names `-s fs.image=` (a test pins it). Remaining: `lab profiles extra`.
 
 # T-1943: The external QA of `0.2.0-beta.31`, second batch: panics, flags and messages
@@ -6045,7 +6047,7 @@ One small change for each item, with a test of its refusal. 485 keeps exit 1 (T-
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -6078,6 +6080,8 @@ Each item is reproduced as uid 1000 on the cloud host with the binary of `main` 
 
 ## Done
 
+**Done (2026-11-24).** Measured 2026-11-24 on 0.2.0-beta.40 as uid 1000: #492, #493, #494, #497, #499, #500, #504, #505, #506, #507 and #508 are fixed (the commits are in `TODO/issues.md`, the notes in CHANGELOG 0.2.0-beta.32), and their issues are closed. No item of this entry remains.
+
 **Partial (2026-11-17).** 505: `names::argv` reads `args_os` and refuses an argument that is not UTF-8 by name with exit 125 (before: a panic, exit 134); the names of the process are read lossily. 492: `expand` passes `--tls-verify=VALUE` whole to the parser. 479: `--strict=VALUE` passes through only for `run`, `create` and `exec`; `doctor --strict=0` gets the refusal of the table. A unit test pins 492 and 479. Measured as uid 1000. 493 and 506: `notebook` takes `--cycles` from 1 to 1000 and `--kill-after` from 1 to a year, and refuses a value out of the bound by name; the sums are checked. 494: a `--restart-kernel-after` of the last cell or past it is refused, and the help says that CELL counts each cell. 497: each help names each flag row of its verb, and T-1946 checks it. 508: `--podvm-tier=syscall` refuses `-u` by name (the tier fakes no identity). 507: the warning of an image `USER` names the uid that podvm runs as (`interpose::own_uid`), not uid 0. 500: `login` names what is missing: the value of a flag, `-u USER`, `--password-stdin`, or a password that is empty or does not read. 504: `compare --strict` takes an empty or a missing reason as no explanation (a test pins both). 499: the help of `--podvm-confine` names the paths that each run may read and write, and that TCP is not confined with no `connect=`. Remaining: none of T-1943's podvm items.
 
 # T-1944: The external QA of `0.2.0-beta.31`, second batch: `cp`, `import` and the helpers of credentials
@@ -6087,7 +6091,7 @@ Each item is reproduced as uid 1000 on the cloud host with the binary of `main` 
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -6114,6 +6118,8 @@ Verified by T-1942 (the reproduction of each, or the code for 502).
 `cargo test --release -p podvm --bin podvm` passes, with a test of each refusal, and the repro of each issue, as uid 1000, gives the refusal or the result of the fix.
 
 ## Done
+
+**Done (2026-11-24).** #496 (podcrates `v0.70.0`, `helper_server`, taken in `6b5a6cb8`; measured 2026-11-24 on 0.2.0-beta.40 as uid 1000: a helper of credentials gets the `ServerURL` `127.0.0.1:1`), #498 and #503 are fixed, and their issues are closed. #495 and #502 moved to [T-2088](cli.md).
 
 **Partial (2026-11-17).** 498 (with T-1952): `cp` into an image is refused by name. 503 (with T-1952): `import` refuses a hard link whose target is absolute, holds `..`, or comes later. COORD-181 (#568) asks podcrates for 496 (the `ServerURL` of a helper of credentials). Remaining: 495 and 502.
 
@@ -6159,7 +6165,7 @@ As uid 1000: `exec --env-file F NAME sh -c 'echo $SECRET'` prints the value, and
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -6184,6 +6190,8 @@ One change for each item; `tests/cli_contract.rs` (T-1946) checks the help of ea
 `cargo test --release -p podvm --bin podvm` and `cargo test --release -p podvm --test cli_contract` pass, and the repro of each issue, as uid 1000, gives the refusal or the result of the fix.
 
 ## Done
+
+**Done (2026-11-24).** Measured 2026-11-24 on 0.2.0-beta.40 as uid 1000: #513, #514, #518, #520, #521, #522, #530, #532, #533, #541, #542, #543, #545, #556 and #559 are fixed (the commits are in `TODO/issues.md`, the notes in CHANGELOG 0.2.0-beta.32), and their issues are closed. #517, #519, #524, #531 and #546 moved to [T-2088](cli.md).
 
 **Partial (2026-11-17).** 520: `podvm --help` names `port` and `logout` (the text moved to `usage_text.rs`), and the contract test checks that it names each one-word verb, with the names that redirect to `system` as named exceptions. 522: `save -o` writes no line on stdout, and its line on stderr names the file. 521: an unreadable file of `system abi` exits 125, a code of the table. 483 (T-1937): `podvm man` lists the redirects as `system df`, `image prune` and the others. 514 and 523 (T-1952): `inspect` prints one JSON array of each reference in the order given, a container before an image; measured with two containers, a container and an image, a name of both, and a missing name. 532: a bare `profile`, `lab` and `windows` print the help and exit 0. 530: `uname -v` of the syscall tier is `#1 SMP podvm syscall tier`. 533: `run --help` says that `-v` is a bind mount on the namespace rung and that a `-w` in a volume resolves there. 542: the refusal of the machine tier names only the flag given. 513: `--report` refuses an empty path, and its preflight probes the directory where the writer makes its temp file (`/dev/full` is refused before the payload). 519: `probe-inside`, `compare`, `port` and `profile show` answer a missing argument with exit 1 and a line that names it; `login` keeps 125 for a missing flag (a refusal of the flag parser, in the words of the table) and names the flag. 559: `login` keeps docker's `Login Succeeded` on stdout (scripts read it), and says on stderr that the registry checks the login at the next pull. 541 and 543: the `exec` help and `docs/limits.md` say that `exec NAME` enters a running guest, and that an arm64 guest runs. 556: `docs/limits.md` says that `-v` is a bind mount on the namespace rung. 518: the model of the manual takes the arguments of the usage line only (`man/model.rs` `split_usage`), and the rest of the help is a note; `man --roff` has 48 `Usage:` lines with none doubled, and `mandoc -Tlint -Wwarning` passes. 545: `run -t` with no `-i` gives the payload no stdin, as docker's; under `script` the output is `hi\r\n` with no `^@`, and `-i -t` still takes input. Remaining: 517, 519 (`notebook`, `machine ssh`), 524, 531, 546.
 
@@ -7179,3 +7187,41 @@ removal of one of two names of an image removed the lock that a container
 held, and the image then read as not in use. The files now stay where a
 surviving record names the same image. `cargo test --workspace
 --no-fail-fast`: 97 test binaries, each passed.
+
+
+# T-2088: The faults of the external QA of `0.2.0-beta.31` that stay open on `0.2.0-beta.40`
+
+**Source:** the external QA of `0.2.0-beta.31` (2026-11-17), issues 486, 495, 502, 510, 517, 519, 524, 531 and 546, measured again on 2026-11-24 as uid 1000 with the release binary of `0.2.0-beta.40`, or read in the code where it is noted
+**Category:** cli
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+- 486: `lab profiles extra` and `lab scenarios extra` exit 0 and ignore the extra word, as `lab profiles --bogus` does.
+- 495: on the userland rung, `cp` out of a container copies a symbolic link that holds the host path of the tree. Under `scripts/dev/nouserns.c`: `ln -s /tmp/f /ln2` in the container, then `readlink` of the copy gives the path of the tree followed by `/tmp/f`. In the container, `readlink` gives `/tmp/f`.
+- 502: `remote ssh forward exec PROG` exits 0 whatever the status of PROG. In the code, `run_inner` of `crates/podvm-ssh/src/bin/proxy.rs` returns `Ok` after `pump`, and nothing waits for the child.
+- 510: the image form `exec IMAGE CMD` says in its banner and its help that it shares "not the process table, not /proc, not signals". It runs in the process table of the caller, and `kill -0` of the payload of a container gives 0. The container form is fixed (T-2053).
+- 517: a sealed bundle with an empty, a missing or a null `argv` runs the command of the image (a shell with no input) and exits 0. No document says so.
+- 519: `notebook` and `machine ssh` exit 125 for a missing argument, where the exit table gives 1 for a missing argument. `profile show` with no name prints the usage of `profile list`.
+- 524: the `.Digest` that `inspect` prints is no reference for `inspect`, `rmi`, `tag` or `cp` ("no such image"). `.ManifestDigest` and `.PulledAt` are in the JSON, and `--format` refuses them.
+- 531: `build_commit` of `crates/podvm-gate/src/dev/steps.rs` takes the text of a failed `scripts/build-state.py commit` (the build record is not built) as the commit, so `version --verbose` of a source build shows a build error as `commit:`.
+- 546: `README.md`, `docs/architecture.md`, `SECURITY.md` and `docs/limits.md` say that the namespace rung makes no user, PID or UTS namespace. The probe field `rung_must_never_claim` says it too, and the refusal of `--pid` says that there is no PID, IPC, UTS or user namespace to select. The run opens a user, a PID and a UTS namespace (the banner says so).
+
+## Premise
+
+Each item is measured on 2026-11-24 as uid 1000 with `/var/tmp/podvm-current/podvm` (0.2.0-beta.40), except 502 and 531, which are read in the code (the helper `proxy` is not beside the binary there, and the fault of 531 is in the build step, not in the binary).
+
+## Approach
+
+486: refuse an operand of each list verb of `lab`. 495: take the prefix of the tree off the target of a symbolic link on a copy out. 502: wait for the child and give its code (128 plus the signal). 510: write the banner and the help of the image form from the entered rung. 517: refuse an empty `argv` by name, or say in `docs/limits.md` that it keeps the command of the image. 519: exit 1 for the two verbs, and give `profile show` its own usage. 524: take a bare digest as a reference, and add the two fields to `--format`. 531: refuse a failed `build-state.py commit` and pass `unknown`. 546: correct the four documents, the probe field and the refusal.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test --release -p podvm --bin podvm` passes with a test of each item, and the repro of each issue, as uid 1000, gives the refusal or the result of the fix.
