@@ -2487,7 +2487,7 @@ On the cloud host with the interposer objects in place: `cargo test --workspace 
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -2530,7 +2530,7 @@ tag pass their self-tests and run from the session hook.
 
 ## Done
 
-**Partial (2026-11-24).** The take is `a39f4c4f`: each podcrates
+**Done (2026-11-24).** The take is `a39f4c4f`: each podcrates
 dependency and `issue-sync.yml` take `v0.83.0` (`5fd6fb7`).
 `incus::space::transport` matches `ErrorKind::TooLarge`, gives
 `AnswerTimeout` and `Io` the class `Other`, and the words of a full disk
@@ -2545,7 +2545,10 @@ tests). The session hook fetches `watch.py`, `watch_test.py` and `runs.py`
 at `5fd6fb7`, runs both self-tests, and starts both watchers;
 the script runs-watch.py is gone. `AGENTS.md` 2a and 2b are the text
 of the session protocol of podcrates at `v0.83.0`. `sh scripts/dev/checks.sh`
-exits 0. Remaining: the workspace tests and experiment 434 on the tree of
-the take; `Client::image` and `storage_pool_resources` in place of the
-record of the need of an image (T-2078 remaining 1); the COORD issue of
-the take to podcrates.
+exits 0; `cargo test --workspace --no-fail-fast` passes (97 test
+binaries); experiment 434 (`PODVM_434_MIRROR=1`) on the tree of the take
+matches each clause except clause 23, the known flake of incusd's metrics
+(T-2076): the full pool (27), 126 and 127 (28), and the socket that does
+not answer pass. The take is named to podcrates in #663 (COORD-247).
+`Client::image` and `storage_pool_resources` stay for T-2078 (remaining
+1).

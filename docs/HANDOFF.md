@@ -1,107 +1,72 @@
 # Handoff
 
-The state on 2026-11-24, 12:00 (UTC), at the end of a session. `main` is
-at the commit that changes this file or later. `0.2.0-beta.39` is the last
-release (2026-11-24, release run 45353882402 on `a43c9476`, podcrates
-`v0.82.0`). `main` carries podcrates `v0.82.1` and three fixes for
-podrunner after it (below). A fresh session with no memory reads this file
-first, then `AGENTS.md`, `TODO/PROGRESS.md` and `docs/decisions.md`. The
-handoffs of the sessions before 2026-11-23 are in git: `git show
-836c0799:docs/HANDOFF.md`. Remove this file when each step below is done.
+The state on 2026-11-24, 22:00 (UTC), at the end of a session. `main` is
+at the commit that changes this file or later. A fresh session with no
+memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
+`docs/decisions.md`. The handoffs before this one are in git: `git show
+0cb62f18:docs/HANDOFF.md`. Remove this file when each step below is done.
 
-## The rulings of 2026-11-18 that stay in force
+## The rulings that stay in force
 
-* "podrunner first" and "Coordinator" (PodUtils/podcrates#225, COORD-134;
-  `docs/decisions.md`): after a red run of podvm's CI, each ask of
-  podrunner comes first, then the asks of githome and cfb, then podvm's
-  own order. The session of podcrates coordinates; COORD issues are the
-  one channel (PodUtils/podcrates#227, COORD-136). Each session writes its
-  state to the coordinator at its start: podvm's is COORD-184 (#571);
-  amend it. (2026-11-23) The owner closed PodUtils/podcrates#225
-  (COORD-134) on 2026-11-23 as complete.
+* "Watchers" and "Work until done" (2026-11-24, `docs/decisions.md`): the
+  session hook starts `watch.py` and `runs.py` of podcrates (`v0.83.0`) as
+  background processes with logs (`.work/watch.log`, `.work/runs.log`);
+  read the logs and the runs yourself, and never wait for a notice of the
+  harness. Work each step below until it is done or truly blocked; ask the
+  owner only for a decision that only the owner can make.
+* "podrunner first" (2026-11-18): after a red run of podvm's CI, each ask
+  of podrunner comes first.
 * "Schema ids": an added optional field keeps `run-report.v1`; a changed
   or removed field needs `v2` and a COORD issue `(to all)`.
 
-
 ## Where things are
 
-* podcrates is taken at `v0.82.1` (T-2084, `18160173` to `e7c19b16`;
-  #656, COORD-240, closed: PodUtils/podcrates#257 lists the take). A podvm
-  session can not write on PodUtils/podcrates issues (its GitHub access
-  reaches podvm only): each take is a COORD issue of this repository.
-* Each release publishes `ghcr.io/podutils/podvm:TAG` by the job `image`
-  of `release.yml` (`image.yml`, T-1992).
-* The issue-sync bot of a push sets the state of each issue from the
-  record of THAT commit (`TODO/issues.md`, `TODO/github.txt`): close an
-  issue in the record first, in one commit on `main`, before or with the
-  close on GitHub, or the bot reopens it. A peer's own bot does the same
-  on its side (podrunner#339 was reopened and closed again this way).
-* The pkgforge mirrors answer for podvm and podcrates reads, with some
-  403s; retry. Release assets of another repository: the GitHub MCP tool.
-* The cloud host has cgroup v1 (hybrid), no `/dev/kvm`, and after a
-  restart of the container NO running system incusd. Experiment 434
-  (`PODVM_434_MIRROR=1 sh experiments/434-incus-tier.sh`) starts what it
-  needs; for a measurement by hand, start a private incusd
-  (`INCUS_DIR=DIR /usr/libexec/incus/incusd`) and point podvm at it with
-  `PODVM_INCUS_SOCKET`. Clause 23 of experiment 434 (the `oom_kills` of the
-  report of a foreground run, from incusd's metrics) fails now and then
-  (a known flake of incusd, T-2076).
-* `docs/maintenance.md`, "Releases", is the gate of each beta (T-1949):
-  gate, `workloads.yml`, the uid-1000 tests, an outside pass with the
-  binary and `podvm man` only, `arm.yml` and the nightly trial on the bump
-  commit, and an entry "Known gaps". A script for the uid-1000 tests:
-  build the test binaries of `podvm` and `podvm-supervise` (`cargo test
-  --release --no-run --message-format=json`) and run each with `setpriv
-  --reuid 1000 --regid 1000 --clear-groups`, `HOME` and `TMPDIR` in a new
-  directory of mode 777 under `/var/tmp`, `CARGO_MANIFEST_DIR=$PWD/crates/podvm`.
-* The size of the release `podvm` is 9 197 784 bytes at `cd51868e` (the
-  ceiling of call C29 is 9 500 000).
-
-## The sessions of 2026-11-23 and 2026-11-24
-
-* Released `0.2.0-beta.38` (#648) and `0.2.0-beta.39` (#654), each behind
-  the beta gate with an outside pass: the seventh (T-2070: two P1 and three
-  P2 faults fixed, T-2071 to T-2075) and the eighth (T-2079: four P1 faults
-  fixed, T-2080, T-2081 and the rule of `cp`; seven P2 faults fixed). Call
-  C29: the size ceiling is 9 500 000 bytes.
-* podcrates `v0.81.0`, `v0.82.0` (#645) and `v0.82.1` (#656) are taken.
-* podrunner, each answered by a COORD issue: #339 (PAX ACLs, T-2065, closed),
-  #344 (85 layers, T-2068, closed), #345 (the use of a stopped incus
-  instance, T-2076; #649), #346 (a full pool, T-2078; #652), #347 (ask 2:
-  SIGPIPE, T-2082; ask 1: one tree and a gzip upload, T-2085; #658), #349
-  (the readiness of an init on the incus tier, T-2083; #655).
-* Asks to podcrates that stay open: #651 (an answer over the bound keeps
-  its status and head; the resources of a pool), #653 (the exit of an exec
-  that ends with 126 or 127, a bound of each answer, the answer after a
-  failed write), #657 (a stream of the layers as one tar, a writer of gzip
-  members), and the older #602, #604, #584.
-* After `0.2.0-beta.39`, `main` carries T-2083, T-2084 and T-2085; they
-  wait for the next beta.
+* `v0.2.0-beta.40` is released (release run 45436996748 on `e6bf9aeb`,
+  the second attempt; the first stopped in the bootstrap of four builds of
+  the nightly run of the tag, a slow download of zig). Its gate
+  (45420327645), the nightly trial (45420327893), `arm.yml` (45420337077),
+  the job `incus` of `kvm.yml` (45405003660), `workloads.yml`
+  (45390483251), the integration tests as uid 1000 (37 binaries) and the
+  ninth outside pass (T-2087, its three P1 faults fixed) passed. #662
+  (COORD-246) tells podrunner.
+* podcrates `v0.83.0` is taken on `main` after the tag (T-2089, `a39f4c4f`;
+  #663, COORD-247, tells podcrates).
+* The issue cleanup of 2026-11-24: four agents checked each open issue
+  against the code, the record and a run of the beta.40 binary; the record
+  closes 82 of 143 open rows (`TODO/issues.md`), and the plans of the
+  GitHub changes (comments, corrected bodies) are in the scratchpad of the
+  session, applied by step 3. The new entries are T-2088 (the QA faults of
+  beta.31 that stay open) and T-2090 (the QA reports that beta.40 passes).
+* The cause of the stale issues: an issue maps to an umbrella entry (for
+  example T-1951) that stayed partial while most of its findings were
+  fixed; the sync bot keeps an issue open while its row says open, and the
+  body keeps the text of the day it was opened. Map each new issue to the
+  entry of its own finding, and close its row in the same commit as the
+  fix.
+* The bot issue-sync sets each issue from the record of the pushed commit:
+  close an issue in the record first (`TODO/issues.md` and
+  `TODO/github.txt`, pushed), then on GitHub, or the bot reopens it.
+* The cloud host has cgroup v1, no `/dev/kvm`, and an incusd with no
+  AppArmor; a fault that AppArmor or cgroup v2 makes shows only in the job
+  `incus` of `kvm.yml` (experiment 471, about 4 min).
 
 ## Next steps, in order
 
-1. Start the session (`AGENTS.md`, section 8), with the watcher.
-2. Done (2026-11-24): T-2086 (podrunner#350). The AppArmor profile of
-   incus refused the init's mount of the cgroup; the init now takes the
-   cgroup mounts of the instance (`88e1a0d`). Proof: `kvm.yml` job
-   `incus` (experiment 471, new) run 45384508724. Answered by #660
-   (COORD-244); the mount reader is asked of podcrates by #659 (COORD-243).
-3. The next beta (`0.2.0-beta.40`) behind the full beta gate, with
-   T-2083, T-2084, T-2085 and T-2086: name the tag on #655, #658 and #660 and in
-   a COORD "beta.40 is out" to podrunner.
-4. Watch #583, #585, #593, #596, #599, #605, #636, #648, #649, #652, #654,
-   #655, #658, #660 (podrunner) and #602, #604, #584, #651, #653, #657,
-   #659 (podcrates); take the next podcrates tag that has #651, #653, #657
-   or #659.
-5. T-2085 remainder (a run on the hosted runner; the stream of the layers
-   when podcrates gives it), T-2078 remainder (a check of the pool for an
-   image that incus has), T-2069 (the staging files of the store), the
-   open rows of T-2070 and T-2079, T-2054 (items 1, 2, 3 and 5 of OQ-08:
-   close as limits in `docs/limits.md`, or fix).
-6. T-2050 remainder (a machine run with the store's static QEMU), T-2048
-   remainder (a SIGTERM during a save), T-2016, T-2002, T-2014, T-2015,
-   then [the hard problems](history/hard-problems-2026-11-20.md) and the
-   work order of `TODO/PROGRESS.md`.
+1. Watch #662 (podrunner takes beta.40) and #663 (podcrates lists the
+   take of `v0.83.0`); close each with that evidence.
+2. T-2078 remaining 1: `Client::image` and `storage_pool_resources` of
+   pod-incus as the second path beside the record of the need of an image.
+3. The GitHub half of the issue cleanup, if it is not done: the plans
+   `plan-A.json`, `plan-B.json` and `plan-C.json` (one object for each
+   issue: close with a comment, or a new body under which the bot block
+   stays). An issue that the record closed and GitHub keeps open closes at
+   the next push by the bot.
+4. podrunner: #583 (T-1964 pool with a quota, T-1968), #596 and #599 (the
+   hosted snapshot: T-1994, T-1996, T-1998, T-1999), #593 (T-1990,
+   T-1991). Then T-2088 and the open rows of T-2070, T-2079, T-2087.
+5. T-2085 remainder (the stream of the layers when podcrates gives it,
+   #657), T-2054, T-2050, T-2048, then the work order of
+   `TODO/PROGRESS.md`.
 
 ## Rules learned
 
@@ -144,8 +109,11 @@ handoffs of the sessions before 2026-11-23 are in git: `git show
   Claude Code" from an issue body, at the end or before the block
   (measured on #644 to #648, 2026-11-23). The sync does not remove it. A
   session writes the footer each time; it cannot make it stay.
-* The watcher pin `f76099d` stops on a cut answer of the API
-  (`IncompleteRead`); the pin `ed6d84c` of `AGENTS.md` retries it.
+* Two watchers and a `--until` at 30 s spent the keyless reads of the
+  forge in minutes (the rule is in `AGENTS.md`, section 9).
+* A job of a workflow can end at its time limit while its bootstrap waits
+  for ziglang.org (6 to 15 min on 2026-11-24): a cancelled run is not a
+  pass; read the step, and run the failed jobs again.
 * A worktree under `.claude/worktrees/` is the place for record and docs
   commits while an agent holds the main checkout: `git push origin
   HEAD:main` from it, then tell the agent that `main` moved. The prebuilt

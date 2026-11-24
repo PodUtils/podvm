@@ -8,6 +8,19 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Changed: podcrates `v0.83.0`, the bounds of each answer of incusd, 2026-11-24
+
+Record: T-2089.
+Deployed: not deployed; on main, for the next beta after 0.2.0-beta.40.
+
+- On the incus tier, each silence of incusd ends after 30 s with one line
+  that names the socket, for each call, not only the first.
+- An exec that ends with 126 or 127 gives its code from pod-incus, with no
+  second read of the operation of incusd.
+- On a full pool, the error of tar comes from incusd with its text cut;
+  podvm reads its words of a full disk and gives the line of the room of
+  the pool, as before.
+
 ## 0.2.0-beta.40 (2026-11-24)
 
 ### Known gaps: what the checks of 0.2.0-beta.40 prove, and what stays open, 2026-11-24

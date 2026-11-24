@@ -725,12 +725,12 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2086](machine.md) | P1 | M | none | machine | done | On a hosted runner with cgroup v2, `inspect` of an ended incus instance gives no peak memory and no OOM kill of a child |
 | [T-2087](cli.md) | P1 | M | none | cli | partial | The faults of the ninth outside pass (2026-11-24, the gate of 0.2.0-beta.40) |
 | [T-2088](cli.md) | P2 | M | none | cli | open | The faults of the external QA of `0.2.0-beta.31` that stay open on `0.2.0-beta.40` |
-| [T-2089](deps.md) | P1 | M | none | deps | partial | Take podcrates `v0.83.0`: the classes and the bounds of pod-incus, the exit of an exec with 126 or 127, the mounts of a cgroup, the shared watchers |
+| [T-2089](deps.md) | P1 | M | none | deps | done | Take podcrates `v0.83.0`: the classes and the bounds of pod-incus, the exit of an exec with 126 or 127, the mounts of a cgroup, the shared watchers |
 | [T-2090](gate.md) | P2 | S | none | gate | done | The external QA of `0.2.0-beta.31`: the reports that `0.2.0-beta.40` passes |
 
 ## Counts
 
-661 entries: 23 open, 44 partial, 5 blocked, 589 done.
+661 entries: 23 open, 43 partial, 5 blocked, 590 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -740,10 +740,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 23 | 0 | 268 | 294 |
+| P1 | 3 | 22 | 0 | 269 | 294 |
 | P2 | 15 | 16 | 4 | 201 | 236 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 23 | 44 | 5 | 589 | 661 |
+| **All** | 23 | 43 | 5 | 590 | 661 |
 
 ## Work order
 

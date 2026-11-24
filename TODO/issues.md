@@ -544,17 +544,19 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #648 | COORD-232: v0.2.0-beta.38 is out (to podrunner) | closed (superseded by `v0.2.0-beta.40`) | T-1949, T-2065, T-2066, T-2068, T-2070 |
 | #649 | COORD-233: the answer to PodUtils/podrunner#345: inspect of a stopped incus instance gives CpuSeconds, PeakMemoryBytes and OomKills on main (to podrunner) | closed (released in `v0.2.0-beta.39` (T-2076, T-2077); the use of an ended instance on cgroup v2 is #660) | T-2076, T-2077 |
 | #650 | COORD-234: a reader of the usage of a cgroup (CPU time, peak memory, OOM kills; v2 and v1) for pod-hostprobe::cgroup (to podcrates) | closed (podcrates v0.82.1 has pod_hostprobe::usage; taken in 39a85246 (#656); PodUtils/podcrates#257 lists the take) | T-2076, T-2084 |
-| #651 | COORD-235: an answer over the bound keeps its status, its size, the bound and its head; the resources of a storage pool (to podcrates) | open | T-2078 |
+| #651 | COORD-235: an answer over the bound keeps its status, its size, the bound and its head; the resources of a storage pool (to podcrates) | closed (podcrates v0.83.0 has ErrorKind::TooLarge and the resources of a pool and of an image, PodUtils/podcrates#259; taken in a39f4c4f, #663) | T-2078 |
 | #652 | COORD-236: the answer to PodUtils/podrunner#346: a full storage pool gave "the response body is larger than allowed"; podvm now refuses an image that cannot fit and names the free space (to podrunner) | open | T-2078 |
-| #653 | COORD-237: pod-incus: the exit code of an exec that ends with 126 or 127, a bound of each answer, the answer after a failed write (to podcrates) | open | T-2080, T-2082 |
+| #653 | COORD-237: pod-incus: the exit code of an exec that ends with 126 or 127, a bound of each answer, the answer after a failed write (to podcrates) | closed (podcrates v0.83.0 gives 126 and 127 and bounds each answer, PodUtils/podcrates#259; taken in a39f4c4f, #663) | T-2080, T-2082 |
 | #654 | COORD-238: v0.2.0-beta.39 is out (to podrunner) | closed (superseded by `v0.2.0-beta.40`) | T-1949, T-2076, T-2077, T-2078, T-2079, T-2080, T-2081, T-2082 |
-| #655 | COORD-239: the answer to PodUtils/podrunner#349: "offline" of systemd is not final for --podvm-init=image on the incus tier (to podrunner) | open | T-2083 |
+| #655 | COORD-239: the answer to PodUtils/podrunner#349: "offline" of systemd is not final for --podvm-init=image on the incus tier (to podrunner) | closed (in 0.2.0-beta.40, release run 45436996748; named in #662, COORD-246) | T-2083 |
 | #656 | COORD-240: podvm took v0.82.1 (to podcrates) | closed (PodUtils/podcrates#257 lists the take of v0.82.1) | T-2084, T-2054, T-2076 |
 | #657 | COORD-241: a stream of the layers of an image as one tar, and a writer of gzip members (to podcrates) | open | T-2085 |
-| #658 | COORD-242: the answer to PodUtils/podrunner#347: an import of a large image keeps one tree and a gzip upload on the incus tier (to podrunner) | open | T-2085, T-2082 |
-| #659 | COORD-243: pod_hostprobe::usage: open the meter from the cgroup mounts of mountinfo, where a mount of cgroup is refused (to podcrates) | open | T-2086 |
-| #660 | COORD-244: the answer to PodUtils/podrunner#350: on a host with AppArmor the init could not mount the cgroup; the record of the stop now holds on cgroup v2 (to podrunner) | open | T-2086 |
-| #661 | COORD-245: the owner's rulings "Watchers" and "Work until done" of 2026-11-24, and a shared watcher of the Actions runs of a repository (to podcrates) | open | none: the rulings (docs/decisions.md, 2026-11-24) and an ask of a shared tool |
+| #658 | COORD-242: the answer to PodUtils/podrunner#347: an import of a large image keeps one tree and a gzip upload on the incus tier (to podrunner) | closed (in 0.2.0-beta.40, release run 45436996748; named in #662, COORD-246) | T-2085, T-2082 |
+| #659 | COORD-243: pod_hostprobe::usage: open the meter from the cgroup mounts of mountinfo, where a mount of cgroup is refused (to podcrates) | closed (podcrates v0.83.0 has pod_hostprobe::usage::Mounts, PodUtils/podcrates#259; taken in a39f4c4f, #663) | T-2086 |
+| #660 | COORD-244: the answer to PodUtils/podrunner#350: on a host with AppArmor the init could not mount the cgroup; the record of the stop now holds on cgroup v2 (to podrunner) | closed (in 0.2.0-beta.40, release run 45436996748; named in #662, COORD-246) | T-2086 |
+| #661 | COORD-245: the owner's rulings "Watchers" and "Work until done" of 2026-11-24, and a shared watcher of the Actions runs of a repository (to podcrates) | closed (podcrates v0.83.0 has runs.py, PodUtils/podcrates#259; taken in a39f4c4f, #663) | none: the rulings (docs/decisions.md, 2026-11-24) and an ask of a shared tool |
+| #662 | COORD-246: v0.2.0-beta.40 is out (to podrunner) | open | T-1949, T-2086, T-2087 |
+| #663 | COORD-247: podvm took podcrates v0.83.0 in a39f4c4f (the answer to PodUtils/podcrates#259) (to podcrates) | open | T-2089 |
 
 ## Messages whose title does not start with COORD-NNN
 
