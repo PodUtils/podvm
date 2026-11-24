@@ -493,4 +493,5 @@ fn a_key_lock_is_exclusive_and_takes_only_a_plain_key() {
     for bad in ["", "../x", "a/b", "a b", "\u{e9}", &"a".repeat(129)] {
         assert!(s.try_lock_key(bad).is_err(), "{bad:?}");
     }
+    let _ = std::fs::remove_dir_all(s.root()); // TODO/gate.md T-1859
 }
