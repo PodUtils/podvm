@@ -8,6 +8,23 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Changed: podcrates `v0.82.1`, the processes of podvm in the PID namespace of a run, 2026-11-24
+
+Record: T-2084, T-2054, T-2076.
+Deployed: not deployed; on main, for the next beta after 0.2.0-beta.39.
+
+- The init of `run -d` on the namespace rung and the relay of `exec` are
+  not dumpable, and the payload cannot read their memory, their
+  environment or their namespaces as a user with no root. The process of
+  podvm's own join (`podvm-exec`) is not dumpable either: before, a
+  payload could read the variables of the caller of `exec` in its memory.
+- `exec`, `exec -t` and `cp` into a run of a user with no root join the
+  payload of the run, not its init. An `exec` of an older podvm does not
+  join a run of this one.
+- On the incus tier, `inspect` of a stopped instance takes the CPU time
+  and the OOM kills from cgroup2 on Linux 5.8 to 5.18 too; the peak memory
+  is then a dash, and `inspect --verbose` gives the reason.
+
 ### Fixed: the boot of `--podvm-init=image` on the incus tier, 2026-11-24
 
 Record: T-2083.
@@ -194,7 +211,7 @@ Deployed: version 0.2.0-beta.38.
   `--podvm-mem` from 13/4 of its initrd and 512 MiB, not three times and
   512 MiB: under KVM an initrd of 2055 MiB needs 6656 MiB, one step under
   the old estimate (T-2047, experiment 470, `kvm.yml` run 44854125431).
-- podvm takes podcrates `v0.80.0` (PodUtils/podcrates#250). `pod-enter` writes the write table of the confine layer (`PODVM_WRITE_HOST`) for the entry with no chroot, and each entry removes a value of the caller (podcrates@T-999). The payload of each entry starts with an empty signal mask (podcrates@T-1010).
+- podvm takes podcrates `v0.80.0` (PodUtils/podcrates#250). `pod-enter` writes the write table of the confine layer (`PODVM_WRITE_HOST`) for the entry with no chroot, and each entry removes a value of the caller (podcrates@T-999). The payload of each entry starts with an empty signal mask (podcrates task 1010).
 - podvm no longer writes the write table of the confine layer itself: `pod-enter` writes it from the spec of the plan (`podvm_supervise::table::set_write_table` is gone; T-2050).
 - The open of a volume under `--podvm-volume-base` is the crate `pod-beneath` of podcrates on each route (the namespace rung, the syscall tier and the interposer of the loader family), in place of three copies of podvm; each open tries `EAGAIN` again (T-2050, #611).
 - A chain of five `#!` scripts runs on the userland rung, the syscall tier and through the interposer, as the kernel runs it; a sixth level is `ELOOP` (T-2050). Before, podvm refused a chain of five.
@@ -202,11 +219,11 @@ Deployed: version 0.2.0-beta.38.
 - Each thread of a relay of a foreground run blocks the one list of forwarded signals of podcrates (`pod_enter::block_forwarded`); on aarch64 the relay of `-t` no longer calls a wrong system call to block them (T-2050, #616).
 - The end of the tree of a detached run whose payload holds the init of a PID namespace and a second process of it takes milliseconds, not 5 s (`pod-supervise` of podcrates `v0.80.0`; T-2018, #624).
 - podvm takes podcrates `v0.81.0` (PodUtils/podcrates#254; T-2066).
-- podvm takes podcrates `v0.82.0` (T-2066). A layer of GNU tar `--acls` extracts: each ACL in a PAX record `SCHILY.acl.access` or `SCHILY.acl.default`, one entry on each line, is set as `system.posix_acl_access` or `system.posix_acl_default`, or the sidecar names it as not set, and the mode of each entry stays (podcrates@T-1086; T-2065, #643, PodUtils/podrunner#339). Before, the newline byte refused the layer whole.
-- A layer that holds a GNU sparse file (`GNU.sparse.*` records) is refused: the `tar` reader gives its data with no holes, under another name (podcrates@T-1087).
-- An `execve` that finds the program and fails with `E2BIG`, `EINVAL` or `ELIBBAD` exits 126, as with `EPERM`, `ENOEXEC`, `EACCES`, `EISDIR` and `ETXTBSY`; a refused file on `PATH` is the answer also when a later directory has no such file (`pod-enter`, podcrates@T-1080, #639). podvm no longer reads the text of the error for E2BIG (T-2062).
+- podvm takes podcrates `v0.82.0` (T-2066). A layer of GNU tar `--acls` extracts: each ACL in a PAX record `SCHILY.acl.access` or `SCHILY.acl.default`, one entry on each line, is set as `system.posix_acl_access` or `system.posix_acl_default`, or the sidecar names it as not set, and the mode of each entry stays (podcrates task 1086; T-2065, #643, PodUtils/podrunner#339). Before, the newline byte refused the layer whole.
+- A layer that holds a GNU sparse file (`GNU.sparse.*` records) is refused: the `tar` reader gives its data with no holes, under another name (podcrates task 1087).
+- An `execve` that finds the program and fails with `E2BIG`, `EINVAL` or `ELIBBAD` exits 126, as with `EPERM`, `ENOEXEC`, `EACCES`, `EISDIR` and `ETXTBSY`; a refused file on `PATH` is the answer also when a later directory has no such file (`pod-enter`, podcrates task 1080, #639). podvm no longer reads the text of the error for E2BIG (T-2062).
 - The save of the state of a Linux guest of the machine tier is `pod_guest::warm::line` of podcrates: one connection to the monitor of the emulator, whose connect has a bound (#633), the late answer of `query-migrate` read on it, the pipe after a refused `file:` save, and the guest goes on after each failure. The record of a state is the one of the crate (`STATE.record`); a state of the old layout is not loaded, and the guest boots once and saves a new state. A failed save names the first transport, the cause, the free space and the monitor in one line (T-2051, T-2048).
-- The store copy of QEMU for a host with none is the static QEMU 11.1.3 of PodUtils/static-pkgs (release `qemu-11.1.3`, the service `static-pkgs-qemu` of `pod-services`), in place of QEMU 9.2.0 of pkgforge. It holds the fix of the use-after-free of `address_space_translate_for_iotlb` (T-2016, #618) and the migration of an NVMe device, so `podvm windows doctor` passes its check of a warm start (QEMU 11.1 or later, podcrates@T-1035) with it. podvm checks each archive and each member that it takes by its size and sha256.
+- The store copy of QEMU for a host with none is the static QEMU 11.1.3 of PodUtils/static-pkgs (release `qemu-11.1.3`, the service `static-pkgs-qemu` of `pod-services`), in place of QEMU 9.2.0 of pkgforge. It holds the fix of the use-after-free of `address_space_translate_for_iotlb` (T-2016, #618) and the migration of an NVMe device, so `podvm windows doctor` passes its check of a warm start (QEMU 11.1 or later, podcrates task 1035) with it. podvm checks each archive and each member that it takes by its size and sha256.
 - `logs --podvm-tier=incus` reads the log in pieces of 64 KiB from the offset that it wrote last (`Client::get_file_to` of `pod-incus`), so a log larger than 64 MiB is no longer refused. `logs` takes the stream of a log of `pod-supervise`, and each read of a log refuses a symbolic link at its place (T-2046, #631).
 - Each atomic replace of a file of podvm (the report of a run and of a container, the hold state of an init, the record of a machine, the probe cache, the cache of the completion, a pulled base) is `pod_core::files::replace`: a temporary file with a name of its own that goes away on each failure, mode 0644, a sync of the file and of its directory, and an error that names the step and the path (T-2066).
 - `inspect --format` gives each field its docker type: `{{json .Config.Env}}` is a list, `{{.Config.Cmd}}` prints `[python3]`, `{{json .Labels}}` is a map, and `Pid`, `ExitCode` and the counts of `End` are numbers. Plain `inspect` and `--format` read one model of the fields. A container has docker's `Config` (T-2060, OQ-06).
