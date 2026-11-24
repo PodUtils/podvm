@@ -23,7 +23,10 @@ jobs:
   todo:
     name: TODO index and citations
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 2026-11-24: the job takes about 13 min (the check "every check can
+    # fail" about 11), and a slow download of zig made the bootstrap 6 to
+    # 10 min: 15 cancelled the gate of the beta.40 bump twice.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -225,7 +225,9 @@ watches them.
    (forge API of pkgforge, no token). Start it beside the first one, and
    for a push or a dispatch that a step waits for, run it with `--until
    SHA`: it exits 0 green, 1 red (with the failed jobs and steps), 3 when
-   each run was cancelled, 2 at its timeout. A session of a repository
+   a run was cancelled (a newer push or a time limit: run it again), 2 at
+   its timeout. Where the forge refuses reads (a 403), read the runs with
+   the GitHub tool of the harness. A session of a repository
    with no such script takes the one of a sibling (the script
    watch-runs.sh of podcrates or podnet, or this one) before it writes one.
 

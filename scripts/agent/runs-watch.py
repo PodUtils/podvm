@@ -18,12 +18,11 @@ asks podcrates to take this script as the shared one.
 
 --until SHA  poll until each run of the commit SHA (a prefix is enough)
              ended; exit 0 when each one is green (success or skipped), 1
-             when one is red, 2 at the timeout or when the API does not
-             answer. A run that a newer push cancelled counts as neither:
-             the line says so, and the exit is 3 when only cancelled runs
-             are left.
+             when one is red, 3 when one was cancelled (a newer push or a
+             time limit) and none is red, 2 at the timeout or when the API
+             does not answer.
 --once       one poll, print the state of each run of the newest commit,
-             then exit.
+             then exit 0; exit 2 where the API gave no list.
 
 The answers of the service: 429 and 503 wait for Retry-After; 502 waits
 with backoff; another error (a 403: keyless callers share GitHub's 60
@@ -122,6 +121,9 @@ def main(argv):
     wait = every
     while True:
         rs = runs(repo, branch)
+        if rs is None and once:
+            say("the API gave no list of runs")
+            return 2
         if rs is None:
             wait = min(wait * 2, 600)
             say(f"the API gave no list of runs; the next poll in {wait} s")
@@ -156,8 +158,11 @@ def main(argv):
                     if ends - GREEN - {"cancelled"}:
                         say(f"{until}: RED")
                         return 1
-                    if ends <= {"cancelled"}:
-                        say(f"{until}: each run was cancelled")
+                    if "cancelled" in ends:
+                        # A run that a newer push or a time limit cancelled
+                        # proves nothing: GREEN needs each run green.
+                        names = [r["name"] for r in mine if r.get("conclusion") == "cancelled"]
+                        say(f"{until}: not green: cancelled: {', '.join(names)}")
                         return 3
                     say(f"{until}: GREEN")
                     return 0
