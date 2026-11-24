@@ -230,8 +230,8 @@ watches them.
    watch-runs.sh of podcrates or podnet, or this one) before it writes one.
 
    ```sh
-   nohup python3 -I scripts/agent/runs-watch.py --every 60 >.work/runs.log 2>&1 &
-   python3 -I scripts/agent/runs-watch.py --until "$(git rev-parse HEAD)" --every 30
+   nohup python3 -I scripts/agent/runs-watch.py --every 120 >.work/runs.log 2>&1 &
+   python3 -I scripts/agent/runs-watch.py --until "$(git rev-parse HEAD)" --every 120
    ```
 
    It prints one line for each event: each issue and pull request of this

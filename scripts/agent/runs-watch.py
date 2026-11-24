@@ -26,7 +26,10 @@ asks podcrates to take this script as the shared one.
              then exit.
 
 The answers of the service: 429 and 503 wait for Retry-After; 502 waits
-with backoff; another error is one line on stderr and the poll goes on.
+with backoff; another error (a 403: keyless callers share GitHub's 60
+reads an hour of each egress address) is one line on stderr, and the next
+poll waits twice as long, up to 600 s, until a poll passes again. Keep
+--every at 120 or more where other readers share the address.
 """
 
 import json
@@ -93,7 +96,7 @@ def runs(repo, branch):
 
 
 def main(argv):
-    opt = {"--repo": "PodUtils/podvm", "--branch": "main", "--every": "60",
+    opt = {"--repo": "PodUtils/podvm", "--branch": "main", "--every": "120",
            "--until": None, "--timeout": "3600"}
     once = False
     it = iter(argv)
@@ -116,11 +119,14 @@ def main(argv):
         return 2
     seen = {}
     start = time.monotonic()
+    wait = every
     while True:
         rs = runs(repo, branch)
         if rs is None:
-            say("the API gave no list of runs")
+            wait = min(wait * 2, 600)
+            say(f"the API gave no list of runs; the next poll in {wait} s")
         else:
+            wait = every
             if once:
                 head = rs[0]["head_sha"] if rs else ""
                 for r in rs:
@@ -158,7 +164,7 @@ def main(argv):
         if until and time.monotonic() - start > timeout:
             say(f"{until}: no end within {timeout} s")
             return 2
-        time.sleep(every)
+        time.sleep(wait)
 
 
 if __name__ == "__main__":

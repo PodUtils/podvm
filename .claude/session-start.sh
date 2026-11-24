@@ -55,7 +55,7 @@ else
   echo "session-start: the watcher of the organization runs already; its log is .work/watch.log"
 fi
 if ! pgrep -f "scripts/agent/runs-watch.py --every" >/dev/null 2>&1; then
-  nohup python3 -I scripts/agent/runs-watch.py --every 60 >>.work/runs.log 2>&1 </dev/null &
+  nohup python3 -I scripts/agent/runs-watch.py --every 120 >>.work/runs.log 2>&1 </dev/null &
   echo "session-start: the watcher of the Actions runs runs; its log is .work/runs.log"
 else
   echo "session-start: the watcher of the Actions runs runs already; its log is .work/runs.log"

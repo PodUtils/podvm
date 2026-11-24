@@ -8,6 +8,23 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: the usage of an ended incus instance on a host with AppArmor and cgroup v2, 2026-11-24
+
+Record: T-2086; PodUtils/podrunner#350.
+Deployed: not deployed; on main, for the next beta after 0.2.0-beta.39.
+
+- On a host with AppArmor (a hosted ubuntu-24.04 runner with incus of
+  apt), `inspect --podvm-tier=incus` of a stopped instance gave a dash for
+  `CpuSeconds` and `PeakMemoryBytes` and 0 for `OomKills`: the profile of
+  incus refused the init's mount of the cgroup file systems. The init now
+  takes the cgroup mounts that the instance has from its start. Measured
+  on such a runner: a load that the shell counted at 13.22 s gives
+  `13.270 136134656 0`, and an OOM kill of a child under `--memory 256m`
+  gives `OomKills` 1.
+- The peak is the high mark of the kernel for the cgroup of the instance
+  (`memory.peak` of cgroup v2), not a sample: it counts the page cache
+  and the kernel memory of the instance too.
+
 ### Fixed: the import of a large image keeps at most one full copy beside the upload on the incus tier, 2026-11-24
 
 Record: T-2085, T-2078; PodUtils/podrunner#347 (ask 1).
