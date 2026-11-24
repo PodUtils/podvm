@@ -7,7 +7,7 @@ start.
 
 ## State
 
-658 entries: 22 open, 48 partial, 5 blocked, 583 done.
+659 entries: 23 open, 43 partial, 5 blocked, 588 done.
 
 * The newest release is `v0.2.0-beta.40` (2026-11-24). [CHANGELOG](../CHANGELOG.md)
   holds what each release ships, with its known gaps.
@@ -49,9 +49,8 @@ status with `podvm-count` in the same commit as the work.
 3. Quality first (the owner's ruling, 2026-11-17;
    `docs/methodology/quality.md`): each beta passes the gate of
    `docs/maintenance.md`, "Releases". Work the open entries of the external
-   QA of `0.2.0-beta.31` (T-1937 to T-1941, T-1943, T-1944 and T-1951 to T-1954)
-   by their class, with T-1947 (fail safe at the edges) and T-1948
-   (messages from the entered mechanism). The harness of the CLI
+   QA of `0.2.0-beta.31` (T-2088, T-1938 to T-1941 and T-1952 to T-1954)
+   by their class, with T-1947 (fail safe at the edges). The harness of the CLI
    (`tests/cli_contract.rs`) guards the surface.
 4. [T-1911](probe.md): `-u UID` in the user namespace (the range is opt-in
    until each verb keeps the store rule).
