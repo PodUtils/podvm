@@ -25,6 +25,10 @@ use std::time::{Duration, Instant};
 
 use pod_hostprobe::usage;
 
+pub mod mounts;
+use mounts::fs_magic;
+use mounts::Mounted;
+
 /// The usage of the instance at the end of its command, written by its init.
 pub const USAGE: &str = "/.podvm/usage";
 /// The directory of podvm's files in the instance.
@@ -186,11 +190,27 @@ impl Meter {
     /// `cpuacct`). The `cpu.stat` of a cgroup2 with no controllers is that
     /// of the host on a host with both versions: it is not taken. Each
     /// hierarchy is mounted at [`MOUNT`] in turn; the open files keep it.
+    ///
+    /// TODO/machine.md T-2086 (PodUtils/podrunner#350): where that mount
+    /// gives fewer values than the cgroup mounts that the instance has from
+    /// its start ([`Mounted`]), the meter takes those. The AppArmor profile
+    /// of incus allows a cgroup mount only under `/sys/fs/cgroup`, so on a
+    /// host with AppArmor the mount at [`MOUNT`] fails and each value was a
+    /// dash.
     pub fn open() -> Meter {
+        let own = Self::own_mount();
+        let info = std::fs::read_to_string("/proc/self/mountinfo").unwrap_or_default();
+        let at = Mounted::of(&info).checked(&fs_magic);
+        Meter(better(own, at.meter()))
+    }
+
+    /// The meter of the cgroup file systems that the init mounts at
+    /// [`MOUNT`] in turn.
+    fn own_mount() -> usage::Meter {
         let mut m = usage::Meter::default();
         if let Err(e) = std::fs::create_dir_all(MOUNT) {
             m.note(format!("{MOUNT}: {e}"));
-            return Meter(m);
+            return m;
         }
         let at = Path::new(MOUNT);
         match with_mount("cgroup2", None, || usage::Meter::v2(at)) {
@@ -212,13 +232,39 @@ impl Meter {
             }
         }
         let _ = std::fs::remove_dir(MOUNT);
-        Meter(m)
+        m
     }
 
     /// The values of the files now.
     pub fn read(&mut self) -> Measure {
         self.0.read().into()
     }
+}
+
+/// The meter of the two that reads more values now: `own` (the mount at
+/// [`MOUNT`]) where both read as many. Where `theirs` serves, each reason
+/// of `own` stays in [`Measure::why`], named as the mount's.
+pub fn better(mut own: usage::Meter, mut theirs: usage::Meter) -> usage::Meter {
+    let first = own.read();
+    if count(&theirs.read()) > count(&first) {
+        for n in first.why {
+            theirs.note(format!("the mount at {MOUNT}: {n}"));
+        }
+        return theirs;
+    }
+    own
+}
+
+/// The count of the values of a read.
+fn count(u: &usage::Usage) -> usize {
+    [
+        u.cpu_usec.is_some(),
+        u.peak_bytes.is_some(),
+        u.oom_kills.is_some(),
+    ]
+    .iter()
+    .filter(|v| **v)
+    .count()
 }
 
 /// The root of the init when it started. A command with root in the

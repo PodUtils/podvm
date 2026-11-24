@@ -184,3 +184,200 @@ fn the_usage_file_reads_back() {
     let none = Measure::parse(&Measure::default().to_json()).unwrap();
     assert_eq!(none, Measure::default());
 }
+
+/// TODO/machine.md T-2086 (PodUtils/podrunner#350): one rule for each
+/// line of mountinfo: a cgroup mount counts only where it shows the root
+/// of its hierarchy, at an absolute path, with its escapes undone; the
+/// last line of a kind wins; and a mount point whose file system is not
+/// the one that mountinfo names does not count.
+#[test]
+fn the_cgroup_mounts_of_the_instance_come_from_mountinfo() {
+    use super::usage::mounts::{Mounted, CGROUP_SUPER_MAGIC};
+    use std::path::{Path, PathBuf};
+    const V2: u64 = pod_hostprobe::cgroup::CGROUP2_SUPER_MAGIC;
+    let p = |s: &str| Some(PathBuf::from(s));
+    let line2 = |root: &str, at: &str| {
+        format!("35 30 0:30 {root} {at} rw,nosuid,nodev,noexec,relatime - cgroup2 cgroup2 rw,nsdelegate\n")
+    };
+    let line1 = |at: &str, opts: &str| {
+        format!(
+            "40 30 0:40 / {at} rw,nosuid,nodev,noexec,relatime shared:9 - cgroup cgroup {opts}\n"
+        )
+    };
+    let hybrid = format!(
+        "{}{}{}",
+        line1("/sys/fs/cgroup/memory", "rw,memory"),
+        line1("/sys/fs/cgroup/cpu,cpuacct", "rw,cpu,cpuacct"),
+        line2("/", "/sys/fs/cgroup/unified")
+    );
+    let all = |_: &Path| None::<u64>;
+    let true_fs = |p: &Path| {
+        Some(if p.ends_with("memory") || p.ends_with("cpu,cpuacct") {
+            CGROUP_SUPER_MAGIC
+        } else {
+            V2
+        })
+    };
+    // (case, mountinfo, the mounts, the mounts after the check of true_fs)
+    let rows: Vec<(&str, String, Mounted)> = vec![
+        (
+            "cgroup2 of a hosted runner",
+            line2("/", "/sys/fs/cgroup"),
+            Mounted {
+                v2: p("/sys/fs/cgroup"),
+                ..Mounted::default()
+            },
+        ),
+        (
+            "a sub-tree of cgroup2 is another cgroup",
+            line2("/lxc.payload.u1", "/sys/fs/cgroup"),
+            Mounted::default(),
+        ),
+        (
+            "the hybrid layout",
+            hybrid.clone(),
+            Mounted {
+                v2: p("/sys/fs/cgroup/unified"),
+                memory: p("/sys/fs/cgroup/memory"),
+                cpuacct: p("/sys/fs/cgroup/cpu,cpuacct"),
+            },
+        ),
+        (
+            "an option that only starts with memory",
+            line1("/sys/fs/cgroup/m", "rw,memoryx,cpuacctx"),
+            Mounted::default(),
+        ),
+        (
+            "an escaped space",
+            line2("/", "/sys/fs/cgroup/a\\040b"),
+            Mounted {
+                v2: p("/sys/fs/cgroup/a b"),
+                ..Mounted::default()
+            },
+        ),
+        (
+            "a bad escape",
+            line2("/", "/sys/fs/cgroup/a\\04x"),
+            Mounted::default(),
+        ),
+        (
+            "a cut escape",
+            line2("/", "/sys/fs/cgroup/a\\04"),
+            Mounted::default(),
+        ),
+        (
+            "a path that is not absolute",
+            line2("/", "sys/fs/cgroup"),
+            Mounted::default(),
+        ),
+        (
+            "no separator",
+            "35 30 0:30 / /sys/fs/cgroup rw cgroup2 cgroup2 rw\n".into(),
+            Mounted::default(),
+        ),
+        (
+            "too few fields",
+            "35 30 0:30 / - cgroup2\n".into(),
+            Mounted::default(),
+        ),
+        (
+            "another file system",
+            "35 30 0:30 / /sys/fs/cgroup rw - tmpfs tmpfs rw\n".into(),
+            Mounted::default(),
+        ),
+        (
+            "the last line of a kind wins",
+            format!("{}{}", line2("/", "/a"), line2("/", "/b")),
+            Mounted {
+                v2: p("/b"),
+                ..Mounted::default()
+            },
+        ),
+        ("empty", String::new(), Mounted::default()),
+    ];
+    for (case, info, want) in rows {
+        let got = Mounted::of(&info);
+        assert_eq!(got, want, "{case}");
+        assert_eq!(
+            Mounted::of(&info).checked(&true_fs),
+            want,
+            "{case}: the true file systems"
+        );
+        assert_eq!(
+            Mounted::of(&info).checked(&all),
+            Mounted::default(),
+            "{case}: no statfs"
+        );
+    }
+    // A tmpfs over the mount point of cgroup2 hides it; v1 stays.
+    let over = |p: &Path| {
+        if p.ends_with("unified") {
+            Some(0x0102_1994)
+        } else {
+            true_fs(p)
+        }
+    };
+    let got = Mounted::of(&hybrid).checked(&over);
+    assert_eq!(got.v2, None);
+    assert_eq!(got.memory, p("/sys/fs/cgroup/memory"));
+}
+
+/// TODO/machine.md T-2086: of the mount of the init and the mounts of the
+/// instance, the meter that reads more values serves; the mount of the
+/// init where both read as many. The reasons of a mount that did not serve
+/// stay, named as its own.
+#[test]
+fn the_meter_that_reads_more_values_serves() {
+    use pod_hostprobe::usage::Meter;
+    let dir = super::tests::scratch("t2086-meter");
+    std::fs::write(dir.join("cpu.stat"), "usage_usec 2500000\nuser_usec 1\n").unwrap();
+    std::fs::write(dir.join("memory.peak"), "67108864\n").unwrap();
+    std::fs::write(
+        dir.join("memory.events"),
+        "low 0\nhigh 0\nmax 3\noom 1\noom_kill 1\n",
+    )
+    .unwrap();
+    let full = || Meter::open(Some(&dir), None, None);
+    let mut denied = Meter::default();
+    denied.note("mount -t cgroup2: Permission denied (os error 13)");
+    // (case, own, theirs, the values, a word of why)
+    type Row = (
+        &'static str,
+        Meter,
+        Meter,
+        [Option<u64>; 3],
+        Option<&'static str>,
+    );
+    let rows: Vec<Row> = vec![
+        (
+            "a denied mount: the mounts of the instance",
+            denied,
+            full(),
+            [Some(2_500_000), Some(67_108_864), Some(1)],
+            Some("the mount at /.podvm/.meter: mount -t cgroup2: Permission denied"),
+        ),
+        (
+            "both read each value: the mount of the init",
+            full(),
+            full(),
+            [Some(2_500_000), Some(67_108_864), Some(1)],
+            None,
+        ),
+        (
+            "neither reads a value: the mount of the init",
+            Meter::default(),
+            Meter::default(),
+            [None, None, None],
+            Some("no cgroup file is open"),
+        ),
+    ];
+    for (case, own, theirs, want, why) in rows {
+        let u = super::usage::better(own, theirs).read();
+        assert_eq!([u.cpu_usec, u.peak_bytes, u.oom_kills], want, "{case}");
+        match why {
+            Some(w) => assert!(u.why.iter().any(|l| l.contains(w)), "{case}: {:?}", u.why),
+            None => assert!(u.why.is_empty(), "{case}: {:?}", u.why),
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
