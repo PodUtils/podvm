@@ -554,6 +554,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #658 | COORD-242: the answer to PodUtils/podrunner#347: an import of a large image keeps one tree and a gzip upload on the incus tier (to podrunner) | open | T-2085, T-2082 |
 | #659 | COORD-243: pod_hostprobe::usage: open the meter from the cgroup mounts of mountinfo, where a mount of cgroup is refused (to podcrates) | open | T-2086 |
 | #660 | COORD-244: the answer to PodUtils/podrunner#350: on a host with AppArmor the init could not mount the cgroup; the record of the stop now holds on cgroup v2 (to podrunner) | open | T-2086 |
+| #661 | COORD-245: the owner's rulings "Watchers" and "Work until done" of 2026-11-24, and a shared watcher of the Actions runs of a repository (to podcrates) | open | none: the rulings (docs/decisions.md, 2026-11-24) and an ask of a shared tool |
 
 ## Messages whose title does not start with COORD-NNN
 

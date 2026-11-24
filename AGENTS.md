@@ -173,8 +173,16 @@ The project is 0BSD. Carried material keeps its own terms
    `git status`, `git log --oneline -5`.
 4. Read the last CI runs and the open issues. A red run that the record
    does not know is the first task.
-5. Start the one watcher of the organization (section 9) under the
-   Monitor tool.
+5. Start the two watchers (section 9, the owner's ruling "Watchers",
+   2026-11-24) as background processes, each with a log: the watcher of
+   the organization (issues, pull requests, COORD messages) and the
+   watcher of the Actions runs of this repository.
+   `.claude/session-start.sh` starts each one that does not run; where its
+   line says that one did not start, start it by section 9. Do this each
+   session, with no question. Read the logs yourself (`tail .work/watch.log
+   .work/runs.log`) after each push, each dispatch and between steps. A
+   notice of the harness (Monitor, a task notification, an MCP event) can
+   fail to come: never wait for one.
 6. Run `sh scripts/cloud-setup.sh` (zig and the toolchain), and put
    `$HOME/.local/podvm/zig-x86_64-linux-0.16.0` on `PATH`. Build the record
    tools: `cargo build --release -p podvm-gate -p podvm-release`, then run
@@ -197,10 +205,10 @@ watches them.
    (the script watch.py of podcrates, the owner's ruling "Watcher") from
    PodUtils/podcrates at a pinned commit (`ed6d84c`: the tag `v0.70.0`,
    which the last COORD issue of podcrates on the watcher names, COORD-112), check
-   it, and keep it
-   running under the Monitor tool (it polls each 120 s; start it again
-   when the monitor ends). `.work/` must be in `.gitignore`. Do not write
-   a watcher of your own: ask podcrates for a change of this one.
+   it, and keep it running as a background process with its log in
+   `.work/watch.log` (it polls each 120 s; start it again when it ends).
+   `.work/` must be in `.gitignore`. Do not write a second watcher of the
+   issues: ask podcrates for a change of this one.
 
    ```sh
    mkdir -p .work/podcrates-agent
@@ -209,7 +217,21 @@ watches them.
        "https://raw.githubusercontent.com/PodUtils/podcrates/ed6d84c8ed09b219665fcfe3ad760296027042dc/scripts/agent/$f"
    done
    python3 -I .work/podcrates-agent/watch.py --self-test
-   python3 -I .work/podcrates-agent/watch.py podvm --state .work/agent
+   nohup python3 -I .work/podcrates-agent/watch.py podvm --state .work/agent \
+     >.work/watch.log 2>&1 &
+   ```
+
+   The watcher of the Actions runs is `scripts/agent/runs-watch.py`
+   (forge API of pkgforge, no token). Start it beside the first one, and
+   for a push or a dispatch that a step waits for, run it with `--until
+   SHA`: it exits 0 green, 1 red (with the failed jobs and steps), 3 when
+   each run was cancelled, 2 at its timeout. A session of a repository
+   with no such script takes the one of a sibling (the script
+   watch-runs.sh of podcrates or podnet, or this one) before it writes one.
+
+   ```sh
+   nohup python3 -I scripts/agent/runs-watch.py --every 60 >.work/runs.log 2>&1 &
+   python3 -I scripts/agent/runs-watch.py --until "$(git rev-parse HEAD)" --every 30
    ```
 
    It prints one line for each event: each issue and pull request of this
@@ -289,6 +311,15 @@ watches them.
    ```
 
 ## 10. Decisions
+
+* "Resume from the handoff" means: work each step of the handoff and of
+  the work order, one after the other, until each one is done or truly
+  blocked by a thing out of the session's control (the owner's ruling
+  "Work until done", 2026-11-24). Do not stop to ask the owner a question
+  that the record, these rules, the handoff or a sane default answers, and
+  do not ask leave for a step that the handoff orders (a release behind
+  its gate included). Ask only for a decision that only the owner can
+  make; then record it as below and take the next entry.
 
 * `docs/decisions.md` has each ruling of the owner since 2026-11-06 with
   its date, and the questions for the owner. `TODO/RULES.md`, section 11,

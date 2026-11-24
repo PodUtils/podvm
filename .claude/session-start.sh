@@ -28,4 +28,36 @@ if [ "$cur" != main ] && [ -z "$(git status --porcelain 2>/dev/null)" ]; then
     git checkout -q -b main origin/main 2>/dev/null || true
   fi
 fi
+# The owner's ruling "Watchers" (docs/decisions.md, 2026-11-24; AGENTS.md,
+# sections 8 and 9): the watcher of the organization and the watcher of the
+# Actions runs start with each session, as background processes with a log.
+# The session reads the logs; it does not wait for a notice of the harness.
+# A watcher that runs already is not started again. No step here can fail
+# the session.
+mkdir -p .work/podcrates-agent
+pin=ed6d84c8ed09b219665fcfe3ad760296027042dc
+if ! pgrep -f "watch.py podvm --state .work/agent" >/dev/null 2>&1; then
+  ok=1
+  for f in watch.py watch_test.py; do
+    [ -s ".work/podcrates-agent/$f" ] && continue
+    curl -qfsSL --max-time 60 -o ".work/podcrates-agent/$f.part" \
+      "https://raw.githubusercontent.com/PodUtils/podcrates/$pin/scripts/agent/$f" &&
+      mv ".work/podcrates-agent/$f.part" ".work/podcrates-agent/$f" || ok=0
+  done
+  if [ "$ok" = 1 ] && python3 -I .work/podcrates-agent/watch.py --self-test >/dev/null 2>&1; then
+    nohup python3 -I .work/podcrates-agent/watch.py podvm --state .work/agent \
+      >>.work/watch.log 2>&1 </dev/null &
+    echo "session-start: the watcher of the organization runs; its log is .work/watch.log"
+  else
+    echo "session-start: the watcher of the organization did not start (fetch or self-test failed): start it by AGENTS.md, section 9"
+  fi
+else
+  echo "session-start: the watcher of the organization runs already; its log is .work/watch.log"
+fi
+if ! pgrep -f "scripts/agent/runs-watch.py --every" >/dev/null 2>&1; then
+  nohup python3 -I scripts/agent/runs-watch.py --every 60 >>.work/runs.log 2>&1 </dev/null &
+  echo "session-start: the watcher of the Actions runs runs; its log is .work/runs.log"
+else
+  echo "session-start: the watcher of the Actions runs runs already; its log is .work/runs.log"
+fi
 exit 0
