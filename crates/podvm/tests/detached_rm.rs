@@ -86,6 +86,12 @@ fn rm_of_a_detached_run_removes_the_container_at_its_end() {
             failures.push(format!("{name}: ps -a lists it after its end"));
         }
     }
+    // The record goes first and the tree after it (T-2074, `launcher::Discard`):
+    // wait for the tree within the same bound.
+    let end = Instant::now() + Duration::from_secs(20);
+    while Instant::now() < end && trees() != before {
+        std::thread::sleep(Duration::from_millis(200));
+    }
     if trees() != before {
         failures.push(format!(
             "trees of containers: {before} before, {} after",

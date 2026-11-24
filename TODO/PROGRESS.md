@@ -11,7 +11,16 @@ start.
 
 The state on 2026-11-23 (`docs/HANDOFF.md` has the detail):
 
-* The newest release is `v0.2.0-beta.38` (2026-11-23, release run
+* The newest release is `v0.2.0-beta.39` (2026-11-24, release run
+  45353882402 on `a43c9476`): the incus tier for podrunner (the use after
+  the end, T-2076; the exit code under `--memory`, T-2077; a full pool,
+  T-2078; exit 126 and 127, signals, one import, a cut upload, T-2080 to
+  T-2082), the rule of `cp` and the faults of the eighth outside pass
+  (T-2079). Its gate: the gate 45349587998, `arm.yml` 45349602183 and the
+  nightly trial 45349597748 on `a43c9476`, `workloads.yml` 45324901359,
+  the integration tests as uid 1000 (36 test binaries), the eighth
+  outside pass. Before it:
+* `v0.2.0-beta.38` (2026-11-23, release run
   45212007696 on `2ae4b41`): podcrates `v0.81.0` and `v0.82.0` (T-2066:
   the ACLs of a layer, T-2065; 126 for E2BIG, T-2062; the bounded monitor
   connect, T-2051), the size ceiling of 9 500 000 bytes (call C29), a load
