@@ -14,9 +14,9 @@
 //! Now:
 //!
 //! * stdout and stderr go to podvm's own as they come; stdin goes in;
-//! * the exit code of an operation that failed with "Command not found" or
-//!   "Command not executable" is its `metadata.return` ([`code_of_failure`]),
-//!   read with `GET /1.0/operations/ID` after the wait;
+//! * the exit code of a command that ended with 127 or 126 is the code that
+//!   `Attached::wait` of pod-incus gives (podcrates `v0.83.0`, #653; before
+//!   it, podvm read the `metadata.return` of the operation itself);
 //! * podvm blocks the signals of `pod_enter::WAIT_FORWARDED` and reads them
 //!   from a signalfd ([`Signals`]). The first one goes to the command by the
 //!   control socket ("forwarded SIGTERM to the payload in the instance");
@@ -30,7 +30,6 @@ use std::time::Duration;
 
 use pod_incus::{Client, Exec};
 use podvm_probe::sys as k;
-use serde_json::Value;
 
 /// The time that the command has to end after the first signal.
 pub const GRACE: Duration = Duration::from_secs(10);
@@ -50,22 +49,6 @@ pub fn sig_name(n: i32) -> &'static str {
         .iter()
         .find(|(s, _)| *s == n)
         .map_or("a signal", |(_, name)| *name)
-}
-
-/// The exit code of an operation of exec that failed with the error
-/// `err`, where incusd gives its `return` in `ret`: `None` for another
-/// failure. incusd gives these two words only for 127 and 126, so a
-/// missing or odd `return` takes the code of the words.
-pub fn code_of_failure(err: &str, ret: Option<i64>) -> Option<i32> {
-    let by_words = match err.trim() {
-        NOT_FOUND => 127,
-        NOT_EXECUTABLE => 126,
-        _ => return None,
-    };
-    Some(match ret {
-        Some(r) if (0..=255).contains(&r) => r as i32,
-        _ => by_words,
-    })
 }
 
 /// The signalfd.
@@ -318,7 +301,7 @@ pub async fn exec_streamed(
         }
     }
     let bound = if hard { KILL_WAIT } else { END_WAIT };
-    match finish(c, a, &id, bound).await {
+    match finish(a, &id, bound).await {
         Ok(code) => Ok(Outcome { code, wrote }),
         Err(e) => match first {
             // After a signal the end of the command is the signal's.
@@ -335,32 +318,14 @@ pub async fn exec_streamed(
 }
 
 /// The exit code of the command of the operation `id`, within `bound`.
-async fn finish(
-    c: &Client,
-    a: pod_incus::Attached,
-    id: &str,
-    bound: Duration,
-) -> Result<i32, String> {
-    let e = match tokio::time::timeout(bound, a.wait()).await {
-        Err(_) => {
-            return Err(format!(
-                "the operation {id} of the command gave no end within {} s",
-                bound.as_secs()
-            ))
-        }
-        Ok(Ok(code)) => return Ok(code),
-        Ok(Err(e)) => e,
-    };
-    let words = e.incus_error().unwrap_or_default().to_string();
-    if code_of_failure(&words, None).is_some() {
-        // incusd keeps an operation that ended for some seconds.
-        let ret = match tokio::time::timeout(END_WAIT, c.operation(id)).await {
-            Ok(Ok(op)) => op.metadata.get("return").and_then(Value::as_i64),
-            _ => None,
-        };
-        if let Some(code) = code_of_failure(&words, ret) {
-            return Ok(code);
-        }
+async fn finish(a: pod_incus::Attached, id: &str, bound: Duration) -> Result<i32, String> {
+    match tokio::time::timeout(bound, a.wait()).await {
+        Err(_) => Err(format!(
+            "the operation {id} of the command gave no end within {} s",
+            bound.as_secs()
+        )),
+        // podcrates `v0.83.0` (#653): 126 and 127 come as codes here.
+        Ok(Ok(code)) => Ok(code),
+        Ok(Err(e)) => Err(e.to_string()),
     }
-    Err(e.to_string())
 }

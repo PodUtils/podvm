@@ -427,6 +427,10 @@ impl Target {
                  (TODO/machine.md T-2078, PodUtils/podrunner#346)",
                 mib(bound as u64)
             )),
+            Transport::NoSpace => Some(format!(
+                "incusd ran out of space: {rooms} (TODO/machine.md T-2078, \
+                 PodUtils/podrunner#346)"
+            )),
             Transport::Other if short => Some(format!(
                 "{rooms}: a lack of space can cut the answer of incusd \
                  (TODO/machine.md T-2078)"
@@ -443,22 +447,25 @@ pub enum Transport {
     None,
     /// The answer was over the bound of the client.
     TooLarge,
+    /// incusd's error says that a disk is full ("No space left on device";
+    /// pod-incus `v0.83.0` gives an envelope past the bound with a cut text).
+    NoSpace,
     /// Another read or write fault of the connection.
     Other,
 }
 
-/// The class of `e`. pod-incus gives the refusal by size as an I/O error of
-/// the kind `InvalidData` with the text of pod-proxy (podcrates `v0.82.0`);
-/// T-2078 asks podcrates for a kind of its own.
+/// The class of `e`. pod-incus gives the refusal by size its own kind
+/// (`ErrorKind::TooLarge`, podcrates `v0.83.0`, #651); a silence of incusd
+/// (`ErrorKind::AnswerTimeout`) is a fault of the transport too.
 pub fn transport(e: &pod_incus::Error) -> Transport {
+    if super::cut::no_space(e) {
+        return Transport::NoSpace;
+    }
     match e.kind() {
-        pod_incus::ErrorKind::Io(io)
-            if io.kind() == std::io::ErrorKind::InvalidData
-                && io.to_string().contains("larger than allowed") =>
-        {
-            Transport::TooLarge
+        pod_incus::ErrorKind::TooLarge { .. } => Transport::TooLarge,
+        pod_incus::ErrorKind::Io(_) | pod_incus::ErrorKind::AnswerTimeout { .. } => {
+            Transport::Other
         }
-        pod_incus::ErrorKind::Io(_) => Transport::Other,
         _ => Transport::None,
     }
 }

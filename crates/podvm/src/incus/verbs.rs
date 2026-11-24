@@ -73,23 +73,26 @@ pub fn valid_name(n: &str) -> bool {
 
 /// TODO/machine.md T-2080 (OR-B39-10): the bound of the first answer of
 /// incusd. A socket that takes the connection and never answers held
-/// podvm with no bound (90 s and more); each later call of the run has
-/// the bound of its own wait.
+/// podvm with no bound (90 s and more). Since podcrates `v0.83.0` (#653)
+/// `Settings::answer_timeout` of pod-incus bounds each silence of each
+/// answer; this is its value, for the line.
 pub const FIRST_ANSWER: std::time::Duration = std::time::Duration::from_secs(30);
 
-/// `GET /1.0` within [`FIRST_ANSWER`].
+/// `GET /1.0`; a silence of incusd past [`FIRST_ANSWER`] gives one line
+/// that names the socket.
 pub(crate) async fn first_answer(
     c: &Client,
     sock: &std::path::Path,
 ) -> Result<pod_incus::Server, String> {
-    match tokio::time::timeout(FIRST_ANSWER, c.server()).await {
-        Ok(r) => r.map_err(|e| e.to_string()),
-        Err(_) => Err(format!(
+    match c.server().await {
+        Ok(s) => Ok(s),
+        Err(e) if matches!(e.kind(), pod_incus::ErrorKind::AnswerTimeout { .. }) => Err(format!(
             "the socket {} took the connection and gave no answer to GET /1.0 within {} s: \
              incusd hangs, or another program holds the socket (TODO/machine.md T-2080)",
             sock.display(),
             FIRST_ANSWER.as_secs()
         )),
+        Err(e) => Err(e.to_string()),
     }
 }
 
@@ -105,6 +108,9 @@ pub(crate) async fn connect() -> Result<(Client, String), String> {
     }
     let mut settings = Settings::new(sock.clone());
     settings.user_agent = format!("podvm/{}", env!("CARGO_PKG_VERSION"));
+    // T-2080: each silence of incusd ends after this bound (podcrates
+    // `v0.83.0`, #653).
+    settings.answer_timeout = Some(super::verbs::FIRST_ANSWER);
     let c = Client::new(settings);
     let server = first_answer(&c, &sock).await?;
     server.check().map_err(|e| e.to_string())?;

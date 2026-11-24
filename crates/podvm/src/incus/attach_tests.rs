@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use serde_json::json;
 
-use super::attach::{code_of_failure, exec_streamed, Outcome, Signals};
+use super::attach::{exec_streamed, Outcome, Signals};
 use super::guest_exec;
 
 /// What the command of the stand-in does.
@@ -346,23 +346,6 @@ fn each_end_of_a_command_gives_its_code_its_output_and_its_signals() {
             "{:?}",
             c.plan
         );
-    }
-}
-
-/// incusd's two words of a failed exec are 127 and 126; the `return` of
-/// the operation wins where it is a code; another failure is no code.
-#[test]
-fn the_words_of_a_failed_exec_give_its_code() {
-    for (words, ret, want) in [
-        ("Command not found", Some(127), Some(127)),
-        ("Command not found", None, Some(127)),
-        ("Command not executable", Some(126), Some(126)),
-        ("Command not executable", Some(-1), Some(126)),
-        ("Command not executable", Some(300), Some(126)),
-        ("Instance is not running", Some(1), None),
-        ("", None, None),
-    ] {
-        assert_eq!(code_of_failure(words, ret), want, "{words:?} {ret:?}");
     }
 }
 

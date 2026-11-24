@@ -104,6 +104,8 @@ pub async fn after_cut(c: &pod_incus::Client, plan: Option<&Plan>, cut: bool) ->
 
 /// True where incusd's error of an import says that a disk is full.
 pub fn no_space(e: &pod_incus::Error) -> bool {
+    // tar writes "No space left on device"; incusd's own words are lower
+    // case.
     e.incus_error()
-        .is_some_and(|w| w.contains("no space left on device"))
+        .is_some_and(|w| w.to_ascii_lowercase().contains("no space left on device"))
 }

@@ -25,10 +25,6 @@ use std::time::{Duration, Instant};
 
 use pod_hostprobe::usage;
 
-pub mod mounts;
-use mounts::fs_magic;
-use mounts::Mounted;
-
 /// The usage of the instance at the end of its command, written by its init.
 pub const USAGE: &str = "/.podvm/usage";
 /// The directory of podvm's files in the instance.
@@ -193,15 +189,23 @@ impl Meter {
     ///
     /// TODO/machine.md T-2086 (PodUtils/podrunner#350): where that mount
     /// gives fewer values than the cgroup mounts that the instance has from
-    /// its start ([`Mounted`]), the meter takes those. The AppArmor profile
+    /// its start (`pod_hostprobe::usage::Mounts`), the meter takes those. The AppArmor profile
     /// of incus allows a cgroup mount only under `/sys/fs/cgroup`, so on a
     /// host with AppArmor the mount at [`MOUNT`] fails and each value was a
     /// dash.
     pub fn open() -> Meter {
         let own = Self::own_mount();
-        let info = std::fs::read_to_string("/proc/self/mountinfo").unwrap_or_default();
-        let at = Mounted::of(&info).checked(&fs_magic);
-        Meter(better(own, at.meter()))
+        // podcrates `v0.83.0` (#659): the mounts of mountinfo, each checked
+        // with statfs(2).
+        let theirs = match usage::Mounts::of_host() {
+            Ok(m) => m.meter(),
+            Err(f) => {
+                let mut m = usage::Meter::default();
+                m.note(f.chain());
+                m
+            }
+        };
+        Meter(better(own, theirs))
     }
 
     /// The meter of the cgroup file systems that the init mounts at

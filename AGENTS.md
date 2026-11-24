@@ -54,7 +54,12 @@ retry, a lock of a shared file, a probe of the host, a parser of the help,
 an installer step, a stand-in for a test), search for it:
 
 1. In podcrates: docs/design.md of podcrates (the table of crates) and each crate's
-   `README.md`. Where a crate has it, take the crate. Where it has most of
+   `README.md`. In a shallow clone of podcrates at a tag,
+   `python3 -I scripts/codegraph.py similar WORDS` ranks each public
+   item, each entry of the record and each crate by the words (an
+   identifier counts as its words: `FileLock` is "file lock"), and
+   `codegraph.py crate NAME` gives the items of a crate. Where a crate has
+   it, take the crate. Where it has most of
    it, ask podcrates for the extension by a COORD issue `(to podcrates)`;
    do not write a second copy beside it.
 2. In each sibling (podssh, podnet, podvm, podrunner). Where a sibling has
@@ -83,7 +88,7 @@ ends with one copy in podcrates.
   the binary and the documents only, not from your own checks.
 
 The text of 2a and 2b is podcrates' docs/session-protocol.md at
-`b950f27`, word for word. podvm's plan is `docs/methodology/quality.md`.
+`v0.83.0` (`5fd6fb7`), word for word. podvm's plan is `docs/methodology/quality.md`.
 
 ## 3. Git
 
@@ -201,40 +206,37 @@ A session of a repository of PodUtils can run with no messages to the
 other sessions. GitHub issues are then the channel, and each session
 watches them.
 
-1. At the start of each session, get the one watcher of the organization
-   (the script watch.py of podcrates, the owner's ruling "Watcher") from
-   PodUtils/podcrates at a pinned commit (`ed6d84c`: the tag `v0.70.0`,
-   which the last COORD issue of podcrates on the watcher names, COORD-112), check
-   it, and keep it running as a background process with its log in
-   `.work/watch.log` (it polls each 120 s; start it again when it ends).
-   `.work/` must be in `.gitignore`. Do not write a second watcher of the
-   issues: ask podcrates for a change of this one.
+1. At the start of each session, get the two watchers of podcrates (the
+   owner's rulings "Watcher" and "Watchers"): `watch.py` (the issues, the
+   pull requests and the COORD messages of the organization) and `runs.py`
+   (the Actions runs of one repository), from PodUtils/podcrates at a pinned
+   commit (`5fd6fb7`: the tag `v0.83.0`, PodUtils/podcrates#259). Check
+   each with its self-test, and keep each running as a background process
+   with its log (`.work/watch.log`, `.work/runs.log`; start it again when
+   it ends). `.claude/session-start.sh` does this. `.work/` must be in
+   `.gitignore`. Do not write a watcher of your own: ask podcrates for a
+   change of these.
 
    ```sh
    mkdir -p .work/podcrates-agent
-   for f in watch.py watch_test.py; do
+   for f in watch.py watch_test.py runs.py; do
      curl -qfsSL -o ".work/podcrates-agent/$f" \
-       "https://raw.githubusercontent.com/PodUtils/podcrates/ed6d84c8ed09b219665fcfe3ad760296027042dc/scripts/agent/$f"
+       "https://raw.githubusercontent.com/PodUtils/podcrates/5fd6fb7e3495d5e9a591e36c5752e268309f6e4a/scripts/agent/$f"
    done
    python3 -I .work/podcrates-agent/watch.py --self-test
+   python3 -I .work/podcrates-agent/runs.py --self-test
    nohup python3 -I .work/podcrates-agent/watch.py podvm --state .work/agent \
      >.work/watch.log 2>&1 &
+   nohup python3 -I .work/podcrates-agent/runs.py --repo PodUtils/podvm --branch main \
+     --every 120 >.work/runs.log 2>&1 &
    ```
 
-   The watcher of the Actions runs is `scripts/agent/runs-watch.py`
-   (forge API of pkgforge, no token). Start it beside the first one, and
-   for a push or a dispatch that a step waits for, run it with `--until
-   SHA`: it exits 0 green, 1 red (with the failed jobs and steps), 3 when
-   a run was cancelled (a newer push or a time limit: run it again), 2 at
-   its timeout. Where the forge refuses reads (a 403), read the runs with
-   the GitHub tool of the harness. A session of a repository
-   with no such script takes the one of a sibling (the script
-   watch-runs.sh of podcrates or podnet, or this one) before it writes one.
-
-   ```sh
-   nohup python3 -I scripts/agent/runs-watch.py --every 120 >.work/runs.log 2>&1 &
-   python3 -I scripts/agent/runs-watch.py --until "$(git rev-parse HEAD)" --every 120
-   ```
+   For a push or a dispatch that a step waits for, run `runs.py --repo
+   PodUtils/podvm --until SHA`: it exits 0 green, 1 red (with the failed
+   jobs and steps), 3 when each run was cancelled (a newer push), 2 at its
+   timeout. Keyless reads of the forge share 60 an hour for each egress
+   address: keep `--every` at 120 or more, and where the forge refuses
+   reads (a 403), read the runs with the GitHub tool of the harness.
 
    It prints one line for each event: each issue and pull request of this
    repository (new, commented, closed, reopened, merged, and a pull request

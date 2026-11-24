@@ -304,6 +304,9 @@ async fn run_async(job: &Job<'_>, sock: PathBuf) -> i32 {
     let mut sig = (job.detach.is_none()).then(|| super::attach::Signals::open(job.verb));
     let mut settings = Settings::new(sock.clone());
     settings.user_agent = format!("podvm/{}", env!("CARGO_PKG_VERSION"));
+    // T-2080: each silence of incusd ends after this bound (podcrates
+    // `v0.83.0`, #653).
+    settings.answer_timeout = Some(super::verbs::FIRST_ANSWER);
     let c = Client::new(settings);
     let prepare = async {
         let server = super::verbs::first_answer(&c, &sock)
