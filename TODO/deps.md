@@ -2479,3 +2479,73 @@ Measured on the cloud host as uid 1000 with `mirror.gcr.io/library/alpine:3.20`,
 Step 2 (`39a85246`): `pod_hostprobe::usage` is the reader of the usage of a cgroup. `incus::usage::Meter` holds a `pod_hostprobe::usage::Meter`: the init of the instance mounts cgroup2 at `/.podvm/.meter` and opens it with `Meter::v2`, else each hierarchy of cgroup v1 in turn (`v1_memory`, `v1_cpu`), before the command starts, and reads through those descriptors at the end (the rules of T-2076 stay: the open before the command, the read through the descriptors, a cgroup2 with no memory controller not taken on a host with both versions). `Measure` takes the `Usage` of the crate. `podvm_supervise::report` and `run::cgroup` (`oom_kills`, `release`) take `pod_hostprobe::usage::oom_kills_of`. podvm's parsers, `oom_kills_in`, `oom_kills_of` and their tests are gone; the tests of the crate hold them. `docs/incus.md` names the rule of Linux 5.8 to 5.18.
 
 On the cloud host with the interposer objects in place: `cargo test --workspace --no-fail-fast` gives 97 test binaries and 1,156 tests: 1,155 passed, and `pod_todo_finds_no_problem_in_the_record` failed on a path of the record to the removed `title.rs` (fixed in the same commit; the test passes). `cargo check --target aarch64-unknown-linux-musl --workspace` passes; the integration tests of `podvm` and `podvm-supervise` as uid 1000 (release test binaries): 37 binaries, each passes (602 unit tests of `podvm`). Experiment 434 (`PODVM_434_MIRROR=1`, the release binary of the take, cgroup v1 host): the first run passed each clause but 23 (the report of an OOM kill had no `oom_kills`: the metrics of incusd, which this take does not touch, as T-2076 records); the second run passed each clause (`experiments/results/incus-tier.txt`). Clause 26 passed in both: `inspect` gave `2.805 136089600 0 0` and `2.832 136097792 0 0` for a command of 2.77 s and 2.8 s of CPU, `0.245 33554432 1 137` over `--memory 32m`, `0.990 2527232 0 4` and `0.987 2514944 0 4` for the forging command, and `- - - -` after a forced stop. The release `podvm` is 9,152,728 bytes, the size of `2a882cb2` (a page of 4,096 bytes holds the change).
+
+# T-2089: Take podcrates `v0.83.0`: the classes and the bounds of pod-incus, the exit of an exec with 126 or 127, the mounts of a cgroup, the shared watchers
+
+**Source:** PodUtils/podcrates#259 (COORD-154 of podcrates, the message of `v0.83.0` to each session); the answers to #651, #653, #659, #661 and #570
+**Category:** deps
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+podcrates `v0.83.0` answers five asks of podvm, and podvm keeps the code
+that the answers replace: the class of an answer over the bound from the
+words of an I/O error (`incus::space::transport`), the read of the
+operation of an exec that ends with 126 or 127 (`incus::attach`,
+`code_of_failure`), podvm's own bound of the first `GET /1.0`, its own
+reader of the cgroup mounts of mountinfo (`incus/usage/mounts.rs`), and its
+own watcher of the Actions runs (the script runs-watch.py of the
+session of 2026-11-24).
+
+## Premise
+
+The section "podvm" of PodUtils/podcrates#259 names each change. Two of
+them change a behaviour: `ErrorKind::TooLarge` takes the place of the I/O
+error, and an error envelope over `Settings::max_body` now comes as an
+`Incus` error with its text cut (the crate reads it past the bound).
+
+## Approach
+
+One commit for the take, with each removal of a copy; the record after the
+proof.
+
+## Decision
+
+2026-11-24, the session's call. An error of incusd that says that a disk
+is full ("No space left on device", in any case) is its own class,
+`Transport::NoSpace`, and gives the line of the room of the pool (T-2078):
+on a full pool the error of tar now comes as such an envelope, not as a
+refusal by size. The stand-in of the test sends the whole chunk that it
+declares, as incusd does (108 MB measured, T-2078).
+
+## Prove
+
+`sh scripts/dev/checks.sh` exits 0; `cargo test --workspace
+--no-fail-fast` passes; experiment 434 passes (the clauses of a full pool,
+of 126 and 127, and of a socket that does not answer); the watchers of the
+tag pass their self-tests and run from the session hook.
+
+## Done
+
+**Partial (2026-11-24).** The take is `a39f4c4f`: each podcrates
+dependency and `issue-sync.yml` take `v0.83.0` (`5fd6fb7`).
+`incus::space::transport` matches `ErrorKind::TooLarge`, gives
+`AnswerTimeout` and `Io` the class `Other`, and the words of a full disk
+`NoSpace` (`incus::cut::no_space` reads them in any case). `finish` of
+`incus::attach` takes the code of `Attached::wait`; `code_of_failure` and
+its test are gone. `first_answer` calls `server()` with no wrapper, and
+each client sets `Settings::answer_timeout` to 30 s; the line of a silence
+names the socket, as before. `Meter::open` takes
+`pod_hostprobe::usage::Mounts::of_host()`, and `incus/usage/mounts.rs`
+and its table test are gone (the crate holds the same rules and their
+tests). The session hook fetches `watch.py`, `watch_test.py` and `runs.py`
+at `5fd6fb7`, runs both self-tests, and starts both watchers;
+the script runs-watch.py is gone. `AGENTS.md` 2a and 2b are the text
+of the session protocol of podcrates at `v0.83.0`. `sh scripts/dev/checks.sh`
+exits 0. Remaining: the workspace tests and experiment 434 on the tree of
+the take; `Client::image` and `storage_pool_resources` in place of the
+record of the need of an image (T-2078 remaining 1); the COORD issue of
+the take to podcrates.
