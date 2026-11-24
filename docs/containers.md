@@ -97,9 +97,7 @@ captured corpus left the tree on 2026-11-06 ([T-1606](../TODO/machine.md)).
 
 `--container-lifecycle ephemeral` removes the container and guest job
 directory after the run. The host record goes too (wsl-toolkit 8+); `wait ID`
-and `logs ID --follow` answer for 10 minutes after. The 2026-09-28 drive
-below, on 6.0.0, found three host job directories after two successful jobs
-and one caller path probe, and none after job-specific collection.
+and `logs ID --follow` answer for 10 minutes after.
 
 A job writes artifacts into `/out`. Set `PODVM_ARTIFACTS` to copy them
 back to a host directory. A file written only in `/work` stays in the

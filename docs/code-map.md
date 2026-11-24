@@ -2,26 +2,26 @@
 
 ## Crates of this tree
 
-podvm takes 20 shared crates from PodUtils/podcrates at the tag `v0.50.0`
-(podcrates commit `ad50c7f`; COORD-114, issue 369).
+podvm takes the shared crates from PodUtils/podcrates at the tag `v0.82.1`
+(podcrates commit `0d7832b`; `Cargo.lock` names it).
 A local crate gives podvm's names, paths and settings to its `pod-*` crate
 and keeps the parts that only podvm needs.
 The `Cargo.toml` of each crate names its `pod-*` dependencies.
 
 | Directory | Owns | Takes from podcrates |
 | --- | --- | --- |
-| `crates/podvm` | The binary: dispatch, arguments, parity table, manual, `run` and the lifecycle verbs, `images`, `doctor`, `system`, the tier flag, the profiles of `run --profile` (`profile.rs`, T-1654), `probe-inside` and `compare` (`sandprobe.rs`, T-1666), `remote`, `machine ssh`, `windows`, the incus tier, the egress broker of `--network broker` (`broker.rs`, T-1665), `podvm lab` (`lab.rs`, T-1662) | `pod-incus` (the client of the incus REST API), `pod-broker` (the broker), `pod-services` (the hosts of other parties, T-1679), `pod-netlab` (the lab of `podvm lab`, T-1662), `pod-link` (the streams of the guest channel, T-1751); the rest through the crates below |
+| `crates/podvm` | The binary: dispatch, arguments, parity table, manual, `run` and the lifecycle verbs, `images`, `doctor`, `system`, the tier flag, the profiles of `run --profile` (`profile.rs`, T-1654), `probe-inside` and `compare` (`sandprobe.rs`, T-1666), `remote`, `machine ssh`, `windows`, the incus tier, the egress broker of `--network broker` (`broker.rs`, T-1665), `podvm lab` (`lab.rs`, T-1662) | `pod-incus` (the client of the incus REST API), `pod-broker` (the broker), `pod-services` (the hosts of other parties, T-1679), `pod-netlab` (the lab of `podvm lab`, T-1662), `pod-lab` (the profiles of hostile hosts), `pod-manual` (the help and the manual from one model), `pod-beneath` (the open of a path under a base, with no link), `pod-link` (the streams of the guest channel, T-1751); the rest through the crates below |
 | `crates/podvm-api` | The typed request of `run` and the reader of its `--report` record, for a program that runs podvm: it spawns the binary of the same version (T-1745, call C20) | none |
 | `crates/podvm-probe` | podvm's settings for the probes, the report, the exit codes, the JSON writer, the non-goals, the probe inside a payload and its compare (`inside.rs`, T-1666) | `pod-hostprobe` (probes, rung selection, machine legs) |
 | `crates/podvm-image` | The store, its layout and records, credentials paths, platform choice, space and exec checks, `pull` | `pod-oci` (registry client), `pod-proxy`, `pod-tls`, `pod-supervise` (store lock), `pod-hostprobe`, `pod-core` |
 | `crates/podvm-extract` | The layers of a manifest as blob paths, the rootfs place in the store, the tree of each container (`tree.rs`, T-1709) | `pod-extract` (layers, whiteouts, containment, sidecar) |
 | `crates/podvm-complete` | podvm's flags and file names for completion, the host CA bundle, the mirror probe, the report | `pod-rootfs` (devices, accounts, resolver, package configuration, CA data) |
 | `crates/podvm-enter` | podvm's variable names, cache marker and memfd label; docker's exit codes | `pod-enter` (chroot, namespace and userland entry, launch ladder, FUSE server, ELF reader), `pod-confine` (the confine layer, T-1658) |
-| `crates/podvm-dispatch` | The native-static rung: the loader of a static program, the SIGSYS handler of Syscall User Dispatch, the path calls through `openat2(RESOLVE_IN_ROOT)`, the clone trampoline and the re-exec of `execve` (T-1652); x86_64 only | none |
+| `crates/podvm-dispatch` | The native-static rung: the loader of a static program, the SIGSYS handler of Syscall User Dispatch, the path calls through `openat2(RESOLVE_IN_ROOT)`, the clone trampoline and the re-exec of `execve` (T-1652); x86_64 only | `pod-beneath` |
 | `crates/podvm-supervise` | The store and names of the container table, the fields of a podvm record, the launcher entry of a payload, the ownership memo | `pod-supervise` (launcher, pidfd, control socket, logs, lifecycle verbs) |
-| `crates/podvm-windows` | podvm's names and places for the Windows and DOS guest driver, the base caches, docker's exit range | `pod-guest` (boot plan, overlay, FAT16 mailbox, agent, QMP, bounded stop), `pod-qga` (the client of the QEMU Guest Agent, T-1868) |
+| `crates/podvm-windows` | podvm's names and places for the Windows and DOS guest driver, the base caches, docker's exit range | `pod-guest` (boot plan, overlay, FAT16 mailbox, agent, QMP, bounded stop), `pod-qga` (the client of the QEMU Guest Agent, T-1868), `pod-udf` (the reader of UDF for a range fetch of a medium, T-1863) |
 | `crates/podvm-ssh` | SSH transport, the relay legs, server, interactive session; the `node`, `operator`, `proxy` and `shell` helpers | `pod-relay` (the relay legs, through its blocking facade), `pod-ws`, `pod-tls`, `pod-proxy`, `pod-term` (line discipline) |
-| `crates/podvm-interpose` | The `LD_PRELOAD` interposer, one object for glibc and one for musl; outside the workspace | none |
+| `crates/podvm-interpose` | The `LD_PRELOAD` interposer, one object for glibc and one for musl; outside the workspace | `pod-beneath` |
 | `crates/podvm-gate` | `podvm-gate`, `podvm-count`, `podvm-plant`, `podvm-dev`, `podvm-smoke`, `podvm-interpose-build`, `podvm-libc-interpose` | `pod-todo` (the reader of check 35, T-1680) |
 | `crates/podvm-todo` | `podvm-todo check`: pod-todo's reader of the record with the facts of `TODO/todo.toml` (T-1672) | `pod-todo` |
 | `crates/podvm-buildstate` | `podvm-buildstate` (build freshness), `podvm-release-licenses` (licence inventory) | none |

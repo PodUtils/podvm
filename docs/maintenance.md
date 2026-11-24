@@ -30,9 +30,12 @@ and 5). Do each step on the commit that the release takes:
 1. The gate run of the commit passes, and `sh scripts/dev/checks.sh`
    passes (it runs `tests/cli_contract.rs`).
 2. Dispatch `workloads.yml` on `main`; its run passes.
-3. Run the integration tests as uid 1000 (`docs/HANDOFF.md`, the command
-   of the tests); each failure is one that the handoff names as a fault
-   of the host.
+3. Run the integration tests as uid 1000: build the test binaries of
+   `podvm` and `podvm-supervise` (`cargo test --release --no-run
+   --message-format=json`) and run each with `setpriv --reuid 1000 --regid
+   1000 --clear-groups`, `HOME` and `TMPDIR` in a new directory of mode 777
+   under `/var/tmp`, and `CARGO_MANIFEST_DIR=$PWD/crates/podvm`. Each
+   failure has a cause in the record that is a fault of the host.
 4. An outside pass: an agent with the release binary and `podvm man`
    only, no source, tests the surface for about one hour as uid 1000 and
    writes its findings. Each finding becomes an issue or an entry. No P0
