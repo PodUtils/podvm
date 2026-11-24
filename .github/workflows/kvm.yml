@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       only:
-        description: "One job to run (guest, windows, cgroup, nonroot, mem, init, arch or install); empty runs each"
+        description: "One job to run (guest, windows, cgroup, incus, nonroot, mem, init, arch or install); empty runs each"
         required: false
         default: ""
       windows:
@@ -306,6 +306,57 @@ jobs:
         with:
           name: cgroup-limits
           path: experiments/results/cgroup-limits.txt
+          if-no-files-found: warn
+
+  # TODO/machine.md T-2086 (PodUtils/podrunner#350): the record of the stop
+  # of an incus instance on cgroup v2, with the system incusd of apt and
+  # AppArmor, as podrunner's hosted runner has it. The cloud host has
+  # cgroup v1 and an incusd with no AppArmor. No KVM is used.
+  incus:
+    if: inputs.only == '' || inputs.only == 'incus'
+    name: incus tier on cgroup v2 (experiment 471)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: incus of apt
+        run: |
+          set -eu
+          sudo apt-get -qq update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq incus >/dev/null
+          sudo incus admin init --minimal
+          # The socket for the user of the job, as the group incus-admin
+          # gives it to podrunner's user.
+          sudo chmod 0666 /var/lib/incus/unix.socket
+          incus version
+          stat -fc %T /sys/fs/cgroup
+
+      - name: bootstrap
+        run: ./scripts/common/bootstrap-env.sh rust cc zig tools
+
+      - name: build podvm
+        run: |
+          cargo build --release -p podvm-gate --bin podvm-interpose-build
+          mkdir -p target/release
+          cp target/x86_64-unknown-linux-musl/release/podvm-interpose-build target/release/
+          ./target/release/podvm-interpose-build
+          cargo build --release -p podvm
+
+      - name: experiment 471
+        env:
+          PODVM_471_MIRROR: "1"
+        run: |
+          rc=0
+          sh experiments/471-incus-usage-v2.sh || rc=$?
+          exit "$rc"
+
+      - name: keep the transcript
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: incus-usage-v2
+          path: experiments/results/incus-usage-v2.txt
           if-no-files-found: warn
 
   # TODO/machine.md T-1922 (PodUtils/podrunner#195): the machine tier as a
