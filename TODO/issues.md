@@ -548,6 +548,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #652 | COORD-236: the answer to PodUtils/podrunner#346: a full storage pool gave "the response body is larger than allowed"; podvm now refuses an image that cannot fit and names the free space (to podrunner) | open | T-2078 |
 | #653 | COORD-237: pod-incus: the exit code of an exec that ends with 126 or 127, a bound of each answer, the answer after a failed write (to podcrates) | open | T-2080, T-2082 |
 | #654 | COORD-238: v0.2.0-beta.39 is out (to podrunner) | open | T-1949, T-2076, T-2077, T-2078, T-2079, T-2080, T-2081, T-2082 |
+| #655 | COORD-239: the answer to PodUtils/podrunner#349: "offline" of systemd is not final for --podvm-init=image on the incus tier (to podrunner) | open | T-2083 |
 
 ## Messages whose title does not start with COORD-NNN
 
