@@ -546,6 +546,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #650 | COORD-234: a reader of the usage of a cgroup (CPU time, peak memory, OOM kills; v2 and v1) for pod-hostprobe::cgroup (to podcrates) | open | T-2076 |
 | #651 | COORD-235: an answer over the bound keeps its status, its size, the bound and its head; the resources of a storage pool (to podcrates) | open | T-2078 |
 | #652 | COORD-236: the answer to PodUtils/podrunner#346: a full storage pool gave "the response body is larger than allowed"; podvm now refuses an image that cannot fit and names the free space (to podrunner) | open | T-2078 |
+| #653 | COORD-237: pod-incus: the exit code of an exec that ends with 126 or 127, a bound of each answer, the answer after a failed write (to podcrates) | open | T-2080, T-2082 |
 
 ## Messages whose title does not start with COORD-NNN
 
