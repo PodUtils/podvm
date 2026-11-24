@@ -8,6 +8,12 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+- `podvm cp` puts a copy where `docker cp` puts it, in each direction and
+  from an image: a directory onto an existing directory goes into it as
+  DEST/basename(SRC) (before, its contents merged into DEST); `SRC/.`
+  gives the contents. A destination whose parent directory is missing
+  refuses the copy with exit 1; before, podvm made the parent. A missing
+  source exits 1 and makes nothing (T-2079, OR-B39-04, OR-B39-14).
 - `inspect --podvm-tier=incus` of a stopped instance gives `CpuSeconds`,
   `PeakMemoryBytes` and `OomKills`: the init writes them to `/.podvm/usage`
   after the command and each other process of the instance ended; before,

@@ -14,9 +14,16 @@ usage: podvm cp [-r|--recursive] <container|image>:<path> <dest>
 
   The name before the colon is a container first (as before), then an
   image, whose rootfs is extracted if needed. An image is a source only:
-  a copy into it would change the shared extraction, and is refused. A directory copies its
-  contents into DEST: created where missing, and it must be a directory
-  where present. Symlinks are replicated as symlinks, never followed,
+  a copy into it would change the shared extraction, and is refused.
+
+  Where the copy lands, as docker cp (TODO/cli.md T-2079):
+    SRC a directory, DEST missing      DEST is made with the contents of SRC
+    SRC a directory, DEST a directory  DEST/basename(SRC)
+    SRC ends with /.                   the contents of SRC go into DEST
+    SRC a file, DEST a directory       DEST/basename(SRC)
+    SRC a file, DEST a file or missing written as DEST; DEST/ must exist
+  A missing DEST needs its parent directory: podvm makes no parent. A
+  directory onto a file is refused. Symlinks are replicated as symlinks, never followed,
   and every rootfs-side path passes the same containment gate as a
   single file; special files are refused by name rather than recreated
   (TODO/cli.md T-1323).

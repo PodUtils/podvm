@@ -7042,7 +7042,7 @@ experiment 434 with clauses 28 to 30; each other finding is a line in
 | OR-B39-01, incus: a command that ends with 126 or 127 gives "incus refused the call (400): Command not found / Command not executable", exit 125, and its output is lost (`run`, `exec`) | P1 | fix | [T-2080](machine.md) | done |
 | OR-B39-02, incus: parallel first runs of one image race on the import ("Image with same fingerprint already exists", a 409 of the alias) | P1 | fix | [T-2081](machine.md) | done |
 | OR-B39-03, incus: SIGINT, SIGTERM or SIGHUP to a foreground `run --rm` leaves the instance running | P1 | fix | [T-2080](machine.md) | done |
-| OR-B39-04, native: `cp -r SRC EXISTING_DIR` merges the contents of SRC into DEST (docker: DEST/basename(SRC)) | P1 | fix, a second agent | - | open |
+| OR-B39-04, native: `cp -r SRC EXISTING_DIR` merges the contents of SRC into DEST (docker: DEST/basename(SRC)) | P1 | fix, a second agent | - | done: docker's rule of the destination is one function (`lifecycle/cp_rule.rs`), for each direction and an image as the source; `cp_tree.rs` pins it |
 | OR-B39-05, incus: `exec` drops stdin and lacks the environment of the run | P2 | fix if cheap | [T-2080](machine.md) | done |
 | OR-B39-06, incus: a foreground `run` gives its output at the end, stderr after stdout | P2 | gap | [T-2080](machine.md) | done |
 | OR-B39-07, incus: `run -d --rm` keeps the stopped instance; a foreground `--name` is ignored | P2 | fix if cheap | [T-2080](machine.md) | done (a foreground run still keeps no record: the instance goes at its end, as under `--rm`) |
@@ -7052,7 +7052,7 @@ experiment 434 with clauses 28 to 30; each other finding is a line in
 | OR-B39-11, incus: `rm -rf /.podvm` in the payload deletes its log; `logs` gives a raw 404 | P2 | gap | - | open |
 | OR-B39-12, incus: after a failed create, "the instance stays" although the delete answered 404; `incus tier;` | P2 | fix | [T-2080](machine.md) | done |
 | OR-B39-13, incus: no check of the pool for an image that incus has; the line of the check names a host path | P2 | T-2078 | [T-2078](machine.md) | open |
-| OR-B39-14, native: `cp HOST ctr:/nonexistdir/f` makes the directory | P2 | known (OR-B38-14) | - | open |
+| OR-B39-14, native: `cp HOST ctr:/nonexistdir/f` makes the directory | P2 | known (OR-B38-14) | - | done: a missing parent of DEST refuses the copy (exit 1) in each direction, as docker; the same rule as OR-B39-04 |
 | OR-B39-15, native: the edits of a payload to `/etc/hosts` are lost at the next `exec` | P2 | gap | - | open |
 | OR-B39-16, incus: `--platform linux/arm64` on amd64 gives "Command not executable" with no word of the architecture | P2 | with OR-B39-01 | [T-2080](machine.md) | done for a foreground `run`; `run -d` writes the error of the start to the log |
 | OR-B39-17, incus: `--podvm-init=image` of an image with no init: a raw error of forkstart, the instance stays RUNNING | P3 | gap | - | open |
@@ -7068,4 +7068,23 @@ Experiment 434 (`PODVM_434_MIRROR=1`): "THE INCUS TIER RUNS", each clause,
 with the new clauses 28 (OR-B39-01), 29 (OR-B39-02) and 30 (OR-B39-03).
 The reproducers of the pass on a private incusd: T-2080 and T-2081.
 PodUtils/podrunner#347 ask 2, which came during this work, is T-2082.
+
+Proof of OR-B39-04 and OR-B39-14 (2026-11-24): the cause was `copy_one`
+of `crates/podvm/src/lifecycle/wait_rm_cp.rs`, which gave each directory
+source to `copy_tree` with DEST as the top (so the contents of SRC always
+merged into DEST) and made each missing parent of a file
+(`create_dir_all`). docker's rule of the destination is now one function,
+`target` of `crates/podvm/src/lifecycle/cp_rule.rs`, with one table-driven
+test of each row; `copy_one` uses it in each direction and for an image as
+the source. `crates/podvm/tests/cp_tree.rs` pins the three cases of the
+pass, `SRC/.`, an image source and five refusals; it passes as root and as
+uid 1000. `sh scripts/dev/checks.sh` passes; `cargo check --target
+aarch64-unknown-linux-musl --workspace` passes; `cargo test --workspace
+--no-fail-fast` gives 1156 passed, 0 failed, 1 ignored (96 test
+binaries). The release `podvm` is 9 148 632 bytes. The reproducers of the
+pass as uid 1000 with a new store under `/var/tmp`: beta.38 gives
+`/opt/exist/{a,lnk,sub,old}`, `a lnk sub` in `/opt`, `dst/{inner,y}` and a
+new `/nonexistdir/f` with exit 0; the new binary gives
+`/opt/exist/{dir,old}`, `/opt/dir`, `dst/srcd/{inner,y}`, and "the parent
+directory of /nonexistdir/f does not exist" with exit 1.
 Left: the findings of the table that are open.

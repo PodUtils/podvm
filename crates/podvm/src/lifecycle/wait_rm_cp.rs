@@ -283,7 +283,12 @@ fn copy_named(
     {
         // T-1775: `cp` joins the mounts of a running payload of the
         // namespace rung, as `exec` does (T-1765); `setns` moves the cwd.
-        let outside = std::path::absolute(outside).unwrap_or_else(|_| outside.to_path_buf());
+        // ⚠ A join, not `std::path::absolute`: that drops a last `/.`, which
+        // names the contents of SRC (T-2079).
+        let outside = match std::env::current_dir() {
+            Ok(cwd) if outside.is_relative() => cwd.join(outside),
+            _ => outside.to_path_buf(),
+        };
         if c.state == podvm_supervise::table::State::Running && c.rung == "namespace" {
             crate::exec::enter::join_mounts(c.pid);
         }
@@ -390,33 +395,69 @@ pub(super) fn copy_one(
             }
         }
     };
-    let (src, mut dst) = if out_of {
+    let (src, dst) = if out_of {
         (target, outside.to_path_buf())
     } else {
         (outside.to_path_buf(), target)
     };
-    let dst_was_dir = dst.is_dir();
-    // TODO/supervise.md T-1822: a file onto a directory goes into it under
-    // its own name, as docker does; the checks below see the joined path.
-    if !src.is_dir()
-        && dst_was_dir
-        && let Some(name) = src.file_name()
-    {
-        dst = dst.join(name);
-    }
-    // PodUtils/podvm#555: a destination that ends with `/` names a
-    // directory; where none is there, nothing is written as a file.
-    let named = if out_of {
-        outside.to_string_lossy().into_owned()
+    let (src_named, dest_named) = if out_of {
+        (inside.to_string(), outside.to_string_lossy().into_owned())
     } else {
-        inside.to_string()
+        (outside.to_string_lossy().into_owned(), inside.to_string())
     };
-    if named.ends_with('/') && !dst_was_dir && !src.is_dir() {
+    // ⚠ Stat the SOURCE side first: its kind decides the shape of the copy,
+    // and a missing source makes nothing on the other side.
+    let kind = match std::fs::symlink_metadata(&src).map(|m| m.file_type()) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("podvm cp: {src_named}: {e}");
+            return EXIT_CLI_ERROR; // T-2062
+        }
+    };
+    if kind.is_dir() && !recursive {
         eprintln!(
-            "podvm cp: {named} ends with '/', which names a directory, and no directory is there"
+            "podvm cp: {} is a directory; pass -r to copy it",
+            src.display()
         );
-        return EXIT_CLI_ERROR;
+        return EXIT_FLAG_ERROR;
     }
+    if !kind.is_dir() && !kind.is_file() && !kind.is_symlink() {
+        eprintln!(
+            "podvm cp: {} is not a file or directory; special files are refused",
+            src.display()
+        );
+        return EXIT_RUNTIME_ERROR;
+    }
+    // The basename of SRC as it was named; `..` takes its resolved name.
+    let name = std::path::Path::new(&src_named)
+        .file_name()
+        .map(|n| n.to_os_string())
+        .or_else(|| {
+            src.canonicalize()
+                .ok()?
+                .file_name()
+                .map(|n| n.to_os_string())
+        });
+    // ⛔ TODO/cli.md T-2079 (OR-B39-04, OR-B39-14): docker's rule, in one
+    // place (`cp_rule`), for each direction and an image as the source.
+    let ask = super::cp_rule::Ask {
+        src: if kind.is_dir() {
+            super::cp_rule::Src::Dir
+        } else {
+            super::cp_rule::Src::File
+        },
+        contents: super::cp_rule::names_contents(&src_named),
+        name: name.as_deref(),
+        dest: super::cp_rule::dest_of(&dst),
+        slash: super::cp_rule::names_dir(&dest_named),
+    };
+    let dst = match super::cp_rule::target(ask, &dst) {
+        Ok(p) => p,
+        Err(r) => {
+            eprintln!("podvm cp: {}", r.line(&dest_named));
+            return EXIT_CLI_ERROR; // T-2062
+        }
+    };
     // ⛔ Never write through a pre-existing symlink: the path is gated but
     // the write would land where the link points.
     if is_link(&dst) {
@@ -430,34 +471,11 @@ pub(super) fn copy_one(
         eprintln!("podvm cp: {msg}");
         return EXIT_CLI_ERROR; // T-2062
     }
-    // ⚠ Stat the SOURCE side: a missing destination directory on the way
-    // in must still read as a directory copy. (`src_is_link` above already
-    // decided the gate; this match decides the copy shape.)
-    match std::fs::symlink_metadata(&src).map(|m| m.file_type()) {
-        Ok(t) if t.is_symlink() => {
-            return replicate_link(&src, &dst);
-        }
-        Ok(t) if t.is_dir() => {
-            if !recursive {
-                eprintln!(
-                    "podvm cp: {} is a directory; pass -r to copy it",
-                    src.display()
-                );
-                return EXIT_FLAG_ERROR;
-            }
-            return copy_tree(&src, &dst, root, out_of);
-        }
-        Ok(t) if !t.is_file() => {
-            eprintln!(
-                "podvm cp: {} is not a file or directory; special files are refused",
-                src.display()
-            );
-            return EXIT_RUNTIME_ERROR;
-        }
-        _ => {}
+    if kind.is_symlink() {
+        return replicate_link(&src, &dst);
     }
-    if let Some(parent) = dst.parent() {
-        let _ = std::fs::create_dir_all(parent);
+    if kind.is_dir() {
+        return copy_tree(&src, &dst, root, out_of);
     }
     match std::fs::copy(&src, &dst) {
         Ok(n) => {
