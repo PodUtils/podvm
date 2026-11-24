@@ -149,7 +149,7 @@
 257 issue closed
 258 issue closed
 259 issue closed
-260 issue open
+260 issue closed
 261 issue closed
 262 issue closed
 263 issue closed
@@ -316,7 +316,7 @@
 424 issue closed
 425 issue closed
 426 issue closed
-427 issue open
+427 issue closed
 428 issue closed
 429 issue closed
 430 issue closed
@@ -328,7 +328,7 @@
 436 issue closed
 437 issue closed
 438 issue closed
-439 issue open
+439 issue closed
 440 issue closed
 441 issue closed
 442 issue closed
@@ -355,7 +355,7 @@
 463 issue closed
 464 issue closed
 465 issue closed
-466 issue open
+466 issue closed
 467 issue closed
 468 issue closed
 469 issue closed
@@ -398,7 +398,7 @@
 506 issue closed
 507 issue closed
 508 issue closed
-509 issue open
+509 issue closed
 510 issue open
 511 issue open
 512 issue open
@@ -474,12 +474,12 @@
 582 issue closed
 583 issue open
 584 issue open
-585 issue open
+585 issue closed
 586 issue closed
 587 issue closed
 588 issue closed
 589 issue closed
-590 issue open
+590 issue closed
 591 issue closed
 592 issue closed
 593 issue open
@@ -494,7 +494,7 @@
 602 issue open
 603 issue closed
 604 issue open
-605 issue open
+605 issue closed
 606 issue closed
 607 issue closed
 608 issue closed
@@ -525,7 +525,7 @@
 633 issue closed
 634 issue closed
 635 issue closed
-636 issue open
+636 issue closed
 637 issue closed
 638 issue closed
 639 issue closed
@@ -537,13 +537,13 @@
 645 issue closed
 646 issue closed
 647 issue closed
-648 issue open
-649 issue open
+648 issue closed
+649 issue closed
 650 issue closed
 651 issue open
 652 issue open
 653 issue open
-654 issue open
+654 issue closed
 655 issue open
 656 issue closed
 657 issue open
