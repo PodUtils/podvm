@@ -410,6 +410,7 @@ fn the_t_0215_instrument_sees_a_lock_that_is_held() {
 }
 
 mod staging;
+mod staging_names; // TODO/image.md T-2069
 fn record(repo: &str, tag: Option<&str>, seed: u8) -> Record {
     let d = |b: u8| Digest::of(&[b, seed]).to_string();
     Record {

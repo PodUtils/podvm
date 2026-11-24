@@ -6803,7 +6803,7 @@ Fix the two P1 findings and the P2 findings that the lead marked "fix"; give OR-
 | OR-B38-02, a foreground `run` reports the owner of the store for a name collision or a corrupt `containers.json` | P2 | fix | [T-2073](cli.md) | done |
 | OR-B38-03, each `exec` rewrites `/etc/hosts` and drops `--add-host`; `run -d --hostname hx` maps 127.0.0.1 to the name of the container | P2 | fix | [T-2075](cli.md) | done |
 | OR-B38-04, `run -d --rm` keeps the container after its end | P2 | fix | [T-2074](cli.md) | done |
-| OR-B38-05, a killed `pull` or `load` leaves a `.partial` in `store/staging` that no verb removes or counts | P2 | T-2069 | [T-2069](image.md) | open |
+| OR-B38-05, a killed `pull` or `load` leaves a `.partial` in `store/staging` that no verb removes or counts | P2 | T-2069 | [T-2069](image.md) | done: the next command after 10 s removes it (T-2069) |
 | OR-B38-06, `-v DIR:/etc` and `-v DIR:/dev` write podvm's fixups into DIR | P1 (lead) | fix | [T-2072](cli.md) | done |
 | OR-B38-07, `cp -r` onto an existing copy of a tree with symbolic links fails half way ("is a symlink; writing through one is refused") | P2 | known gap | - | open |
 | OR-B38-08, `login` prints "Login Succeeded" for a registry that it did not contact | P2 | known gap | - | open |

@@ -4700,7 +4700,7 @@ Known limit: the image of podrunner (85 layers, about 16 GiB) is not measured he
 **Milestone:** none
 **Priority:** P2
 **Effort:** S
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -4725,3 +4725,7 @@ Name a staging file with an id that is unique across PID namespaces (for example
 ## Prove
 
 A table test: two writers with the same pid and sequence (a test seam) get two names, or a refusal that names the clash; `put_bytes` holds its lock through the rename (a test that runs the sweep in the window). A `.partial` that no process holds is removed by the sweep and counted by `system df` (a test that leaves one with no lock).
+
+## Done
+
+**Done (2026-11-24).** (1) `podvm_image::store::staging_name` names each staging file of `Store::stage` and `Store::write_index` `HINT.PID.SEQ.TOKEN.held.partial`, where TOKEN is 64 random bits of `pod_core::entropy::OsEntropy` (the time in nanoseconds where the system gives no random bytes): two writers with one pid in two PID namespaces get two names. A clash is refused with one true line, "another process holds the staging file PATH: this write stops, and the store is as it was", no longer "a defect". (2) `Store::put_bytes` drops the lock of its staging file after the rename. (3) The sweep of `Store::open` (each command) removes a `.held.partial` that nobody holds once it is older than 10 s (`HELD_AGE`; its writer locks it right after the create); another `.partial` (the table of containers of pod-supervise, written with no lock) keeps the age of 600 s. Table tests `a_staging_name_is_unique_across_pid_namespaces`, `the_sweep_takes_a_held_name_that_nobody_holds_after_its_short_age`, `put_bytes_leaves_no_staging_file` and `a_clash_of_names_is_refused_with_a_true_line` (`crates/podvm-image/src/store/tests/staging_names.rs`). Measured with the release binary as uid 1000: a SIGKILL of `pull` of `golang:1.24-bookworm` left four `.held.partial` files (72 MiB); `images` at once kept them (younger than 10 s), and `images` 11 s later removed each one. `system df` does not count a staging file: with the sweep of each command, a file of a dead writer stays for at most 10 s, an estimate that holds where a command runs after it.

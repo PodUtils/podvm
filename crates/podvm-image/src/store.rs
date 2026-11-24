@@ -115,6 +115,39 @@ const EXTRACT_PAUSE: std::time::Duration = std::time::Duration::from_millis(100)
 /// process, which is the difference `TODO/probe.md` T-0113 cost one crate over.
 static STAGE_SEQUENCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
+/// TODO/image.md T-2069: the end of the name of a staging file whose writer
+/// locks it from its creation ([`Store::stage`], [`Store::write_index`]). A
+/// sweep removes such a file where nobody holds it and it is older than
+/// [`blobs::HELD_AGE`]; a `.partial` of another writer keeps the age of
+/// [`blobs::STAGING_AGE`].
+pub const HELD_SUFFIX: &str = ".held.partial";
+
+/// TODO/image.md T-2069: the name of a staging file for `hint`, unique per
+/// call (invariant I6) and across PID namespaces (AGENTS.md 2b: a pid is not
+/// unique there): the pid, the sequence of this process and 64 random bits.
+/// Where the system gives no random bytes, the time in nanoseconds takes
+/// their place.
+pub fn staging_name(hint: &str) -> String {
+    staging_name_with(hint, &mut pod_core::entropy::OsEntropy)
+}
+
+/// [`staging_name`] with the random source `e` (a test seam).
+pub fn staging_name_with(hint: &str, e: &mut dyn pod_core::entropy::Entropy) -> String {
+    let mut r = [0u8; 8];
+    let token = match e.fill(&mut r) {
+        Ok(()) => u64::from_le_bytes(r),
+        Err(_) => std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(0),
+    };
+    format!(
+        "{hint}.{}.{}.{token:016x}{HELD_SUFFIX}",
+        std::process::id(),
+        STAGE_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    )
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Record {
     /// `<domain>/<repository>`, canonical. ⛔ Never the display form: `alpine`
@@ -406,11 +439,7 @@ impl Store {
         // ⛔ Invariants I5 and I6: unique per call, named `.partial` so the one
         // sweep rule covers it, and held while it is written so the sweep
         // cannot take it out from under this write.
-        let tmp = self.root.join(STAGING).join(format!(
-            "{INDEX_FILE}.{}.{}.partial",
-            std::process::id(),
-            STAGE_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-        ));
+        let tmp = self.root.join(STAGING).join(staging_name(INDEX_FILE));
         {
             let mut f = StagedFile::create(&tmp)?;
             f.write_all(&bytes)

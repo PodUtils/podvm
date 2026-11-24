@@ -705,7 +705,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2066](deps.md) | P2 | L | none | deps | partial | Take podcrates `v0.81.0`: the warm line with a bounded connect, the static QEMU 11.1.3, the streamed log reads, one atomic replace of a file |
 | [T-2067](gate.md) | P2 | S | none | gate | done | Tests of `podvm` and the machine tier fail with a long `TMPDIR`: a probe in the working directory, socket paths longer than `sun_path` |
 | [T-2068](image.md) | P1 | S | none | image | done | `load` of an image of 14 layers or more is refused: the load holds one lock for each blob |
-| [T-2069](image.md) | P2 | S | none | image | open | The staging files of the store: a name that a pid alone makes unique, and a lock that `put_bytes` drops before its rename |
+| [T-2069](image.md) | P2 | S | none | image | done | The staging files of the store: a name that a pid alone makes unique, and a lock that `put_bytes` drops before its rename |
 | [T-2070](cli.md) | P1 | M | none | cli | partial | The faults of the seventh outside pass (2026-11-23, the gate of the next beta) |
 | [T-2071](cli.md) | P1 | S | none | cli | done | `exec -it CTR sh`: a job-control shell takes the caller's terminal, and the relay gets no more input |
 | [T-2072](cli.md) | P1 | S | none | cli | done | `-v DIR:/etc` and `-v DIR:/dev` write podvm's fixups into DIR |
@@ -726,7 +726,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-657 entries: 23 open, 47 partial, 5 blocked, 582 done.
+657 entries: 22 open, 47 partial, 5 blocked, 583 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -737,9 +737,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 23 | 0 | 266 | 292 |
-| P2 | 15 | 19 | 4 | 196 | 234 |
+| P2 | 14 | 19 | 4 | 197 | 234 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 23 | 47 | 5 | 582 | 657 |
+| **All** | 22 | 47 | 5 | 583 | 657 |
 
 ## Work order
 

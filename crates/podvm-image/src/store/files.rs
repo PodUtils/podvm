@@ -54,12 +54,14 @@ impl StagedFile {
         let lock = match try_lock_at(path, sys::LOCK_EX)? {
             Some(l) => l,
             None => {
+                // TODO/image.md T-2069: the name holds 64 random bits, so
+                // a clash is two writers that drew one name, or a process
+                // that holds a file of the store that it did not make.
                 return Err(Error::Store(format!(
-                    "{} is already being written by another podvm. Invariant I6 \
-                     makes this name unique per call, so two writers on one name is \
-                     a defect rather than contention",
+                    "another process holds the staging file {}: this write stops, and \
+                     the store is as it was (TODO/image.md T-2069)",
                     path.display()
-                )))
+                )));
             }
         };
         let file = std::fs::OpenOptions::new()
@@ -72,6 +74,12 @@ impl StagedFile {
 
     pub fn sync_all(&self) -> std::io::Result<()> {
         self.file.sync_all()
+    }
+
+    /// [`StagedFile::create`] for the tests of the store.
+    #[cfg(test)]
+    pub(crate) fn create_for_test(path: &Path) -> Result<StagedFile> {
+        StagedFile::create(path)
     }
 }
 

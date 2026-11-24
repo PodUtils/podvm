@@ -21,11 +21,7 @@ impl Store {
             .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
             .take(24)
             .collect();
-        let path = self.root.join(STAGING).join(format!(
-            "{safe}.{}.{}.partial",
-            std::process::id(),
-            STAGE_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-        ));
+        let path = self.root.join(STAGING).join(staging_name(&safe));
         let f = StagedFile::create(&path)?;
         Ok((path, f))
     }
@@ -66,7 +62,22 @@ impl Store {
             // launcher lost the end of a run (`Dead`, no exit code), or `run`
             // failed with "containers.json: No such file or directory". A
             // young file is a write in progress, locked or not.
-            if !abandoned_by_age(&resolved, if memo { memo_age } else { STAGING_AGE }) {
+            // TODO/image.md T-2069 (OR-B38-05): a file of a writer that locks
+            // it from its creation is abandoned where nobody holds it, after
+            // the moment between its create and its lock: a `pull` that a
+            // SIGKILL ended leaves it to the next command, not for 10 minutes.
+            let held = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.ends_with(HELD_SUFFIX));
+            let age = if memo {
+                memo_age
+            } else if held {
+                HELD_AGE
+            } else {
+                STAGING_AGE
+            };
+            if !abandoned_by_age(&resolved, age) {
                 continue;
             }
             // ⭐ The lock test: a live writer holds this file, so a lock this
@@ -107,8 +118,12 @@ impl Store {
         f.write_all(bytes)
             .and_then(|_| f.sync_all())
             .map_err(|e| Error::io(staged.display().to_string(), e))?;
+        // TODO/image.md T-2069: the lock stays through the rename. Dropped
+        // before it, a sweep could take the lock and remove the file in
+        // between, and the rename failed.
+        let committed = self.commit(&staged, want);
         drop(f);
-        self.commit(&staged, want)
+        committed
     }
 
     pub fn read_blob(&self, d: &Digest) -> Result<Vec<u8>> {
@@ -310,6 +325,11 @@ impl Store {
 
 /// The age after which an unlocked staging file is abandoned.
 pub const STAGING_AGE: std::time::Duration = std::time::Duration::from_secs(600);
+
+/// TODO/image.md T-2069: the age after which a staging file that ends with
+/// [`HELD_SUFFIX`] and that nobody holds is abandoned. Its writer locks it
+/// right after the create; the age covers only that moment.
+pub const HELD_AGE: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// The age after which an unlocked memo of a run is abandoned. A run locks
 /// its memo when it makes it (`interpose::ephemeral_memo_path`), so this only

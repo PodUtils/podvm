@@ -8,6 +8,18 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: a killed pull or load no longer leaves its staging file, 2026-11-24
+
+Record: T-2069; T-2070 (OR-B38-05).
+Deployed: not deployed; on main, for the next beta after 0.2.0-beta.39.
+
+- A `pull`, `load` or `import` that a SIGKILL ends leaves its staging
+  file under `store/staging` for at most 10 s: the next command after that
+  removes it. Before, it stayed for 10 minutes, and `system prune` and
+  `image prune` left it (40 to 71 MiB measured).
+- The name of a staging file holds 64 random bits beside the pid, so two
+  writers in two PID namespaces do not take one name.
+
 ### Fixed: the usage of an ended incus instance on a host with AppArmor and cgroup v2, 2026-11-24
 
 Record: T-2086; PodUtils/podrunner#350.
