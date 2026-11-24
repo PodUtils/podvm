@@ -1,6 +1,6 @@
 use super::*;
 
-fn with_argv(argv: &[&str]) -> Container {
+pub(super) fn with_argv(argv: &[&str]) -> Container {
     Container {
         id: "a".repeat(64),
         name: "n".into(),

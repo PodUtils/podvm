@@ -413,6 +413,8 @@ use cp_args::*;
 
 mod copy_tree;
 pub use copy_tree::*;
+mod opened; // TODO/cli.md T-2087
+pub(crate) use opened::*;
 
 mod prune; // TODO/supervise.md T-1848
 pub use prune::container_group;

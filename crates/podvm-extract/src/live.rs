@@ -78,11 +78,21 @@ pub const BOUND_DEVICES: [&str; 4] = ["dev/null", "dev/zero", "dev/random", "dev
 /// nothing is mounted, or this process may not unmount, it does nothing.
 /// `UMOUNT_NOFOLLOW`: a link of the payload never aims it out of the tree.
 pub fn unbind_devices(dir: &Path) {
+    unmount_under(dir);
+    unbind_devices_at(&dir.join("rootfs"));
+}
+
+/// Take the binds of [`BOUND_DEVICES`] off the root `rootfs` itself, in
+/// the mount namespace of this process. TODO/cli.md T-2087 (OR-B40-03):
+/// the copy of the tree for the rundir, cache and tmpfs rungs reads a
+/// bound device as the file that it covers, and `copy` of a device fails.
+pub fn unbind_devices_at(rootfs: &Path) {
     const MNT_DETACH: i32 = 2;
     const UMOUNT_NOFOLLOW: i32 = 8;
-    unmount_under(dir);
-    for d in BOUND_DEVICES {
-        let path = dir.join("rootfs").join(d);
+    // `dev/ptmx`: the bind of the `ptmx` of the run's own devpts
+    // (`userns::new_pts`, T-1909).
+    for d in BOUND_DEVICES.iter().copied().chain(["dev/ptmx"]) {
+        let path = rootfs.join(d);
         let Ok(c) = std::ffi::CString::new(path.as_os_str().as_encoded_bytes()) else {
             continue;
         };

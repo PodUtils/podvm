@@ -723,10 +723,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2084](deps.md) | P2 | M | none | deps | done | Take podcrates `v0.82.1`: the title and the dump flag of the init and the relay of pod-enter, the join of the payload, the meter of a cgroup |
 | [T-2085](machine.md) | P1 | M | none | machine | partial | On the incus tier, an import of a large image keeps three copies of its tree on one file system |
 | [T-2086](machine.md) | P1 | M | none | machine | done | On a hosted runner with cgroup v2, `inspect` of an ended incus instance gives no peak memory and no OOM kill of a child |
+| [T-2087](cli.md) | P1 | M | none | cli | partial | The faults of the ninth outside pass (2026-11-24, the gate of 0.2.0-beta.40) |
 
 ## Counts
 
-657 entries: 22 open, 47 partial, 5 blocked, 583 done.
+658 entries: 22 open, 48 partial, 5 blocked, 583 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -736,10 +737,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 23 | 0 | 266 | 292 |
+| P1 | 3 | 24 | 0 | 266 | 293 |
 | P2 | 14 | 19 | 4 | 197 | 234 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 22 | 47 | 5 | 583 | 657 |
+| **All** | 22 | 48 | 5 | 583 | 658 |
 
 ## Work order
 

@@ -8,6 +8,7 @@ pub(crate) mod cut; // TODO/machine.md T-2082, T-2085
 pub(crate) mod exec; // TODO/machine.md T-2080
 pub(crate) mod guest_exec; // TODO/machine.md T-2080
 pub(crate) mod gzip; // TODO/machine.md T-2085
+pub(crate) mod held; // TODO/machine.md T-2078
 pub(crate) mod image;
 pub(crate) mod import; // TODO/machine.md T-2081
 pub(crate) mod inspect;
@@ -23,6 +24,8 @@ mod xattrs; // TODO/machine.md T-1999
 
 #[cfg(test)]
 mod attach_tests; // TODO/machine.md T-2080
+#[cfg(test)]
+mod held_tests; // TODO/machine.md T-2078
 #[cfg(test)]
 mod import_tests; // TODO/machine.md T-2085
 #[cfg(test)]

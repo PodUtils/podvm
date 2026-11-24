@@ -8,6 +8,28 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: the three P1 faults of the ninth outside pass, and the pool for an image that incus has, 2026-11-24
+
+Record: T-2087, T-2078; T-2079 (OR-B39-13).
+Deployed: not deployed; on main, for the next beta after 0.2.0-beta.39.
+
+- `rmi` of one name of an image that a running container uses removes
+  that name ("Untagged:"), where another name keeps the image, as docker
+  does. The last name is refused with exit 1, the code of the exit table;
+  before, each name was refused with exit 125 (OR-B40-01).
+- `inspect` of a container that was created and not started gives
+  `.Exec.Mode` `fresh-chroot` and `.Exec.Shares` `filesystem`, which is
+  what `exec` does there; before, it gave `join` and the namespaces of a
+  run (OR-B40-02).
+- `PODVM_MODE=tmpfs`, `rundir` and `cache` run for a user with no root;
+  before, each failed with exit 125 and a copy error of `dev/random`
+  (OR-B40-03).
+- On the incus tier, a run of an image that incus already has checks the
+  room of the pool before the create, as an import does; before, a full
+  pool gave incusd's raw error ("run out of disk space"). The need comes
+  from a record that the import writes in the store; an image that an
+  older podvm imported is not checked (OR-B39-13, T-2078).
+
 ### Fixed: a killed pull or load no longer leaves its staging file, 2026-11-24
 
 Record: T-2069; T-2070 (OR-B38-05).

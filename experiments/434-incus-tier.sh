@@ -137,7 +137,10 @@
 #      one file system) and the image of clause 1 removed from incusd, a run
 #      is refused before the import with exit 125 and one line that names
 #      the pool, its free space and the need of the image; no image and no
-#      instance stays.
+#      instance stays. (T-2078, OR-B39-13) Before that, with the image of
+#      clause 1 still in incusd, a run of it is refused the same way, from
+#      the need that its import recorded in the store, and no instance
+#      stays (before: incusd's raw 500 "run out of disk space").
 #      (On a full pool incusd 6.0 puts the stderr of tar, one line for each
 #      file, into its error: 108 MB for 400 000 files, over the bound of
 #      the client, measured on 2026-11-23.)
@@ -605,7 +608,10 @@ echo "  tree     $tree"
 echo "  base     $base"
 echo "  peak     ${peak:-0}"
 echo "  growth   $(( ${peak:-0} - base ))"
-echo "  left     $(ls "$B/store/incus" 2>/dev/null | wc -l) files in store/incus"
+# T-2078: the record of the need of each imported image (ALIAS.need) is
+# no tarball.
+echo "  left     $(ls "$B/store/incus" 2>/dev/null | grep -vc '\.need$') files in store/incus"
+echo "  records  $(ls "$B/store/incus" 2>/dev/null | grep -c '\.need$')"
 } >"$WORK/c21.txt" 2>&1
 cat "$WORK/c21.txt" >>"$REPORT"
 c21() { grep -Eq "$1" "$WORK/c21.txt" || { note "21: $2"; fail=1; }; }
@@ -785,6 +791,11 @@ nsenter -t "$IPID" -m mount --bind "$B/small27" /var/lib/incus/storage-pools/sma
 mount --bind "$B/small27" "$B/state/lib/storage-pools/small/containers" 2>&1 | sed 's/^/  mount    /'
 echo "  free     $(df -k --output=avail "$B/state/lib/storage-pools/small/containers" | tail -1) KiB"
 RI profile device set default root pool=small 2>&1 | sed 's/^/  profile  /'
+# T-2078 (OR-B39-13): an image that incusd has (clause 1 imported it) is
+# checked too, with the need that its import recorded in the store.
+out=$(T "$OCI" true </dev/null 2>&1); echo "  held exit $?"
+echo "$out" | grep -v "incus tier: incusd" | sed 's/^/  held     /'
+echo "  held stays $(RI list --format csv -c n 2>/dev/null | grep -c .)"
 for f in $(RI image list --format csv -c f 2>/dev/null); do RI image delete "$f" >/dev/null 2>&1; done
 echo "  images   $(RI image list --format csv -c f 2>/dev/null | grep -c .) before"
 out=$(T "$OCI" true </dev/null 2>&1); rc=$?
@@ -799,6 +810,9 @@ RI storage delete small 2>&1 | sed 's/^/  pool     /'
 } >"$WORK/c27.txt" 2>&1
 cat "$WORK/c27.txt" >>"$REPORT"
 c27() { grep -Eq "$1" "$WORK/c27.txt" || { note "27: $2"; fail=1; }; }
+c27 "^  held exit 125$" "a run of an image that incusd has, on a pool with no room, did not exit 125"
+c27 "^  held     podvm run: incus tier: the storage pool \`small\` at .* has [0-9.]+ [KM]iB free and the root of the instance needs at least [0-9.]+ MiB" "no line that names the pool for an image that incusd has"
+c27 "^  held stays 0$" "an instance of an image that incusd has stayed on a pool with no room"
 c27 "^  exit     125$" "a run on a pool with no room did not exit 125"
 c27 "^  stderr   podvm run: incus tier: the storage pool \`small\` at .*/storage-pools/small/containers has [0-9.]+ [KM]iB free and the root of the instance needs at least [0-9.]+ MiB" "no line that names the pool, its free space and the need"
 c27 "^  images   0 after$" "an image was imported into a pool with no room"

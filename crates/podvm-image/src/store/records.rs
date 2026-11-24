@@ -309,17 +309,29 @@ impl Store {
         // this answer and the unlinks below: `Store::hold` takes the same lock.
         let mut skipped = Vec::new();
         let mut kept = Vec::new();
+        let before = self.read_index()?;
+        let same = |x: &Record, y: &Record| {
+            x.repository == y.repository && x.tag == y.tag && x.digest == y.digest
+        };
         for r in doomed {
-            if self.in_use(r)? {
+            // TODO/cli.md T-2087 (OR-B40-01): a name of an image that another
+            // record keeps goes as docker's untag does: the hold of a
+            // container is on the image (its digest), and that stays.
+            let other_name = before
+                .images
+                .iter()
+                .any(|o| o.digest == r.digest && !doomed.iter().any(|d| same(d, o)));
+            if !other_name && self.in_use(r)? {
                 match on_held {
                     Held::Refuse => {
-                        return Err(Error::Store(format!(
-                            "{} is in use by a running container and was not removed. \
-                             A GC that deletes an extraction out from under a payload \
-                             makes its failure read as a missing file rather than as a \
-                             concurrent deletion (TODO/image.md T-0204)",
+                        // OR-B40-01: the exit table gives 1 (cli-error) for
+                        // an image that a container uses.
+                        return Err(Error::Usage(format!(
+                            "{} is in use by a running container and was not removed: \
+                             remove the container first, or give the image another \
+                             name and remove this one (TODO/image.md T-0204)",
                             r.name()
-                        )))
+                        )));
                     }
                     Held::Skip => {
                         skipped.push(r.name());
@@ -368,6 +380,18 @@ impl Store {
                     Err(e) if e.kind() == std::io::ErrorKind::NotFound => freed.push(b.to_string()),
                     Err(e) => return Err(Error::io(resolved.display().to_string(), e)),
                 }
+            }
+            // TODO/cli.md T-2087 (OR-B40-01): the locks are keyed by the
+            // image, not by the name. Where a surviving record names the same
+            // image, they stay: the untag of a second name removed the lock
+            // that a running container held, and the image then read as not
+            // in use.
+            if index
+                .images
+                .iter()
+                .any(|o| o.digest == r.digest || o.manifest_digest == r.manifest_digest)
+            {
+                continue;
             }
             let lock = self.image_lock_path(r)?;
             if lock.exists() {

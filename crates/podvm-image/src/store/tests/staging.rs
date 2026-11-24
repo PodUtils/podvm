@@ -336,8 +336,22 @@ fn an_image_a_container_holds_is_refused_by_rmi_and_skipped_by_prune() {
 
     let held = s.hold(&r).unwrap();
     assert!(s.in_use(&r).unwrap());
+    // TODO/cli.md T-2087 (OR-B40-01): a second name of the held image goes,
+    // as docker untags it; the last name is refused with exit 1.
+    s.tag("alpine:latest", "local/alp:v2").unwrap();
+    s.remove("local/alp:v2")
+        .expect("rmi of a second name of a held image");
+    assert!(
+        s.find("local/alp:v2").unwrap().is_empty(),
+        "the second name stayed"
+    );
+    assert!(
+        !s.find("alpine:latest").unwrap().is_empty(),
+        "the held name went"
+    );
     let e = s.remove("alpine:latest").unwrap_err();
     assert!(format!("{e}").contains("in use"), "{e}");
+    assert_eq!(e.exit_code(), crate::error::EXIT_CLI_ERROR, "{e}");
     let pruned = s.prune(true).unwrap();
     assert_eq!(pruned.skipped, vec!["alpine:latest".to_string()]);
     assert!(pruned.untagged.is_empty());

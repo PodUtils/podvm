@@ -402,7 +402,9 @@ fn held_record() -> podvm_image::Record {
 
 /// T-1517 (`160-store-gc.sh` clause 1). `rmi` on a held image exits
 /// non-zero naming `in use`: `store.remove` takes `Held::Refuse` and
-/// `rmi` reports the resulting error's own exit code.
+/// `rmi` reports the resulting error's own exit code. TODO/cli.md T-2087
+/// (OR-B40-01): that code is 1, the `cli-error` of the exit table ("an
+/// image that a container uses (rmi)"), as for a created container.
 #[test]
 fn rmi_refuses_a_held_image() {
     let root = scratch_store("rmi-held");
@@ -417,8 +419,8 @@ fn rmi_refuses_a_held_image() {
     );
     assert_eq!(
         error.exit_code(),
-        podvm_image::error::EXIT_RUNTIME_ERROR,
-        "held removal must exit non-zero the way rmi reports it"
+        podvm_image::error::EXIT_CLI_ERROR,
+        "held removal must exit 1, the code of the exit table"
     );
     drop(held);
     assert!(

@@ -6283,7 +6283,21 @@ before the create of an image that incus already has, with the size of the
 image from incusd. (3) A run on the hosted runner of PodUtils/podrunner#346
 with the next beta after 0.2.0-beta.38.
 
-OR-B39-13 of the eighth outside pass (T-2079, 2026-11-24) is remaining
+Remaining (2) is done (2026-11-24, with OR-B39-13): pod-incus has no call
+that reads an image (#651 asks podcrates), so the import writes the need
+of the tree to `incus/ALIAS.need` of the store (`incus::held`, a record
+`v1 BYTES ENTRIES`), and a run of an alias that incus has checks the pool
+of the default profile with it before the create, as before an import; an
+alias with no record (an older podvm, another store) is not checked. The
+table test `the_need_of_an_image_that_incus_has_comes_from_its_record`
+(`crates/podvm/src/incus/held_tests.rs`). Experiment 434 clause 27 (new
+case): with the image of clause 1 in incusd and the default profile on the
+pool of 8 MiB, a run exits 125 with the line "the storage pool `small` ...
+has 8.0 MiB free and the root of the instance needs at least 16.2 MiB",
+and no instance stays; clause 21 counts the records apart from a tarball.
+Remaining: (1) and (3).
+
+OR-B39-13 of the eighth outside pass (T-2079, 2026-11-24) was remaining
 (2): on a full pool, a run of an image that incus already has gets incusd's
 raw 500 "run out of disk space", as the check runs only before an import.
 The pass also notes that the line of the check names a path of the host

@@ -151,11 +151,15 @@ pub(super) async fn ensure_image(
             r.map(|a| a.is_some()).map_err(|e| (e.to_string(), None))
         };
     if there(c.alias(&name).await)? {
+        // T-2078 (OR-B39-13): the room of the pool for the root, also where
+        // no import comes first.
+        super::held::check(c, job, storage, &name).await?;
         return Ok((name, true));
     }
     let _lock = import_lock(job, &name).await?;
     // Another podvm of the store imported it while this one waited.
     if there(c.alias(&name).await)? {
+        super::held::check(c, job, storage, &name).await?;
         return Ok((name, true));
     }
     // T-2085: the tree is made now, under the lock of the import, and only
@@ -275,5 +279,15 @@ async fn upload(
         return Err((e.to_string(), hint));
     }
     wrote.map_err(|e| (e, None))?;
+    // T-2078 (OR-B39-13): the need of the root for a later run of the alias,
+    // which has no tree in the store to measure.
+    if let Some(s) = job.store
+        && let Err(w) = super::held::write(s, &name, tree)
+    {
+        eprintln!(
+            "podvm {}: incus tier: the record of the need of the image: {w}",
+            job.verb
+        );
+    }
     Ok((name, false))
 }

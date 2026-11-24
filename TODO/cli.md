@@ -7051,7 +7051,7 @@ experiment 434 with clauses 28 to 30; each other finding is a line in
 | OR-B39-10, incus: a daemon that takes the connection and never answers holds podvm with no bound | P2 | fix if cheap | [T-2080](machine.md) | done for the first call of each verb (30 s); a bound of each call is asked of podcrates |
 | OR-B39-11, incus: `rm -rf /.podvm` in the payload deletes its log; `logs` gives a raw 404 | P2 | gap | - | open |
 | OR-B39-12, incus: after a failed create, "the instance stays" although the delete answered 404; `incus tier;` | P2 | fix | [T-2080](machine.md) | done |
-| OR-B39-13, incus: no check of the pool for an image that incus has; the line of the check names a host path | P2 | T-2078 | [T-2078](machine.md) | open |
+| OR-B39-13, incus: no check of the pool for an image that incus has; the line of the check names a host path | P2 | T-2078 | [T-2078](machine.md) | done: the import records the need of the tree in the store, and a run of an image that incus has checks the pool with it (T-2078); the path of the pool stays in the line |
 | OR-B39-14, native: `cp HOST ctr:/nonexistdir/f` makes the directory | P2 | known (OR-B38-14) | - | done: a missing parent of DEST refuses the copy (exit 1) in each direction, as docker; the same rule as OR-B39-04 |
 | OR-B39-15, native: the edits of a payload to `/etc/hosts` are lost at the next `exec` | P2 | gap | - | open |
 | OR-B39-16, incus: `--platform linux/arm64` on amd64 gives "Command not executable" with no word of the architecture | P2 | with OR-B39-01 | [T-2080](machine.md) | done for a foreground `run`; `run -d` writes the error of the start to the log |
@@ -7088,3 +7088,94 @@ new `/nonexistdir/f` with exit 0; the new binary gives
 `/opt/exist/{dir,old}`, `/opt/dir`, `dst/srcd/{inner,y}`, and "the parent
 directory of /nonexistdir/f does not exist" with exit 1.
 Left: the findings of the table that are open.
+
+# T-2087: The faults of the ninth outside pass (2026-11-24, the gate of 0.2.0-beta.40)
+
+**Source:** the ninth outside pass (2026-11-24, the gate of 0.2.0-beta.40): an agent with the release binary of `bfb3822` (`--version` 0.2.0-beta.39) and `podvm man` only; the native surface as uid 1000, the incus tier as root against a private incusd 6.0.0 that the tester started ([the report](../docs/history/outside-pass-2026-11-24.md))
+**Category:** cli
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+The pass found 28 findings, OR-B40-01 to OR-B40-28: no P0, three P1, 15
+P2 and ten P3. The rule of the gate: no P0 or P1 finding stays open
+(`docs/maintenance.md`, "Releases", step 4). The changes of the beta held:
+systemd of `--podvm-init=image` on the incus tier, the usage of an ended
+instance, the import of a large image, the joins and the signals.
+
+## Premise
+
+Each P1 finding was reproduced on a release binary of the tree before its
+fix, as uid 1000: OR-B40-01 (`rmi local/alp:v2` with a running container
+of the image: exit 125), OR-B40-02 (`inspect` of a created container:
+`created join filesystem+user+pid+mount`), OR-B40-03 (`PODVM_MODE=tmpfs`
+with a fresh store: "dev/random: the file could not be copied", exit 125).
+
+## Approach
+
+Fix the three P1 findings; keep each other finding in the table below, as
+a line of "Known gaps" of the release.
+
+## Decision
+
+-
+
+## Prove
+
+`sh scripts/dev/checks.sh` passes with a test of the class of each fixed
+finding; the reproducer of each P1 finding on the new release binary as
+uid 1000 gives the docker result; each other finding is a line in "Known
+gaps" of the release.
+
+## Done
+
+**Partial (2026-11-24).** The state of each finding:
+
+| Finding | Sev | Triage | Entry | State |
+| --- | --- | --- | --- | --- |
+| OR-B40-01, `rmi` of a second tag of an image that a running container uses is refused with exit 125 | P1 | fix | [T-2087](cli.md) | done: the name goes as docker untags it, where another record keeps the image; the last name is refused with exit 1, the `cli-error` of the exit table |
+| OR-B40-02, `inspect` gives `.Exec.Mode join` and pid sharing for a created container, where `exec` is a fresh chroot | P1 | fix | [T-2087](cli.md) | done: `.Exec.Mode` and `.Exec.Shares` say `join` only for a running run (`lifecycle::exec_opened`) |
+| OR-B40-03, `PODVM_MODE=tmpfs`, `rundir` and `cache` fail for uid 1000 with a copy error of `dev/random` | P1 | fix | [T-2087](cli.md) | done: the binds of the devices go off the source tree before the copy and are made again on the staged root |
+| OR-B40-04, incus: `wait` and `kill` have no path of the tier | P2 | gap | - | open |
+| OR-B40-05, a foreground run on the namespace rung does not reap orphans until it ends | P2 | gap | - | open |
+| OR-B40-06, `--init` and `top` are refused with a reason that is false on the namespace rung | P2 | gap | - | open |
+| OR-B40-07, `doctor` and `probe` say the machine tier is refused where `run` fetches its own QEMU | P2 | gap | - | open |
+| OR-B40-08, `login` checks no password (known: OR-B38-08) | P2 | known | - | open |
+| OR-B40-09, a payload argument that is not UTF-8 is refused | P2 | gap | - | open |
+| OR-B40-10, a name conflict exits 1 from `create` and 125 from `run` | P2 | gap | - | open |
+| OR-B40-11, `run --rm` keeps the extracted tree of the image (the store keeps trees by design) | P2 | gap | - | open |
+| OR-B40-12, `--env-file` refuses a bare NAME (known: OR-B38) | P2 | known | - | open |
+| OR-B40-13, `run -it` and `exec -it`: the pty is not the controlling terminal (known: OR-B38-17) | P2 | known | - | open |
+| OR-B40-14, `--network host` is refused, though the payload shares the host network | P2 | gap | - | open |
+| OR-B40-15, `--format '{{json .}}'`, `table` and `index` are refused | P2 | gap | - | open |
+| OR-B40-16, `cp` refuses a container path with `..` or an absolute link that docker resolves in the root | P2 | gap | - | open |
+| OR-B40-17, `run -u` does not drop privileges and says nothing (`exec -u` says it) | P2 | gap | - | open |
+| OR-B40-18, incus: a created instance reads `Stopped`, and `inspect --verbose` gives a false reason for the dashes | P2 | gap | - | open |
+| OR-B40-19 to OR-B40-28, ten P3 items (the list of the findings file) | P3 | gap | - | open |
+
+Proof of the P1 fixes (2026-11-24): OR-B40-01: `Store::delete` lets a
+name go where another record keeps the same image, and refuses the last
+name with `Error::Usage` (exit 1); the test
+`an_image_a_container_holds_is_refused_by_rmi_and_skipped_by_prune` has the
+second tag, and `rmi_refuses_a_held_image` pins exit 1. OR-B40-02:
+`lifecycle::exec_opened`; the table test
+`the_exec_fields_say_what_exec_does_in_each_state` (created, running,
+exited, another rung). OR-B40-03: `podvm_extract::live::unbind_devices_at`
+(the four devices and `dev/ptmx`) before the copy of the rundir, cache and
+tmpfs rungs, `userns::bind_devices` on the staged root after it, and the
+binds off before the removal of a rundir tree. The reproducers as uid 1000
+on the release binary of the fix: `rmi local/alp:v2` gives "Untagged:
+local/alp:v2" and exit 0, `rmi` of the last name exit 1; `inspect` gives
+`created fresh-chroot filesystem` and `running join
+filesystem+user+pid+mount`; `PODVM_MODE=tmpfs`, `rundir` and `cache` (twice)
+run with `/dev/urandom` and a character device at `/dev/null`, exit 0, and
+no tree of `runs/` stays. The test of OR-B40-01 found a second fault, as old
+as the locks: `Store::delete` removed the payload, fill and extraction
+lock files of each removed name, and they are keyed by the image, so the
+removal of one of two names of an image removed the lock that a container
+held, and the image then read as not in use. The files now stay where a
+surviving record names the same image. `cargo test --workspace
+--no-fail-fast`: 97 test binaries, each passed.

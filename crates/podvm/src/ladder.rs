@@ -157,9 +157,22 @@ fn stage_rundir(
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     let dir = base.join(format!("run-{}-{nanos}", std::process::id()));
+    unbound(rootfs);
     podvm_enter::stage::copy_tree(std::path::Path::new(rootfs), &dir)
         .map_err(|r| podvm_enter::runtime(format!("PODVM_MODE=rundir was forced but {r}")))?;
+    crate::userns::bind_devices(&dir);
     Ok(dir)
+}
+
+/// TODO/cli.md T-2087 (OR-B40-03): a run in a user namespace binds the
+/// devices of the host onto the placeholder files of its tree
+/// (`userns::bind_devices`, T-1909). The copy of the tree for the rundir,
+/// cache and tmpfs rungs read such a file as a device and failed ("the
+/// source path is neither a regular file ..."). The binds go off the
+/// source first, in the mount namespace of this run only, and
+/// `bind_devices` makes them again on the staged root.
+fn unbound(rootfs: &str) {
+    podvm_extract::live::unbind_devices_at(std::path::Path::new(rootfs));
 }
 
 /// The hold of a foreground run (TODO/supervise.md T-1786): called with
@@ -207,6 +220,8 @@ fn enter_staged(
         run_held(&staged_root, plan, mode, None, on_pid, err)
     })();
     if !keep {
+        // T-2087: a bound device is a mount point, which `unlink` refuses.
+        podvm_extract::live::unbind_devices_at(staged);
         let _ = std::fs::remove_dir_all(staged);
     }
     code
@@ -345,11 +360,13 @@ pub(crate) fn enter_forced(
         // it, kept when the payload exits.
         ladder::resolve_payload(rootfs, argv0, path_dirs)
             .map_err(|e| podvm_enter::runtime(format!("PODVM_MODE=cache was forced but {e}")))?;
+        unbound(rootfs);
         let staged =
             podvm_enter::stage::stage_cache(store_root, cache_digest, std::path::Path::new(rootfs))
                 .map_err(|r| {
                     podvm_enter::runtime(format!("PODVM_MODE=cache was forced but {r}"))
                 })?;
+        crate::userns::bind_devices(&staged);
         enter_staged(&staged, plan, Mode::Cache, true, on_pid, err)
     } else if chosen == Mode::Tmpfs {
         // ⭐ TODO/packaging.md T-1003. The ephemeral per-run root: resolved
@@ -359,8 +376,10 @@ pub(crate) fn enter_forced(
         // the ladder's own attach verdict already refused it above.
         ladder::resolve_payload(rootfs, argv0, path_dirs)
             .map_err(|e| podvm_enter::runtime(format!("PODVM_MODE=tmpfs was forced but {e}")))?;
+        unbound(rootfs);
         let staged = podvm_enter::stage::stage_tmpfs(store_root, std::path::Path::new(rootfs))
             .map_err(|r| podvm_enter::runtime(format!("PODVM_MODE=tmpfs was forced but {r}")))?;
+        crate::userns::bind_devices(&staged);
         let staged_str = staged.to_string_lossy().into_owned();
         let code = (|| {
             let staged_root = RootDir::open(&staged_str)?;
