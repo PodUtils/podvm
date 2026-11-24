@@ -6,10 +6,11 @@
 //! space"). The need of the root of the instance is the tree of the image,
 //! and since T-2085 the store keeps no tree after an import. So the import
 //! records the need of the tree in the store (`incus/ALIAS.need`), and a
-//! run of the alias checks the pool with it before the create. pod-incus
-//! has no call that reads an image (#651 asks podcrates for the resources
-//! of an image); an alias with no record (an import of an older podvm, or
-//! of another store) is not checked, as before.
+//! run of the alias checks the pool with it before the create. An alias
+//! with no record (an import of an older podvm, or of another store) is
+//! checked with the size of its image file in incusd, a lower bound of the
+//! root (`Client::image` of podcrates `v0.83.0`): it refuses only an image
+//! that surely cannot fit, and gives no warning of the estimate.
 
 use std::path::PathBuf;
 
@@ -80,8 +81,16 @@ pub async fn check(
     storage: &str,
     alias: &str,
 ) -> Result<(), super::run::Fault> {
-    let Some(need) = job.store.and_then(|s| read(s, alias)) else {
-        return Ok(());
+    // The record of the import; else (an image of an older podvm or of
+    // another store) the size of the image file of incusd, a lower bound
+    // of the root (compressed where the upload was gzip; podcrates
+    // `v0.83.0`, `Client::image`).
+    let (need, bound_only) = match job.store.and_then(|s| read(s, alias)) {
+        Some(n) => (n, false),
+        None => match image_bytes(c, alias).await {
+            Some(bytes) => (Need { bytes, entries: 0 }, true),
+            None => return Ok(()),
+        },
     };
     let plan = super::space::Plan {
         tree: need,
@@ -89,9 +98,22 @@ pub async fn check(
     };
     let _ = job.plan.set(plan);
     if let Some(t) = super::space::Target::find(c, storage).await {
-        for w in t.check(&plan, false).map_err(|e| (e, None))? {
-            eprintln!("podvm {}: incus tier: {w}", job.verb);
+        let warnings = t.check(&plan, false).map_err(|e| (e, None))?;
+        // A lower bound refuses only what surely cannot fit; its estimate
+        // would read the bound as the need.
+        if !bound_only {
+            for w in warnings {
+                eprintln!("podvm {}: incus tier: {w}", job.verb);
+            }
         }
     }
     Ok(())
+}
+
+/// The bytes of the image file of `alias` in incusd, or `None` where incusd
+/// gives no image or no size.
+async fn image_bytes(c: &pod_incus::Client, alias: &str) -> Option<u64> {
+    let a = c.alias(alias).await.ok()??;
+    let i = c.image(&a.target).await.ok()??;
+    u64::try_from(i.size).ok().filter(|b| *b > 0)
 }

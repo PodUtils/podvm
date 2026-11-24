@@ -20,6 +20,9 @@ Deployed: not deployed; on main, for the next beta after 0.2.0-beta.40.
 - On a full pool, the error of tar comes from incusd with its text cut;
   podvm reads its words of a full disk and gives the line of the room of
   the pool, as before.
+- A run of an image that an older podvm imported (no record of its need)
+  is checked against the room of the pool with the size of its image file
+  in incusd, a lower bound (T-2078).
 
 ## 0.2.0-beta.40 (2026-11-24)
 

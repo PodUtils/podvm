@@ -6299,7 +6299,15 @@ case): with the image of clause 1 in incusd and the default profile on the
 pool of 8 MiB, a run exits 125 with the line "the storage pool `small` ...
 has 8.0 MiB free and the root of the instance needs at least 16.2 MiB",
 and no instance stays; clause 21 counts the records apart from a tarball.
-Remaining: (1) and (3).
+(2026-11-24, podcrates `v0.83.0`, T-2089) An alias with no record (an
+import of an older podvm, or of another store) is checked with the size
+of its image file in incusd (`Client::image`), a lower bound of the root:
+it refuses only what surely cannot fit and gives no warning of the
+estimate. Experiment 434 clause 27 (the records removed): exit 125, "the
+root of the instance needs at least 16.5 MiB", no instance stays; the
+whole experiment passes, "THE INCUS TIER RUNS". Remaining: (1) the
+resources of a pool through the API (`storage_pool_resources`) for a
+driver other than `dir`, and (3).
 
 OR-B39-13 of the eighth outside pass (T-2079, 2026-11-24) was remaining
 (2): on a full pool, a run of an image that incus already has gets incusd's
