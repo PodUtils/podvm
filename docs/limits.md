@@ -389,9 +389,10 @@ The operator removed the ReactOS clause from T-1112 on 2026-10-02.
 
 `run --podvm-init=image IMAGE CMD` boots `/sbin/init` of the image
 (systemd) as PID 1 and runs the command after `systemctl
-is-system-running` gives `running` or `degraded` (180 s at most, else 125
-with the state and the last lines of the console of the init). The end of
-the command ends the init: SIGRTMIN+4, 10 s, then SIGKILL (T-2002, call
+is-system-running` gives `running` or `degraded` (180 s at most,
+`PODVM_INIT_BOOT_TIMEOUT` sets 1 to 3600 s; `offline` and `unknown` are
+not final; else 125 with the state and the last lines of the console of
+the init). The end of the command ends the init: SIGRTMIN+4, 10 s, then SIGKILL (T-2002, call
 C26). Experiment 465 measures each line below as uid 1000.
 
 - The namespace rung holds it for a foreground `run` of a caller that is

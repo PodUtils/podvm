@@ -12,7 +12,7 @@ use std::os::unix::process::CommandExt;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-use crate::incus::systemd::{step, Step, BOOT_BOUND};
+use crate::incus::systemd::{boot_bound, step, Step};
 
 /// The PATH of the state queries, and of an init with no PATH.
 pub const PATH: &str = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
@@ -156,7 +156,8 @@ fn output_until(
 /// complete, so no time goes to a poll (TODO/enter.md T-2010); before PID 1
 /// has its bus, and with a systemctl that has no `--wait`, podvm asks again.
 pub fn wait_boot(ns: &Namespaces, ended: &mut dyn FnMut() -> Option<i32>) -> Result<bool, String> {
-    let end = Instant::now() + BOOT_BOUND;
+    let bound = boot_bound()?;
+    let end = Instant::now() + bound;
     let mut wait = true;
     let mut last = String::from("no answer");
     loop {
@@ -187,8 +188,6 @@ pub fn wait_boot(ns: &Namespaces, ended: &mut dyn FnMut() -> Option<i32>) -> Res
                 match step(&state, &err) {
                     Step::Run => return Ok(true),
                     Step::Again => {}
-                    // "offline" before PID 1 made /run/systemd/system.
-                    Step::Fail if state == "offline" || state == "unknown" => {}
                     Step::Fail => return Err(format!("the init of the image is not up: {last}")),
                 }
             }
@@ -196,7 +195,7 @@ pub fn wait_boot(ns: &Namespaces, ended: &mut dyn FnMut() -> Option<i32>) -> Res
         if Instant::now() >= end {
             return Err(format!(
                 "the init of the image did not finish its boot in {} s: {last}",
-                BOOT_BOUND.as_secs()
+                bound.as_secs()
             ));
         }
         std::thread::sleep(Duration::from_millis(25));

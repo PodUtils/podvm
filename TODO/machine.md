@@ -6587,3 +6587,89 @@ the line of (2) (the last build, one run), then `incusd has no room for the uplo
 the storage pool `bt` at .../storage-pools/bt has 219.0 MiB free`, exit 125,
 no image and no instance left. The stand-in test pins the line of a cut
 with no answer. The test totals and the size are in T-2079.
+
+# T-2083: On the incus tier, `--podvm-init=image` takes "offline" of systemd as final and removes the instance
+
+**Source:** PodUtils/podrunner#349 (COORD-127 of podrunner, a report of a member of the team), podrunner's run `hosted-measure.yml` 45333131256, podvm 0.2.0-beta.38, incusd 6.0.0 with a btrfs pool on a hosted runner
+**Category:** machine
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+On a hosted runner, `podvm run -d --podvm-tier=incus --podvm-init=image`
+ended 4 s after the start with `the init of the image is not up:
+systemctl is-system-running gives "offline" (exit 1)`, exit 125, and podvm
+removed the instance. incusd logged the exec of `systemctl
+is-system-running --wait` in the second of the start, and its exit 1 in
+the same second. The same instance, started by `incus start`, reached
+`degraded`. On a `dir` pool, the same run exited 0.
+
+## Premise
+
+`crates/podvm/src/incus/systemd.rs`, `step` (T-1993), took `running` and
+`degraded` as up, `initializing`, `starting` and an error of the bus as
+"ask again", and each other answer as final. systemctl gives "offline"
+while PID 1 has not made `/run/systemd/system`, and `--wait` waits only in
+`initializing` and `starting`, so the first exec after the start can give
+"offline" at once. A slow start (the remap of the ids on btrfs) widens the
+time in which systemd is not up. A refused exec ended the wait too. The
+namespace rung (`initns/join.rs`) already asked again on "offline" and
+"unknown" with its own case; the runsc tier asks again on each answer that
+is not up; the machine tier uses the code of the namespace rung in the
+guest (`podvm guest-init`).
+
+## Approach
+
+Reproduce on the cloud host: a private root incusd 6.0.0 with a btrfs
+pool as the root disk of the default profile, and an image whose init
+starts systemd late, so that the time of "offline" is long enough to see.
+
+## Decision
+
+(1) `step` takes "offline" and "unknown" as "ask again", for each route
+that reads it (incus, the namespace rung, runsc); the own case of the
+namespace rung goes. (2) On the incus tier, the wait is a pure state
+machine (`Waiter`): a refused exec of an instance in the state Running and
+no answer are "ask again"; a refused exec of an instance that is not
+running, `maintenance`, `stopping` and another word are final. podvm asks
+each half second until the bound. (3) `PODVM_INIT_BOOT_TIMEOUT` sets the
+bound, 1 to 3600 s; with no value, 180 s as before (larger than the 60 s
+of the ask). Another value is an error with exit 125. (4) On `degraded`,
+podvm prints the failed units in one line and continues. (5) Where the
+bound passes, the error gives each poll (a run of equal answers once with
+its count, at most twelve runs), PID 1 and the failed units, and the
+instance stays with the commands that read it and remove it. A final
+state removes the instance as before, and its line gives the polls too.
+
+## Prove
+
+`cargo test -p podvm --bin podvm incus::systemd`: one table of the states
+(offline, initializing, starting, unknown, running, degraded, maintenance,
+stopping, a garbage word, a refused exec of a running and of a stopped
+instance, no answer) before the bound and at the bound; the line of the
+polls; the values of the variable. A run on a private incusd 6.0.0 with a
+btrfs pool, on beta.39 and on the new binary.
+
+## Done
+
+**Done (2026-11-24).** Measured on a private root incusd 6.0.0 with a
+loop-backed btrfs pool of 6 GiB as the root disk of the default profile.
+The stand-in image is `ubi9/ubi-init` with a `/sbin/init` that waits 4 s
+before it executes systemd, so that systemctl gives "offline" in that time
+(9 polls by `incus exec` gave "offline", then "running"). beta.39 (the
+head before the fix): `the init of the image is not up: systemctl
+is-system-running gives "offline" (exit 1)`, exit 125, no instance; the
+same line as the report. The new binary: `run -d` exit 0 in 9.4 s, the
+command saw `running` and gave exit 7 to `inspect`. With
+`PODVM_INIT_BOOT_TIMEOUT=2`: exit 125, `the init of the image did not
+finish its boot in 2 s; the polls: "offline" (exit 1) x4, no answer; PID 1
+is init; ...; the instance late3 stays for a look (...): podvm rm -f
+--podvm-tier incus late3 removes it`, and the instance stayed RUNNING. An
+image with a unit that fails: `podvm: --podvm-init=image: systemd of deg1
+is degraded; failed units: fail349.service`, exit 0, and the command saw
+`degraded`. `PODVM_INIT_BOOT_TIMEOUT=abc`: one line, exit 125, no
+instance. The unmodified `ubi9/ubi-init` on the btrfs pool: exit 0 (the
+first poll gave the error of the bus, then "running").

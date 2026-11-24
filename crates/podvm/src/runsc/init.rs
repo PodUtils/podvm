@@ -20,7 +20,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::time::{Duration, Instant};
 
-use crate::incus::systemd::{step, Step, BOOT_BOUND};
+use crate::incus::systemd::{boot_bound, step, Step};
 
 use super::Job;
 
@@ -276,7 +276,8 @@ fn boot_then_run(
             )
         })
     };
-    let end = Instant::now() + BOOT_BOUND;
+    let bound = boot_bound()?;
+    let end = Instant::now() + bound;
     let systemctl = has_systemctl(job.rootfs);
     // `--wait` returns at the moment the boot is complete (T-2010); an old
     // systemctl has none, and podvm then asks again.
@@ -339,7 +340,7 @@ fn boot_then_run(
             return Err(format!(
                 "the init of the image did not finish its boot in {} s: systemctl \
                  is-system-running gives {state_word:?}: {err}",
-                BOOT_BOUND.as_secs()
+                bound.as_secs()
             ));
         }
         std::thread::sleep(Duration::from_millis(25));

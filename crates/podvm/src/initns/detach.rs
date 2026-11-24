@@ -185,7 +185,8 @@ pub fn spawn(job: &InitJob<'_>) -> Result<InitStarted, String> {
 /// init. A failed boot, a supervisor that ended with no state, and the
 /// bound each give their own line; the supervisor is reaped then.
 fn wait_state(file: &Path, pid: i32) -> Result<(), String> {
-    let bound = crate::incus::systemd::BOOT_BOUND + OVER;
+    let bound =
+        crate::incus::systemd::boot_bound().unwrap_or(crate::incus::systemd::BOOT_BOUND) + OVER;
     let end = Instant::now() + bound;
     let mut gone: Option<i32> = None;
     let reap = || {

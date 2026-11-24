@@ -221,10 +221,20 @@ pub(super) async fn detached(c: &Client, job: &Job<'_>, image: &str, d: &Detach)
     }
     if d.start
         && d.init_image
-        && let Err(e) = super::systemd::boot_then_run(c, &name).await
+        && let Err(down) = super::systemd::boot_then_run(c, &name).await
     {
+        if down.keep {
+            // PodUtils/podrunner#349 ask 3 (TODO/machine.md T-2083): the
+            // instance stays, so that the fault is not lost with it.
+            return fail(format!(
+                "{}; the instance {name} stays for a look (`incus console {name} --show-log`, \
+                 `incus exec {name} -- systemctl status`): `podvm rm -f --podvm-tier incus \
+                 {name}` removes it",
+                down.line
+            ));
+        }
         let left = discard(c, &name).await;
-        return fail(with_left(e, &left));
+        return fail(with_left(down.line, &left));
     }
     println!("{name}");
     0

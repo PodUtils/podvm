@@ -233,10 +233,17 @@ and no `-d` is a flag error, exit 125. The code is
 `crates/podvm/src/incus/systemd.rs`. A run does this:
 
 1. podvm asks `systemctl is-system-running --wait` by the exec API each
-   second, for 180 s at most, until it gives `running` or `degraded`. An
-   answer before PID 1 opens its bus ("Failed to connect to bus") is
-   not a state: podvm asks again. Where the bound ends, the run ends with exit 125, and the
-   error names PID 1 and the state.
+   half second, for 180 s at most (`PODVM_INIT_BOOT_TIMEOUT` sets 1 to
+   3600 s), until it gives `running` or `degraded`. On `degraded`, podvm
+   prints the failed units in one line and continues. `offline`,
+   `unknown`, `initializing`, `starting`, an answer before PID 1 opens its
+   bus ("Failed to connect to bus") and an exec that incusd refuses while
+   the instance runs are not final: podvm asks again
+   (PodUtils/podrunner#349, T-2083). `maintenance`, `stopping`, another
+   word and an instance that stopped end the run with exit 125, the polls
+   and the failed units, and podvm removes the instance. Where the bound
+   ends, the run ends with exit 125, the error names PID 1 and each poll,
+   and the instance stays for a look, with the command that removes it.
 2. podvm runs `guest-hold --run --detach` by the exec API, with the
    command, the user and the environment of the run. The command is not
    PID 1; the init of the image is.

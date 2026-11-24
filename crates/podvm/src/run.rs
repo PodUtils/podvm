@@ -219,7 +219,7 @@ pub const RUN_OPTIONS: &str = "\
   --podvm-init image|podvm
                    podvm's own: image boots the init of the image
                    (/sbin/init, systemd) as PID 1, waits for systemctl
-                   is-system-running (180 s), then runs the command, and
+                   is-system-running (180 s, PODVM_INIT_BOOT_TIMEOUT), then runs the command, and
                    ends the init when the command ends. On the incus tier
                    with -d or create (TODO/machine.md T-1993). On a
                    foreground run, the first place that the host gives,

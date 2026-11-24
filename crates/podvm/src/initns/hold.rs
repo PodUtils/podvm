@@ -136,7 +136,9 @@ pub fn hold(spec: &Spec, file: &Path) -> i32 {
 /// little more for the write. A supervisor that ended with no file is a
 /// failure at once.
 fn wait_state(file: &Path, pid: i32) -> i32 {
-    let end = Instant::now() + crate::incus::systemd::BOOT_BOUND + Duration::from_secs(30);
+    let end = Instant::now()
+        + crate::incus::systemd::boot_bound().unwrap_or(crate::incus::systemd::BOOT_BOUND)
+        + Duration::from_secs(30);
     let mut gone = false;
     loop {
         match Held::read(file) {

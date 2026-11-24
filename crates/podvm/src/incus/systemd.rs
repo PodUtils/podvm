@@ -10,12 +10,41 @@
 //! with podvm's own init, relays the channel, and asks PID 1 to power the
 //! instance off when the command ends.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use pod_incus::{Client, Exec};
 
-/// The bound of the boot of the init of the image.
+/// The bound of the boot of the init of the image, where
+/// [`BOOT_BOUND_VAR`] sets no other.
 pub const BOOT_BOUND: Duration = Duration::from_secs(180);
+
+/// PodUtils/podrunner#349 ask 1 (TODO/machine.md T-2083): the variable
+/// that sets the bound of the boot, in seconds.
+pub const BOOT_BOUND_VAR: &str = "PODVM_INIT_BOOT_TIMEOUT";
+
+/// The largest bound that [`BOOT_BOUND_VAR`] takes.
+const BOOT_BOUND_MAX: u64 = 3600;
+
+/// The bound of the boot: [`BOOT_BOUND_VAR`], else [`BOOT_BOUND`]. A value
+/// that is not a number of seconds from 1 to 3600 is an error, not the
+/// default.
+pub fn boot_bound() -> Result<Duration, String> {
+    bound_of(std::env::var_os(BOOT_BOUND_VAR).as_deref())
+}
+
+/// [`boot_bound`] for the value `v` of the variable.
+pub(crate) fn bound_of(v: Option<&std::ffi::OsStr>) -> Result<Duration, String> {
+    let Some(v) = v else {
+        return Ok(BOOT_BOUND);
+    };
+    match v.to_str().map(str::trim).map(str::parse::<u64>) {
+        Some(Ok(n)) if (1..=BOOT_BOUND_MAX).contains(&n) => Ok(Duration::from_secs(n)),
+        _ => Err(format!(
+            "{BOOT_BOUND_VAR}={}: not a number of seconds from 1 to {BOOT_BOUND_MAX}",
+            v.to_string_lossy()
+        )),
+    }
+}
 
 /// What podvm does after one `systemctl is-system-running --wait`.
 #[derive(Debug, PartialEq, Eq)]
@@ -31,11 +60,16 @@ pub(crate) enum Step {
 }
 
 /// The step for one answer of `systemctl is-system-running`; the boot of
-/// an init in a PID namespace reads it too (TODO/enter.md T-2002).
+/// an init in a PID namespace (TODO/enter.md T-2002) and in a gVisor
+/// sandbox (T-2007) read it too.
 pub(crate) fn step(state: &str, stderr: &str) -> Step {
     match state {
         "running" | "degraded" => Step::Run,
-        "initializing" | "starting" => Step::Again,
+        // PodUtils/podrunner#349 (T-2083): "offline" before PID 1 made
+        // /run/systemd/system or opened its bus, and "unknown" where
+        // systemctl cannot read the state yet. `--wait` waits only in
+        // "initializing" and "starting", so these come back at once.
+        "initializing" | "starting" | "offline" | "unknown" => Step::Again,
         // systemd 262 says "Failed to connect to system scope bus via local
         // transport" (TODO/enter.md T-2002); older ones "... to bus".
         "" if stderr.contains("Failed to connect to") => Step::Again,
@@ -43,65 +77,267 @@ pub(crate) fn step(state: &str, stderr: &str) -> Step {
     }
 }
 
-/// Wait for the init of the image, then start the command. An error names
-/// what happened: the state of systemd, or the bound and the name of PID 1.
-pub async fn boot_then_run(c: &Client, name: &str) -> Result<(), String> {
-    let end = tokio::time::Instant::now() + BOOT_BOUND;
-    let wait = Exec::new(["systemctl", "is-system-running", "--wait"]);
-    let mut last = String::from("no answer");
-    loop {
-        let left = end.saturating_duration_since(tokio::time::Instant::now());
-        let out = match tokio::time::timeout(left, c.exec_recorded(name, &wait)).await {
-            Err(_) => None,
-            Ok(r) => Some(
-                r.map_err(|e| format!("--podvm-init=image: systemctl is-system-running: {e}"))?,
-            ),
-        };
-        if let Some(out) = out {
-            let state = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
-            last = format!(
-                "systemctl is-system-running gives {state:?} (exit {}){}",
-                out.exit_code,
-                if err.is_empty() {
-                    String::new()
+/// One answer to the poll of the state of systemd.
+#[derive(Debug)]
+pub(crate) enum Answer {
+    /// systemctl ran: its first line, its error output and its exit code.
+    Out {
+        state: String,
+        err: String,
+        exit: i32,
+    },
+    /// The exec API refused; `running` is false where the instance is not
+    /// in the state Running (or podvm cannot read its state).
+    ExecErr { err: String, running: bool },
+    /// No answer before the bound.
+    NoReply,
+}
+
+impl Answer {
+    /// The answer in one short text, for the record of the polls.
+    fn text(&self) -> String {
+        match self {
+            Answer::Out { state, err, exit } => {
+                let first = err.lines().next().unwrap_or("");
+                if first.is_empty() {
+                    format!("{state:?} (exit {exit})")
                 } else {
-                    format!(": {err}")
+                    format!("{state:?} (exit {exit}: {first})")
                 }
-            );
-            match step(&state, &err) {
-                Step::Run => break,
+            }
+            Answer::ExecErr { err, running: true } => format!("exec refused ({err})"),
+            Answer::ExecErr {
+                err,
+                running: false,
+            } => {
+                format!("exec refused ({err}), the instance is not running")
+            }
+            Answer::NoReply => "no answer".to_string(),
+        }
+    }
+}
+
+/// The decision after one poll.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum Next {
+    /// systemd is up; `degraded` is true for the state "degraded".
+    Up { degraded: bool },
+    /// Poll again.
+    Again,
+    /// A final state: the line. The instance goes.
+    Fail(String),
+    /// The bound passed with no final state: the line. The instance stays
+    /// for a look (PodUtils/podrunner#349 ask 3).
+    Bound(String),
+}
+
+/// The record of the polls of one boot: each run of equal answers once,
+/// with its count.
+#[derive(Debug, Default)]
+pub(crate) struct Polls(Vec<(String, u32)>);
+
+/// The most runs of equal answers that [`Polls::line`] shows: the first
+/// and the last half.
+const POLLS_SHOWN: usize = 12;
+
+impl Polls {
+    fn push(&mut self, text: String) {
+        match self.0.last_mut() {
+            Some((last, n)) if *last == text => *n += 1,
+            _ => self.0.push((text, 1)),
+        }
+    }
+
+    /// The polls in order, as `"offline" (exit 1) x5, "starting" (exit 1)`.
+    pub(crate) fn line(&self) -> String {
+        let one = |(t, n): &(String, u32)| {
+            if *n == 1 {
+                t.clone()
+            } else {
+                format!("{t} x{n}")
+            }
+        };
+        let all = &self.0;
+        if all.len() <= POLLS_SHOWN {
+            return all.iter().map(one).collect::<Vec<_>>().join(", ");
+        }
+        let half = POLLS_SHOWN / 2;
+        let head: Vec<String> = all[..half].iter().map(one).collect();
+        let tail: Vec<String> = all[all.len() - half..].iter().map(one).collect();
+        format!(
+            "{}, ({} more), {}",
+            head.join(", "),
+            all.len() - POLLS_SHOWN,
+            tail.join(", ")
+        )
+    }
+}
+
+/// The wait for the init of one instance: the end and the polls.
+#[derive(Debug)]
+pub(crate) struct Waiter {
+    end: Instant,
+    bound: Duration,
+    polls: Polls,
+}
+
+impl Waiter {
+    pub(crate) fn new(start: Instant, bound: Duration) -> Waiter {
+        Waiter {
+            end: start + bound,
+            bound,
+            polls: Polls::default(),
+        }
+    }
+
+    /// The time that is left at `now`.
+    pub(crate) fn left(&self, now: Instant) -> Duration {
+        self.end.saturating_duration_since(now)
+    }
+
+    /// The decision for the answer `a` at `now`. "offline", "initializing",
+    /// "starting", "unknown", the bus and a refused exec of a running
+    /// instance are not final before the bound.
+    pub(crate) fn next(&mut self, a: Answer, now: Instant) -> Next {
+        let text = a.text();
+        self.polls.push(text.clone());
+        let again = match &a {
+            Answer::Out { state, err, .. } => match step(state, err) {
+                Step::Run => {
+                    return Next::Up {
+                        degraded: state == "degraded",
+                    }
+                }
                 Step::Fail => {
-                    return Err(format!(
-                        "--podvm-init=image: the init of the image is not up: {last}{}",
-                        failed_units(c, name).await
+                    return Next::Fail(format!(
+                        "systemctl is-system-running gives {text}; the polls: {}",
+                        self.polls.line()
                     ))
                 }
-                Step::Again => {}
+                Step::Again => true,
+            },
+            Answer::ExecErr { running: false, .. } => {
+                return Next::Fail(format!(
+                    "systemctl is-system-running: {text}; the polls: {}",
+                    self.polls.line()
+                ))
             }
-        }
-        if tokio::time::Instant::now() >= end {
-            return Err(format!(
-                "--podvm-init=image: the init of the image did not finish its boot in {} s: {last}; \
-                 PID 1 is {}; an image with no systemd has no such init{}",
-                BOOT_BOUND.as_secs(),
-                pid1(c, name).await,
-                failed_units(c, name).await
+            Answer::ExecErr { running: true, .. } | Answer::NoReply => true,
+        };
+        if again && now >= self.end {
+            return Next::Bound(format!(
+                "the init of the image did not finish its boot in {} s; the polls: {}",
+                self.bound.as_secs(),
+                self.polls.line()
             ));
         }
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        Next::Again
+    }
+}
+
+/// Why the init of the image is not up.
+#[derive(Debug)]
+pub struct Down {
+    /// The line, with the polls.
+    pub line: String,
+    /// True where the instance stays for a look: the bound passed with no
+    /// final state (PodUtils/podrunner#349 ask 3).
+    pub keep: bool,
+}
+
+impl Down {
+    fn gone(line: String) -> Down {
+        Down { line, keep: false }
+    }
+}
+
+/// The time between two polls.
+const POLL_GAP: Duration = Duration::from_millis(500);
+
+/// One poll of `systemctl is-system-running --wait`, at most `left` long.
+async fn poll(c: &Client, name: &str, left: Duration) -> Answer {
+    let wait = Exec::new(["systemctl", "is-system-running", "--wait"]);
+    match tokio::time::timeout(left, c.exec_recorded(name, &wait)).await {
+        Err(_) => Answer::NoReply,
+        Ok(Ok(out)) => Answer::Out {
+            state: String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .next()
+                .unwrap_or("")
+                .trim()
+                .to_string(),
+            err: String::from_utf8_lossy(&out.stderr).trim().to_string(),
+            exit: out.exit_code,
+        },
+        Ok(Err(e)) => {
+            // Before the instance is ready, incusd can refuse the exec; a
+            // refusal of an instance that is not running is final.
+            let running = matches!(c.instance_state(name).await, Ok(s) if s.status == "Running");
+            Answer::ExecErr {
+                err: e.to_string(),
+                running,
+            }
+        }
+    }
+}
+
+/// Wait for the init of the image, then start the command. An error names
+/// what happened: the state of systemd with each poll, or the bound, the
+/// polls and the name of PID 1.
+pub async fn boot_then_run(c: &Client, name: &str) -> Result<(), Down> {
+    let bound = boot_bound().map_err(|e| Down::gone(format!("--podvm-init=image: {e}")))?;
+    let mut w = Waiter::new(Instant::now(), bound);
+    loop {
+        let left = w.left(Instant::now());
+        let a = poll(c, name, left).await;
+        match w.next(a, Instant::now()) {
+            Next::Up { degraded } => {
+                if degraded {
+                    // PodUtils/podrunner#349 ask 2: degraded is up, with
+                    // the failed units in one line.
+                    let units = failed_units(c, name).await;
+                    eprintln!(
+                        "podvm: --podvm-init=image: systemd of {name} is degraded{}",
+                        if units.is_empty() {
+                            "; systemctl names no failed unit"
+                        } else {
+                            &units
+                        }
+                    );
+                }
+                break;
+            }
+            Next::Again => tokio::time::sleep(POLL_GAP.min(w.left(Instant::now()))).await,
+            Next::Fail(line) => {
+                return Err(Down::gone(format!(
+                    "--podvm-init=image: the init of the image is not up: {line}{}",
+                    failed_units(c, name).await
+                )))
+            }
+            Next::Bound(line) => {
+                return Err(Down {
+                    line: format!(
+                        "--podvm-init=image: {line}; PID 1 is {}; an image with no systemd has \
+                         no such init{}",
+                        pid1(c, name).await,
+                        failed_units(c, name).await
+                    ),
+                    keep: true,
+                })
+            }
+        }
     }
     let run = Exec::new(["/.podvm/podvm", "guest-hold", "--run", "--detach"]);
     let r = c
         .exec_recorded(name, &run)
         .await
-        .map_err(|e| format!("--podvm-init=image: the start of the command: {e}"))?;
+        .map_err(|e| Down::gone(format!("--podvm-init=image: the start of the command: {e}")))?;
     if r.exit_code != 0 {
-        return Err(format!(
+        return Err(Down::gone(format!(
             "--podvm-init=image: the start of the command gave exit {}: {}",
             r.exit_code,
             String::from_utf8_lossy(&r.stderr).trim()
-        ));
+        )));
     }
     Ok(())
 }
@@ -143,43 +379,4 @@ async fn pid1(c: &Client, name: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{step, units_line, Step};
-
-    #[test]
-    fn the_failed_units_give_one_line() {
-        for (text, want) in [
-            ("", ""),
-            ("\n", ""),
-            (
-                "chrony.service loaded failed failed chrony\nsystemd-remount-fs.service loaded failed failed Remount\n",
-                "; failed units: chrony.service, systemd-remount-fs.service",
-            ),
-        ] {
-            assert_eq!(units_line(text), want, "{text:?}");
-        }
-    }
-
-    #[test]
-    fn the_state_of_systemd_gives_the_step() {
-        let bus = "Failed to connect to bus: No such file or directory";
-        for (state, err, want) in [
-            ("running", "", Step::Run),
-            ("degraded", "", Step::Run),
-            ("starting", "", Step::Again),
-            ("initializing", "", Step::Again),
-            ("", bus, Step::Again),
-            (
-                "",
-                "Failed to connect to system scope bus via local transport: No such file or directory",
-                Step::Again,
-            ),
-            ("", "", Step::Fail),
-            ("maintenance", "", Step::Fail),
-            ("offline", "", Step::Fail),
-            ("stopping", "", Step::Fail),
-        ] {
-            assert_eq!(step(state, err), want, "{state:?} {err:?}");
-        }
-    }
-}
+mod tests;

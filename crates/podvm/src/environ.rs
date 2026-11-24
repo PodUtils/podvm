@@ -204,6 +204,14 @@ pub const USER: &[Group] = &[
                 "Names the UEFI variable store of a Windows guest.",
             ),
             v(
+                "PODVM_INIT_BOOT_TIMEOUT",
+                "1 to 3600",
+                "Sets the bound in seconds of the boot of --podvm-init=image: on the incus tier, \
+                 the namespace rung and the runsc tier, podvm asks systemctl is-system-running \
+                 again while it gives offline, unknown, initializing or starting, until this \
+                 bound. With no value, 180. Another value is an error with exit 125.",
+            ),
+            v(
                 "PODVM_INCUS_SOCKET",
                 "a socket path",
                 "Names the socket of incusd for the incus tier. With no value, podvm uses \

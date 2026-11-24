@@ -8,6 +8,24 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: the boot of `--podvm-init=image` on the incus tier, 2026-11-24
+
+Record: T-2083.
+Deployed: not deployed; on main, for the next beta after 0.2.0-beta.39.
+
+- `run -d --podvm-tier=incus --podvm-init=image` asks `systemctl
+  is-system-running` again while it gives `offline`, `unknown`,
+  `initializing` or `starting`, or while incusd refuses the exec of a
+  running instance. Before, "offline" in the first second of the start
+  ended the run with exit 125 and removed the instance
+  (PodUtils/podrunner#349). The namespace rung and the runsc tier take
+  "offline" and "unknown" with the same rule.
+- `PODVM_INIT_BOOT_TIMEOUT` sets the bound of the boot, 1 to 3600 s (180 s
+  with no value), on the incus tier, the namespace rung and the runsc tier.
+- On `degraded`, podvm prints the failed units in one line and runs the
+  command. Where the bound passes, the error gives each poll, and the
+  instance stays, with the command that removes it.
+
 ## 0.2.0-beta.39 (2026-11-24)
 
 ### Known gaps: what the checks of 0.2.0-beta.39 prove, and what stays open, 2026-11-24

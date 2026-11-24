@@ -719,10 +719,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2080](machine.md) | P1 | M | none | machine | done | On the incus tier, an exit of 126 or 127 is a refusal of incusd, and a signal leaves the instance running |
 | [T-2081](machine.md) | P1 | S | none | machine | done | Parallel first runs of one image on the incus tier race on its import |
 | [T-2082](machine.md) | P1 | S | none | machine | done | On the incus tier, an upload of the image that incusd cuts ends podvm with SIGPIPE and no line |
+| [T-2083](machine.md) | P1 | S | none | machine | done | On the incus tier, `--podvm-init=image` takes "offline" of systemd as final and removes the instance |
 
 ## Counts
 
-653 entries: 23 open, 46 partial, 5 blocked, 579 done.
+654 entries: 23 open, 46 partial, 5 blocked, 580 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -732,10 +733,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 22 | 0 | 264 | 289 |
+| P1 | 3 | 22 | 0 | 265 | 290 |
 | P2 | 15 | 19 | 4 | 195 | 233 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 23 | 46 | 5 | 579 | 653 |
+| **All** | 23 | 46 | 5 | 580 | 654 |
 
 ## Work order
 
