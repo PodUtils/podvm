@@ -1,0 +1,23 @@
+Experiment 478, rootless metadata of an EROFS root (T-1994).
+The tools came from Debian trixie amd64 erofs-utils 1.8.6-1.
+Archive SHA-256 81042b8c0c3eb63699aa7d0763dceedc675a747d9f5cfebf914b4160233f411e.
+The checksum matched the Debian package index, whose digest matched the
+signed InRelease. GnuPG verified it with the Debian archive keyring.
+The tools were unpacked into scratch. GCC 14.2.0 built the observer.
+The observer captured bytes decoded by fsck.erofs in place of setting
+host xattrs. The proof used no mounts and ran no guest.
+Command: python3 experiments/478-machine-root-erofs.py
+Exit: 0. A run with absent tools exited 2.
+
+2026-11-25T13:14:03Z Linux 6.18.57, x86_64, uid 1000
+mkfs.erofs (erofs-utils) 1.8.6
+stdin pipe: --tar and --tar=f produced the same 4096-byte image
+image SHA-256 638270431ef0aa65180c0cef7b1a8e66295f4bded60d87e2bb801871a8938d6a
+/usr/bin mode 0555, uid 44, gid 55
+tool mode 4755, uid 123456, gid 234567, hard link inode 55
+shortcut symlink target and hard link bytes match
+offline reader decoded user.marker (7 bytes), exact on both names
+offline reader decoded security.capability (20 bytes), exact on both names
+offline reader decoded system.posix_acl_access (44 bytes), exact on both names
+--tar=i needed the original tar as an extra device
+PASS: full EROFS tar input kept the fixture's metadata
