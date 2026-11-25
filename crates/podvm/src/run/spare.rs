@@ -55,6 +55,8 @@ fn spawn_prefill() -> Option<u32> {
     let me = std::env::current_exe().ok()?;
     let null = std::process::Stdio::null;
     std::process::Command::new(me)
+        // The helper gets its store and digest from its arguments.
+        .env_clear()
         .arg("tree-prefill")
         .arg(root)
         .args((!digest.is_empty()).then_some(digest))
