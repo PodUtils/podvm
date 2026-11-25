@@ -86,7 +86,10 @@ contains the commit that changes this file. A fresh session reads
 3. Sweep the current open issues at each session start (`AGENTS.md`, section 8
    item 7), and map each new issue to the entry of its own finding.
 4. podrunner: #583 (experiment 474 in the `incus` job of `kvm.yml` for
-   the T-1964 quota proof, run 45593099465 on `04c8b7f4`, then T-1968).
+   the T-1964 quota proof, run 45615157310 on `1697fe3d`, then T-1968).
+   In the first run, 45593099465, Incus reported a 1 GiB Btrfs root and
+   `inspect` gave `Stopped -`. The retry collects the write status and
+   output over Incus exec.
    Then #596 and #599 (the
    hosted snapshot: T-1994, T-1996, T-1998, T-1999), #593 (T-1990,
    T-1991). Then T-2088 and the open rows of T-2070, T-2079, T-2087.

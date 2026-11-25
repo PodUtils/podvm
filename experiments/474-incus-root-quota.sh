@@ -93,10 +93,11 @@ timeout 120 incus exec "$name" -- sh -c '
 ' >"$work/log" 2>&1 || write_exit=$?
 tee -a "$out" <"$work/log"
 show "write exit $write_exit"
-[ "$write_exit" -eq 7 ] || fail "expected the large write to fail with payload exit 7"
-grep -q '^small write passed$' "$work/log" || fail "the small write did not pass"
-grep -Eq 'No space left on device|Disk quota exceeded' "$work/log" || fail "the large write did not report a quota error"
 free=$(room) || fail "could not check the space left in the pool"
 show "pool free after the writes $free bytes"
+[ "$write_exit" -eq 7 ] || fail "expected the large write to fail with payload exit 7"
+grep -q '^small write passed$' "$work/log" || fail "the small write did not pass"
+grep -Eq '^dd:.*quota-large.*: (No space left on device|Disk quota exceeded|Quota exceeded)$' "$work/log" ||
+    fail "the large write did not report a quota error"
 [ "$free" -gt 2147483648 ] || fail "the pool ran out of space during the test"
 show "THE INCUS ROOT DISK QUOTA HOLDS"

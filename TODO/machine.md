@@ -5418,6 +5418,12 @@ Hosted run 45593099465 on `04c8b7f4` reported a 1 GiB Btrfs root, then
 Experiment 474 now collects the write status and output over Incus exec.
 The pool must still have more than 2 GiB free after the write.
 
+Hosted run 45615157310 on `1697fe3d` wrote 16 MiB and stopped the large
+write at 1,039,327,232 bytes. Incus exec gave exit 7. Alpine's `dd` said
+`Quota exceeded`. The earlier assertion expected different wording and
+stopped before recording the pool's free space. The experiment now
+accepts that wording and records free space before the output checks.
+
 # T-1965: The incus tier gives no CPU time and no peak memory of an instance
 
 **Source:** PodUtils/podrunner#296 (COORD-089 of podrunner, ask 2), COORD-186 (PodUtils/podvm#582)
