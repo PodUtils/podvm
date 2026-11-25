@@ -5403,7 +5403,10 @@ The `root` device of a new instance must name the pool of its profile, and `pod-
 
 ## Prove
 
-Experiment 434 with the incusd of experiment 433: `run -d --podvm-tier=incus --storage-opt size=1GiB public.ecr.aws/docker/library/alpine:3.20 sh -c 'dd if=/dev/zero of=/f bs=1M count=2000'` ends with `No space left on device`.
+`sh experiments/474-incus-root-quota.sh` in the `incus` job of `kvm.yml`:
+incusd reports a 1 GiB root on a btrfs pool with room. A write of 16 MiB
+passes. A write of 2 GiB reaches the quota and the command's exit is
+available from `inspect`. The transcript records the kernel's error.
 
 ## Done
 
@@ -6880,9 +6883,20 @@ a growth of 2.37 times the tree, as before. Clause 27: the same refusal
 aarch64-unknown-linux-musl --workspace` passes. The release `podvm` is
 9,197,784 bytes (9,152,728 before).
 
-Remaining: (1) a run on the hosted runner of PodUtils/podrunner#347 with
-the next beta after 0.2.0-beta.39; (2) design (a), a stream of the layers
-with no tree, by podcrates (the COORD draft).
+Remaining (1) is done. PodUtils/podrunner#347 closes with hosted run
+45521073386 on `4fc871c` (`v0.2.0-beta.40`, `place=btrfs`, `full=all`).
+The import took 1752 s. The btrfs pool held 102.79 GB of 129.17 GB, and
+the instance booted and ended with exit 0. Run 45521078992 also passed
+with `place=store-root`. The controlled low-space refusal of T-2078
+still needs a hosted run.
+
+Partial (2026-11-25). The take of podcrates `v0.84.0` replaces the local
+gzip writer with `pod_gzip::Members`. Podvm keeps the selection of plain
+or gzip and its test of the gzip upload against a stand-in incusd.
+`cargo check --locked --workspace --all-targets` passes.
+`cargo test --locked -p podvm --bin podvm incus::` passes 44 tests.
+Remaining (2): wire `pod_extract::flatten_with` into the import
+(PodUtils/podcrates#260, the answer to #657).
 
 # T-2086: On a hosted runner with cgroup v2, `inspect` of an ended incus instance gives no peak memory and no OOM kill of a child
 
@@ -6952,7 +6966,7 @@ two cases of the problem: `PeakMemoryBytes` near the truth, and
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** open
+**Status:** blocked
 
 ## Problem
 
@@ -6972,6 +6986,10 @@ a running container live (`PATCH /1.0/instances/NAME`). `run` already
 writes these keys at the create (`incus::run::apply_limits`, T-1897,
 T-1964). The behaviour on cgroup v1 (the cloud host) and on cgroup v2 (a
 hosted runner, the job `incus` of `kvm.yml`) is not measured.
+
+Incus 6.0 merges the supplied `config` keys in a synchronous PATCH. The
+endpoint checks `If-Match` under the instance operation lock. The
+pod-incus client at `v0.84.0` has no public method for this call.
 
 ## Approach
 
@@ -6993,6 +7011,13 @@ flags against the keys and a stand-in incusd that refuses one key. An
 experiment on the job `incus` of `kvm.yml` (cgroup v2): `run -d` with
 `--memory 512m`, `update --memory 256m`, then the limit in the cgroup of
 the instance and `inspect` give 256 MiB.
+
+## Blocker
+
+COORD-248 (PodUtils/podvm#664) asks podcrates for a typed config PATCH and
+an instance ETag. Resume when a tagged release of pod-incus provides
+these calls. Podrunner uses cold instances for offers with lower limits
+until podvm releases this update.
 
 # T-2094: The saved state of the machine tier serves a run with `--podvm-channel` and `--pids-limit`
 

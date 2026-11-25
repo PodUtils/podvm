@@ -33,13 +33,15 @@ memory reads `AGENTS.md` first, then this file, `TODO/PROGRESS.md` and
 * podcrates `v0.83.0` is taken on `main` after the tag (T-2089, `a39f4c4f`;
   #663, closed: PodUtils/podcrates#259 lists the take). podrunner pins
   beta.40 in its `4fc871c` (#662, closed).
+* `main` takes podcrates `v0.84.0` and its shared gzip writer (T-2085,
+  PodUtils/podcrates#260). The layer stream of T-2085 still needs wiring.
 * On `main` after beta.40, not released (CHANGELOG, "Unreleased"): the
   room of an incus pool from incusd for each driver (T-2078 remaining 1,
   `a033f62`, experiment 472), what the namespace rung opens (T-2092, #546),
   the commit of `podvm-dev build` (T-2091, #531). Gate 45536609832 on
   `a033f62` and gate 45539122840 on `07416ff` are green.
-* The issues of this repository: 52 open (the 56 of 2026-11-24 less #531,
-  #546, #662 and #663).
+* The start sweep found 52 open issues in GitHub and in the record.
+  #664, the new pod-incus request, makes 53.
 * The issue cleanup of 2026-11-24 is done: four agents checked each open
   issue against the code, the record and a run of the beta.40 binary. 87
   issues are closed with a comment of evidence; 56 stay open, each with a
@@ -63,24 +65,25 @@ memory reads `AGENTS.md` first, then this file, `TODO/PROGRESS.md` and
 
 ## Next steps, in order
 
-1. Two new asks of podrunner (2026-11-25, from a member of the team, not
-   answered yet; nothing in podrunner waits): PodUtils/podrunner#354
+1. Two asks of podrunner (2026-11-25): PodUtils/podrunner#354
    (COORD-132, `podvm update --podvm-tier=incus` of the memory, CPU and
    process limits of a running instance: T-2093) and PodUtils/podrunner#355
    (COORD-133, a saved state of the machine tier for `--podvm-channel` and
-   `--pids-limit`: T-2094). Read each entry's Premise against the code
-   first; answer each with a COORD issue `(to podrunner)` of this
-   repository when its work is in a beta.
+   `--pids-limit`: T-2094). T-2093 waits for pod-incus instance config
+   PATCH and ETag support (#664, COORD-248 to podcrates). Answer each ask
+   with a COORD issue `(to podrunner)` when its work is in a beta.
 2. T-2078 remaining 3: a run on the hosted runner of
    PodUtils/podrunner#346 with the next beta (remaining 1 is done,
    experiment 472).
 3. Sweep the current open issues at each session start (`AGENTS.md`, section 8
    item 7), and map each new issue to the entry of its own finding.
-4. podrunner: #583 (T-1964 pool with a quota, T-1968), #596 and #599 (the
+4. podrunner: #583 (experiment 474 in the `incus` job of `kvm.yml` for
+   the T-1964 quota proof, then T-1968), #596 and #599 (the
    hosted snapshot: T-1994, T-1996, T-1998, T-1999), #593 (T-1990,
    T-1991). Then T-2088 and the open rows of T-2070, T-2079, T-2087.
-5. T-2085 remainder (the stream of the layers when podcrates gives it,
-   #657), T-2054, T-2050, T-2048, then the work order of
+5. T-2085 remainder (wire the layer stream from
+   podcrates `v0.84.0`, PodUtils/podcrates#260, the answer to #657),
+   T-2054, T-2050, T-2048, then the work order of
    `TODO/PROGRESS.md`.
 
 ## Rules learned

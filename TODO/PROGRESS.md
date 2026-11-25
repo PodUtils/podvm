@@ -7,12 +7,12 @@ start.
 
 ## State
 
-666 entries: 25 open, 43 partial, 5 blocked, 593 done.
+666 entries: 24 open, 43 partial, 6 blocked, 593 done.
 
 * The newest release is `v0.2.0-beta.40` (2026-11-24). [CHANGELOG](../CHANGELOG.md)
   holds what each release ships, with its known gaps.
 * Open first: the asks of podrunner (`docs/HANDOFF.md`, "Next steps").
-* podvm takes the crates of PodUtils/podcrates at `v0.83.0`. A change of
+* podvm takes the crates of PodUtils/podcrates at `v0.84.0`. A change of
   moved code goes to podcrates as a COORD issue.
 * KVM is free (the owner, 2026-11-09). Probe `/dev/kvm` on the current host.
   `kvm.yml` (T-1682) gives a hosted runner with it, and `arm.yml` a hosted
@@ -37,12 +37,13 @@ status with `podvm-count` in the same commit as the work.
 1. Asks of peer sessions come first (the watcher of `AGENTS.md`, section
    9; the owner's ruling "podrunner first", 2026-11-18,
    `docs/decisions.md`): each new COORD issue `(to podvm)` of podrunner
-   (on 2026-11-25: PodUtils/podrunner#354, [T-2093](machine.md), and
+   (on 2026-11-25: PodUtils/podrunner#354, [T-2093](machine.md), blocked
+   on the pod-incus API requested in #664, and
    PodUtils/podrunner#355, [T-2094](machine.md)),
    then PodUtils/podrunner#277, #216, #189, #168, #110, #296 (the
    remainder of [T-1964](machine.md) and [T-1968](machine.md)), and #313
    and #316 (the hosted snapshot: [T-1996](machine.md), T-1999, which
-   waits for the xattrs of `pod-extract`, [T-1994](machine.md) and
+   needs the machine-tier xattr proof, [T-1994](machine.md) and
    [T-1998](machine.md)). Then the asks of githome and cfb for their CI,
    then the items below. A quality item that a podrunner unit meets counts
    as an ask of podrunner.

@@ -351,12 +351,24 @@ jobs:
           sh experiments/471-incus-usage-v2.sh || rc=$?
           exit "$rc"
 
+      - name: experiment 474 (root disk quota)
+        run: |
+          set -eu
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq btrfs-progs
+          old_pool=$(incus profile device get default root pool)
+          incus storage create quota474 btrfs size=8GiB
+          trap 'incus profile device set default root pool="$old_pool"' EXIT
+          incus profile device set default root pool=quota474
+          sh experiments/474-incus-root-quota.sh
+
       - name: keep the transcript
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: incus-usage-v2
-          path: experiments/results/incus-usage-v2.txt
+          path: |
+            experiments/results/incus-usage-v2.txt
+            experiments/results/incus-root-quota.txt
           if-no-files-found: warn
 
   # TODO/machine.md T-1922 (PodUtils/podrunner#195): the machine tier as a

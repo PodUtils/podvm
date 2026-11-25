@@ -8,6 +8,15 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Changed: podcrates `v0.84.0` and the shared gzip writer, 2026-11-25
+
+Record: T-2085.
+Deployed: not deployed; on main, for the next beta after 0.2.0-beta.40.
+
+- The incus tier uses `pod_gzip::Members` for compressed image uploads.
+  The same space check selects a plain or compressed upload.
+- The Incus client bounds a write that stalls on the daemon socket.
+
 ### Fixed: what the namespace rung opens, and the commit of a source build, 2026-11-25
 
 Record: T-2091 (#531), T-2092 (#546).

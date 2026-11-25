@@ -8,7 +8,8 @@ use std::sync::{Arc, Mutex};
 
 use serde_json::json;
 
-use super::gzip::{Members, BLOCK};
+use pod_gzip::BLOCK;
+
 use super::import::{ensure_image, Tree};
 use super::run::Job;
 use super::tests::{read_request, scratch};
@@ -32,69 +33,6 @@ fn gunzip(b: &[u8]) -> Vec<u8> {
         .read_to_end(&mut out)
         .expect("one gzip file");
     out
-}
-
-/// One rule for each size and each count of threads: the members are one
-/// gzip file that gives the input back, and the bytes do not depend on the
-/// threads (the fingerprint of T-2081 stays the same for the same tarball).
-#[test]
-fn the_members_give_the_input_back_with_the_same_bytes_for_each_thread_count() {
-    let sizes = [0, 1, 4096, BLOCK - 1, BLOCK, BLOCK + 1, 3 * BLOCK + 5];
-    for size in sizes {
-        let input: Vec<u8> = noise(size / 2, size as u64)
-            .into_iter()
-            .chain(std::iter::repeat_n(b'a', size - size / 2))
-            .collect();
-        let mut first: Option<Vec<u8>> = None;
-        for threads in [1, 2, 3, 8, 64] {
-            let mut w = Members::new(Vec::new(), threads);
-            // Writes of odd sizes, so that the cut of the blocks is the
-            // writer's, not the caller's.
-            for chunk in input.chunks(7919) {
-                w.write_all(chunk).unwrap();
-                w.flush().unwrap();
-            }
-            let out = w.finish().unwrap();
-            assert!(gunzip(&out) == input, "size {size}, {threads} threads");
-            match &first {
-                None => first = Some(out),
-                Some(f) => assert!(&out == f, "size {size}: {threads} threads, other bytes"),
-            }
-        }
-    }
-}
-
-/// A writer that fails after `left` bytes, as a pipe that incusd closed.
-struct Failing {
-    left: usize,
-}
-
-impl Write for Failing {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        if self.left == 0 {
-            return Err(std::io::ErrorKind::BrokenPipe.into());
-        }
-        let n = buf.len().min(self.left);
-        self.left -= n;
-        Ok(n)
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-#[test]
-fn a_reader_that_goes_gives_the_error_of_the_pipe() {
-    let input = noise(3 * BLOCK, 9);
-    for left in [0, 100, BLOCK] {
-        let mut w = Members::new(Failing { left }, 4);
-        let wrote = w.write_all(&input);
-        let e = match wrote {
-            Err(e) => e,
-            Ok(()) => w.finish().err().expect("an error"),
-        };
-        assert_eq!(e.kind(), std::io::ErrorKind::BrokenPipe, "left {left}");
-    }
 }
 
 /// The calls that the import made of its tree.
