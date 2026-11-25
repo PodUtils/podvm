@@ -556,7 +556,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #660 | COORD-244: the answer to PodUtils/podrunner#350: on a host with AppArmor the init could not mount the cgroup; the record of the stop now holds on cgroup v2 (to podrunner) | closed (in 0.2.0-beta.40, release run 45436996748; named in #662, COORD-246) | T-2086 |
 | #661 | COORD-245: the owner's rulings "Watchers" and "Work until done" of 2026-11-24, and a shared watcher of the Actions runs of a repository (to podcrates) | closed (podcrates v0.83.0 has runs.py, PodUtils/podcrates#259; taken in a39f4c4f, #663) | none: the rulings (docs/decisions.md, 2026-11-24) and an ask of a shared tool |
 | #662 | COORD-246: v0.2.0-beta.40 is out (to podrunner) | open | T-1949, T-2086, T-2087 |
-| #663 | COORD-247: podvm took podcrates v0.83.0 in a39f4c4f (the answer to PodUtils/podcrates#259) (to podcrates) | open | T-2089 |
+| #663 | COORD-247: podvm took podcrates v0.83.0 in a39f4c4f (the answer to PodUtils/podcrates#259) (to podcrates) | closed (PodUtils/podcrates#259 lists the take under "Takes": a39f4c4f, closed 2026-11-25) | T-2089 |
 
 ## Messages whose title does not start with COORD-NNN
 
