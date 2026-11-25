@@ -1,6 +1,7 @@
 # Handoff
 
-The state on 2026-11-25, 03:20 (UTC), at the end of a session. `main` is
+The state on 2026-11-25, 03:40 (UTC), at the end of a session (the owner
+restarts the session). `main` is
 at the commit that changes this file or later. A fresh session with no
 memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
 `docs/decisions.md`. The handoffs before this one are in git: `git show
@@ -30,7 +31,15 @@ memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
   ninth outside pass (T-2087, its three P1 faults fixed) passed. #662
   (COORD-246) tells podrunner.
 * podcrates `v0.83.0` is taken on `main` after the tag (T-2089, `a39f4c4f`;
-  #663, COORD-247, tells podcrates).
+  #663, closed: PodUtils/podcrates#259 lists the take). podrunner pins
+  beta.40 in its `4fc871c` (#662, closed).
+* On `main` after beta.40, not released (CHANGELOG, "Unreleased"): the
+  room of an incus pool from incusd for each driver (T-2078 remaining 1,
+  `a033f62`, experiment 472), what the namespace rung opens (T-2092, #546),
+  the commit of `podvm-dev build` (T-2091, #531). Gate 45536609832 on
+  `a033f62` and gate 45539122840 on `07416ff` are green.
+* The issues of this repository: 52 open (the 56 of 2026-11-24 less #531,
+  #546, #662 and #663).
 * The issue cleanup of 2026-11-24 is done: four agents checked each open
   issue against the code, the record and a run of the beta.40 binary. 87
   issues are closed with a comment of evidence; 56 stay open, each with a
@@ -53,12 +62,18 @@ memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
 
 ## Next steps, in order
 
-1. #662 and #663 are closed (2026-11-25): podrunner pins beta.40 in its
-   `4fc871c`, and PodUtils/podcrates#259 lists the take of `v0.83.0`.
-2. T-2078 remaining 1 is done (2026-11-25, experiment 472); remaining 3
-   is a run on the hosted runner of PodUtils/podrunner#346 with the next
-   beta.
-3. Sweep the 56 open issues at each session start (`AGENTS.md`, section 8
+1. Two new asks of podrunner (2026-11-25, from a member of the team, not
+   answered yet; nothing in podrunner waits): PodUtils/podrunner#354
+   (COORD-132, `podvm update --podvm-tier=incus` of the memory, CPU and
+   process limits of a running instance: T-2093) and PodUtils/podrunner#355
+   (COORD-133, a saved state of the machine tier for `--podvm-channel` and
+   `--pids-limit`: T-2094). Read each entry's Premise against the code
+   first; answer each with a COORD issue `(to podrunner)` of this
+   repository when its work is in a beta.
+2. T-2078 remaining 3: a run on the hosted runner of
+   PodUtils/podrunner#346 with the next beta (remaining 1 is done,
+   experiment 472).
+3. Sweep the 52 open issues at each session start (`AGENTS.md`, section 8
    item 7), and map each new issue to the entry of its own finding.
 4. podrunner: #583 (T-1964 pool with a quota, T-1968), #596 and #599 (the
    hosted snapshot: T-1994, T-1996, T-1998, T-1999), #593 (T-1990,

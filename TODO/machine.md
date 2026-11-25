@@ -6944,3 +6944,102 @@ two cases of the problem: `PeakMemoryBytes` near the truth, and
 ## Done
 
 **Done (2026-11-24).** The cause: on a hosted `ubuntu-24.04` runner (Linux 7.0, cgroup v2, incus 6.0.0 of apt), the AppArmor profile of incus allows a cgroup mount only under `/sys/fs/cgroup`. The init's mount at `/.podvm/.meter` failed with EACCES for cgroup2 and for each cgroup v1 hierarchy, and `/.podvm/usage` held each value as null with these reasons. podrunner's CPU time came from its sample of a running instance (incusd's state), up to one read before the stop: 6 s against 6.92 s of the shell. Measured in `kvm.yml` 45381917515 (job `incus`, new; experiment 471, new) on `4102518`: `usage - - - 0` for both cases, and the kernel log `apparmor="DENIED" operation="mount" ... name="/.podvm/.meter/" fstype="cgroup2"` under the profile `incus-use471_`. The fix (`88e1a0d`): `incus::usage::Meter::open` also opens the meter of the cgroup mounts that LXC made in the cgroup namespace of the instance (`incus::usage::mounts::Mounted`: a `cgroup2` or `cgroup` mount of mountinfo whose root is `/`, the octal escapes undone, the last line of a kind, `statfs(2)` of each mount point as the check), and takes the meter that reads more values (`incus::usage::better`; the init's own mount on a tie). The reasons of the failed mount stay in the record. Table tests `the_cgroup_mounts_of_the_instance_come_from_mountinfo` and `the_meter_that_reads_more_values_serves` (`crates/podvm/src/incus/usage_tests.rs`). Proof: `kvm.yml` 45384508724 on `88e1a0d`, experiment 471, "THE RECORD OF THE STOP HOLDS ON CGROUP V2" (`experiments/results/incus-usage-v2.txt`): a load of 64 MiB and four busy processes, which the shell counted at 13.22 s, gives `13.270 136134656 0 0`; podrunner's payload under `--memory 256m` (the kernel kills the child `dd` in `/lxc.payload.oom471`) gives `0.160 268435456 1 0`; the client of incus reads the same values from `/.podvm/usage`; a running instance gives `Running 0.754 - 0 -` (incusd 6.0 gives no peak on cgroup v2). Experiment 434 on the cloud host (cgroup v1, route A) passes with the change, "THE INCUS TIER RUNS"; clause 26 gives `3.375 135958528 0 0` and `0.447 33554432 1 137`. The answers to the three asks: (1) yes, on the fix; (2) the count is `oom_kill` of `memory.events` of the cgroup of the instance, which counts a kill of any process of the instance; (3) the peak is the high mark of the kernel for that cgroup (`memory.peak`, or `memory.max_usage_in_bytes` of cgroup v1), not a sample; it includes the page cache and the kernel memory that the cgroup is charged. The mount reader is asked of podcrates as #659 (COORD-243).
+
+# T-2093: `podvm update --podvm-tier=incus NAME` changes the memory, CPU and process limits of a running instance
+
+**Source:** PodUtils/podrunner#354 (COORD-132 of podrunner, from a member of the team, 2026-11-25; podrunner tasks 487 and 658)
+**Category:** machine
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+podrunner keeps warm incus instances: an instance boots before a job and
+waits for one claim. An offer can ask for less memory, CPU or processes
+than the kind gives (podrunner's ruling "apply offer values", its task 198).
+podvm has no verb that changes the limits of a running instance: the row
+`update` of the parity table is `None` ("there are no resource limits to
+update"). So a warm instance serves only an offer whose limits are at or
+above the limits of its kind; other offers start a cold instance. Nothing
+in podrunner is blocked.
+
+## Premise
+
+incusd applies `limits.memory`, `limits.cpu` and `limits.processes` of
+a running container live (`PATCH /1.0/instances/NAME`). `run` already
+writes these keys at the create (`incus::run::apply_limits`, T-1897,
+T-1964). The behaviour on cgroup v1 (the cloud host) and on cgroup v2 (a
+hosted runner, the job `incus` of `kvm.yml`) is not measured.
+
+## Approach
+
+Add `update` for the incus tier only: `--memory`, `--cpus` and
+`--pids-limit` with the parsers of `run`; a PATCH of the three keys; then
+read the instance back and exit 0 only where each key holds, else exit 125
+with one line that names the key that does not hold. Each other tier and
+each other flag refuses by name. Answer podrunner with a COORD issue `(to
+podrunner)` when it is in a beta.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test -p podvm --bin podvm incus::` passes with a table test of the
+flags against the keys and a stand-in incusd that refuses one key. An
+experiment on the job `incus` of `kvm.yml` (cgroup v2): `run -d` with
+`--memory 512m`, `update --memory 256m`, then the limit in the cgroup of
+the instance and `inspect` give 256 MiB.
+
+# T-2094: The saved state of the machine tier serves a run with `--podvm-channel` and `--pids-limit`
+
+**Source:** PodUtils/podrunner#355 (COORD-133 of podrunner, from a member of the team, 2026-11-25; podrunner tasks 487 and 659)
+**Category:** machine
+**Milestone:** none
+**Priority:** P2
+**Effort:** L
+**Status:** open
+
+## Problem
+
+`state::refusal` (`crates/podvm/src/machine/guest/state.rs`) refuses a
+saved state for `--podvm-channel` (with `--podvm-sealed`), `--pids-limit`
+and `--podvm-engine`. Each microvm unit of podrunner has a channel, and most
+have a pids limit, so each guest boots from the start (about 30 s,
+podrunner's measure) and does not take the start from a state of T-2008
+(1.3 s to 1.9 s under TCG, experiment 468). podrunner keeps warm units in
+the meantime; nothing in podrunner is blocked.
+
+## Premise
+
+podrunner asks: the template guest carries the port of the channel, and
+the job carries the pids limit; the host dials the socket for each stream,
+so the socket of the run can come with the job. Each run stays a fresh
+guest of a state that ran no job, with its own seed and time (call C27,
+Q10 of `docs/decisions.md`). Not checked: whether the device of the
+channel can be in the saved guest shape, and where the guest applies the
+pids limit after the load.
+
+## Approach
+
+Read the channel and the pids path of the guest script. Make the channel
+device part of the guest shape of the fingerprint (no host path in the
+state), give the socket of the run to the host side after the load, and
+send the pids limit in the job frame; the guest sets it before the
+command. Keep `--podvm-engine` refused. Answer podrunner with a COORD issue
+`(to podrunner)` when it is in a beta.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test -p podvm --bin podvm state` passes with a table test of
+`state::refusal` with the new shapes. An experiment under
+TCG (as experiment 468): a run with `--podvm-channel` and `--pids-limit 64`
+loads a state, the channel carries a stream both ways, the pids limit holds
+in the guest, and two runs of one state get their own seed.
