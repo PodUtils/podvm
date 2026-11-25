@@ -5405,13 +5405,18 @@ The `root` device of a new instance must name the pool of its profile, and `pod-
 
 `sh experiments/474-incus-root-quota.sh` in the `incus` job of `kvm.yml`:
 incusd reports a 1 GiB root on a btrfs pool with room. A write of 16 MiB
-passes. A write of 2 GiB reaches the quota and the command's exit is
-available from `inspect`. The transcript records the kernel's error.
+passes. A write of 2 GiB reaches the quota. Incus exec gives the command's
+exit and the transcript records the kernel's error.
 
 ## Done
 
 **Partial (2026-11-18).** podcrates `v0.71.0` (PodUtils/podcrates#228, podcrates@T-925) gives `Client::profile` and `Client::instance_state`. `run -d --podvm-tier=incus --storage-opt size=N` (also `run` and `create`; `N` as `1G`, `1GB`, `1GiB`, `512MiB` or bytes, at least 64m) copies the `root` device of the default profile with `size` (`incus::run::apply_limits`); after the start, `incus::run::size_held` reads the state of the root disk, and a pool that reports no limit refuses the run and leaves no instance. Each other tier refuses the flag by name; docker's other options of the flag are refusals. Experiment 434 clause 17, on the `dir` pool of route A: `run -d --storage-opt size=1GiB` exits 125 with "the storage pool of the instance holds no size of its root disk", no instance stays, and a native run refuses the flag by name. The run found a fault, fixed in `d812a02`: `size=1GiB` was refused. `storage_opt_takes_each_spelling_of_a_size` pins the spellings. Remaining: a pool with a quota (btrfs, zfs, lvm) that bounds the disk; route A runs incusd in a user namespace, which can mount none of them, so podrunner's host or a hosted runner measures it.
 
+
+Hosted run 45593099465 on `04c8b7f4` reported a 1 GiB Btrfs root, then
+`inspect` gave `Stopped -`. The run did not capture the write's result.
+Experiment 474 now collects the write status and output over Incus exec.
+The pool must still have more than 2 GiB free after the write.
 
 # T-1965: The incus tier gives no CPU time and no peak memory of an instance
 

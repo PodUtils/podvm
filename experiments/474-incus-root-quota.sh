@@ -70,16 +70,10 @@ show "image    $image"
 incus_call storage info "$pool" >>"$out" 2>&1 || exit 2
 podvm_call pull "$image" >>"$out" 2>&1 || exit 2
 
-# Hold the command until the caller reads the state of the running disk.
+# Keep the instance alive so the write can report its status through exec.
 podvm_call run -d --name "$name" --podvm-tier=incus --podvm-net none \
-    --storage-opt size=1GiB "$image" sh -c '
-    export LC_ALL=C
-    until [ -f /quota-start ]; do sleep 1; done
-    dd if=/dev/zero of=/quota-small bs=1M count=16 conv=fsync || exit 8
-    echo "small write passed"
-    dd if=/dev/zero of=/quota-large bs=1M count=2048 conv=fsync && exit 9
-    exit 7
-' >>"$out" 2>&1 || fail "run -d with a 1 GiB root disk"
+    --storage-opt size=1GiB "$image" sleep 240 >>"$out" 2>&1 ||
+    fail "run -d with a 1 GiB root disk"
 
 running=$(incus_call query "/1.0/instances/$name/state") ||
     fail "incusd did not return the state of the running instance"
@@ -87,19 +81,19 @@ disk=$(printf '%s\n' "$running" | jq -er '.disk.root.total') ||
     fail "incusd did not report the size of the running root disk"
 show "root disk total $disk bytes"
 [ "$disk" = 1073741824 ] || fail "incusd did not report a 1 GiB root disk"
-incus_call exec "$name" -- touch /quota-start || fail "could not start the writes"
 
-state=
-for i in $(seq 1 60); do
-    state=$(timeout 6 "$bin" inspect --podvm-tier=incus --format '{{.Status}} {{.ExitCode}}' "$name") ||
-        fail "could not inspect the instance"
-    case "$state" in Stopped\ *) break ;; esac
-    sleep 1
-done
-show "state    $state"
-[ "$state" = 'Stopped 7' ] || fail "expected the large write to fail with payload exit 7"
-podvm_call logs --podvm-tier=incus "$name" >"$work/log" 2>&1 || fail "could not read the payload log"
-cat "$work/log" >>"$out"
+# The host keeps the diagnostics even if the guest cannot write another file.
+write_exit=0
+timeout 120 incus exec "$name" -- sh -c '
+    export LC_ALL=C
+    dd if=/dev/zero of=/quota-small bs=1M count=16 conv=fsync || exit 8
+    echo "small write passed"
+    dd if=/dev/zero of=/quota-large bs=1M count=2048 conv=fsync && exit 9
+    exit 7
+' >"$work/log" 2>&1 || write_exit=$?
+tee -a "$out" <"$work/log"
+show "write exit $write_exit"
+[ "$write_exit" -eq 7 ] || fail "expected the large write to fail with payload exit 7"
 grep -q '^small write passed$' "$work/log" || fail "the small write did not pass"
 grep -Eq 'No space left on device|Disk quota exceeded' "$work/log" || fail "the large write did not report a quota error"
 free=$(room) || fail "could not check the space left in the pool"
