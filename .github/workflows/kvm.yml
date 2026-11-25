@@ -343,6 +343,9 @@ jobs:
           ./target/release/podvm-interpose-build
           cargo build --release -p podvm
 
+      - name: experiment 475 (OCI layer stream)
+        run: sh experiments/475-incus-layer-stream.sh
+
       - name: experiment 471
         env:
           PODVM_471_MIRROR: "1"
@@ -367,6 +370,7 @@ jobs:
         with:
           name: incus-usage-v2
           path: |
+            experiments/results/incus-layer-stream.txt
             experiments/results/incus-usage-v2.txt
             experiments/results/incus-root-quota.txt
           if-no-files-found: warn
