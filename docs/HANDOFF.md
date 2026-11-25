@@ -1,6 +1,6 @@
 # Handoff
 
-The state on 2026-11-24, 22:00 (UTC), at the end of a session. `main` is
+The state on 2026-11-25, 03:20 (UTC), at the end of a session. `main` is
 at the commit that changes this file or later. A fresh session with no
 memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
 `docs/decisions.md`. The handoffs before this one are in git: `git show
@@ -68,6 +68,18 @@ memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
    `TODO/PROGRESS.md`.
 
 ## Rules learned
+
+* The record gate refuses a closed issue whose entry is not done: where a
+  fix closes one item of an umbrella entry (T-2088), give the item an entry
+  of its own (T-2091, T-2092) and map the issue to it in the same commit.
+* pod-incus cuts a long error of incusd with `…` (U+2026): an experiment
+  that copies stderr into `experiments/results/` puts `...` in its place,
+  or `check-markers` fails.
+* btrfs of a small loop file gives incusd more free space than a write can
+  use (74.5 MiB free while a write fails, experiment 472): a check of the
+  room on btrfs refuses only a need over that number.
+* The cloud host can run a root incusd of apt (`/usr/libexec/incus/incusd
+  --group root`) with a btrfs pool on a loop file; experiment 472 uses it.
 
 * The cloud host's incusd has no AppArmor: a fault of the incus tier that
   AppArmor makes shows only on a hosted runner. The job `incus` of
