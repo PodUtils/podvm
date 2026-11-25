@@ -690,7 +690,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2046](cli.md) | P1 | S | none | cli | done | `logs` loads the whole log into memory and has no bound of bytes |
 | [T-2047](machine.md) | P2 | M | none | machine | done | The memory that a guest of the machine tier needs for an initrd of N bytes, as a curve |
 | [T-2048](machine.md) | P1 | M | none | machine | partial | The save of the state of a guest hangs the run with no line when the monitor of the emulator answers late |
-| [T-2050](deps.md) | P2 | L | none | deps | partial | Take podcrates `v0.80.0`: the write table, `pod-beneath`, the loader rule, five `#!` levels, the signals, the saved state of a line, the static QEMU 11.0.0 |
+| [T-2050](deps.md) | P2 | L | none | deps | done | Take podcrates `v0.80.0`: the write table, `pod-beneath`, the loader rule, five `#!` levels, the signals, the saved state of a line, the static QEMU 11.0.0 |
 | [T-2051](machine.md) | P2 | M | none | machine | done | The save and the load of the Linux guest of the machine tier keep their own code beside `pod_guest::warm::line` |
 | [T-2052](cli.md) | P2 | S | none | cli | done | `run -it`: the interrupt key does not stop the foreground child of the payload |
 | [T-2053](cli.md) | P2 | M | none | cli | done | The banner, `--strict` and `inspect` of the namespace rung deny the PID namespace and the `/proc` that the run has |
@@ -702,7 +702,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2063](cli.md) | P3 | S | none | cli | done | The sixth outside pass, OQ-12: a SIGKILL of podvm leaves `staging/memo-*.tmp` |
 | [T-2064](cli.md) | P3 | S | none | cli | done | The sixth outside pass, OQ-13: texts of the manual and of messages |
 | [T-2065](image.md) | P1 | S | none | image | done | A layer whose PAX record `SCHILY.acl.access` holds a newline is refused whole |
-| [T-2066](deps.md) | P2 | L | none | deps | partial | Take podcrates `v0.81.0`: the warm line with a bounded connect, the static QEMU 11.1.3, the streamed log reads, one atomic replace of a file |
+| [T-2066](deps.md) | P2 | L | none | deps | done | Take podcrates `v0.81.0`: the warm line with a bounded connect, the static QEMU 11.1.3, the streamed log reads, one atomic replace of a file |
 | [T-2067](gate.md) | P2 | S | none | gate | done | Tests of `podvm` and the machine tier fail with a long `TMPDIR`: a probe in the working directory, socket paths longer than `sun_path` |
 | [T-2068](image.md) | P1 | S | none | image | done | `load` of an image of 14 layers or more is refused: the load holds one lock for each blob |
 | [T-2069](image.md) | P2 | S | none | image | done | The staging files of the store: a name that a pid alone makes unique, and a lock that `put_bytes` drops before its rename |
@@ -736,7 +736,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-667 entries: 22 open, 42 partial, 7 blocked, 596 done.
+667 entries: 22 open, 40 partial, 7 blocked, 598 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -747,9 +747,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 21 | 0 | 271 | 295 |
-| P2 | 14 | 16 | 6 | 205 | 241 |
+| P2 | 14 | 14 | 6 | 207 | 241 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 22 | 42 | 7 | 596 | 667 |
+| **All** | 22 | 40 | 7 | 598 | 667 |
 
 ## Work order
 

@@ -40,6 +40,11 @@ contains the commit that changes this file. A fresh session reads
 * T-2054's spare-tree helper now clears its environment. Both
   `tree-prefill` paths worked with an empty environment in a private
   Alpine store. T-2054 still tracks the helper's store path in argv.
+* T-2050 and T-2066 are done. A machine-tier Alpine run fetched the pinned
+  static QEMU 11.1.3 into an empty tools store and returned the payload
+  exit 7 under TCG. Hosted run 45153867720 already proves experiments 465
+  and 468 with `warm::line` under KVM. T-2048 still tracks SIGTERM during
+  an active save.
 * The saved-state and layer-stream follow-up passed `sh scripts/dev/checks.sh`.
   The candidate, a static binary of 9,488,600 bytes, passed experiment 473
   under TCG. An earlier check during a QEMU run had one broker test fail.
@@ -95,12 +100,16 @@ contains the commit that changes this file. A fresh session reads
    item 7), and map each new issue to the entry of its own finding.
 4. podrunner: #583 (T-1968, a sized writable disk). The machine tier
    needs the disk-backed root of T-1994, and the namespace tier needs
-   the pod-enter mount requested in #667. Then #596 and #599 (the
+   the pod-enter mount requested in #667. Podrunner's 9p work mount also
+   needs a bound (#583). Experiment 477 found that `sqfstar` 4.6.1 loses
+   a valid POSIX ACL, so the T-1994 disk builder still needs a candidate
+   that keeps it. Experiment 476 needs the podrunner hosted-boot wiring
+   requested in #599. Then #596 and #599 (the
    hosted snapshot: T-1994, T-1996, T-1998, T-1999), #593 (T-1990,
    T-1991). Then T-2088 and the open rows of T-2070, T-2079, T-2087.
 5. T-2085 remainder (run the layer stream proof against incusd,
    PodUtils/podcrates#260, the answer to #657),
-   T-2054, T-2050, T-2048, then the work order of
+   T-2054, T-2048, then the work order of
    `TODO/PROGRESS.md`.
 
 ## Rules learned

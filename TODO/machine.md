@@ -5635,7 +5635,14 @@ In three steps, each released alone: (1) a root on a disk image made once for ea
 
 ## Decision
 
--
+Experiment 477 (2026-11-25, uid 1000) built SquashFS from a tar stream
+with late directory entries. `sqfstar` 4.6.1 kept numeric ownership,
+modes, links, the user xattr and `security.capability`. It warned and
+omitted a valid `system.posix_acl_access` record and returned 0 even
+with `-exit-on-error`. A full-fidelity disk builder must keep this ACL
+or refuse the image. A run with a requested disk size must refuse when
+the capped path is unavailable. The cached disk, overlay and guest boot
+proof are still open.
 
 ## Prove
 
@@ -6057,6 +6064,14 @@ Under KVM on a hosted runner (`kvm.yml` run 44808044333 on `7324fe0`, QEMU 10.2.
 Remaining: (1) done (the run above). (2) A SIGTERM that comes during a save waits for the end of the save (at most about 7 minutes with each bound, an estimate from the bounds); the drive reads the signal after it. (3) The ask for podcrates of the Decision (#633), and the take of `Monitor::ask_within` when podcrates tags it.
 
 Amended (2026-11-21, [T-2066](deps.md), [T-2051](machine.md)): (3) is done. podcrates `v0.81.0` bounds `Monitor::connect` itself (a connect with `O_NONBLOCK`, made again each 100 ms to its bound), so podvm has no thread around a connect. The save is `pod_guest::warm::line::save`: it opens one connection, reads the late answer of `query-migrate` on that connection within the bound of the save (180 s), and opens no second connection, so the queue of the monitor never fills by podvm. `tests_monitor.rs` holds one connection for each save. A save that fails says why in one line, and the guest boots with no state, as before. (2) stays: the bound of a save that hangs is now the bound of the migration and 5 s each for `migrate_cancel` and `cont` (about 190 s, an estimate from the bounds). Experiment 465 clauses 2, 3 and 9 pass under TCG as root for a user with no root (T-2066). Only `kvm.yml` can prove the save under KVM on the take.
+
+Amended (2026-11-25). Hosted KVM run 45153867720 on `a43e80cd` proves
+the save on the `warm::line` take. In the `init-state` artifact, experiment
+465 clause 2 saved a state in a run of 17 s and returned 7. Clause 3
+restored it in 2 s. Clause 9 passed its recovery checks, including an
+invalid mode that returned 125. Experiment 468 measured `mach-sav` at
+19.7 s and `mach-lod` at 3.6 s, with first output at 0.7 s, a 1541 MiB
+state and zero failure markers. Item (2), SIGTERM during the save, stays.
 
 # T-2051: The save and the load of the Linux guest of the machine tier keep their own code beside `pod_guest::warm::line`
 
