@@ -53,11 +53,11 @@ memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
 
 ## Next steps, in order
 
-1. Watch #662 (podrunner takes beta.40) and #663 (podcrates lists the
-   take of `v0.83.0`); close each with that evidence.
-2. T-2078 remaining 1: the resources of a pool through the API
-   (`storage_pool_resources`) for a driver other than `dir` (the size of
-   an image file is taken, `d8d400c3`).
+1. #662 and #663 are closed (2026-11-25): podrunner pins beta.40 in its
+   `4fc871c`, and PodUtils/podcrates#259 lists the take of `v0.83.0`.
+2. T-2078 remaining 1 is done (2026-11-25, experiment 472); remaining 3
+   is a run on the hosted runner of PodUtils/podrunner#346 with the next
+   beta.
 3. Sweep the 56 open issues at each session start (`AGENTS.md`, section 8
    item 7), and map each new issue to the entry of its own finding.
 4. podrunner: #583 (T-1964 pool with a quota, T-1968), #596 and #599 (the

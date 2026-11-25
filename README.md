@@ -149,7 +149,10 @@ run. Each run with `--name` leaves a record that `ps -a` lists;
 `podvm container prune` removes each exited record and its tree.
 
 A chroot changes path resolution. The namespace path creates a mount namespace
-and private temporary filesystem. It does not create user, PID, or network isolation.
+and private temporary filesystem. For a caller that is not root, a run there also
+opens a user, a PID and a UTS namespace; the parts depend on the caller and the
+verb, and the banner of the run names them (`podvm man`, ISOLATION). It does not
+create network isolation.
 Where chroot is denied, the userland path enters a dynamic payload through the image loader.
 A static x86_64 payload there runs on the native-static path: podvm resolves each
 path of its system calls in the image (Syscall User Dispatch, TODO/enter.md T-1652).

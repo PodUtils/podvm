@@ -31,15 +31,18 @@
 //! image, its volume and its own files: 2.38 times the tree, bound 2.6),
 //! and gives a warning only.
 //!
-//! The path of a pool is `INCUS_DIR/storage-pools/NAME`, where each driver
-//! mounts its pool, and the root of an instance goes into its `containers`
-//! directory; only the driver `dir` keeps the files of an instance there,
-//! so another driver gives no check. pod-incus has no call of
-//! `GET /1.0/storage-pools/NAME/resources` (podcrates `v0.82.0`): the
-//! request to podcrates is in T-2078.
+//! [`super::target`] finds the pool and reads its free space: `statfs` of a
+//! pool of the driver `dir` that podvm sees, else the resources that incusd
+//! gives for each driver. A driver other than `dir` and thick `lvm` makes
+//! the root of an instance as a clone of one volume of the image
+//! ([`clones`]): an import needs the bytes of the tree there for that
+//! volume, and a create of an image that incus has needs no bytes that
+//! podvm can bound.
 
-use std::os::unix::fs::MetadataExt;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+
+pub use super::target::{after_failure, incus_dir, room_at, Target};
 
 use pod_hostprobe::space::mib;
 
@@ -134,15 +137,89 @@ pub struct Plan {
     /// The device of the store's tree where the import removes it before
     /// the create.
     pub freed: Option<u64>,
+    /// This run imported the image: a pool of clones makes the volume of
+    /// the image at the create, also after the import.
+    pub imported: bool,
 }
 
-/// A file system that incusd writes: its words, a path on it, and its
-/// device.
+/// A file system that incusd writes: its words, a path on it (empty where
+/// incusd names none), and its device.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Spot {
     pub label: String,
     pub path: PathBuf,
-    pub dev: u64,
+    pub dev: Dev,
+    /// The pool makes the root of an instance as a clone of the volume of
+    /// its image ([`clones`]).
+    pub clones: bool,
+    /// The free space as incusd measured it; `None`: `statfs` of `path`.
+    pub room: Option<Room>,
+}
+
+impl Spot {
+    /// The words and the path of the spot, for a line.
+    pub fn place(&self) -> String {
+        if self.path.as_os_str().is_empty() {
+            self.label.clone()
+        } else {
+            format!("{} at {}", self.label, self.path.display())
+        }
+    }
+}
+
+/// What podvm knows of the file system under a spot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Dev {
+    /// The device of the file system (`statfs`).
+    Is(u64),
+    /// The pool has storage of its own: a loop file of incusd, a block
+    /// device, a volume group. A file that podvm removes on another file
+    /// system gives it no room.
+    Own,
+    /// Not known: the pool can share a file system with the store of podvm
+    /// or with incusd's images (a `dir`, a dataset of ZFS, a directory on
+    /// btrfs).
+    Unknown,
+}
+
+impl Dev {
+    /// The device of a pool of `driver` on `source`, as incusd names them.
+    pub fn of(driver: &str, source: &str) -> Dev {
+        let own_driver = matches!(driver, "lvm" | "lvmcluster" | "ceph" | "powerflex" | "pure");
+        if own_driver || source.starts_with("/dev/") || source.ends_with(".img") {
+            Dev::Own
+        } else {
+            Dev::Unknown
+        }
+    }
+
+    /// True where both are one known file system. Two loads on spots that
+    /// are not known to be one each keep their own lower bound.
+    pub fn same(self, other: Dev) -> bool {
+        matches!((self, other), (Dev::Is(a), Dev::Is(b)) if a == b)
+    }
+
+    /// True where the removal of the store's tree on the device `freed` can
+    /// give room here: so the lower bound of a load here is 0.
+    pub fn can_gain(self, freed: Option<u64>) -> bool {
+        match self {
+            Dev::Is(d) => freed == Some(d),
+            Dev::Own => false,
+            Dev::Unknown => freed.is_some(),
+        }
+    }
+}
+
+/// True where a pool of `driver` with `config` makes the root of an
+/// instance as a clone of the volume of its image. Only `dir` and thick
+/// `lvm` copy each file; an unknown driver counts as a clone, so that the
+/// need stays a lower bound.
+pub fn clones(driver: &str, config: &BTreeMap<String, String>) -> bool {
+    match driver {
+        "dir" | "lvmcluster" => false,
+        "lvm" => config.get("lvm.use_thinpool").is_none_or(|v| v != "false"),
+        _ => true,
+    }
 }
 
 /// What one step writes on one file system.
@@ -162,10 +239,20 @@ pub struct Load {
 pub fn loads(pool: &Spot, images: Option<&Spot>, plan: &Plan, importing: bool) -> Vec<Load> {
     // T-2085: on the file system of the store's tree that the import
     // removes, the root of the instance takes its place.
-    let (root, root_what) = if importing && plan.freed == Some(pool.dev) {
+    let (root, root_what) = if importing && pool.dev.can_gain(plan.freed) {
         (
             Need::default(),
             "the root of the instance (in the place of podvm's tree, which the import removes)",
+        )
+    } else if pool.clones && (importing || plan.imported) {
+        (
+            plan.tree,
+            "the volume of the image (the root of the instance is a clone of it)",
+        )
+    } else if pool.clones {
+        (
+            Need::default(),
+            "the root of the instance (a clone of the volume of its image)",
         )
     } else {
         (plan.tree, "the root of the instance")
@@ -192,7 +279,7 @@ pub fn loads(pool: &Spot, images: Option<&Spot>, plan: &Plan, importing: bool) -
         )
     };
     match images {
-        Some(i) if importing && i.dev == pool.dev => vec![Load {
+        Some(i) if importing && i.dev.same(pool.dev) => vec![Load {
             spot: Spot {
                 label: format!("{} (also incusd's images)", pool.label),
                 ..pool.clone()
@@ -231,12 +318,8 @@ pub fn loads(pool: &Spot, images: Option<&Spot>, plan: &Plan, importing: bool) -
         ],
         _ => vec![Load {
             spot: pool.clone(),
-            what: if importing {
-                root_what
-            } else {
-                "the root of the instance"
-            },
-            need: if importing { root } else { plan.tree },
+            what: root_what,
+            need: root,
             extra: 0,
         }],
     }
@@ -247,7 +330,7 @@ pub fn line(load: &Load, room: Room, verdict: Verdict) -> Option<String> {
     let Load {
         spot, what, need, ..
     } = load;
-    let at = format!("{} at {}", spot.label, spot.path.display());
+    let at = spot.place();
     let why = "(TODO/machine.md T-2078, PodUtils/podrunner#346)";
     match verdict {
         Verdict::Fits => None,
@@ -286,160 +369,6 @@ pub(super) fn segment(name: &str) -> bool {
     !name.is_empty() && name != "." && name != ".." && !name.contains(['/', '\0'])
 }
 
-/// The directory of the incusd of `socket`: `INCUS_DIR`, else the directory
-/// of the socket.
-pub fn incus_dir(socket: &Path) -> Option<PathBuf> {
-    match std::env::var_os("INCUS_DIR") {
-        Some(d) if !d.is_empty() => Some(PathBuf::from(d)),
-        _ => socket.parent().map(Path::to_path_buf),
-    }
-}
-
-/// The free space at `path`, or `None` where `statfs` fails.
-pub fn room_at(path: &Path) -> Option<Room> {
-    let have = pod_hostprobe::space::read(path.to_str()?).ok()?;
-    Some(Room {
-        bytes: have.free.bytes,
-        inodes: have.inodes_are_counted.then_some(have.free.inodes),
-    })
-}
-
-/// The pool of the root disk of new instances and incusd's images.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Target {
-    pub pool: Spot,
-    pub images: Option<Spot>,
-}
-
-impl Target {
-    /// The target in the incusd directory `dir` for the pool `name`; `None`
-    /// where the name is not one segment or the pool does not show the
-    /// `containers` directory of the driver to this user. The root of a
-    /// new instance goes into that directory, so podvm reads its file
-    /// system. An incusd in a mount namespace of its own (route A of
-    /// `docs/incus.md`) mounts a pool with a `source` where podvm does not
-    /// see it: the mount point is then empty, and podvm gives no check.
-    pub fn at(dir: &Path, name: &str) -> Option<Target> {
-        if !segment(name) {
-            return None;
-        }
-        let path = dir.join("storage-pools").join(name).join("containers");
-        let md = std::fs::metadata(&path).ok().filter(|m| m.is_dir())?;
-        let images = dir.join("images");
-        let images = std::fs::metadata(&images).ok().map(|m| Spot {
-            label: "incusd's images".to_string(),
-            path: images,
-            dev: m.dev(),
-        });
-        Some(Target {
-            pool: Spot {
-                label: format!("the storage pool `{name}`"),
-                path,
-                dev: md.dev(),
-            },
-            images,
-        })
-    }
-
-    /// The target of the client: the pool of the `root` disk of the
-    /// default profile, where each driver of the server is `dir`.
-    pub async fn find(c: &pod_incus::Client, storage: &str) -> Option<Target> {
-        if !dir_only(storage) {
-            return None;
-        }
-        let profile = c.profile("default").await.ok()?;
-        let name = profile.devices.get("root")?.get("pool")?.clone();
-        Target::at(&incus_dir(&c.settings().socket)?, &name)
-    }
-
-    /// The loads of `plan`, each with its free space now.
-    fn measured(&self, plan: &Plan, importing: bool) -> Vec<(Load, Room)> {
-        loads(&self.pool, self.images.as_ref(), plan, importing)
-            .into_iter()
-            .filter_map(|l| room_at(&l.spot.path).map(|r| (l, r)))
-            .collect()
-    }
-
-    /// Before a create (and the import with `importing`): the refusal where
-    /// the image cannot fit, else the warnings.
-    pub fn check(&self, plan: &Plan, importing: bool) -> Result<Vec<String>, String> {
-        let mut warn = Vec::new();
-        for (l, r) in self.measured(plan, importing) {
-            let v = judge(l.need, l.extra, r);
-            match (v, line(&l, r, v)) {
-                (Verdict::NoBytes | Verdict::NoInodes, Some(t)) => return Err(t),
-                (_, Some(t)) => warn.push(t),
-                _ => {}
-            }
-        }
-        Ok(warn)
-    }
-
-    /// The line after a call that failed with `transport`: the free space
-    /// and the need of each load. A refusal by size gives it each time;
-    /// another fault of the transport where a load does not fit. With no
-    /// plan (T-2085: no tree in the store, as incus had the image), the
-    /// need is a dash.
-    pub fn after(
-        &self,
-        plan: Option<&Plan>,
-        importing: bool,
-        transport: Transport,
-        bound: usize,
-    ) -> Option<String> {
-        let m = self.measured(&plan.copied().unwrap_or_default(), importing);
-        let short = plan.is_some()
-            && m.iter()
-                .any(|(l, r)| judge(l.need, l.extra, *r) != Verdict::Fits);
-        let rooms = m
-            .iter()
-            .map(|(l, r)| {
-                let inodes = r
-                    .inodes
-                    .map(|i| format!(" and {i} free inodes"))
-                    .unwrap_or_default();
-                let need = match plan {
-                    Some(_) => format!(
-                        "at least {} and {} inodes",
-                        mib(l.need.bytes),
-                        l.need.entries
-                    ),
-                    None => "- (podvm has no tree of the image)".to_string(),
-                };
-                format!(
-                    "{} at {} has {} free{inodes} now, and {} needs {need}",
-                    l.spot.label,
-                    l.spot.path.display(),
-                    mib(r.bytes),
-                    l.what,
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("; ");
-        if rooms.is_empty() {
-            return None;
-        }
-        match transport {
-            Transport::TooLarge => Some(format!(
-                "the answer of incusd was over podvm's bound of {}: where a pool fills, \
-                 incusd's error holds a line of tar for each file that it could not write \
-                 (measured), and incusd then removes what it wrote; {rooms} \
-                 (TODO/machine.md T-2078, PodUtils/podrunner#346)",
-                mib(bound as u64)
-            )),
-            Transport::NoSpace => Some(format!(
-                "incusd ran out of space: {rooms} (TODO/machine.md T-2078, \
-                 PodUtils/podrunner#346)"
-            )),
-            Transport::Other if short => Some(format!(
-                "{rooms}: a lack of space can cut the answer of incusd \
-                 (TODO/machine.md T-2078)"
-            )),
-            _ => None,
-        }
-    }
-}
-
 /// The class of a failed call in its transport.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Transport {
@@ -468,22 +397,6 @@ pub fn transport(e: &pod_incus::Error) -> Transport {
         }
         _ => Transport::None,
     }
-}
-
-/// The line after a create or an import that failed with `transport`, for
-/// `plan` (`None`: no tree): the target of the server, measured now.
-pub async fn after_failure(
-    c: &pod_incus::Client,
-    plan: Option<&Plan>,
-    importing: bool,
-    transport: Transport,
-) -> Option<String> {
-    if transport == Transport::None {
-        return None;
-    }
-    let server = c.server().await.ok()?;
-    let target = Target::find(c, &server.environment.storage).await?;
-    target.after(plan, importing, transport, c.settings().max_body)
 }
 
 /// The plan of a tree at `rootfs` with no upload and no removal, or `None`

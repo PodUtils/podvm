@@ -7,7 +7,7 @@ pub fn document(f: &Findings, sel: &Selection) -> String {
     let mut o = json::Obj::new(&mut s);
     o.str("podvm", VERSION);
     o.str("rung", sel.rung.word());
-    o.str("rung_must_never_claim", sel.rung.must_never_claim());
+    o.str("rung_must_never_claim", &never_claim(sel.rung));
     // ⚠ The rung and only the rung: `controls_answered` is beside it and is a
     // statement about the diagnostic. See `Selection::exit_code`.
     o.bool("strict_ok", sel.meets(Selection::STRICT_FLOOR));
@@ -318,4 +318,26 @@ pub fn document(f: &Findings, sel: &Selection) -> String {
     o.end();
     s.push('\n');
     s
+}
+
+/// The "must never claim" words of `rung` for the probe, which enters
+/// nothing (PodUtils/podvm#546, TODO/cli.md T-2088): what the rung gives in
+/// no entry. On the namespace rung a run opens a user, a PID and a UTS
+/// namespace and a `/proc` by the caller and the verb
+/// ([`crate::isolation::of_entry`]), so the probe names only the network
+/// and points at the banner of the run and the manual.
+pub fn never_claim(rung: Rung) -> String {
+    if rung != Rung::Namespace {
+        return rung.must_never_claim().to_string();
+    }
+    let all = pod_hostprobe::select::Opened {
+        user: true,
+        pid: true,
+        proc: true,
+    };
+    format!(
+        "{}; user, pid or /proc isolation where the entry does not open it (the banner of \
+         the run names each part; `podvm man`, ISOLATION)",
+        rung.must_never_claim_with(all)
+    )
 }

@@ -43,7 +43,12 @@ Selection reports available mechanisms. Entry reports the mechanism it actually 
 | interpose | Library-call compatibility for payloads that the object reaches |
 | unsupported | Refusal with the missing operation |
 
-The namespace path does not create user, PID, or network namespaces.
+The namespace path does not create a network namespace. The user, PID and
+UTS namespaces and the `/proc` of a run there depend on the caller and the
+verb (`podvm_probe::isolation::of_entry`, T-2053): a foreground run of a
+caller that is not root opens each of them. The banner of the run,
+`inspect` (`.Exec.Mode`, `.Exec.Shares`) and the ISOLATION section of
+`podvm man` read one table.
 A stronger request cannot silently receive a weaker result.
 [Limits](limits.md) gives host and payload restrictions.
 

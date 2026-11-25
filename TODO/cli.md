@@ -7191,7 +7191,7 @@ surviving record names the same image. `cargo test --workspace
 
 # T-2088: The faults of the external QA of `0.2.0-beta.31` that stay open on `0.2.0-beta.40`
 
-**Source:** the external QA of `0.2.0-beta.31` (2026-11-17), issues 486, 495, 502, 510, 517, 519, 524, 531 and 546, measured again on 2026-11-24 as uid 1000 with the release binary of `0.2.0-beta.40`, or read in the code where it is noted
+**Source:** the external QA of `0.2.0-beta.31` (2026-11-17), issues 486, 495, 502, 510, 517, 519 and 524 (531 moved to [T-2091](cli.md) and 546 to [T-2092](cli.md) on 2026-11-25), measured again on 2026-11-24 as uid 1000 with the release binary of `0.2.0-beta.40`, or read in the code where it is noted
 **Category:** cli
 **Milestone:** none
 **Priority:** P2
@@ -7207,16 +7207,14 @@ surviving record names the same image. `cargo test --workspace
 - 517: a sealed bundle with an empty, a missing or a null `argv` runs the command of the image (a shell with no input) and exits 0. No document says so.
 - 519: `notebook` and `machine ssh` exit 125 for a missing argument, where the exit table gives 1 for a missing argument. `profile show` with no name prints the usage of `profile list`.
 - 524: the `.Digest` that `inspect` prints is no reference for `inspect`, `rmi`, `tag` or `cp` ("no such image"). `.ManifestDigest` and `.PulledAt` are in the JSON, and `--format` refuses them.
-- 531: `build_commit` of `crates/podvm-gate/src/dev/steps.rs` takes the text of a failed `scripts/build-state.py commit` (the build record is not built) as the commit, so `version --verbose` of a source build shows a build error as `commit:`.
-- 546: `README.md`, `docs/architecture.md`, `SECURITY.md` and `docs/limits.md` say that the namespace rung makes no user, PID or UTS namespace. The probe field `rung_must_never_claim` says it too, and the refusal of `--pid` says that there is no PID, IPC, UTS or user namespace to select. The run opens a user, a PID and a UTS namespace (the banner says so).
 
 ## Premise
 
-Each item is measured on 2026-11-24 as uid 1000 with `/var/tmp/podvm-current/podvm` (0.2.0-beta.40), except 502 and 531, which are read in the code (the helper `proxy` is not beside the binary there, and the fault of 531 is in the build step, not in the binary).
+Each item is measured on 2026-11-24 as uid 1000 with `/var/tmp/podvm-current/podvm` (0.2.0-beta.40), except 502, which is read in the code (the helper `proxy` is not beside the binary there).
 
 ## Approach
 
-486: refuse an operand of each list verb of `lab`. 495: take the prefix of the tree off the target of a symbolic link on a copy out. 502: wait for the child and give its code (128 plus the signal). 510: write the banner and the help of the image form from the entered rung. 517: refuse an empty `argv` by name, or say in `docs/limits.md` that it keeps the command of the image. 519: exit 1 for the two verbs, and give `profile show` its own usage. 524: take a bare digest as a reference, and add the two fields to `--format`. 531: refuse a failed `build-state.py commit` and pass `unknown`. 546: correct the four documents, the probe field and the refusal.
+486: refuse an operand of each list verb of `lab`. 495: take the prefix of the tree off the target of a symbolic link on a copy out. 502: wait for the child and give its code (128 plus the signal). 510: write the banner and the help of the image form from the entered rung. 517: refuse an empty `argv` by name, or say in `docs/limits.md` that it keeps the command of the image. 519: exit 1 for the two verbs, and give `profile show` its own usage. 524: take a bare digest as a reference, and add the two fields to `--format`.
 
 ## Decision
 
@@ -7225,3 +7223,92 @@ Each item is measured on 2026-11-24 as uid 1000 with `/var/tmp/podvm-current/pod
 ## Prove
 
 `cargo test --release -p podvm --bin podvm` passes with a test of each item, and the repro of each issue, as uid 1000, gives the refusal or the result of the fix.
+
+# T-2091: `podvm-dev build` takes the error of a failed `build-state.py commit` as the commit
+
+**Source:** PodUtils/podvm#531 (the external QA of `0.2.0-beta.31`), read in the code on 2026-11-24
+**Category:** cli
+**Milestone:** none
+**Priority:** P2
+**Effort:** S
+**Status:** done
+
+## Problem
+
+`build_commit` of `crates/podvm-gate/src/dev/steps.rs` takes the text of a failed `scripts/build-state.py commit` (the build record is not built) as the commit, so `version --verbose` of a source build shows a build error as `commit:`.
+
+## Premise
+
+The issue is part of the external QA of `0.2.0-beta.31`, kept open on `0.2.0-beta.40` in [T-2088](cli.md).
+
+## Approach
+
+Take the commit only where the script exits 0 and prints a commit; else pass no `PODVM_BUILD_COMMIT`, so that `crates/podvm/build.rs` reads git, and give one line.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test -p podvm-gate steps::tests` passes, and with `podvm-buildstate` not built, `podvm-dev build` then `podvm version --verbose` gives a commit of git.
+
+## Done
+
+**Done (2026-11-25).** `build_commit` of `crates/podvm-gate/src/dev/steps.rs` takes the
+  first line of `scripts/build-state.py commit` only where it exits 0 and
+  the line is a hex commit of 7 to 64 digits (with `-dirty` or not) or
+  `unknown` (`commit_of`); else the build gets no `PODVM_BUILD_COMMIT`, one
+  line says so, and `crates/podvm/build.rs` reads the commit from git. Before,
+  the background build also set the variable to an empty string where the
+  script failed. Table test `steps::tests::only_a_commit_word_with_exit_0_is_the_commit`
+  (14 cases). Repro on 2026-11-25 with `podvm-buildstate` not built (the
+  shim exits 2): `podvm-dev build` gives the line, and `podvm version
+  --verbose` gives `commit: fe3f2bf19a5061c224b997bceeb5da4524195ade-dirty`.
+
+# T-2092: The documents, the probe field and the refusal of `--pid` say that the namespace rung opens no user, PID or UTS namespace
+
+**Source:** PodUtils/podvm#546 (the external QA of `0.2.0-beta.31`), measured on 2026-11-24 as uid 1000 on `0.2.0-beta.40`
+**Category:** cli
+**Milestone:** none
+**Priority:** P2
+**Effort:** S
+**Status:** done
+
+## Problem
+
+`README.md`, `docs/architecture.md`, `SECURITY.md` and `docs/limits.md` say that the namespace rung makes no user, PID or UTS namespace. The probe field `rung_must_never_claim` says it too, and the refusal of `--pid` says that there is no PID, IPC, UTS or user namespace to select. The run opens a user, a PID and a UTS namespace (the banner says so).
+
+## Premise
+
+The issue is part of the external QA of `0.2.0-beta.31`, kept open on `0.2.0-beta.40` in [T-2088](cli.md).
+
+## Approach
+
+Write each text from what an entry opens (`podvm_probe::isolation::of_entry`, T-2053): the rung makes no network namespace in any entry, and the other parts depend on the caller and the verb.
+
+## Decision
+
+-
+
+## Prove
+
+As uid 1000, `podvm probe --json` gives the words of the fix, the refusal of the flag `--pid` gives its words with exit 125, and `run --verbose` names the same namespaces.
+
+## Done
+
+**Done (2026-11-25).** `README.md`, `docs/architecture.md`, `SECURITY.md` and
+  `docs/limits.md` say that the user, PID and UTS namespaces of the
+  namespace rung depend on the caller and the verb, that the banner names
+  them, and that the rung makes no network namespace; `docs/limits.md` also
+  gives the PID namespace of `run -d` and `create` (T-1930). The probe field
+  `rung_must_never_claim` of the namespace rung is "network isolation; user,
+  pid or /proc isolation where the entry does not open it (the banner of the
+  run names each part; `podvm man`, ISOLATION)" (`report::never_claim`).
+  The refusal of `--pid, --ipc, --uts, --userns` says that a foreground run
+  of a caller that is not root opens its own user, PID and UTS namespace,
+  and that each run shares the network and IPC namespaces of the host; the
+  note of `--domainname` no longer says that the runtime grants no UTS
+  namespace. Repro on 2026-11-25 as uid 1000 with the release `podvm`: the
+  probe field and the refusal (exit 125) give these words, and `run
+  --verbose` gives `namespaces: user+pid+uts+mount` and `pids: private`.

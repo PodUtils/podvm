@@ -6222,6 +6222,12 @@ systems; the drivers; the walk; the path of a pool; a stand-in incusd whose
 wait declares a chunk of 80 MiB). Experiment 434 clause 27 (`PODVM_434_MIRROR=1
 sh experiments/434-incus-tier.sh`): a pool of 8 MiB refuses the run before
 the import, with one line and exit 125.
+`cargo test -p podvm --bin podvm target_tests` (the driver and the
+`source` of a pool against its storage and its clones; the loads on a pool
+of clones; a stand-in incusd of the driver `btrfs`). Experiment 472 (`sh
+experiments/472-incus-pool-api.sh` as root, with the system incusd of apt
+and btrfs): a pool that podvm cannot read with `statfs` is measured by
+incusd.
 
 ## Done
 
@@ -6308,6 +6314,38 @@ root of the instance needs at least 16.5 MiB", no instance stays; the
 whole experiment passes, "THE INCUS TIER RUNS". Remaining: (1) the
 resources of a pool through the API (`storage_pool_resources`) for a
 driver other than `dir`, and (3).
+
+Remaining (1) is done (2026-11-25, podcrates `v0.83.0`): where a server
+has a driver other than `dir`, or podvm does not see the `containers`
+directory of the pool, `incus::target` takes the free space from incusd
+(`Client::storage_pool` and `Client::storage_pool_resources`), and the line
+names the pool "(driver `NAME`, as incusd measures it)" with its `source`.
+podvm does not know the file system under such a pool (`space::Dev`): the
+store's tree that an import removes counts as room only where the pool can
+share a file system (`dir`, a dataset, a directory), not on a loop file, a
+block device or a volume group, and a pool and incusd's images keep a
+load each. A driver other than `dir` and thick `lvm` makes the root of an
+instance as a clone of one volume of the image (`space::clones`; an
+unknown driver counts as one, so the need stays a lower bound): an import,
+or the create after an import of the same run (`Plan::imported`), needs
+the bytes of the tree for that volume; a create of an image that incus has
+needs 0. Table tests `incus::target_tests` (3). Experiment 472
+(`experiments/results/incus-pool-api.txt`, incusd 6.0.0 of apt as root,
+the release `podvm` of this commit), "THE POOL OF INCUSD IS MEASURED
+THROUGH ITS API": (1) a btrfs pool of 200 MiB that a file fills, a fresh
+image: exit 125, and after incusd's error ``the storage pool `bt472`
+(driver `btrfs`, as incusd measures it) at /var/lib/incus/disks/bt472.img
+has 74.5 MiB free now, and the volume of the image (the root of the
+instance is a clone of it) needs at least 15.0 MiB and 519 inodes``; (2)
+with room, `hello` and exit 0; (3) a pool of the driver `dir` on an ext4 of
+8 MiB that podvm does not see (`INCUS_DIR` elsewhere), an image that incus
+has: exit 125 before the create with ``the storage pool `small472` (driver
+`dir`, as incusd measures it) at ... has 3.4 MiB free and the root of the
+instance needs at least 15.0 MiB``; no instance stays. Before this change,
+a server with the drivers `btrfs` and `dir` gave no check, and the run got
+incusd's raw error. Recorded: btrfs gives 74.5 MiB free while a write of
+the pool fails with "No space left on device", so the check cannot refuse
+there (a lower bound refuses only what surely cannot fit). Remaining: (3).
 
 OR-B39-13 of the eighth outside pass (T-2079, 2026-11-24) was remaining
 (2): on a full pool, a run of an image that incus already has gets incusd's

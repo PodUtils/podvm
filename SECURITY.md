@@ -9,7 +9,10 @@ The runtime validates transport, digest, archive paths, and requested mechanisms
 The chroot, userland, and interpose paths share host resources.
 They do not isolate an untrusted payload from the invoking account.
 The namespace path supplies the mount behavior stated in
-[the architecture](docs/architecture.md), without user, PID, or network isolation.
+[the architecture](docs/architecture.md), without network isolation. Its user,
+PID and UTS namespaces depend on the caller and the verb, and the banner of each
+run names them; a user namespace of a run is not a security boundary that podvm
+claims against the invoking account.
 The Windows, DOS, and `machine ssh` guests run in QEMU on KVM or TCG.
 Under TCG the emulator process is the boundary, not hardware isolation.
 

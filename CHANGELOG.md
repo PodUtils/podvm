@@ -8,6 +8,35 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: what the namespace rung opens, and the commit of a source build, 2026-11-25
+
+Record: T-2091 (#531), T-2092 (#546).
+Deployed: not deployed; on main, for the next beta after 0.2.0-beta.40.
+
+- `README.md`, `docs/architecture.md`, `SECURITY.md`, `docs/limits.md`,
+  the probe field `rung_must_never_claim` and the refusal of `--pid`,
+  `--ipc`, `--uts` and `--userns` say what a run on the namespace rung
+  opens: a user, a PID and a UTS namespace by the caller and the verb, and
+  no network namespace, as the banner says.
+- `podvm-dev build` where `podvm-buildstate` is not built gives one line,
+  and the build reads the commit from git: `version --verbose` no longer
+  shows the error of the script as `commit:`.
+
+### Changed: the room of a storage pool from incusd, for each driver, 2026-11-25
+
+Record: T-2078.
+Deployed: not deployed; on main, for the next beta after 0.2.0-beta.40.
+
+- On the incus tier, where the server has a driver other than `dir`, or
+  podvm does not see the directory of the pool (route A), podvm takes the
+  free space of the pool of the default profile from incusd, refuses a run
+  that cannot fit by name with exit 125, and names the pool "(driver
+  `NAME`, as incusd measures it)" (experiment 472).
+- On a pool of clones (btrfs, ZFS, thin LVM, Ceph), an import needs the
+  bytes of the tree for the volume of the image, and the line after a
+  failure names that volume; a create of an image that incus has is not
+  refused by size.
+
 ### Changed: podcrates `v0.83.0`, the bounds of each answer of incusd, 2026-11-24
 
 Record: T-2089.

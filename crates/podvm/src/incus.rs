@@ -18,6 +18,7 @@ pub(crate) mod oom; // TODO/machine.md T-2077
 pub(crate) mod run;
 pub(crate) mod space; // TODO/machine.md T-2078
 pub(crate) mod systemd;
+pub(crate) mod target; // TODO/machine.md T-2078
 pub(crate) mod usage; // TODO/machine.md T-2076
 pub(crate) mod verbs;
 mod xattrs; // TODO/machine.md T-1999
@@ -34,6 +35,8 @@ mod oom_tests; // TODO/machine.md T-2077
 mod run_tests; // TODO/machine.md T-2080
 #[cfg(test)]
 mod space_tests; // TODO/machine.md T-2078
+#[cfg(test)]
+mod target_tests; // TODO/machine.md T-2078
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

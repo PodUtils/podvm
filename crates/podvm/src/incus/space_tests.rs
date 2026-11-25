@@ -6,7 +6,7 @@ use std::os::unix::net::UnixListener;
 use std::path::PathBuf;
 
 use super::space::{
-    dir_only, judge, line, loads, need_of, transport, Load, Need, Plan, Room, Spot, Target,
+    dir_only, judge, line, loads, need_of, transport, Dev, Load, Need, Plan, Room, Spot, Target,
     Transport, Verdict,
 };
 
@@ -16,7 +16,9 @@ fn spot(label: &str, dev: u64) -> Spot {
     Spot {
         label: label.to_string(),
         path: PathBuf::from(format!("/p/{dev}")),
-        dev,
+        dev: Dev::Is(dev),
+        clones: false,
+        room: None,
     }
 }
 
@@ -130,10 +132,14 @@ fn the_import_and_the_root_add_up_on_one_file_system() {
             upload: 3,
             gzip: *gzip,
             freed: *freed,
+            imported: false,
         };
         let got: Vec<(u64, u64, u64, u64)> = loads(&pool, *images, &plan, *importing)
             .iter()
-            .map(|l| (l.spot.dev, l.need.bytes, l.need.entries, l.extra))
+            .map(|l| match l.spot.dev {
+                Dev::Is(d) => (d, l.need.bytes, l.need.entries, l.extra),
+                d => panic!("{what}: {d:?}"),
+            })
             .collect();
         assert_eq!(got, *want, "{what}");
     }
@@ -215,6 +221,9 @@ fn a_pool_is_one_segment_under_the_incusd_directory() {
     let t = Target::at(&d, "default").expect("the pool");
     assert_eq!(t.pool.path, d.join("storage-pools/default/containers"));
     assert_eq!(t.images.as_ref().map(|i| i.dev), Some(t.pool.dev));
+    let Dev::Is(pool_dev) = t.pool.dev else {
+        panic!("statfs gives the device: {:?}", t.pool.dev)
+    };
     for bad in ["", ".", "..", "a/b", "../images", "missing", "unseen"] {
         assert!(Target::at(&d, bad).is_none(), "{bad:?}");
     }
@@ -255,7 +264,7 @@ fn a_pool_is_one_segment_under_the_incusd_directory() {
     // T-2085: the same need where the import removes the store's tree on
     // the file system of the pool: no refusal, as the root takes its place.
     let freed = Plan {
-        freed: Some(t.pool.dev),
+        freed: Some(pool_dev),
         gzip: true,
         ..huge
     };

@@ -355,12 +355,31 @@ it wrote, so after the failure the pool has its space again.
   line gives the free space and the need of the pool: each time for a
   refusal by size, else where the image does not fit. Where podvm has no
   tree of the image (incus had it, T-2085), the need is a dash.
-* The check needs a server whose drivers are all `dir`, and a pool whose
-  `containers` directory podvm sees at `INCUS_DIR/storage-pools/NAME`. A
-  pool with a `source` of an incusd in its own mount namespace (route A) is
-  not checked. A run of an image that incus already has is checked before
-  its create against the need that the import wrote in the store; an image
-  that an older podvm imported has no such record and is not checked.
+* **Where the free space comes from** (`incus::target`). Where each driver
+  of the server is `dir` and podvm sees the `containers` directory of the
+  pool at `INCUS_DIR/storage-pools/NAME`, podvm reads it with `statfs`.
+  Else podvm asks incusd (`GET /1.0/storage-pools/NAME/resources`, podcrates
+  `v0.83.0`): incusd measures each driver in its own mount namespace, also
+  a pool of route A. incusd gives the free blocks of root (`f_bfree`). The
+  line names such a pool "(driver `NAME`, as incusd measures it)". podvm
+  does not know the file system under it: the store's tree that an import
+  removes counts as room only where the pool can share a file system (a
+  `dir`, a dataset of ZFS, a directory on btrfs), not on a loop file of
+  incusd, a block device or a volume group.
+* **A pool of clones.** Each driver other than `dir` and thick `lvm`
+  unpacks the image once into a volume of the image, and makes the root of
+  each instance as a clone of it. An import then needs the bytes of the
+  tree there for that volume, and a create of an image that incus has needs
+  no bytes that podvm can bound. On a btrfs pool of 200 MiB that a file
+  fills, incusd gives 74.5 MiB free while a write fails with "No space left
+  on device" (experiment 472): the check cannot refuse there, and the line
+  after the failure names the pool and the volume with the bytes of the
+  tree.
+* A run of an image that incus already has is checked before its create
+  against the need that the import wrote in the store; an image that an
+  older podvm imported has no such record and is checked with the size of
+  its image file in incusd, a lower bound. Experiment 472 measures the
+  refusal on a pool of the driver `dir` of 8 MiB that podvm does not see.
 
 ## What stays open
 
@@ -371,6 +390,5 @@ it wrote, so after the failure the pool has its space again.
 * A static `incusd`.
 * A push of podvm that each instance does not repeat (a shared file, or a
   smaller release binary).
-* The room of a pool through the API of incusd (`GET
-  /1.0/storage-pools/NAME/resources`), and the head of an answer over the
-  bound: pod-incus and pod-proxy do not have them (T-2078).
+* A run on the hosted runner of PodUtils/podrunner#346 with a beta that
+  has the check of the room (T-2078, remaining (3)).

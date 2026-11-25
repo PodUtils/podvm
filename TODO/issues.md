@@ -424,7 +424,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #528 | `pull --platform linux/amd64/v3` stores a platform the index does not offer, and the tag then refuses `extract` | closed (T-1952, 97e2737e; checked 2026-11-24 on 0.2.0-beta.40: `linux/arm64` and `linux/arm64/v8` make one record) | T-2090 |
 | #529 | Refusals for `--tmpfs` name `-v` and print an internal store path the caller never passed | open | T-1952 |
 | #530 | The syscall tier's `uname -v` contains an internal task reference: `podvm syscall tier (TODO/enter.md T-1657)` | closed (c1c6bb67; checked 2026-11-24 on 0.2.0-beta.40: `uname -v` of the syscall tier is `#1 SMP podvm syscall tier`) | T-1951 |
-| #531 | `podvm version --verbose` reports `commit:` as a build error string instead of a commit | open | T-2088 |
+| #531 | `podvm version --verbose` reports `commit:` as a build error string instead of a commit | closed (fixed on main: build_commit takes only a commit with exit 0, else the build reads git; T-2091, 2026-11-25) | T-2091 |
 | #532 | Five command groups print help and exit 0 for a bare name, three exit 125, and the exit table names only the first behavior | closed (c1c6bb67, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: bare `profile`, `lab` and `windows` exit 0) | T-1951 |
 | #533 | `run --help` says a `-w` or a first program inside a volume is refused, but both work | closed (c1c6bb67; checked 2026-11-24 on 0.2.0-beta.40: `-w` in a volume works and the help says so) | T-1951 |
 | #534 | A foreground run piped into `head` dies of SIGPIPE and leaves a permanent `Created` record and its tree | closed (T-1953, b756b83f; checked 2026-11-24 on 0.2.0-beta.40: `yes` piped into `head -1` exits 141 and leaves no record) | T-2090 |
@@ -439,7 +439,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #543 | `docs/limits.md` says an arm64 guest is refused before boot and also that it runs with `qemu-system-aarch64` | closed (95506f70; checked 2026-11-24 on 0.2.0-beta.40: `docs/limits.md` says that an arm64 guest runs, and names its conditions) | T-1951 |
 | #544 | Pulling `linux/arm64` and `linux/arm64/v8` creates two records for one manifest | closed (T-1952, 97e2737e; checked 2026-11-24 on 0.2.0-beta.40: `linux/arm64` and `linux/arm64/v8` make one record) | T-2090 |
 | #545 | `podvm run -t` writes a NUL byte to stdout before the payload output | closed (9da72a0d, CHANGELOG 0.2.0-beta.32; checked 2026-11-24 on 0.2.0-beta.40: under a pty, `run -t` prints `hi` with no NUL byte) | T-1951 |
-| #546 | The probe, README, architecture, SECURITY, the limits page and the banner disagree with the run about user, PID and UTS namespaces and `/proc` | open | T-2088 |
+| #546 | The probe, README, architecture, SECURITY, the limits page and the banner disagree with the run about user, PID and UTS namespaces and `/proc` | closed (fixed on main: the four documents, the probe field and the refusal of --pid name what the entry opens; T-2092, 2026-11-25) | T-2092 |
 | #547 | An image with no `/tmp` downgrades the namespace rung to chroot, and the report still says `namespace` | open | T-1953 |
 | #548 | `podvm rmi TAG` refuses to remove the tag whenever any container references the image | closed (T-1952, 86b5e758; checked 2026-11-24 on 0.2.0-beta.40: `rmi TAG` of an image with a container is an untag) | T-2090 |
 | #549 | `system install-names` creates the `podman` link and then exits 125 because it refused the `docker` name | closed (T-1953, be808de7; checked 2026-11-24 on 0.2.0-beta.40 against a daemon stand-in: exit 125 and no link) | T-2090 |
@@ -555,7 +555,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #659 | COORD-243: pod_hostprobe::usage: open the meter from the cgroup mounts of mountinfo, where a mount of cgroup is refused (to podcrates) | closed (podcrates v0.83.0 has pod_hostprobe::usage::Mounts, PodUtils/podcrates#259; taken in a39f4c4f, #663) | T-2086 |
 | #660 | COORD-244: the answer to PodUtils/podrunner#350: on a host with AppArmor the init could not mount the cgroup; the record of the stop now holds on cgroup v2 (to podrunner) | closed (in 0.2.0-beta.40, release run 45436996748; named in #662, COORD-246) | T-2086 |
 | #661 | COORD-245: the owner's rulings "Watchers" and "Work until done" of 2026-11-24, and a shared watcher of the Actions runs of a repository (to podcrates) | closed (podcrates v0.83.0 has runs.py, PodUtils/podcrates#259; taken in a39f4c4f, #663) | none: the rulings (docs/decisions.md, 2026-11-24) and an ask of a shared tool |
-| #662 | COORD-246: v0.2.0-beta.40 is out (to podrunner) | open | T-1949, T-2086, T-2087 |
+| #662 | COORD-246: v0.2.0-beta.40 is out (to podrunner) | closed (podrunner pins v0.2.0-beta.40 in its 4fc871c, the state line of PodUtils/podrunner#350 and #345, 2026-11-25) | T-1949, T-2086, T-2087 |
 | #663 | COORD-247: podvm took podcrates v0.83.0 in a39f4c4f (the answer to PodUtils/podcrates#259) (to podcrates) | closed (PodUtils/podcrates#259 lists the take under "Takes": a39f4c4f, closed 2026-11-25) | T-2089 |
 
 ## Messages whose title does not start with COORD-NNN

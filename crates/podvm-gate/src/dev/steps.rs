@@ -95,9 +95,44 @@ fn inputs_digest(root: &Path, target: &str) -> Option<String> {
     .map(|(_, text)| text)
 }
 
+/// The commit that `scripts/build-state.py commit` names, or `None` where it
+/// fails or prints no commit (PodUtils/podvm#531: where `podvm-buildstate`
+/// is not built, the shim prints an error and exits 2). With `None` the
+/// build gets no `PODVM_BUILD_COMMIT`, and `crates/podvm/build.rs` reads the
+/// commit from git.
 fn build_commit(root: &Path) -> Option<String> {
-    capture("python3", &["scripts/build-state.py", "commit"], root)
-        .map(|(_, text)| text.lines().next().unwrap_or("").trim().to_string())
+    let (rc, text) = capture("python3", &["scripts/build-state.py", "commit"], root)?;
+    commit_of(rc, &text)
+}
+
+/// The commit of an answer of `build-state.py commit` with the exit code
+/// `rc`: its first line where the code is 0 and the line is a hex commit of
+/// 7 to 64 digits, with `-dirty` or not, or `unknown`.
+pub(super) fn commit_of(rc: i32, text: &str) -> Option<String> {
+    let line = text.lines().next()?.trim();
+    let hex = line.strip_suffix("-dirty").unwrap_or(line);
+    let commit = (7..=64).contains(&hex.len())
+        && hex
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
+    (rc == 0 && (commit || line == "unknown")).then(|| line.to_string())
+}
+
+/// The environment of the release build: `PODVM_BUILD_COMMIT` where
+/// `build-state.py` named the commit, else nothing.
+fn commit_env(root: &Path, log: Option<&Path>) -> Vec<(String, String)> {
+    match build_commit(root) {
+        Some(c) => vec![("PODVM_BUILD_COMMIT".to_string(), c)],
+        None => {
+            let why = "podvm-dev: scripts/build-state.py commit gave no commit (is \
+                       podvm-buildstate built?): the build reads the commit from git";
+            match log {
+                Some(l) => append_line(l, why),
+                None => eprintln!("{why}"),
+            }
+            Vec::new()
+        }
+    }
 }
 
 // ---------------------------------------------------------------- the worker
@@ -129,13 +164,13 @@ pub(super) fn do_work(root: &Path, target: &str, bin: &Path, log: &Path) -> i32 
         return 1;
     }
     append_line(log, &format!("== cargo build --release --target {target}"));
-    let commit = build_commit(root).unwrap_or_default();
+    let env = commit_env(root, Some(log));
     let build_rc = run_to_log(
         root,
         log,
         "cargo",
         &["build", "--release", "--target", target],
-        &[("PODVM_BUILD_COMMIT".to_string(), commit)],
+        &env,
     );
     let t2 = epoch_secs();
     append_line(
@@ -317,13 +352,9 @@ pub(super) fn do_build(root: &Path, target: &str) -> ExitCode {
     if rc != 0 {
         return ExitCode::from(1);
     }
-    let commit = match build_commit(root) {
-        Some(commit) => commit,
-        None => return ExitCode::from(1),
-    };
     let rc = Command::new("cargo")
         .args(["build", "--release", "--target", target])
-        .env("PODVM_BUILD_COMMIT", &commit)
+        .envs(commit_env(root, None))
         .current_dir(root)
         .status()
         .map(|status| status.code().unwrap_or(1))
@@ -439,3 +470,7 @@ pub(super) fn do_check(root: &Path, target: &str) -> ExitCode {
     }
     ExitCode::from(rc as u8)
 }
+
+#[cfg(test)]
+#[path = "steps_tests.rs"]
+mod tests;

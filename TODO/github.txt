@@ -420,7 +420,7 @@
 528 issue closed
 529 issue open
 530 issue closed
-531 issue open
+531 issue closed
 532 issue closed
 533 issue closed
 534 issue closed
@@ -435,7 +435,7 @@
 543 issue closed
 544 issue closed
 545 issue closed
-546 issue open
+546 issue closed
 547 issue open
 548 issue closed
 549 issue closed
@@ -551,5 +551,5 @@
 659 issue closed
 660 issue closed
 661 issue closed
-662 issue open
+662 issue closed
 663 issue closed

@@ -202,6 +202,7 @@ async fn upload(
             .then(|| std::fs::metadata(job.rootfs).ok())
             .flatten()
             .map(|m| std::os::unix::fs::MetadataExt::dev(&m)),
+        imported: true,
     };
     let _ = job.plan.set(plan);
     if let Some(t) = super::space::Target::find(c, storage).await {

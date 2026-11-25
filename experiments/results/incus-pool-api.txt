@@ -1,0 +1,24 @@
+== conditions
+date      2026-11-25T02:53:58Z
+kernel    Linux 6.18.44-fc-v880
+incus     Client version: 6.0.0 Server version: 6.0.0 
+podvm     podvm 0.2.0-beta.40
+OCI       mirror.gcr.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+drivers   (with bt472) btrfs
+
+== 1. a full btrfs pool, an image that incus does not have
+incusd    {"space":{"used":131137536,"total":209715200},"inodes":{"used":0,"total":0}} (recorded)
+err       podvm run: incus tier: incusd 6.0.0 at /var/lib/incus/unix.socket, image podvm-c64c687cbea93001-4814f213ab0baaff-v3 imported now (TODO/machine.md T-1718)
+err       podvm run: incus tier: POST /1.0/instances: incus refused the call (500, error_code 500): Failed creating instance from image: Unpack failed: Failed to run: tar --wildcards --exclude=dev/* --exclude=./dev/* --exclude=rootfs/dev/* --exclude=rootfs/./dev/* --restrict --force-local -C /var/lib/incus/storage-pools/bt472/images/06c5c6ef4de2411654f12 ... c6d3c00a7d4cd --numeric-owner --xattrs-
+err       podvm run: incus tier: incusd ran out of space: the storage pool `bt472` (driver `btrfs`, as incusd measures it) at /var/lib/incus/disks/bt472.img has 74.5 MiB free now, and the volume of the image (the root of the instance is a clone of it) needs at least 16.3 MiB and 519 inodes (TODO/machine.md T-2078, PodUtils/podrunner#346)
+exit      125
+
+== 2. the same pool with room
+out       hello
+exit      0
+
+== 3. a dir pool of 8 MiB that podvm does not see, an image that incus has
+incusd    {"space":{"used":61440,"total":3653632},"inodes":{"used":20,"total":2048}} (recorded)
+err       podvm run: incus tier: the storage pool `small472` (driver `dir`, as incusd measures it) at /tmp/podvm-472.PDCSSE/small/pool has 3.4 MiB free and the root of the instance needs at least 16.3 MiB: incusd would fill it and fail the copy (TODO/machine.md T-2078, PodUtils/podrunner#346); free space there, or give the default profile a root disk on a pool with room
+exit      125
+THE POOL OF INCUSD IS MEASURED THROUGH ITS API
