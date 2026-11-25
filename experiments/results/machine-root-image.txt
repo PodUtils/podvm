@@ -1,0 +1,24 @@
+Experiment 477, rootless metadata of a SquashFS root (T-1994).
+The tools came from Debian trixie amd64 squashfs-tools 4.6.1-1.
+The archive SHA-256 was 0e185122f5858132bbc709e26228ba28cf7f0c41f6ed26e3f55f518f2a53b59d.
+The required liblzo2-2 2.10-3+b1 archive SHA-256 was f3032201fe2928a87e13f05ce256ff3ac2a7860c7e594dc51ae6d7348a4466ce.
+Each SHA-256 matched the Debian package index. The digest of the index
+matched InRelease, which GnuPG verified with the Debian archive keyring.
+The tools were unpacked into scratch. The probe used no mount or emulator.
+Command: python3 experiments/477-machine-root-image.py
+Exit: 0. A run with an absent tool exited 2.
+
+2026-11-25T13:03:27Z Linux 6.18.57, x86_64, uid 1000
+sqfstar version 4.6.1 (2023/03/25)
+unsquashfs version 4.6.1 (2023/03/25)
+/ D 0 755 0 0
+usr D 1700000000 755 44 55
+usr/bin D 1700000000 555 44 55
+usr/bin/tool R 1700000000 4755 123456 234567 10 0 0
+usr/bin/tool-link L usr/bin/tool
+usr/bin/shortcut S 1700000000 777 123456 234567 tool
+usr/bin/tool x user.marker=fixture
+usr/bin/tool x security.capability=0t\001\000\000\002\000\004\000\000\000\000\000\000\000\000\000\000\000\000\000\000
+implicit directory: mode 755, uid 0, gid 0
+PASS: late parents, numeric owners, modes, xattrs and links; image 4096 bytes
+ACL: sqfstar exited 0, Unrecognised tar xattr prefix system.posix_acl_access, ignoring
