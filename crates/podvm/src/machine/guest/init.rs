@@ -109,15 +109,23 @@ pub fn template(nonce: &str, net: bool) -> String {
 /// TODO/machine.md T-2008: the script of one run for a guest of
 /// [`template`]: the lines of [`script`] after the mounts, with the
 /// volumes mounted in the mount namespace of the held init and the command
-/// run in that init. The network of the guest is up from the save.
+/// run in that init. The network of the guest is up from the save. The
+/// channel listener and the process limit belong to the job.
 pub fn job(
     nonce: &str,
     argv: &[String],
     env: &[String],
     workdir: &str,
     vols: &[super::vol::Vol],
+    channel_port: Option<u16>,
+    pids: Option<&str>,
 ) -> String {
-    body(nonce, argv, env, workdir, false, vols, None, None, true)
+    let channel = channel_port.map(|port| Chan {
+        port: Some(port),
+        sealed: false,
+    });
+    let script = body(nonce, argv, env, workdir, false, vols, None, channel, true);
+    with_pids(script, pids, nonce)
 }
 
 /// The lines of an init for one run, after [`setup`]. `held` is the run
@@ -186,10 +194,15 @@ fn body(
             "/podvm/podvm guest-channel {args} & i=0\nwhile [ ! -e {r} ] && [ $i -lt {tries} ]; do sleep 0.1; i=$((i+1)); done\n",
             r = super::channel::READY
         ));
-        if c.sealed {
+        if c.sealed || held {
+            let why = if c.sealed {
+                "the run bundle did not reach the guest"
+            } else {
+                "--podvm-channel: the guest channel did not start"
+            };
             s.push_str(&format!(
-                "[ -e {r} ] || {{ echo 'podvm: the run bundle did not reach the guest'; echo; \
-                 echo PODVM-EXIT-{nonce} 125; sync; reboot -f; echo b > /proc/sysrq-trigger; }}\n",
+                "[ -e {r} ] || {{ echo 'podvm: {why}'; echo; \
+                 echo PODVM-EXIT-{nonce} 125; sync; reboot -f; echo b > /proc/sysrq-trigger; exit 125; }}\n",
                 r = super::channel::READY
             ));
         }
@@ -379,7 +392,7 @@ pub fn with_pids(script: String, pids: Option<&str>, nonce: &str) -> String {
     let block = format!(
         "{{ echo +pids > {c}/cgroup.subtree_control && mkdir -p {c}/podvm-payload && \
          echo {n} > {c}/podvm-payload/pids.max && echo $$ > {c}/podvm-payload/cgroup.procs; \
-         }} 2>/dev/null || {}\n",
+         }} 2>/dev/null || {{ {}; exit 125; }}\n",
         early_exit(
             nonce,
             "--pids-limit: the guest has no cgroup2 pids controller to hold it"

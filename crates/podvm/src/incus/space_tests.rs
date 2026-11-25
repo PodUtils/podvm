@@ -282,12 +282,11 @@ fn a_pool_is_one_segment_under_the_incusd_directory() {
     let _ = std::fs::remove_dir_all(&d);
 }
 
-/// A stand-in incusd whose wait of a create sends one chunk of 80 MiB, as
-/// incusd 6.0 sends the error of tar on a full pool: the class is the
-/// lack of space (pod-incus `v0.83.0` gives the envelope with its text
-/// cut), and another error envelope is no fault of the transport.
+/// A stand-in incusd sends an error envelope over the bound. A named
+/// ENOSPC gives the lack of space. A cut envelope with no errno gives the
+/// size error. An ordinary error is no fault of the transport.
 #[test]
-fn an_error_of_tar_over_the_bound_is_a_lack_of_space() {
+fn an_error_of_tar_over_the_bound_keeps_the_size_or_lack_of_space() {
     let sd = crate::test_socket::SocketDir::new("t2078");
     let sock = sd.join("unix.socket");
     let l = UnixListener::bind(&sock).unwrap();
@@ -304,10 +303,12 @@ fn an_error_of_tar_over_the_bound_is_a_lack_of_space() {
                 ),
                 (_, p) if p.starts_with("/1.0/operations/c/wait") => (
                     200,
-                    format!(
-                        "{:x}\r\n{{\"type\":\"error\",\"error_code\":500,\"error\":\"Unpack failed: tar: ./a: Cannot write: No space left on device ",
-                        80 * MIB
-                    ),
+                    "Unpack failed: tar: ./a: Cannot write: No space left on device ".to_string(),
+                    true,
+                ),
+                ("GET", "/1.0/profiles/truncated") => (
+                    500,
+                    "Unpack failed: tar: ./a: an error with no errno ".to_string(),
                     true,
                 ),
                 _ => (
@@ -323,17 +324,14 @@ fn an_error_of_tar_over_the_bound_is_a_lack_of_space() {
             };
             let head = format!("HTTP/1.1 {status} X\r\n{te}Connection: close\r\n\r\n");
             let _ = s.write_all(head.as_bytes());
-            let _ = s.write_all(body.as_bytes());
-            // incusd sends the whole chunk that it declares (108 MB of the
-            // stderr of tar, T-2078); pod-incus `v0.83.0` reads up to its
-            // bound and keeps the head. The client stops reading there.
             if chunked {
-                // The rest of the declared chunk, then its CRLF and the
-                // last chunk: a well-formed answer over the bound.
-                let head_len = body.find("\r\n").map_or(0, |i| i + 2);
-                // The end of the envelope: the last two bytes close the
-                // string of the error and the object, as incusd sends it.
-                let mut left = (80 * MIB) as usize - (body.len() - head_len) - 2;
+                // Send the whole error envelope as incusd does. The head
+                // of the error fits in the bound. Its remainder does not.
+                let envelope =
+                    format!("{{\"type\":\"error\",\"error_code\":500,\"error\":\"{body}");
+                let chunk = 80 * MIB;
+                let _ = write!(s, "{chunk:x}\r\n{envelope}");
+                let mut left = chunk as usize - envelope.len() - 2;
                 let fill = vec![b'a'; MIB as usize];
                 while left > 0 {
                     let n = left.min(fill.len());
@@ -343,6 +341,8 @@ fn an_error_of_tar_over_the_bound_is_a_lack_of_space() {
                     left -= n;
                 }
                 let _ = s.write_all(b"\"}\r\n0\r\n\r\n");
+            } else {
+                let _ = s.write_all(body.as_bytes());
             }
         }
     });
@@ -359,6 +359,14 @@ fn an_error_of_tar_over_the_bound_is_a_lack_of_space() {
         .block_on(c.create_instance(&new))
         .expect_err("the answer is over the bound");
     assert_eq!(transport(&e), Transport::NoSpace, "{e}");
+    let e = rt
+        .block_on(c.profile("truncated"))
+        .expect_err("a cut error envelope");
+    assert!(
+        matches!(e.kind(), pod_incus::ErrorKind::Incus { cut: Some(_), .. }),
+        "{e}"
+    );
+    assert_eq!(transport(&e), Transport::TooLarge, "{e}");
     let e = rt
         .block_on(c.profile("default"))
         .expect_err("an error envelope");

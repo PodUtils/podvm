@@ -474,20 +474,23 @@ C26). Experiment 465 measures each line below as uid 1000.
   memory for an image of 584 MB; the namespace rung takes 3 s.
 - The machine tier saves the state of a guest that booted the init of an
   image, and each later run of the image starts from that state
-  (T-2008). The first run boots a guest with nothing of a run in it,
-  saves its state in the store (`machine/state-DIGEST-KEY.vm`, as large as
-  the memory that the guest uses), and then gives the guest its command;
+  (T-2008). Before it starts the payload or channel relay, the first run
+  boots the guest and saves its state in the store
+  (`machine/state-DIGEST-KEY.vm`, as large as the memory the guest uses).
+  It then gives the guest its command, and
   a later run loads the state and gives its command, its environment,
   its volumes, the time of the host and a seed for the random pool of the
-  guest. A state is used only with the same image digest, podvm, QEMU
+  guest. With `--podvm-channel`, the state has a channel device. Each run
+  supplies its own host socket and guest port. The guest sets the run's
+  `--pids-limit` before it starts the payload (T-2094). A state is used
+  only with the same image digest, podvm, QEMU
   (its file and its version), CPU (under KVM also the kernel of the
   host), guest kernel, memory, vCPUs and arguments of the emulator; each
   other run saves a state of its own, and the store keeps the two that
-  were used last for an image. What the state does not serve boots as
-  before: `-t`, `run -d`, `--pids-limit`, `--podvm-engine`,
-  `--podvm-channel`, `--podvm-sealed`, `--network broker`, more than
-  four volumes, more than 64 KiB of stdin, an arm64 guest, and a kernel
-  of `PODVM_MACHINE_KERNEL`. Each run of one state has the machine-id,
+  were used last for an image. Requests with `-t`, `run -d`,
+  `--podvm-engine`, `--podvm-sealed`, `--network broker`, more than four
+  volumes, more than 64 KiB of stdin, an arm64 guest or a kernel from
+  `PODVM_MACHINE_KERNEL` use a fresh boot. Each run of one state has the machine-id,
   the boot id, the monotonic clock and the service processes of the
   save: a secret that a service made at its start (a session key, the
   state of a random generator in its memory) is the same in each run.

@@ -2,12 +2,11 @@
 //! TODO/machine.md T-1718, in the form of `docs/incus.md`. The calls of the
 //! incus REST API are `pod-incus` of PodUtils/podcrates (T-1727).
 //!
-//! 1. The image: podvm's extracted rootfs as an incus unified tarball
-//!    ([`super::image`]) with podvm itself at `/.podvm/podvm`, imported
-//!    one time for each manifest digest and podvm build under the alias
-//!    `podvm-HEX16-PODVM16-vN` (TODO/machine.md T-1722). The tree is made
-//!    for the import only, the upload is gzip, and the tree that the
-//!    import made goes after it (TODO/machine.md T-2085).
+//! 1. The image: a unified tarball of the OCI layers ([`super::image`])
+//!    with podvm at `/.podvm/podvm`, imported under one alias per manifest
+//!    and build (`podvm-HEX16-PODVM16-vN`, TODO/machine.md T-1722). An
+//!    image the flattener cannot represent uses an extracted tree for the
+//!    import. A tight images directory gets gzip (TODO/machine.md T-2085).
 //! 2. The instance: from that alias, with podvm itself as its init
 //!    (`lxc.init.cmd = /.podvm/podvm guest-hold`), so an image with no
 //!    `sleep` and no shell still starts.
@@ -49,9 +48,8 @@ pub struct Job<'a> {
     pub channel: Option<(PathBuf, u16)>,
     /// The store of the image: the lock of its import (T-2081).
     pub store: Option<&'a podvm_image::Store>,
-    /// TODO/machine.md T-2085: the tree of the image in the store, made
-    /// for an import only and removed after it. `None`: the tree is at
-    /// `rootfs` and stays.
+    /// TODO/machine.md T-2085: the OCI layers or the fallback extraction.
+    /// With `None`, a tree at `rootfs` serves the import and stays.
     pub tree: Option<&'a dyn super::import::Tree>,
     /// What the import measured (T-2085), for the lines after a failure.
     pub plan: std::sync::OnceLock<super::space::Plan>,

@@ -102,9 +102,8 @@ pub struct Asks {
     pub init_image: bool,
     pub tty: bool,
     pub detach: bool,
-    pub channel: bool,
+    pub sealed: bool,
     pub engine: bool,
-    pub pids: bool,
     pub broker: bool,
     pub copies: bool,
     pub volumes: usize,
@@ -121,9 +120,8 @@ impl Asks {
             init_image,
             tty: r.tty,
             detach: r.keeper.is_some(),
-            channel: r.channel.is_some() || r.sealed.is_some(),
+            sealed: r.sealed.is_some(),
             engine: r.engine,
-            pids: r.pids.is_some(),
             broker: r.broker.is_some(),
             copies: !r.copies.is_empty(),
             volumes: r.volumes.len(),
@@ -154,14 +152,11 @@ pub fn refusal(a: &Asks) -> Option<String> {
     if a.detach {
         return no("run -d");
     }
-    if a.channel {
-        return no("--podvm-channel and --podvm-sealed");
+    if a.sealed {
+        return no("--podvm-sealed");
     }
     if a.engine {
         return no("--podvm-engine");
-    }
-    if a.pids {
-        return no("--pids-limit");
     }
     if a.broker {
         return no("--network broker");

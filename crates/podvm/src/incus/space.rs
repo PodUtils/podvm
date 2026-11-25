@@ -15,15 +15,15 @@
 //! one more line with the free space and the need.
 //!
 //! What the image needs is a lower bound: the bytes of each file of the
-//! tree (the unified tarball writes each name with its bytes) and one inode
-//! for each entry. incusd writes the upload into its images, then the root
+//! tree and one inode for each entry that needs its own inode. A stream
+//! counts a hard link once per inode. The tree-based tarball writes each
+//! name with its bytes. incusd writes the upload into its images, then the root
 //! of the instance. TODO/machine.md T-2085 (PodUtils/podrunner#347 ask 1):
 //! where incusd's images have less room than [`super::gzip::ROOM_TIMES`]
 //! times the tree, the upload is gzip ([`super::gzip`]), whose size is not
 //! known before the upload: its lower bound is 0, and its estimate is the
 //! bytes of the layers of the image. A plain upload needs the bytes of the
-//! tree. podvm removes the tree that it extracted for the
-//! import after the upload, before the create: on the file system of that
+//! tree. A fallback import removes its own extracted tree before the create: on the file system of that
 //! tree, the root of the instance takes its place, and its lower bound is
 //! then 0. The free space is that of a user (`f_bavail`): the blocks that
 //! ext4 keeps for root stay for the host. The estimate of
@@ -104,19 +104,27 @@ pub fn need_of(rootfs: &Path, podvm_len: u64) -> Need {
         bytes: podvm_len,
         entries: 2,
     };
+    let init_dir = rootfs.join(super::image::INIT_DIR);
+    let init_file = rootfs.join(super::image::INIT_FILE);
     let mut stack = vec![rootfs.to_path_buf()];
     while let Some(dir) = stack.pop() {
         let Ok(rd) = std::fs::read_dir(&dir) else {
             continue;
         };
         for e in rd.flatten() {
-            let Ok(md) = std::fs::symlink_metadata(e.path()) else {
+            let path = e.path();
+            if path == init_file {
+                continue;
+            }
+            let Ok(md) = std::fs::symlink_metadata(&path) else {
                 continue;
             };
-            need.entries += 1;
+            if path != init_dir {
+                need.entries += 1;
+            }
             if md.is_dir() {
-                stack.push(e.path());
-            } else if md.is_file() {
+                stack.push(path);
+            } else if md.is_file() && path != init_dir {
                 need.bytes = need.bytes.saturating_add(md.len());
             }
         }
@@ -376,8 +384,7 @@ pub enum Transport {
     None,
     /// The answer was over the bound of the client.
     TooLarge,
-    /// incusd's error says that a disk is full ("No space left on device";
-    /// pod-incus `v0.83.0` gives an envelope past the bound with a cut text).
+    /// incusd's error says that a disk is full ("No space left on device").
     NoSpace,
     /// Another read or write fault of the connection.
     Other,
@@ -391,7 +398,8 @@ pub fn transport(e: &pod_incus::Error) -> Transport {
         return Transport::NoSpace;
     }
     match e.kind() {
-        pod_incus::ErrorKind::TooLarge { .. } => Transport::TooLarge,
+        pod_incus::ErrorKind::TooLarge { .. }
+        | pod_incus::ErrorKind::Incus { cut: Some(_), .. } => Transport::TooLarge,
         pod_incus::ErrorKind::Io(_) | pod_incus::ErrorKind::AnswerTimeout { .. } => {
             Transport::Other
         }

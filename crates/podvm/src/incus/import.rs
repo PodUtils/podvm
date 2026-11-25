@@ -2,18 +2,24 @@
 //! alias is not there (TODO/machine.md T-1718, T-1997, T-2078), one import
 //! of an alias at a time in a store (TODO/machine.md T-2081, OR-B39-02).
 //!
-//! TODO/machine.md T-2085 (PodUtils/podrunner#347 ask 1): an import of a
-//! large image kept three copies of its tree on one file system: podvm's
-//! tree in the store, incusd's upload in its images, and the image volume
-//! in the pool. Now podvm extracts the tree only for an import ([`Tree`]),
-//! sends the upload as gzip ([`super::gzip`]), and removes the tree that it
-//! extracted after the upload, before the create: at most one full copy
-//! and the gzip of the upload are on the disk at one time, beside the
-//! blobs.
+//! TODO/machine.md T-2085 (PodUtils/podrunner#347 ask 1): the OCI layers
+//! stream to incusd with no tree in the store. The extraction path serves
+//! a tree that the flattener cannot write. Its temporary tree goes before
+//! the create. A tight incusd images directory gets a gzip upload.
+
+use std::io::{self, Write};
+use std::path::PathBuf;
+use std::pin::Pin;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
+};
+use std::task::{Context, Poll};
 
 use pod_incus::{Client, ImageData, ImageImport, Payload};
+use tokio::io::{AsyncRead, ReadBuf};
 
-use super::image::{alias, unified_tarball_to};
+use super::image::{alias, unified_tarball_to, Layers};
 use super::run::{Fault, Job};
 
 /// The bound of the wait for the import of the same image by another podvm
@@ -66,6 +72,11 @@ async fn import_lock(
 /// TODO/machine.md T-2085: the tree of the image in the store, for an
 /// import only.
 pub trait Tree {
+    /// The cached OCI layers. `None` serves a caller with just a tree.
+    fn layers(&self) -> Result<Option<Layers>, String> {
+        Ok(None)
+    }
+
     /// The tree at `Job::rootfs`: `Ok(true)` where this call extracted it
     /// now. The error is one line.
     fn ensure(&self) -> Result<bool, String>;
@@ -81,10 +92,10 @@ pub trait Tree {
 /// the fingerprint that incusd gives the unified tarball (T-2081).
 struct Hashing<W> {
     inner: W,
-    sum: std::sync::Arc<std::sync::Mutex<sha2::Sha256>>,
+    sum: Arc<Mutex<sha2::Sha256>>,
 }
 
-impl<W: std::io::Write> std::io::Write for Hashing<W> {
+impl<W: Write> Write for Hashing<W> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         use sha2::Digest;
         let n = self.inner.write(buf)?;
@@ -96,6 +107,43 @@ impl<W: std::io::Write> std::io::Write for Hashing<W> {
     fn flush(&mut self) -> std::io::Result<()> {
         self.inner.flush()
     }
+}
+
+/// The producer marks a complete archive before it closes the pipe. A
+/// failure must not end an HTTP chunked upload as a complete request.
+struct UploadRead {
+    file: tokio::fs::File,
+    complete: Arc<AtomicBool>,
+}
+
+impl AsyncRead for UploadRead {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        if buf.remaining() == 0 {
+            return Poll::Ready(Ok(()));
+        }
+        let before = buf.filled().len();
+        std::task::ready!(Pin::new(&mut self.file).poll_read(cx, buf))?;
+        if buf.filled().len() == before && !self.complete.load(Ordering::Acquire) {
+            return Poll::Ready(Err(io::Error::other("the unified tarball writer failed")));
+        }
+        Poll::Ready(Ok(()))
+    }
+}
+
+enum Archive {
+    Layers(Layers, super::space::Need),
+    Tree { path: PathBuf, fresh: bool },
+}
+
+/// A layer failure can explain an interrupted upload. A pipe or an older
+/// tree writer error leaves incusd's response as the first diagnostic.
+enum WriteFault {
+    Layer(String),
+    Other(String),
 }
 
 /// TODO/machine.md T-2081: incusd's words where an image of the same
@@ -145,6 +193,15 @@ pub(super) async fn ensure_image(
     storage: &str,
 ) -> Result<(String, bool), Fault> {
     let me = std::fs::read("/proc/self/exe").map_err(|e| (format!("/proc/self/exe: {e}"), None))?;
+    ensure_image_with(c, job, storage, me).await
+}
+
+pub(super) async fn ensure_image_with(
+    c: &Client,
+    job: &Job<'_>,
+    storage: &str,
+    me: Vec<u8>,
+) -> Result<(String, bool), Fault> {
     let name = alias(job.digest, &crate::machine::guest::kernel::sha256_hex(&me));
     let there =
         |r: Result<Option<pod_incus::ImageAlias>, pod_incus::Error>| -> Result<bool, Fault> {
@@ -162,13 +219,22 @@ pub(super) async fn ensure_image(
         super::held::check(c, job, storage, &name).await?;
         return Ok((name, true));
     }
-    // T-2085: the tree is made now, under the lock of the import, and only
-    // for an import.
+    if let Some(tree) = job.tree
+        && let Some(layers) = tree.layers().map_err(|e| (e, None))?
+        && let Some(need) = layers.measure(me.len() as u64).map_err(|e| (e, None))?
+    {
+        return upload(c, job, storage, &name, me, Archive::Layers(layers, need)).await;
+    }
+    // T-2085: a tree needed by the fallback is made under the import lock.
     let fresh = match job.tree {
         Some(t) => t.ensure().map_err(|e| (e, None))?,
         None => false,
     };
-    let done = upload(c, job, storage, &name, me, fresh).await;
+    let archive = Archive::Tree {
+        path: job.rootfs.to_path_buf(),
+        fresh,
+    };
+    let done = upload(c, job, storage, &name, me, archive).await;
     // T-2085: the tree that this import made goes after the import, also
     // after a failure (it holds the disk that the failure lacked); a later
     // import or native run extracts it again.
@@ -178,30 +244,35 @@ pub(super) async fn ensure_image(
     done
 }
 
-/// The import of the tree of `job` under the alias `name`: the check of
-/// the room, then the upload as gzip (T-2085). `fresh`: the import removes
-/// the tree after the upload.
+/// Check the room before sending the unified tarball under `name`.
 async fn upload(
     c: &Client,
     job: &Job<'_>,
     storage: &str,
     name: &str,
     me: Vec<u8>,
-    fresh: bool,
+    archive: Archive,
 ) -> Result<(String, bool), Fault> {
     let name = name.to_string();
-    let tree = super::space::need_of(job.rootfs, me.len() as u64);
+    let (tree, upload, freed) = match &archive {
+        Archive::Layers(layers, need) => (*need, layers.compressed_bytes(), None),
+        Archive::Tree { path, fresh } => (
+            super::space::need_of(path, me.len() as u64),
+            job.tree.map_or(0, |t| t.layer_bytes()),
+            fresh
+                .then(|| std::fs::metadata(path).ok())
+                .flatten()
+                .map(|m| std::os::unix::fs::MetadataExt::dev(&m)),
+        ),
+    };
     // T-2085: gzip where incusd's images lack room for the plain upload.
     let images = super::space::incus_dir(&c.settings().socket)
         .and_then(|d| super::space::room_at(&d.join("images")));
     let plan = super::space::Plan {
         tree,
-        upload: job.tree.map_or(0, |t| t.layer_bytes()),
+        upload,
         gzip: super::gzip::wanted(images.map(|r| r.bytes), tree.bytes),
-        freed: fresh
-            .then(|| std::fs::metadata(job.rootfs).ok())
-            .flatten()
-            .map(|m| std::os::unix::fs::MetadataExt::dev(&m)),
+        freed,
         imported: true,
     };
     let _ = job.plan.set(plan);
@@ -210,31 +281,48 @@ async fn upload(
             eprintln!("podvm {}: incus tier: {w}", job.verb);
         }
     }
-    // TODO/machine.md T-1997 (PodUtils/podrunner#316): the tarball goes to
-    // incusd through a pipe, in chunks, as a thread writes it: no tarball
-    // file in the store beside the tree and the image of incusd.
+    // The unified archive goes to incusd through a pipe (T-1997).
     let (r, w) = std::io::pipe().map_err(|e| (format!("a pipe for the import: {e}"), None))?;
-    let rootfs = job.rootfs.to_path_buf();
-    let sum = std::sync::Arc::new(std::sync::Mutex::new(<sha2::Sha256 as sha2::Digest>::new()));
+    let sum = Arc::new(Mutex::new(<sha2::Sha256 as sha2::Digest>::new()));
     let hashing = Hashing {
         inner: w,
         sum: sum.clone(),
     };
-    // T-2085: gzip where incusd's images lack room, so that incusd keeps
-    // about a third of the tree there; the hash is that of the bytes that
-    // incusd reads.
-    let out = super::gzip::Upload::new(hashing, plan.gzip);
-    let writer = std::thread::spawn(move || {
-        // T-2080: a reader that went gives EPIPE here, not a SIGPIPE that
-        // ends podvm.
-        let mut old = 0u64;
-        let _ = podvm_probe::sys::sigblock(1 << (13 - 1), &mut old);
-        let out = unified_tarball_to(&rootfs, out, &me)?;
-        out.finish()
-            .map(drop)
-            .map_err(|e| format!("the end of the upload of the unified tarball: {e}"))
-    });
-    let reader = tokio::fs::File::from_std(std::fs::File::from(std::os::fd::OwnedFd::from(r)));
+    let mut out = super::gzip::Upload::new(hashing, plan.gzip);
+    let complete = Arc::new(AtomicBool::new(false));
+    let written = Arc::clone(&complete);
+    let writer = std::thread::Builder::new()
+        .spawn(move || {
+            super::cut::block_pipe();
+            match archive {
+                Archive::Layers(layers, _) => {
+                    let mut buffered = io::BufWriter::new(&mut out);
+                    layers.flatten(&mut buffered, &me, false).map_err(|e| {
+                        if e.io_cause()
+                            .is_some_and(|io| io.kind() == io::ErrorKind::BrokenPipe)
+                        {
+                            WriteFault::Other(e.chain())
+                        } else {
+                            WriteFault::Layer(e.chain())
+                        }
+                    })?;
+                }
+                Archive::Tree { path, .. } => {
+                    out = unified_tarball_to(&path, out, &me).map_err(WriteFault::Other)?;
+                }
+            }
+            let out = out.finish().map_err(|e| {
+                WriteFault::Other(format!("the end of the upload of the unified tarball: {e}"))
+            })?;
+            written.store(true, Ordering::Release);
+            drop(out);
+            Ok(())
+        })
+        .map_err(|e| (format!("the writer of the unified tarball: {e}"), None))?;
+    let reader = UploadRead {
+        file: tokio::fs::File::from_std(std::fs::File::from(std::os::fd::OwnedFd::from(r))),
+        complete,
+    };
     let mut import = ImageImport::new(ImageData::Unified(Payload::new(reader, None)));
     import.aliases = vec![name.clone()];
     // TODO/machine.md T-2082 (PodUtils/podrunner#347 ask 2): incusd that
@@ -247,9 +335,12 @@ async fn upload(
     };
     // The writer ends at the end of the tree, or with EPIPE where incusd
     // stopped reading; incusd's own error is the one that names the cause.
-    let wrote = writer
-        .join()
-        .unwrap_or_else(|_| Err("the writer of the tarball ended with a panic".into()));
+    let wrote = match writer.join() {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(WriteFault::Layer(e))) => return Err((e, None)),
+        Ok(Err(WriteFault::Other(e))) => Err(e),
+        Err(_) => Err("the writer of the tarball ended with a panic".into()),
+    };
     if let Err(e) = done {
         let fingerprint = wrote.is_ok().then(|| {
             let s = sum.lock().map(|s| s.clone()).unwrap_or_default();

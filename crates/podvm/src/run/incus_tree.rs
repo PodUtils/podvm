@@ -1,9 +1,10 @@
-//! The tree of the incus tier in the store, TODO/machine.md T-2085
+//! The image of the incus tier in the store, TODO/machine.md T-2085
 //! (PodUtils/podrunner#347 ask 1).
 
 /// TODO/machine.md T-2085 (PodUtils/podrunner#347 ask 1): the tree of the
-/// incus tier in the store, extracted for an import only and removed after
-/// it where no other process uses the image.
+/// incus tier in the store. The import streams its layers when possible.
+/// A tree extracted as a fallback goes after the import where no other
+/// process uses the image.
 pub(super) struct IncusTree<'a> {
     pub(super) store: &'a podvm_image::Store,
     pub(super) held: &'a std::sync::Mutex<Option<podvm_image::store::Lock>>,
@@ -12,6 +13,19 @@ pub(super) struct IncusTree<'a> {
 }
 
 impl crate::incus::import::Tree for IncusTree<'_> {
+    fn layers(&self) -> Result<Option<crate::incus::image::Layers>, String> {
+        let d = podvm_image::digest::Digest::parse(&self.record.manifest_digest)
+            .map_err(|e| e.to_string())?;
+        let bytes = self.store.read_blob(&d).map_err(|e| e.to_string())?;
+        let manifest = serde_json::from_slice(&bytes)
+            .map_err(|e| format!("the manifest does not parse: {e}"))?;
+        let blobs = podvm_extract::layers(self.store, &manifest).map_err(|e| e.to_string())?;
+        Ok(Some(crate::incus::image::Layers {
+            blobs,
+            loud: self.loud,
+        }))
+    }
+
     fn ensure(&self) -> Result<bool, String> {
         let digest = &self.record.manifest_digest;
         if podvm_extract::is_extracted(self.store, digest) {

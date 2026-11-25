@@ -53,8 +53,8 @@ pub(super) fn prepare_image(
         podvm_image::error::EXIT_RUNTIME_ERROR
     })?;
     // TODO/machine.md T-2085 (PodUtils/podrunner#347 ask 1): the incus tier
-    // extracts the tree only for an import (`run/incus_tree.rs`); a run of
-    // an image that incus has needs no tree.
+    // imports the layers if incus lacks the image. Only the fallback
+    // import needs an extraction (`run/incus_tree.rs`).
     if tier != "incus" && !podvm_extract::is_extracted(store, &record.manifest_digest) {
         extract_now(verb, store, &record, o.ask.verbose)?;
     }

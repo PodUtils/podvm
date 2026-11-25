@@ -1,9 +1,8 @@
 # Handoff
 
-The state on 2026-11-25, 03:40 (UTC), at the end of a session (the owner
-restarts the session). `main` is
-at the commit that changes this file or later. A fresh session with no
-memory reads `AGENTS.md` first, then this file, `TODO/PROGRESS.md` and
+The state on 2026-11-25 after work resumed in Codex. The local checkout
+contains the commit that changes this file. A fresh session reads
+`AGENTS.md` first, then this file, `TODO/PROGRESS.md` and
 `docs/decisions.md`. The handoffs before this one are in git: `git show
 0cb62f18:docs/HANDOFF.md`. Remove this file when each step below is done.
 
@@ -33,15 +32,23 @@ memory reads `AGENTS.md` first, then this file, `TODO/PROGRESS.md` and
 * podcrates `v0.83.0` is taken on `main` after the tag (T-2089, `a39f4c4f`;
   #663, closed: PodUtils/podcrates#259 lists the take). podrunner pins
   beta.40 in its `4fc871c` (#662, closed).
-* `main` takes podcrates `v0.84.0` and its shared gzip writer (T-2085,
-  PodUtils/podcrates#260). The layer stream of T-2085 still needs wiring.
+* `main` takes podcrates `v0.84.0` and its shared gzip writer (T-2096,
+  `04c8b7f4`, #666, PodUtils/podcrates#260). The layer stream of T-2085
+  has a stand-in proof and needs the live `incusd` proof of experiment
+  434 clause 31.
+* The saved-state and layer-stream follow-up passed `sh scripts/dev/checks.sh`.
+  The candidate, a static binary of 9,488,600 bytes, passed experiment 473
+  under TCG. An earlier check during a QEMU run had one broker test fail.
+  The test passed alone and the full check passed with QEMU stopped.
 * On `main` after beta.40, not released (CHANGELOG, "Unreleased"): the
   room of an incus pool from incusd for each driver (T-2078 remaining 1,
   `a033f62`, experiment 472), what the namespace rung opens (T-2092, #546),
   the commit of `podvm-dev build` (T-2091, #531). Gate 45536609832 on
   `a033f62` and gate 45539122840 on `07416ff` are green.
 * The start sweep found 52 open issues in GitHub and in the record.
-  #664, the new pod-incus request, makes 53.
+  #664 (the pod-incus request) and #665 (the hosted quota proof request)
+  are open. Podcrates lists the take under Takes in PodUtils/podcrates#260.
+  The record closes #666 when it is pushed and issue-sync runs.
 * The issue cleanup of 2026-11-24 is done: four agents checked each open
   issue against the code, the record and a run of the beta.40 binary. 87
   issues are closed with a comment of evidence; 56 stay open, each with a
@@ -70,19 +77,22 @@ memory reads `AGENTS.md` first, then this file, `TODO/PROGRESS.md` and
    process limits of a running instance: T-2093) and PodUtils/podrunner#355
    (COORD-133, a saved state of the machine tier for `--podvm-channel` and
    `--pids-limit`: T-2094). T-2093 waits for pod-incus instance config
-   PATCH and ETag support (#664, COORD-248 to podcrates). Answer each ask
-   with a COORD issue `(to podrunner)` when its work is in a beta.
+   PATCH and ETag support (#664, COORD-248 to podcrates). T-2094 passed
+   experiment 473 under TCG. Answer each ask with a COORD issue
+   `(to podrunner)` when its work is in a beta.
 2. T-2078 remaining 3: a run on the hosted runner of
    PodUtils/podrunner#346 with the next beta (remaining 1 is done,
    experiment 472).
 3. Sweep the current open issues at each session start (`AGENTS.md`, section 8
    item 7), and map each new issue to the entry of its own finding.
 4. podrunner: #583 (experiment 474 in the `incus` job of `kvm.yml` for
-   the T-1964 quota proof, then T-1968), #596 and #599 (the
+   the T-1964 quota proof, request #665, then T-1968). Keep the remote
+   `main` at `04c8b7f4` until #665 dispatches on that commit.
+   Then #596 and #599 (the
    hosted snapshot: T-1994, T-1996, T-1998, T-1999), #593 (T-1990,
    T-1991). Then T-2088 and the open rows of T-2070, T-2079, T-2087.
-5. T-2085 remainder (wire the layer stream from
-   podcrates `v0.84.0`, PodUtils/podcrates#260, the answer to #657),
+5. T-2085 remainder (run the layer stream proof against incusd,
+   PodUtils/podcrates#260, the answer to #657),
    T-2054, T-2050, T-2048, then the work order of
    `TODO/PROGRESS.md`.
 

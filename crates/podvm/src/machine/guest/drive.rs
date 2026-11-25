@@ -49,17 +49,6 @@ pub(super) fn drive(
             return Driven::Code(EXIT_RUNTIME_ERROR);
         }
     };
-    // TODO/machine.md T-2008: a guest that comes from a state waits for
-    // its job already; a guest that boots now gets it after the save.
-    let mut job_in = child.stdin.take();
-    let mut sent = None;
-    let mut loaded = false;
-    if let Some(w) = warm.as_deref_mut()
-        && let Mode::Load { qmp } = &w.mode
-    {
-        loaded = true;
-        sent = super::state::send_job(job_in.take(), w.frame.take(), Some(qmp.clone()));
-    }
     // Why the guest of a state did not reach the command.
     let mut cold: Option<String> = None;
     let pid = child.id() as i32;
@@ -74,15 +63,27 @@ pub(super) fn drive(
     let mut console_closed = false;
     let gone = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let errs = stderr::pump(sock.to_path_buf(), deadline, gone.clone());
-    // TODO/machine.md T-1751: the host side of the channel.
-    let _channel = (r.channel.is_some() || r.sealed.is_some()).then(|| {
-        super::channel::serve(
-            super::channel::socket_path(sock),
-            r.channel.as_ref().map(|c| c.0.clone()),
-            r.sealed.clone(),
-            deadline,
-        )
-    });
+    let mut channel = super::channel::starter(r, sock, deadline, gone.clone());
+    if warm.is_none()
+        && let Some(start) = channel.take()
+    {
+        start();
+    }
+    // A loaded guest gets its job when it runs, a fresh guest after the save.
+    let mut job_in = child.stdin.take();
+    let mut sent = None;
+    let mut loaded = false;
+    if let Some(w) = warm.as_deref_mut()
+        && let Mode::Load { qmp } = &w.mode
+    {
+        loaded = true;
+        sent = super::state::send_job(
+            job_in.take(),
+            w.frame.take(),
+            Some(qmp.clone()),
+            channel.take(),
+        );
+    }
     // TODO/machine.md T-1723: the terminal of -t, raw on the host until the
     // end of the run.
     let (_raw, term) = if r.tty {
@@ -167,7 +168,12 @@ pub(super) fn drive(
                                 }
                             }
                             if sent.is_none() {
-                                sent = super::state::send_job(job_in.take(), w.frame.take(), None);
+                                sent = super::state::send_job(
+                                    job_in.take(),
+                                    w.frame.take(),
+                                    None,
+                                    channel.take(),
+                                );
                             }
                             continue;
                         }

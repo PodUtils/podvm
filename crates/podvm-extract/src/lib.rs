@@ -29,7 +29,8 @@ use podvm_image::{oci, Store};
 
 pub use error::{Error, Result};
 pub use pod_extract::{
-    apply, layer, remove, safety, sidecar, whiteout, Extracted, DONE_MARKER, EXTRACT_HEADROOM_BYTES,
+    apply, flatten, layer, refused, remove, safety, sidecar, whiteout, Extracted, Layer,
+    DONE_MARKER, EXTRACT_HEADROOM_BYTES,
 };
 
 /// Where an image's rootfs and its sidecar live, given the store root.
@@ -60,18 +61,7 @@ pub fn extract(
     digest: &str,
     out: &mut dyn Write,
 ) -> Result<Extracted> {
-    let mut layers = Vec::new();
-    for d in &manifest.layers {
-        // `?`: the error of the digest is the store's or `pod-oci`'s, and
-        // `Error` takes both.
-        let parsed = d.parsed_digest()?;
-        layers.push(pod_extract::Layer {
-            digest: parsed.to_string(),
-            media_type: d.media_type.clone(),
-            size: d.size,
-            blob: store.blob_path(&parsed),
-        });
-    }
+    let layers = layers(store, manifest)?;
     let lines = Arc::new(Mutex::new(Vec::new()));
     let keep = Arc::clone(&lines);
     let settings = pod_extract::Settings {
@@ -93,6 +83,23 @@ pub fn extract(
         }
     }
     Ok(done?)
+}
+
+/// The layers of a manifest in order, with their paths in this store.
+pub fn layers(store: &Store, manifest: &oci::Manifest) -> Result<Vec<Layer>> {
+    let mut layers = Vec::new();
+    for d in &manifest.layers {
+        // `?`: the error of the digest is the store's or `pod-oci`'s, and
+        // `Error` takes both.
+        let parsed = d.parsed_digest()?;
+        layers.push(Layer {
+            digest: parsed.to_string(),
+            media_type: d.media_type.clone(),
+            size: d.size,
+            blob: store.blob_path(&parsed),
+        });
+    }
+    Ok(layers)
 }
 
 /// Has this image already been extracted, completely?

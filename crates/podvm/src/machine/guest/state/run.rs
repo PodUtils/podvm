@@ -8,7 +8,7 @@ use std::time::{Instant, SystemTime};
 use podvm_windows::plan::Accel;
 
 use super::super::job::Job;
-use super::super::{arch, init, vol, Request};
+use super::super::{arch, channel, init, vol, Request};
 use super::save::Saved;
 use super::store::{files, mark_bad, plan, touch, Files, Plan};
 use super::{fingerprint, refusal, wanted, Asks, Shape, Transport, SLOTS, VAR};
@@ -25,7 +25,15 @@ pub fn job(r: &Request, nonce: &str, vols: &[vol::Vol]) -> Result<Vec<u8>, Strin
         .map_err(|e| format!("the clock of the host: {e}"))?
         .as_nanos();
     Job {
-        script: init::job(nonce, &r.argv, &r.env, &r.workdir, vols),
+        script: init::job(
+            nonce,
+            &r.argv,
+            &r.env,
+            &r.workdir,
+            vols,
+            r.channel.as_ref().map(|(_, port)| *port),
+            r.pids.as_deref(),
+        ),
         stdin: r.stdin.clone(),
         seed,
         time_ns: u64::try_from(time_ns).map_err(|_| "the clock of the host".to_string())?,
@@ -104,10 +112,29 @@ pub(super) struct Paths<'a> {
     incoming: Option<String>,
 }
 
+impl Paths<'static> {
+    fn fixed() -> Self {
+        Self {
+            initrd: Path::new("INITRD"),
+            err: Path::new("ERR"),
+            qmp: None,
+            slots: (0..SLOTS)
+                .map(|i| (PathBuf::from(format!("SLOT{i}")), true))
+                .collect(),
+            incoming: None,
+        }
+    }
+}
+
 /// The emulator line of a guest of a state: the line of each guest, with
 /// [`SLOTS`] 9p devices.
 pub(super) fn line(r: &Request, accel: Accel, mem: u64, kernel: &Path, p: &Paths) -> Vec<String> {
     let mut extra = super::super::stderr::argv(p.err);
+    // The device has the same name at save and load. The fingerprint uses
+    // the fixed stderr name to derive this socket name as well.
+    if r.channel.is_some() {
+        extra.extend(channel::argv(&channel::socket_path(p.err)));
+    }
     for (i, (dir, ro)) in p.slots.iter().enumerate() {
         extra.push("-virtfs".to_string());
         extra.push(vol::virtfs(
@@ -165,22 +192,13 @@ pub fn run(r: &Request, c: &Ctx) -> Outcome {
         return Outcome::Boot;
     }
     // The fingerprint: the script and the line with fixed names.
-    let fixed = Paths {
-        initrd: Path::new("INITRD"),
-        err: Path::new("ERR"),
-        qmp: None,
-        slots: (0..SLOTS)
-            .map(|i| (PathBuf::from(format!("SLOT{i}")), true))
-            .collect(),
-        incoming: None,
-    };
     let shape = Shape {
         digest: r.digest,
         accel: c.accel,
         qemu: c.qemu,
         kernel: c.kernel,
         mem: r.mem,
-        line: &line(r, c.accel, 0, Path::new("KERNEL"), &fixed),
+        line: &line(r, c.accel, 0, Path::new("KERNEL"), &Paths::fixed()),
         script: &init::template("NONCE", !r.net_none),
     };
     let print = match fingerprint(&shape) {
@@ -327,6 +345,16 @@ pub fn run(r: &Request, c: &Ctx) -> Outcome {
         }
         Plan::Boot(_) => unreachable!("the plan to boot returned before"),
     };
+    let chardev = r.channel.as_ref().map(|_| channel::socket_path(&sock));
+    if let Some(ch) = &chardev
+        && let Err(e) = channel::make_dir(ch)
+    {
+        let _ = std::fs::remove_dir_all(&dir);
+        say(&format!(
+            "the guest boots: the directory of the channel socket: {e}"
+        ));
+        return Outcome::Boot;
+    }
     say(match &plan {
         Plan::Load(_) => {
             "the guest starts from the saved state of this image and guest shape; its clock \
@@ -338,6 +366,9 @@ pub fn run(r: &Request, c: &Ctx) -> Outcome {
     let driven = super::super::drive::drive(r, c.qemu, &argv, &nonce, &dir, &sock, Some(&mut warm));
     let _ = std::fs::remove_file(&sock);
     let _ = std::fs::remove_file(&qmp);
+    if let Some(dir) = chardev.as_deref().and_then(Path::parent) {
+        let _ = std::fs::remove_dir_all(dir);
+    }
     let _ = std::fs::remove_dir_all(&dir);
     let loaded = matches!(plan, Plan::Load(_));
     match (&warm.saved, loaded) {
@@ -387,13 +418,16 @@ pub fn run(r: &Request, c: &Ctx) -> Outcome {
 ///
 /// `after_load` is the monitor of an emulator that loads a state: the
 /// frame goes when the guest runs. Bytes that come before the end of the
-/// load go into the serial port of the emulator and are lost with it. A
-/// monitor that does not answer does not hold the job: the frame goes
-/// then, and its lead of newlines takes the loss.
+/// load go into the serial port of the emulator and are lost with it.
+/// Without a channel, an error of the monitor still gives the frame, and
+/// its lead of newlines takes the loss. With a channel, the monitor must
+/// first confirm the load. Otherwise, send no job and let the drive boot
+/// a fresh guest when the loaded guest does not reach its ready marker.
 pub fn send_job(
     stdin: Option<std::process::ChildStdin>,
     frame: Option<Vec<u8>>,
     after_load: Option<std::path::PathBuf>,
+    start_channel: Option<impl FnOnce() + Send + 'static>,
 ) -> Option<std::thread::JoinHandle<std::process::ChildStdin>> {
     let (mut stdin, frame) = (stdin?, frame?);
     Some(std::thread::spawn(move || {
@@ -404,8 +438,14 @@ pub fn send_job(
         // stdout does (PodUtils/podvm#534).
         let mut old = 0u64;
         let _ = podvm_probe::sys::sigblock(1 << (13 - 1), &mut old);
-        if let Some(qmp) = after_load {
-            let _ = super::save::running(&qmp);
+        if let Some(qmp) = after_load
+            && super::save::running(&qmp).is_err()
+            && start_channel.is_some()
+        {
+            return stdin;
+        }
+        if let Some(start) = start_channel {
+            start();
         }
         // A failed write is an emulator that ended: the console says so.
         stdin
@@ -415,3 +455,7 @@ pub fn send_job(
         stdin
     }))
 }
+
+#[cfg(test)]
+#[path = "tests_run.rs"]
+mod tests;

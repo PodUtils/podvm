@@ -558,6 +558,8 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #662 | COORD-246: v0.2.0-beta.40 is out (to podrunner) | closed (podrunner pins v0.2.0-beta.40 in its 4fc871c, the state line of PodUtils/podrunner#350 and #345, 2026-11-25) | T-1949, T-2086, T-2087 |
 | #663 | COORD-247: podvm took podcrates v0.83.0 in a39f4c4f (the answer to PodUtils/podcrates#259) (to podcrates) | closed (PodUtils/podcrates#259 lists the take under "Takes": a39f4c4f, closed 2026-11-25) | T-2089 |
 | #664 | COORD-248: pod-incus config PATCH for live instance limits (to podcrates) | open | T-2093 |
+| #665 | [gh action] requested | open | the `incus` job of `kvm.yml` on `04c8b7f4` (experiment 474, T-1964) |
+| #666 | COORD-249: podvm took podcrates v0.84.0 (to podcrates) | closed (PodUtils/podcrates#260 lists `04c8b7f4` under Takes) | T-2096 |
 
 ## Messages whose title does not start with COORD-NNN
 

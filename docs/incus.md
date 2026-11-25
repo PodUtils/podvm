@@ -285,7 +285,7 @@ files with capabilities. Three changes serve it on the incus tier.
   no device. A rootless `podman run` and a `fuse-overlayfs` mount of a user
   with the range `165536:65536` are not measured: `ubi-init` does not carry
   them (T-1996 keeps the rest).
-* **No third copy (T-1997).** `incus::run::ensure_image` writes the
+* **No third copy (T-1997).** `incus::import::ensure_image` writes the
   unified tarball into a pipe, and the import of incusd reads the pipe in
   chunks: no tarball file lies in the store. Clause 21 measures a tree of
   850,228,783 bytes (`golang:1.24-bookworm`): the first run grows the disk
@@ -297,14 +297,17 @@ files with capabilities. Three changes serve it on the incus tier.
   that held the store, `/var/lib/incus` and the pool kept three copies of
   the tree at the peak: podvm's tree in the store, incusd's upload in its
   images, and the image volume in the pool (PodUtils/podrunner#347 ask 1).
-  So the incus tier extracts the tree only for an import (a run of an
-  image that incus has needs no tree); it removes the tree that the import
-  extracted after the upload and before the create (also after a failed
-  import), where no other process of the store holds the image; and where
-  incusd's images have less than three times the tree free, the upload is
-  gzip (`incus/gzip.rs`: blocks of 2 MiB, one gzip member each, compressed
-  by up to eight threads; the bytes do not depend on the count of
-  threads). A tree that was in the store before the import stays. Measured
+  Podvm now imports a unified tarball of the layers with `pod-extract`.
+  A first pass counts file bytes and inodes for the space check. A second
+  pass sends the archive to incusd. The passes write no tree in the store.
+  An image that requires extraction uses a temporary tree. Podvm removes
+  it after the import when no other process holds it. A tree that existed
+  before the import stays. Podvm uses gzip where incusd's images have less
+  than three times the tree free or podvm cannot read the free space.
+  `pod-gzip` compresses 2 MiB blocks into gzip members on up to eight
+  threads. The thread count does not change the upload bytes.
+
+  The earlier temporary-tree implementation was measured
   on a btrfs of 1000 MB (817 MB free) with the store, `INCUS_DIR` and a
   btrfs pool, `golang:1.24-alpine` (a tree of 292 MB, 80 MB of blobs):
   before, `create` failed with exit 125 at a peak of 838 MiB over the
@@ -312,15 +315,14 @@ files with capabilities. Three changes serve it on the incus tier.
   gzip; the tree is gone). On a btrfs of 4 GB the upload stays plain: 565
   MiB after, 852 MiB before. The image volumes of the old path, the plain
   path and the gzip path have the same 16,716 entries, modes, owners,
-  bytes and attributes. Experiment 434 clause 31 checks the tree. A native
-  run after the import extracts the tree again. With no tree, `run` does
-  not refuse an absolute program that the image lacks before the start
-  (T-1823): podvm in the instance gives the same exit 127.
-* **Capabilities (T-1999).** The tarball carries the extended attributes of
-  the image as PAX records (`incus/xattrs.rs`): `security.capability` and
-  `user.*` of the tree, and each attribute of the sidecar that
-  `pod-extract` writes (podcrates `v0.76.0`). A v3 capability of the tree
-  goes as v2, so that the kernel of the instance sets its own root id.
+  bytes and attributes. Experiment 434 clause 31 checks the store tree.
+  A native run extracts the tree if it is absent. With no store tree,
+  podvm in the instance gives exit 127 for a missing command (T-1823).
+* **Capabilities (T-1999).** `pod-extract` streams extended attributes and
+  POSIX ACLs from the layers as PAX records. The fallback tarball combines
+  `security.capability` and `user.*` from the tree with attributes from the
+  extraction sidecar. It writes a v3 capability from the tree as v2 so the
+  kernel of the instance sets its own root id.
   Clause 22 checks `cap_net_raw+ep` on a file of an alpine layer in the
   root of the instance. The root of the machine tier is not proven (T-1999
   keeps it for `kvm.yml`).

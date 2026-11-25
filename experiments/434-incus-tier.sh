@@ -166,11 +166,10 @@
 #      instance stays (before: exit 143 with the instance left RUNNING).
 #  31. The tree of an import (T-2085, PodUtils/podrunner#347 ask 1): with
 #      the image of clause 1 removed from incusd and its tree removed from
-#      the store, a run imports it ("imported now") and leaves no tree in
-#      the store; a second run takes it from incus and extracts no tree; a
-#      native run extracts the tree again; a run after the image is removed
-#      from incusd again imports it from that tree, and the tree stays (a
-#      tree that the import did not make is not the import's to remove).
+#      the store, a verbose run imports it ("imported now") and prints a
+#      "Flattened" line for a layer. It leaves no tree. A second run takes
+#      the image from incus and extracts no tree. A native run extracts a
+#      tree. Removing the Incus image and importing again keeps that tree.
 #      (Before: each incus run extracted the tree and kept it, beside the
 #      upload and the root of the instance: three copies at the peak.)
 #
@@ -900,7 +899,8 @@ echo ""; echo "== 31. the tree of an import"
 drop_images
 rm -rf "$B"/store/rootfs/sha256_*
 echo "  before   $(trees) trees, $(RI image list --format csv -c f 2>/dev/null | grep -c .) images"
-out=$(T "$OCI" true </dev/null 2>&1); echo "  import   rc $? $(printf '%s' "$out" | grep -o 'imported now\|from incus' | head -1), $(trees) trees"
+out=$(T --verbose "$OCI" true </dev/null 2>&1); echo "  import   rc $? $(printf '%s' "$out" | grep -o 'imported now\|from incus' | head -1), $(trees) trees"
+printf '%s\n' "$out" | grep -E '^[[:xdigit:]]{12}: (Flattened|Extracted) \(' | sed 's/^/  layer    /'
 out=$(T "$OCI" true </dev/null 2>&1); echo "  cached   rc $? $(printf '%s' "$out" | grep -o 'imported now\|from incus' | head -1), $(trees) trees"
 P run --rm "$OCI" true </dev/null >/dev/null 2>&1; echo "  native   rc $?, $(trees) trees"
 drop_images
@@ -911,6 +911,10 @@ cat "$WORK/c31.txt" >>"$REPORT"
 c31() { grep -Eq "$1" "$WORK/c31.txt" || { note "31: $2"; fail=1; }; }
 c31 "^  before   0 trees, 0 images$" "the tree or the image of clause 1 did not go"
 c31 "^  import   rc 0 imported now, 0 trees$" "the import left its tree in the store"
+c31 "^  layer    [[:xdigit:]]{12}: Flattened \(" "the layers did not supply the import"
+if grep -Eq '^  layer    [[:xdigit:]]{12}: Extracted \(' "$WORK/c31.txt"; then
+    note "31: the layer import extracted a tree"; fail=1
+fi
 c31 "^  cached   rc 0 from incus, 0 trees$" "a run of an image that incus has extracted a tree"
 c31 "^  native   rc 0, 1 trees$" "a native run did not extract the tree again"
 c31 "^  again    rc 0 imported now, 1 trees$" "an import removed a tree that it did not make"

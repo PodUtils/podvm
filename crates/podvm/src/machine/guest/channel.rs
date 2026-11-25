@@ -16,6 +16,10 @@
 //! duplicate of it.
 
 use std::path::{Path, PathBuf};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::time::{Duration, Instant};
 
 use podvm_image::error::EXIT_FLAG_ERROR;
@@ -89,20 +93,40 @@ fn runtime() -> std::io::Result<tokio::runtime::Runtime> {
         .build()
 }
 
-/// The host side: connect to the chardev socket, then dial `host` for each
-/// stream that the guest opens, until the emulator ends. With `bundle`
+/// The host side for this run. The caller starts it once the emulator is
+/// up, and after any save or load of its state.
+pub(super) fn starter(
+    r: &super::Request,
+    err_sock: &Path,
+    deadline: Instant,
+    gone: Arc<AtomicBool>,
+) -> Option<impl FnOnce() + Send + 'static> {
+    let host = r.channel.as_ref().map(|(host, _)| host.clone());
+    let bundle = r.sealed.clone();
+    (host.is_some() || bundle.is_some()).then(|| {
+        let sock = socket_path(err_sock);
+        move || serve(sock, host, bundle, deadline, gone)
+    })
+}
+
+/// Connect to the chardev socket, then dial `host` for each stream
+/// that the guest opens, until the emulator ends. With `bundle`
 /// (`--podvm-sealed`), the first stream gets the bundle, and no host file
 /// holds it ([`super::sealed`]).
-pub fn serve(
+fn serve(
     sock: PathBuf,
     host: Option<PathBuf>,
     bundle: Option<Vec<u8>>,
     deadline: Instant,
-) -> std::thread::JoinHandle<()> {
+    gone: Arc<AtomicBool>,
+) {
     std::thread::spawn(move || {
         let Ok(rt) = runtime() else { return };
         rt.block_on(async move {
             let carrier = loop {
+                if gone.load(Ordering::Acquire) {
+                    return;
+                }
                 match tokio::net::UnixStream::connect(&sock).await {
                     Ok(s) => break s,
                     Err(_) if Instant::now() < deadline => {
@@ -142,7 +166,7 @@ pub fn serve(
                 });
             }
         });
-    })
+    });
 }
 
 /// The device of the port named [`PORT_NAME`], from sysfs.

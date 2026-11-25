@@ -1,0 +1,31 @@
+Does one TCG state serve different channels and process limits?
+2026-11-25T10:05:13Z Linux 6.18.57, uid 1000, TCG with two vCPUs, QEMU emulator version 11.1.3
+podvm SHA-256 b33f3af5ce448ecad4e53ad0c5bde8bce4670202719feb73a398433156aa89c1
+image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b
+job 1: save, port 41001, pids 64, exit 0
+channel=answer-1
+limit=64
+clock=1795601166
+seed=<measured>
+boot=<measured>
+fccd9a525e0c: Extracted (33146 entries, 0 whiteouts); 0 extended attributes set, 2 not set (the first: security.capability of usr/bin/newgidmap, EPERM; the sidecar names each)
+8f1a3f638556: Extracted (10 entries, 0 whiteouts)
+f9b891f38f9e: Extracted (2 entries, 0 whiteouts)
+2dacb2369e13: Extracted (6 entries, 0 whiteouts)
+podvm run: machine tier: the guest boots, and podvm saves its state for the next run of this image (TODO/machine.md T-2008)
+podvm run: machine tier: the state of the guest is saved: 1262 MiB in 2.8 s through file, WORK/store/machine/state-9bef8f23f6fb578d4c8e309d14fe1714ffdea2e967a5e4652dad65abf69d75d9-88c528b0c21b69c565c2b3b4.vm (TODO/machine.md T-2008)
+job 2: load, port 41002, pids 64, exit 0
+channel=answer-2
+limit=64
+clock=1795601199
+seed=<measured>
+boot=<measured>
+podvm run: machine tier: the guest starts from the saved state of this image and guest shape; its clock and its random pool are the ones of this run, and its machine-id, its boot id and its service processes are the ones of the save (TODO/machine.md T-2008)
+job 3: load, port 41003, pids 96, exit 0
+channel=answer-3
+limit=96
+clock=1795601202
+seed=<measured>
+boot=<measured>
+podvm run: machine tier: the guest starts from the saved state of this image and guest shape; its clock and its random pool are the ones of this run, and its machine-id, its boot id and its service processes are the ones of the save (TODO/machine.md T-2008)
+PASS: the restored guest used each host socket, guest port, limit, clock and seed

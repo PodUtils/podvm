@@ -8,14 +8,26 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Added: channels and process limits for saved Linux guests, 2026-11-25
+
+Record: T-2094.
+Deployed: not deployed; for the next beta after 0.2.0-beta.40.
+
+- On the machine tier, a saved guest can use `--podvm-channel` and
+  `--pids-limit`. Each run supplies its socket, port and limit after the
+  save or restore. The guest applies the limit before the payload starts.
+
 ### Changed: podcrates `v0.84.0` and the shared gzip writer, 2026-11-25
 
-Record: T-2085.
+Record: T-2085, T-2096.
 Deployed: not deployed; on main, for the next beta after 0.2.0-beta.40.
 
 - The incus tier uses `pod_gzip::Members` for compressed image uploads.
   The same space check selects a plain or compressed upload.
 - The Incus client bounds a write that stalls on the daemon socket.
+- A fresh Incus import uses `pod_extract::flatten_with` to size and
+  stream the image from its OCI layers. Images that require extraction
+  use the tree-based path. The space check runs before the upload.
 
 ### Fixed: what the namespace rung opens, and the commit of a source build, 2026-11-25
 

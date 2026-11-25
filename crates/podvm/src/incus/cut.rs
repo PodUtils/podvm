@@ -36,6 +36,12 @@ impl Drop for NoSigpipe {
     }
 }
 
+/// A writer thread gets `EPIPE` where the reader closes the pipe.
+pub(super) fn block_pipe() {
+    let mut old = 0u64;
+    let _ = podvm_probe::sys::sigblock(1 << (SIGPIPE - 1), &mut old);
+}
+
 /// True where `e` is a connection that incusd closed while podvm wrote
 /// (EPIPE, a reset).
 pub fn cut(e: &pod_incus::Error) -> bool {

@@ -2552,3 +2552,42 @@ matches each clause except clause 23, the known flake of incusd's metrics
 not answer pass. The take is named to podcrates in #663 (COORD-247).
 `Client::image` and `storage_pool_resources` stay for T-2078 (remaining
 1).
+
+# T-2096: Take podcrates `v0.84.0` and its shared gzip writer
+
+**Source:** PodUtils/podcrates#260 (COORD-155), PodUtils/podvm#657 (COORD-241)
+**Category:** deps
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** done
+
+## Problem
+
+Podvm keeps a local gzip writer and depends on podcrates `v0.83.0`.
+
+## Premise
+
+Podcrates `v0.84.0` provides `pod_gzip::Members`, a bound for Incus
+writes, and the layer stream used in T-2085.
+
+## Approach
+
+Update the dependency and issue-sync pins. Use the shared gzip writer
+with podvm's selection of plain or compressed upload.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo check --locked --workspace --all-targets`, `cargo test --locked
+-p podvm --bin podvm incus::`, and `sh scripts/dev/checks.sh`.
+
+## Done
+
+**Done (2026-11-25).** `04c8b7f4` takes the tag and shared gzip writer.
+The workspace check, 44 Incus tests and `sh scripts/dev/checks.sh`
+passed. PodUtils/podcrates#260 lists the take from #666. T-2085 owns the
+layer stream and its live proof.

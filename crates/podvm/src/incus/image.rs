@@ -1,7 +1,7 @@
 //! The incus image of an OCI image, TODO/machine.md T-1718: a unified
-//! tarball of podvm's extracted rootfs.
+//! tarball of its layers, with a tree-based path for images that need it.
 //!
-//! podvm extracts with no ownership change and records what the image
+//! In the fallback, podvm extracts with no ownership change and records what the image
 //! meant in `.meta.jsonl` beside the rootfs (`podvm extract --help`). The
 //! tarball gives each entry those ids and that mode, so that the files in
 //! the instance belong to whom the image says (`/etc/shadow` is
@@ -18,7 +18,11 @@ use std::path::Path;
 use serde_json::Value;
 
 /// The version of the tarball's form; a change gives a new alias.
-pub const IMAGE_FORMAT: u32 = 3;
+pub const IMAGE_FORMAT: u32 = 4;
+
+/// The directory and the file that podvm adds to the rootfs.
+pub(super) const INIT_DIR: &str = ".podvm";
+pub(super) const INIT_FILE: &str = ".podvm/podvm";
 
 /// The alias of an image of `digest` with the podvm of digest `me`.
 pub fn alias(digest: &str, me: &str) -> String {
@@ -27,6 +31,137 @@ pub fn alias(digest: &str, me: &str) -> String {
         "podvm-{}-{}-v{IMAGE_FORMAT}",
         &hex[..hex.len().min(16)],
         &me[..me.len().min(16)]
+    )
+}
+
+/// An image's layers in manifest order. The store hold protects their blobs.
+pub struct Layers {
+    pub blobs: Vec<podvm_extract::Layer>,
+    pub loud: bool,
+}
+
+impl Layers {
+    /// The estimate of the gzip upload is the size of the compressed layers.
+    pub(super) fn compressed_bytes(&self) -> u64 {
+        self.blobs
+            .iter()
+            .fold(0u64, |n, l| n.saturating_add(l.size))
+    }
+
+    /// Measure the final tree without creating it. The tar reader counts the
+    /// members that survive whiteouts and replacement, and counts a hard link
+    /// once per inode. Tar headers and padding are not file bytes.
+    /// `None` means the image needs the extraction path.
+    pub(super) fn measure(&self, podvm_len: u64) -> Result<Option<super::space::Need>, String> {
+        let (read, write) =
+            std::io::pipe().map_err(|e| format!("a pipe for measuring the image: {e}"))?;
+        std::thread::scope(|scope| {
+            let writer = std::thread::Builder::new()
+                .spawn_scoped(scope, move || {
+                    super::cut::block_pipe();
+                    self.flatten(&mut std::io::BufWriter::new(write), &[], true)
+                })
+                .map_err(|e| format!("the writer for measuring the image: {e}"))?;
+            let mut reserved_init = false;
+            let need = need_from_tar(read, &mut reserved_init);
+            let flattened = writer
+                .join()
+                .map_err(|_| "the writer for measuring the image ended with a panic")?;
+            match flattened {
+                // A hard link whose data entry already went out can lose
+                // records, so use the tree when any record could be lost.
+                Ok(stats) if stats.links > 0 && stats.xattrs.unset > 0 => Ok(None),
+                Ok(_) => need
+                    .map(|mut need| {
+                        need.bytes = need.bytes.saturating_add(podvm_len);
+                        Some(need)
+                    })
+                    .map_err(|e| format!("the unified tarball: {e}")),
+                // The flattener refuses a collision with the bundled
+                // binary. The extraction path replaces the reserved entry.
+                Err(e) if e.class == pod_core::Class::Usage && reserved_init => Ok(None),
+                Err(e) if needs_tree(&e) => Ok(None),
+                Err(e) => Err(e.chain()),
+            }
+        })
+    }
+
+    /// Write a unified archive. A fixed, nonzero creation date keeps the
+    /// fingerprint stable when separate stores import the same bytes.
+    pub(super) fn flatten<W: std::io::Write>(
+        &self,
+        out: &mut W,
+        podvm: &[u8],
+        report: bool,
+    ) -> Result<podvm_extract::flatten::Flattened, pod_core::Failure> {
+        use podvm_extract::flatten::{flatten_with, Options};
+        let mut opts = Options {
+            prefix: "rootfs/".into(),
+            ..Options::default()
+        };
+        if report && self.loud {
+            opts.report.events =
+                std::sync::Arc::new(|event: pod_core::Event| eprintln!("{}", event.text));
+        }
+        flatten_with(
+            &self.blobs,
+            out,
+            &opts,
+            |entries| entries.file("metadata.yaml", 0o644, metadata(1).as_bytes()),
+            |entries| {
+                // An image can already have the directory. Writing the
+                // binary also checks its parent and refuses a file or link.
+                if let Err(e) = entries.dir("rootfs/.podvm", 0o755)
+                    && e.class != pod_core::Class::Usage
+                {
+                    return Err(e);
+                }
+                entries.file("rootfs/.podvm/podvm", 0o755, podvm)
+            },
+        )
+    }
+}
+
+/// These refusals can occur for valid images that an extracted tree holds.
+fn needs_tree(e: &pod_core::Failure) -> bool {
+    e.class == pod_core::Class::Unsupported
+        || podvm_extract::refused(e)
+            .is_some_and(|r| matches!(r.refusal, podvm_extract::safety::Refusal::Stream(_)))
+}
+
+fn need_from_tar(
+    read: impl std::io::Read,
+    reserved_init: &mut bool,
+) -> std::io::Result<super::space::Need> {
+    let mut need = super::space::Need::default();
+    let mut archive = tar::Archive::new(std::io::BufReader::new(read));
+    // pod-extract writes the full size and the rootfs prefix into its
+    // headers. Sizing does not have to interpret binary PAX attributes.
+    for entry in archive.entries()?.raw(true) {
+        let entry = entry?;
+        let path = entry.path_bytes();
+        let Some(path) = path.strip_prefix(b"rootfs/") else {
+            continue;
+        };
+        let kind = entry.header().entry_type();
+        if path == INIT_FILE.as_bytes() || (path == INIT_DIR.as_bytes() && !kind.is_dir()) {
+            *reserved_init = true;
+        }
+        if !kind.is_hard_link() {
+            need.entries = need.entries.saturating_add(1);
+        }
+        if kind.is_file() {
+            need.bytes = need.bytes.saturating_add(entry.size());
+        }
+    }
+    // The reader stops at the first end block. The writer ends after both.
+    std::io::copy(&mut archive.into_inner(), &mut std::io::sink())?;
+    Ok(need)
+}
+
+fn metadata(creation_date: u64) -> String {
+    format!(
+        "architecture: x86_64\ncreation_date: {creation_date}\nproperties:\n  description: an OCI image of podvm\n"
     )
 }
 
@@ -84,9 +219,7 @@ pub fn unified_tarball_to<W: std::io::Write>(
         .map(|d| d.as_secs())
         .unwrap_or(1);
     // incus refuses a creation_date of 0 ("Missing creation date").
-    let meta = format!(
-        "architecture: x86_64\ncreation_date: {now}\nproperties:\n  description: an OCI image of podvm\n"
-    );
+    let meta = metadata(now);
     let mut h = tar::Header::new_gnu();
     h.set_size(meta.len() as u64);
     h.set_mode(0o644);
@@ -141,8 +274,16 @@ fn walk<W: std::io::Write>(
         } else {
             format!("{rel}/{name}")
         };
+        // Podvm installs its own init. A source entry at that path and
+        // its descendants do not go into the archive.
+        if r == INIT_FILE {
+            continue;
+        }
         let p = e.path();
         let md = std::fs::symlink_metadata(&p)?;
+        if r == INIT_DIR && !md.is_dir() {
+            continue;
+        }
         let mut h = tar::Header::new_gnu();
         h.set_metadata_in_mode(&md, tar::HeaderMode::Deterministic);
         let (u, g, mode) = meant.get(&r).copied().unwrap_or((

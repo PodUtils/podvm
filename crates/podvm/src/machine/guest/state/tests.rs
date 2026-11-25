@@ -96,10 +96,10 @@ fn a_state_serves_only_the_run_that_its_guest_can_hold() {
         ),
         (
             Asks {
-                channel: true,
+                sealed: true,
                 ..base.clone()
             },
-            "--podvm-channel",
+            "--podvm-sealed",
         ),
         (
             Asks {
@@ -107,13 +107,6 @@ fn a_state_serves_only_the_run_that_its_guest_can_hold() {
                 ..base.clone()
             },
             "--podvm-engine",
-        ),
-        (
-            Asks {
-                pids: true,
-                ..base.clone()
-            },
-            "--pids-limit",
         ),
         (
             Asks {

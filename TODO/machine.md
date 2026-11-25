@@ -6895,8 +6895,15 @@ gzip writer with `pod_gzip::Members`. Podvm keeps the selection of plain
 or gzip and its test of the gzip upload against a stand-in incusd.
 `cargo check --locked --workspace --all-targets` passes.
 `cargo test --locked -p podvm --bin podvm incus::` passes 44 tests.
-Remaining (2): wire `pod_extract::flatten_with` into the import
-(PodUtils/podcrates#260, the answer to #657).
+The import takes `pod_extract::flatten_with` (PodUtils/podcrates#260,
+the answer to #657). It measures file bytes and inodes in a diskless pass
+and checks the pool before it streams the unified archive. The tree path
+serves images that require extraction. The same change reads the cut
+marker of a response that pod-incus truncated. In the worker checkout,
+`cargo test --locked -p podvm --bin podvm incus::` passed 45 tests.
+Remaining (2): run experiment 434 clause 31 against a real incusd with
+this build. The new assertion requires a flattened import and rejects an
+extraction on that path.
 
 # T-2086: On a hosted runner with cgroup v2, `inspect` of an ended incus instance gives no peak memory and no OOM kill of a child
 
@@ -7026,7 +7033,7 @@ until podvm releases this update.
 **Milestone:** none
 **Priority:** P2
 **Effort:** L
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -7064,7 +7071,24 @@ command. Keep `--podvm-engine` refused. Answer podrunner with a COORD issue
 ## Prove
 
 `cargo test -p podvm --bin podvm state` passes with a table test of
-`state::refusal` with the new shapes. An experiment under
-TCG (as experiment 468): a run with `--podvm-channel` and `--pids-limit 64`
-loads a state, the channel carries a stream both ways, the pids limit holds
-in the guest, and two runs of one state get their own seed.
+`state::refusal` with the new shapes. `python3
+experiments/473-machine-state-channel.py` under TCG checks one save and two
+loads. Each channel carries a stream both ways. The run's process limit,
+clock and seed hold in the guest.
+
+## Done
+
+**Done (2026-11-25).** The guest shape includes a channel device when the
+run has `--podvm-channel`. The fingerprint uses a fixed device path. The
+host starts each run's relay after the save or confirmed restore. The
+guest applies the channel port and process limit from the job frame.
+Sealed and engine requests take a fresh boot.
+
+Experiment 473 passed with QEMU 11.1.3 under TCG as uid 1000 on the
+9,488,600-byte static build. One 1,262 MiB state saved in 2.8 s. Three
+jobs used distinct host sockets and guest ports. The two loads saw
+`pids.max` of 64 and 96 and used the same boot ID. Each job saw a current
+clock and different random bytes. All three jobs and the experiment
+exited 0, and each emulator ended. The transcript is
+`experiments/results/machine-state-channel.txt`. Send podrunner the beta
+tag when the release gate passes.
