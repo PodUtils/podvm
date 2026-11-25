@@ -550,7 +550,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #654 | COORD-238: v0.2.0-beta.39 is out (to podrunner) | closed (superseded by `v0.2.0-beta.40`) | T-1949, T-2076, T-2077, T-2078, T-2079, T-2080, T-2081, T-2082 |
 | #655 | COORD-239: the answer to PodUtils/podrunner#349: "offline" of systemd is not final for --podvm-init=image on the incus tier (to podrunner) | closed (in 0.2.0-beta.40, release run 45436996748; named in #662, COORD-246) | T-2083 |
 | #656 | COORD-240: podvm took v0.82.1 (to podcrates) | closed (PodUtils/podcrates#257 lists the take of v0.82.1) | T-2084, T-2054, T-2076 |
-| #657 | COORD-241: a stream of the layers of an image as one tar, and a writer of gzip members (to podcrates) | open | T-2085 |
+| #657 | COORD-241: a stream of the layers of an image as one tar, and a writer of gzip members (to podcrates) | closed (podcrates v0.84.0 and hosted run 45621890257) | T-2085 |
 | #658 | COORD-242: the answer to PodUtils/podrunner#347: an import of a large image keeps one tree and a gzip upload on the incus tier (to podrunner) | closed (in 0.2.0-beta.40, release run 45436996748; named in #662, COORD-246) | T-2085, T-2082 |
 | #659 | COORD-243: pod_hostprobe::usage: open the meter from the cgroup mounts of mountinfo, where a mount of cgroup is refused (to podcrates) | closed (podcrates v0.83.0 has pod_hostprobe::usage::Mounts, PodUtils/podcrates#259; taken in a39f4c4f, #663) | T-2086 |
 | #660 | COORD-244: the answer to PodUtils/podrunner#350: on a host with AppArmor the init could not mount the cgroup; the record of the stop now holds on cgroup v2 (to podrunner) | closed (in 0.2.0-beta.40, release run 45436996748; named in #662, COORD-246) | T-2086 |

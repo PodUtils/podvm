@@ -35,9 +35,9 @@ contains the commit that changes this file. A fresh session reads
 * `main` takes podcrates `v0.84.0` and its shared gzip writer (T-2096,
   `04c8b7f4`, #666, PodUtils/podcrates#260). Hosted Incus run 45619039653
   on `6bb0ae96` passed experiment 475 for the fresh and cached layer
-  streams. Hosted run 45621890257 on `7fb9e481` covers the added
-  native-tree retention assertions of experiment 434 clause 31 (T-2085,
-  #657).
+  streams. Hosted run 45621890257 on `7fb9e481` also passed the
+  native-tree retention assertions of experiment 434 clause 31.
+  T-2085 is done and the record closes #657.
 * T-2054's spare-tree helper now clears its environment. Both
   `tree-prefill` paths worked with an empty environment in a private
   Alpine store. T-2054 still tracks the helper's store path in argv.
@@ -96,9 +96,10 @@ contains the commit that changes this file. A fresh session reads
    (COORD-132, `podvm update --podvm-tier=incus` of the memory, CPU and
    process limits of a running instance: T-2093) and PodUtils/podrunner#355
    (COORD-133, a saved state of the machine tier for `--podvm-channel` and
-   `--pids-limit`: T-2094). T-2093 waits for pod-incus instance config
-   PATCH and ETag support (#664, COORD-248 to podcrates). T-2094 passed
-   experiment 473 under TCG. Answer each ask with a COORD issue
+   `--pids-limit`: T-2094). The podcrates `v0.85.0` candidate `1d1c9fc`
+   has the typed PATCH and ETag API of #664. T-2093 can be prepared
+   against that source and merged after the tag and its tests. T-2094
+   passed experiment 473 under TCG. Answer each ask with a COORD issue
    `(to podrunner)` when its work is in a beta.
 2. T-2078 remaining 3: a run on the hosted runner of
    PodUtils/podrunner#346 with the next beta (remaining 1 is done,
@@ -106,21 +107,23 @@ contains the commit that changes this file. A fresh session reads
 3. Sweep the current open issues at each session start (`AGENTS.md`, section 8
    item 7), and map each new issue to the entry of its own finding.
 4. podrunner: #583 (T-1968, a sized writable disk). The machine tier
-   needs the disk-backed root of T-1994, and the namespace tier needs
+   needs a disk-backed writable layer, part of T-1994. The namespace tier needs
    the pod-enter mount requested in #667. Podrunner's 9p work mount also
    needs a bound (#583). Experiment 477 found that `sqfstar` 4.6.1 loses
    a valid POSIX ACL. Experiment 478 confirmed that EROFS full tar mode
    keeps that ACL. The static builder pin is requested in #668. Both
    pinned Alpine kernels disable EROFS and carry virtio block, ext4 and
-   overlay modules. The EROFS path needs another kernel pin. T-1999
-   needs a machine root that keeps file capabilities. Experiment 476
+   overlay modules. The EROFS path needs another kernel pin. A disposable
+   64 MiB virtio ext4 disk enforced its size through an overlay under
+   TCG with the current amd64 pins. Ext4 needed `crc32c_generic.ko` in
+   addition to its declared module dependencies. The guest root switch
+   still needs work. T-1999 needs a machine root that keeps file
+   capabilities. Experiment 476
    needs the podrunner hosted-boot wiring requested in #599. Then #596
    and #599 (the hosted snapshot: T-1994, T-1996, T-1998, T-1999),
    #593 (T-1990,
    T-1991). Then T-2088 and the open rows of T-2070, T-2079, T-2087.
-5. T-2085 remainder (run the layer stream proof against incusd,
-   PodUtils/podcrates#260, the answer to #657),
-   T-2054, T-2048, then the work order of
+5. T-2054, T-2048, then the work order of
    `TODO/PROGRESS.md`.
 
 ## Rules learned

@@ -546,7 +546,7 @@
 654 issue closed
 655 issue closed
 656 issue closed
-657 issue open
+657 issue closed
 658 issue closed
 659 issue closed
 660 issue closed

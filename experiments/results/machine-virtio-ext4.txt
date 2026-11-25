@@ -1,0 +1,47 @@
+T-1968 and T-1994. Bounded virtio ext4 and overlay writes inside an amd64 guest.
+
+Build a small initramfs with static BusyBox, an /init shell script, and
+modules from the verified Alpine 3.22.6 amd64 modloop of pod-services
+v0.84.0. Mount devtmpfs, proc and sysfs in the guest. Load crc32c_generic,
+virtio_blk, crc16, mbcache, jbd2, ext4 and overlay in that order. Create a
+64 MiB raw file and format it with mke2fs 1.47.2 using these options.
+  mke2fs -q -F -t ext4 -b 4096 -m 0 -E lazy_itable_init=0,lazy_journal_init=0 disk.raw
+
+The init mounts ext4 with nodelalloc on /disk, mounts overlay at /merged
+with lowerdir=/lower,upperdir=/disk/upper,workdir=/disk/work, and reads a
+file from lower. Overwrite that file through /merged and compare all
+three copies. Write 4 MiB and then 96 MiB to separate files in /merged.
+After reboot, debugfs reads the copied-up and 4 MiB files from the disk.
+
+A separate direct ext4 control confirmed that the disk enumerated with
+131072 sectors. A 4 MiB write succeeded and a 96 MiB write stopped at
+52985856 bytes with No space left on device and exit 1. Omitting only
+crc32c_generic still enumerated the disk, but the mount reported
+EXT4-fs (vda): Cannot load crc32c driver.
+
+Overlay measurement
+2026-11-25T13:31:12Z Linux 6.18.57 amd64 uid 1000
+QEMU emulator version 11.1.3
+mke2fs 1.47.2 (1-Jan-2025)
+Alpine 3.22.6 kernel 6.12.110-0-virt, verified pod-services v0.84.0 pins
+The initramfs has 5424220 bytes. The raw disk has 67108864 bytes.
+QEMU arguments below. WORK and ASSETS name the owned scratch and the verified inputs.
+timeout --kill-after=5s 90s qemu-system-x86_64 -M pc,acpi=off -accel tcg,thread=single -cpu max
+  -smp 1 -m 256M -nodefaults -no-user-config -display none -serial stdio -monitor none -nic none
+  -kernel ASSETS/x86_64/boot/vmlinuz-virt -initrd WORK/initrd.cpio
+  -append 'console=ttyS0 rdinit=/init quiet loglevel=3 panic=-1' -no-reboot
+  -drive if=none,id=proofdisk,format=raw,file=WORK/disk.raw -device virtio-blk-pci,drive=proofdisk
+EXT4-PROOF-MOUNT /dev/vda ext4 sectors=131072
+OVERLAY-PROOF-MOUNT /merged overlay
+OVERLAY-PROOF-LOWER read through merged before copy-up
+OVERLAY-PROOF-COPY-UP merged and upper changed, lower unchanged
+OVERLAY-PROOF-SMALL bytes=4194304
+dd: error writing '/merged/large': No space left on device
+51+0 records in
+50+0 records out
+OVERLAY-PROOF-LARGE requested=100663296 bytes=52969472 exit=1
+OVERLAY-PROOF-PASS
+[    4.723446] reboot: Restarting system
+QEMU exit 0
+No emulator of this proof remained.
+Offline read found the copied-up file and the 4194304-byte file in the upper directory on the raw disk.

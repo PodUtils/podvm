@@ -721,7 +721,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2082](machine.md) | P1 | S | none | machine | done | On the incus tier, an upload of the image that incusd cuts ends podvm with SIGPIPE and no line |
 | [T-2083](machine.md) | P1 | S | none | machine | done | On the incus tier, `--podvm-init=image` takes "offline" of systemd as final and removes the instance |
 | [T-2084](deps.md) | P2 | M | none | deps | done | Take podcrates `v0.82.1`: the title and the dump flag of the init and the relay of pod-enter, the join of the payload, the meter of a cgroup |
-| [T-2085](machine.md) | P1 | M | none | machine | partial | On the incus tier, an import of a large image keeps three copies of its tree on one file system |
+| [T-2085](machine.md) | P1 | M | none | machine | done | On the incus tier, an import of a large image keeps three copies of its tree on one file system |
 | [T-2086](machine.md) | P1 | M | none | machine | done | On a hosted runner with cgroup v2, `inspect` of an ended incus instance gives no peak memory and no OOM kill of a child |
 | [T-2087](cli.md) | P1 | M | none | cli | partial | The faults of the ninth outside pass (2026-11-24, the gate of 0.2.0-beta.40) |
 | [T-2088](cli.md) | P2 | M | none | cli | open | The faults of the external QA of `0.2.0-beta.31` that stay open on `0.2.0-beta.40` |
@@ -736,7 +736,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-667 entries: 22 open, 40 partial, 7 blocked, 598 done.
+667 entries: 22 open, 39 partial, 7 blocked, 599 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -746,10 +746,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 21 | 0 | 271 | 295 |
+| P1 | 3 | 20 | 0 | 272 | 295 |
 | P2 | 14 | 14 | 6 | 207 | 241 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 22 | 40 | 7 | 598 | 667 |
+| **All** | 22 | 39 | 7 | 599 | 667 |
 
 ## Work order
 

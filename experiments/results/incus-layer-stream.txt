@@ -1,7 +1,7 @@
 question  does Incus import the OCI layers and reuse the image?
-date      2026-11-25T13:11:13Z
-host      Linux 7.0.0-1014-aws x86_64
-revision  6bb0ae9646cf916d25fbfa0fe00fa7c439023603
+date      2026-11-25T13:31:10Z
+host      Linux 7.0.0-1017-azure x86_64
+revision  7fb9e481afffc8d9760f68feb8f0ecdeea3fde8f
 image     mirror.gcr.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
 podvm 0.2.0-beta.40
 Client version: 6.0.0
@@ -10,35 +10,103 @@ Server version: 6.0.0
 25f1d6b1951a: Pull complete
 Digest: sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
 Status: Downloaded newer image for mirror.gcr.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
-podvm: probed this machine rather than using the cache: /tmp/podvm-475.cga8GEr7/store/probe.json does not exist yet
+podvm: probed this machine rather than using the cache: /tmp/podvm-475.knZQjxwU/store/probe.json does not exist yet
 before store tree entries 0
 fresh exit 0
   stdout  incus-stream-475-fresh
   stderr  25f1d6b1951a: Flattened (517 entries written, 0 hidden, 0 whiteouts)
-  stderr  podvm run: incus tier: incusd 6.0.0 at /var/lib/incus/unix.socket, image podvm-c64c687cbea93001-7856c9cd4091742f-v4 imported now (TODO/machine.md T-1718)
-fresh store tree entries 0
+  stderr  podvm run: incus tier: incusd 6.0.0 at /var/lib/incus/unix.socket, image podvm-c64c687cbea93001-d515d92a74d2f8cb-v4 imported now (TODO/machine.md T-1718)
 fresh instance removed
-Fingerprint: 44b2d4b118bea2c8d7d678e2128ebcc10102b9f7bc8c2ec5193cde14a5b6169c
+Fingerprint: 340bccd783d96266c71ea39c3954ea486ce97d6be56c80cada78235b9bca1c3d
 Size: 16.77MiB
 Architecture: x86_64
 Type: container
 Public: no
 Timestamps:
     Created: 1970/01/01 00:00 UTC
-    Uploaded: 2026/11/25 13:11 UTC
+    Uploaded: 2026/11/25 13:31 UTC
     Expires: never
-    Last used: 2026/11/25 13:11 UTC
+    Last used: 2026/11/25 13:31 UTC
 Properties:
     description: an OCI image of podvm
 Aliases:
-    - podvm-c64c687cbea93001-7856c9cd4091742f-v4
+    - podvm-c64c687cbea93001-d515d92a74d2f8cb-v4
 Cached: no
 Auto update: disabled
 Profiles:
     - default
+fresh store tree entries 0
 cached exit 0
   stdout  incus-stream-475-cached
-  stderr  podvm run: incus tier: incusd 6.0.0 at /var/lib/incus/unix.socket, image podvm-c64c687cbea93001-7856c9cd4091742f-v4 from incus (TODO/machine.md T-1718)
-cached store tree entries 0
+  stderr  podvm run: incus tier: incusd 6.0.0 at /var/lib/incus/unix.socket, image podvm-c64c687cbea93001-d515d92a74d2f8cb-v4 from incus (TODO/machine.md T-1718)
 cached instance removed
-THE INCUS LAYER STREAM AND CACHED RUN HOLD
+cached store tree entries 0
+native image mirror.gcr.io/library/alpine@sha256:bc21487101ae47172509130ee1092cc273a831968d64b617776d1f69c81e42ab
+sha256:bc21487101ae47172509130ee1092cc273a831968d64b617776d1f69c81e42ab: Pulling from library/alpine
+871d48e9bf6b: Pull complete
+Digest: sha256:bc21487101ae47172509130ee1092cc273a831968d64b617776d1f69c81e42ab
+Status: Downloaded newer image for mirror.gcr.io/library/alpine@sha256:bc21487101ae47172509130ee1092cc273a831968d64b617776d1f69c81e42ab
+before_native store tree entries 0
+native exit 0
+  stdout  incus-stream-475-native
+  stderr  871d48e9bf6b: Extracted (520 entries, 0 whiteouts)
+  stderr  podvm 0.2.0-beta.40: mode=userland (namespaces: none; mounts: none; devices: shimmed;
+  stderr  ownership: virtualized+sidecar; network: host-shared; pids: host-shared)
+  stderr  probes (host, outside any user namespace): clone(NEWNS)=EPERM mount=EPERM fsmount=skip(EPERM) move_mount=skip(EPERM)
+  stderr                                             clone(NEWUTS)=EPERM sethostname=skip(EPERM) chroot=EPERM ptrace=ok
+  stderr  this mode does NOT provide: isolation of any kind, a private root, or host-absolute paths resolving inside the image
+  stderr  note: this machine would permit `supervise`; podvm's entry sequence is `userland` and creates no namespace and mounts nothing
+  stderr  podvm: interpose: /.podvm/interpose.so (musl object) is preloaded for this payload. refused: podvm WROTE that file into the rootfs of this entry and the payload can see it
+  stderr  podvm: interpose: emulating mknod, mount, unshare and clone flag-strip for this payload: each is counted and `inspect` carries the tally under Interpose.Emulated (TODO/interpose.md T-0708). /proc/self/fd, /proc/self/exe and the mount-table files are emulated where exactly answerable and refused elsewhere, counted under Interpose.Emulated.procfs (TODO/complete.md T-0413)
+  stderr  entering without chroot on the loader family: /tmp/podvm-475.knZQjxwU/store/trees/18e4f077a3d69c8f7657418c7c279641/rootfs/lib/ld-musl-x86_64.so.1 runs /tmp/podvm-475.knZQjxwU/store/trees/18e4f077a3d69c8f7657418c7c279641/rootfs/bin/busybox with the image's libraries; absolute guest paths anchor inside the rootfs through PODVM_MAPS, and host pass-through happens only under --unsafe-host-paths, and argv[0] keeps the invoked name; the invoked name "/bin/echo" rides as the applet the resolved busybox file selects; a child that execs a dynamic program or a #! script enters through the image's loader inside the rootfs, with the image's libraries from PODVM_LIB_PATH; a raw call through libc's syscall() takes the same table, and a raw call with a path that the table cannot map, or io_uring_setup, answers ENOSYS, so libuv uses its thread pool (TODO/enter.md T-1317, T-1407, T-1411; TODO/interpose.md T-1646, T-1697)
+  stderr  podvm: userland: absolute guest paths anchor inside /tmp/podvm-475.knZQjxwU/store/trees/18e4f077a3d69c8f7657418c7c279641/rootfs through PODVM_MAPS=/:/tmp/podvm-475.knZQjxwU/store/trees/18e4f077a3d69c8f7657418c7c279641/rootfs,/dev/null:/dev/null,/dev/zero:/dev/zero,/dev/random:/dev/random,/dev/urandom:/dev/urandom (TODO/enter.md T-1407)
+  stderr  podvm: userland: -v /dev/null:/dev/null is a path rewrite through PODVM_MAPS, not a mount: a write lands in /dev/null, and a call that does not pass the interposer (a static program, a raw syscall instruction) sees the image's /dev/null (TODO/enter.md T-1653)
+  stderr  podvm: userland: the volume source /dev/null is on a noexec mount, so a program in /dev/null cannot exec from it (TODO/enter.md T-1653)
+  stderr  podvm: userland: -v /dev/zero:/dev/zero is a path rewrite through PODVM_MAPS, not a mount: a write lands in /dev/zero, and a call that does not pass the interposer (a static program, a raw syscall instruction) sees the image's /dev/zero (TODO/enter.md T-1653)
+  stderr  podvm: userland: the volume source /dev/zero is on a noexec mount, so a program in /dev/zero cannot exec from it (TODO/enter.md T-1653)
+  stderr  podvm: userland: -v /dev/random:/dev/random is a path rewrite through PODVM_MAPS, not a mount: a write lands in /dev/random, and a call that does not pass the interposer (a static program, a raw syscall instruction) sees the image's /dev/random (TODO/enter.md T-1653)
+  stderr  podvm: userland: the volume source /dev/random is on a noexec mount, so a program in /dev/random cannot exec from it (TODO/enter.md T-1653)
+  stderr  podvm: userland: -v /dev/urandom:/dev/urandom is a path rewrite through PODVM_MAPS, not a mount: a write lands in /dev/urandom, and a call that does not pass the interposer (a static program, a raw syscall instruction) sees the image's /dev/urandom (TODO/enter.md T-1653)
+  stderr  podvm: userland: the volume source /dev/urandom is on a noexec mount, so a program in /dev/urandom cannot exec from it (TODO/enter.md T-1653)
+  stderr  podvm: userland: /proc/self/exe answers the payload's own path from PODVM_GUEST_EXE rather than the loader's (TODO/enter.md T-1409)
+  stderr  podvm: the container's own rootfs: 88 files, 7.4 MiB, by copy, in 20 ms (TODO/image.md T-1709)
+  stderr  podvm: complete: created dev/null (dev-shim, T-0401): mknod(2) refused with EPERM, so this is a regular file: a write stays until the next run, and a read gives EOF
+  stderr  podvm: complete: created dev/zero (dev-shim, T-0401): mknod(2) refused with EPERM, so this is a regular file of 1048576 zero bytes. It ENDS: a read after 1048576 bytes gives EOF, and the device does not
+  stderr  podvm: complete: created dev/random (dev-shim, T-0401): mknod(2) refused with EPERM, so this is a regular file of 1048576 bytes read one time from getrandom(2) of the host. It ENDS: a read after 1048576 bytes gives EOF, and the device does not
+  stderr  podvm: complete: created dev/urandom (dev-shim, T-0401): mknod(2) refused with EPERM, so this is a regular file of 1048576 bytes read one time from getrandom(2) of the host. It ENDS: a read after 1048576 bytes gives EOF, and the device does not
+  stderr  podvm: complete: created dev/stdin (dev-fd-link, T-0413): a symlink to /proc/self/fd/0
+  stderr  podvm: complete: created dev/stdout (dev-fd-link, T-0413): a symlink to /proc/self/fd/1
+  stderr  podvm: complete: created dev/stderr (dev-fd-link, T-0413): a symlink to /proc/self/fd/2
+  stderr  podvm: complete: created dev/fd (dev-fd-link, T-0413): a symlink to /proc/self/fd
+  stderr  podvm: complete: created etc/resolv.conf (resolv.conf, T-0402): the /etc/resolv.conf of this host, 391 bytes
+  stderr  podvm: complete: rewrote etc/hosts (hosts, T-0403): localhost
+  stderr  podvm: complete: rewrote etc/mtab (mtab, T-0405): it was a symlink to ../proc/mounts, and /proc is not mounted in the root, so the link does not resolve. The crate REPLACED the link and did not write through it: with an absolute target the write lands on the host. One line, made from the mount table of this host for the file system of the root
+  stderr  podvm: complete: created dev/shm (dev-shm, T-1759): mode 1777, for shm_open and sem_open
+  stderr  podvm: complete: created dev/pts (dev-pts, T-1760): the mount point of the host's /dev/pts
+  stderr  podvm: complete: 13 fixup(s) applied to this image's rootfs, 5 degraded, 0 failed, 0 step(s) to run inside it; libc=musl. refused: These are edits podvm made inside somebody else's image and the payload can see them
+native store tree device:inode 2049:9481716
+retained exit 0
+  stdout  incus-stream-475-retained
+  stderr  871d48e9bf6b: Flattened (520 entries written, 0 hidden, 0 whiteouts)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /var/lib/incus/unix.socket, image podvm-2d8a11041a92082b-d515d92a74d2f8cb-v4 imported now (TODO/machine.md T-1718)
+retained instance removed
+Fingerprint: 731ed952e850e366065004bb5e0991d31275b027b04ed1f9e71c84e0972d4882
+Size: 16.76MiB
+Architecture: x86_64
+Type: container
+Public: no
+Timestamps:
+    Created: 1970/01/01 00:00 UTC
+    Uploaded: 2026/11/25 13:31 UTC
+    Expires: never
+    Last used: 2026/11/25 13:31 UTC
+Properties:
+    description: an OCI image of podvm
+Aliases:
+    - podvm-2d8a11041a92082b-d515d92a74d2f8cb-v4
+Cached: no
+Auto update: disabled
+Profiles:
+    - default
+retained store tree device:inode 2049:9481716
+THE INCUS LAYER STREAM, CACHED RUN AND NATIVE TREE HOLD

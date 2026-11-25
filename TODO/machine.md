@@ -5573,14 +5573,25 @@ Machine tier: a flag that sizes the writable disk of the guest. Namespace rung: 
 ## Blocker
 
 The OCI machine guest currently uses a RAM-backed initrd and optional
-host-backed 9p volumes. T-1994 must supply its disk-backed writable root
-before T-1968 can size it. Podrunner currently binds its host unit work
-directory at `/podrunner-work` over 9p on the machine tier. A limit on the
+host-backed 9p volumes. T-1968 needs a block-backed writable layer and
+guest bootstrap. That part of T-1994 can use the RAM-backed lower layer
+while the immutable disk image is in development. Podrunner mounts its
+host unit work directory at `/podrunner-work` over 9p. A limit on the
 guest root cannot bound writes to that bind. The namespace work directory
 needs a required size-limited mount in pod-enter, requested in #667
-(COORD-250). On this host `unshare -Ur -m` could start, and the tmpfs mount returned
-`Permission denied`. The namespace proof needs a hosted lane that can
-mount tmpfs in its user and mount namespaces.
+(COORD-250). On this host `unshare -Ur -m` could start and the tmpfs
+mount returned `Permission denied`. The namespace proof needs a hosted
+lane that can mount tmpfs in its user and mount namespaces.
+
+An amd64 TCG probe mounted a disposable 64 MiB virtio disk as ext4.
+A 4 MiB control file remained readable after poweroff. A 96 MiB write
+stopped at 52,985,856 bytes with `No space left on device` and exit 1.
+The same kernel and QEMU 11.1.3 mounted an overlay with an initramfs
+lower and ext4 upper and work. Copy-up kept the lower bytes, and a 96
+MiB write through the overlay stopped at 52,969,472 bytes with the same
+error. The product still needs to put the writable layer and the work
+directory on the capped storage path. See
+[the virtio ext4 transcript](../experiments/results/machine-virtio-ext4.txt).
 
 # T-1993: On the incus tier, the init of the image (systemd) runs as PID 1
 
@@ -5658,6 +5669,11 @@ verified Alpine 3.22.6 amd64 and arm64 kernel configs for
 ext4 with ACL and security xattrs, and overlay modules. An EROFS guest
 proof needs a kernel pin with EROFS. An ext4 proof can use the current
 pins after the guest loads the required modules before switching root.
+The amd64 TCG probe mounted a virtio ext4 disk with the pinned modules.
+The ext4 `modules.dep` closure alone gave `Cannot load crc32c driver`.
+Load the pinned `crc32c_generic.ko` as well. The probe proved mount,
+copy-up and bounded writes through a separate overlay. A root switch
+still needs a proof.
 
 ## Prove
 
@@ -6844,7 +6860,7 @@ first poll gave the error of the bus, then "running").
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -6925,10 +6941,19 @@ table of the loads). `cargo test -p podvm-image tree_alone` (each holder
 of the tree refuses, a fill and another image do not), `cargo test -p
 podvm-extract put_aside`. The peak before and after on a private incusd,
 and the image volumes of the old path and of the new paths compared by
-path, type, mode, owner, size, SHA-256 and attributes. Experiment 434
-clause 31.
+path, type, mode, owner, size, SHA-256 and attributes. Hosted experiment
+475 checks all tree and import assertions of experiment 434 clause 31.
 
 ## Done
+
+**Done (2026-11-25).** Hosted Incus run 45621890257 on `7fb9e481`
+passed experiment 475 and regressions 471 and 474 against Incus 6.0.0.
+The first import flattened 517 entries and left zero store trees. The
+cached run reused the alias and read no layers. With the second image,
+a native run extracted 520 entries and created one tree. A fresh Incus
+import flattened the same 520 entries and retained the native tree at
+the same device and inode. All payloads returned 0. All Incus instances
+were removed. See [the transcript](../experiments/results/incus-layer-stream.txt).
 
 Partial (2026-11-24). Measured on the cloud host (a private root incusd 6.0.0,
 `INCUS_DIR`, the store and a btrfs pool on one loop-backed btrfs,
@@ -6984,18 +7009,10 @@ and checks the pool before it streams the unified archive. The tree path
 serves images that require extraction. The same change reads the cut
 marker of a response that pod-incus truncated. In the worker checkout,
 `cargo test --locked -p podvm --bin podvm incus::` passed 45 tests.
-Remaining (2): run experiment 434 clause 31 against a real incusd with
-this build. The new assertion requires a flattened import and rejects an
-extraction on that path.
-
-Hosted run 45619039653 on `6bb0ae96` passed experiment 475 against
-Incus 6.0.0. The fresh import flattened 517 entries and made no store
-tree. The second run used the same Incus alias without reading layers.
-Both commands returned 0, gave the expected output and removed their
-instances. Experiments 471 and 474 also passed. Experiment 475 now
-tests the rest of clause 31 with a second fixture. A native run must
-create a tree, and a fresh Incus import must keep that tree at the same
-inode. For those assertions, hosted run 45621890257 is on `7fb9e481`.
+Hosted run 45619039653 on `6bb0ae96` passed the first version of
+experiment 475 against Incus 6.0.0. It proved the fresh import, cached
+run and empty store. The later run above also proves native tree
+creation and retention.
 
 # T-2086: On a hosted runner with cgroup v2, `inspect` of an ended incus instance gives no peak memory and no OOM kill of a child
 
@@ -7114,9 +7131,12 @@ the instance and `inspect` give 256 MiB.
 ## Blocker
 
 COORD-248 (PodUtils/podvm#664) asks podcrates for a typed config PATCH and
-an instance ETag. Resume when a tagged release of pod-incus provides
-these calls. Podrunner uses cold instances for offers with lower limits
-until podvm releases this update.
+an instance ETag. The podcrates `v0.85.0` candidate at `1d1c9fc` has
+`Client::instance_with_etag`, `patch_instance_config` and a typed 412
+error. Main waits for the release tag. The call sends `If-Match`,
+diagnoses a conflict without retrying it blindly, and reads back each
+requested key. Podrunner uses cold instances for offers with lower
+limits until podvm releases this update.
 
 # T-2094: The saved state of the machine tier serves a run with `--podvm-channel` and `--pids-limit`
 
