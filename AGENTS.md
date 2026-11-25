@@ -197,10 +197,10 @@ to select each worker's model and effort.
    notice of the harness (Monitor, a task notification, an MCP event) can
    fail to come: never wait for one.
 6. Set up the pinned toolchain and update `PATH` as shown in
-   [Operator procedure](HUMAN.md#cloud-or-linux-session). Build the record
-   tools with `cargo build --release -p podvm-gate -p podvm-release`, then run
-   `./target/x86_64-unknown-linux-musl/release/podvm-gate` (the workspace
-   builds musl, `.cargo/config.toml`). Read each exit code without a pipe.
+   [Operator procedure](HUMAN.md#cloud-or-linux-session). That procedure
+   builds both record tools and runs `podvm-gate`. Tool setup and the record
+   build can run while the lead reads the handoff and checks CI and issues.
+   Read each exit code without a pipe.
 7. Sweep the open issues of this repository: no tool closes a COORD
    message, as only a session can see that its peer read it. For each
    open row of `TODO/issues.md` whose entries are done, read the peer: a
@@ -227,8 +227,9 @@ watches them.
    Actions runs with the tools in section 4 until it runs again.
    `.work/` stays ignored. Ask podcrates for changes to the watchers.
 
-   For a push or a dispatch that a step waits for, run `runs.py --repo
-   PodUtils/podvm --until SHA`: it exits 0 green, 1 red (with the failed
+   For a push or a dispatch that a step waits for, run
+   `python3 -I .work/podcrates-agent/runs.py --repo PodUtils/podvm --until SHA`.
+   It exits 0 green, 1 red (with the failed
    jobs and steps), 3 when each run was cancelled (a newer push), 2 at its
    timeout. Keyless reads of the forge share 60 an hour for each egress
    address: keep `--every` at 120 or more, and where the forge refuses

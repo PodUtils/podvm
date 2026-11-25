@@ -321,27 +321,16 @@ if want zig; then
 		bad "zig: not attempted, the disk allowance is short and the tarball is ~53 MB"
 	else
 		tmp="$(mktemp -d)"
-		url="https://ziglang.org/download/$ZIG_VERSION/zig-$ZIG_ARCH-linux-$ZIG_VERSION.tar.xz"
-		# ⛔ Verified before it is unpacked. A download this script cannot check
-		# is a failure: `docs/conventions/code.md` calls an unverified restore
-		# the class that corrupts silently.
-		if ! timeout 900 curl -fsS -o "$tmp/zig.tar.xz" "$url"; then
-			bad "zig: download failed from $url"
+		if ! sh "$HERE/fetch-zig.sh" "$ZIG_ARCH" "$ZIG_VERSION" "$ZIG_SHA256" "$tmp/zig.tar.xz"; then
+			bad "zig: could not download the verified $ZIG_VERSION archive"
+		elif timeout 300 tar -xf "$tmp/zig.tar.xz" -C "$tmp" &&
+			$SUDO rm -rf "${ZIG_PREFIX:?}" &&
+			$SUDO mv "$tmp/zig-$ZIG_ARCH-linux-$ZIG_VERSION" "$ZIG_PREFIX" &&
+			$SUDO ln -sf "$ZIG_PREFIX/zig" /usr/local/bin/zig &&
+			[ "$(zig version 2>/dev/null)" = "$ZIG_VERSION" ]; then
+			did "zig: $ZIG_VERSION at $ZIG_PREFIX, linked as /usr/local/bin/zig"
 		else
-			got="$(sha256sum "$tmp/zig.tar.xz" | cut -d' ' -f1)"
-			if [ "$got" != "$ZIG_SHA256" ]; then
-				bad "zig: sha256 mismatch. Expected $ZIG_SHA256, got $got.
-           ⛔ NOT unpacked. Re-pin the checksum in this script from
-           https://ziglang.org/download/index.json if the version moved."
-			elif timeout 300 tar -xf "$tmp/zig.tar.xz" -C "$tmp" &&
-				$SUDO rm -rf "${ZIG_PREFIX:?}" &&
-				$SUDO mv "$tmp/zig-$ZIG_ARCH-linux-$ZIG_VERSION" "$ZIG_PREFIX" &&
-				$SUDO ln -sf "$ZIG_PREFIX/zig" /usr/local/bin/zig &&
-				[ "$(zig version 2>/dev/null)" = "$ZIG_VERSION" ]; then
-				did "zig: $ZIG_VERSION at $ZIG_PREFIX, linked as /usr/local/bin/zig"
-			else
-				bad "zig: unpack or link failed"
-			fi
+			bad "zig: unpack or link failed"
 		fi
 		rm -rf "$tmp"
 	fi

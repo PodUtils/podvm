@@ -54,7 +54,10 @@ fi
 for file in watch.py watch_test.py runs.py; do
   if [ ! -s "$watcher_dir/$file" ]; then
     url="https://raw.githubusercontent.com/PodUtils/podcrates/$pin/scripts/agent/$file"
-    curl -qfsSL --max-time 60 -o "$watcher_dir/$file.part" "$url" </dev/null
+    if ! curl -qfsSL --max-time 60 -o "$watcher_dir/$file.part" "$url" </dev/null; then
+      printf 'session-start: could not fetch %s from podcrates at %s\n' "$file" "$pin" >&2
+      exit 1
+    fi
     mv -- "$watcher_dir/$file.part" "$watcher_dir/$file"
   fi
 done

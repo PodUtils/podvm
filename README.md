@@ -131,8 +131,8 @@ The build status verifies input and output bytes.
 
 For repository work, read [AGENTS.md](AGENTS.md) first.
 For Claude Code and Codex, see [Hosted sessions](docs/hosted-sessions.md).
-`podvm-dev session` reports the host, and `podvm-dev check` runs the
-complete Linux check ([the gate](docs/methodology/gate.md)).
+Use `podvm-dev session --check` for a lane report. Use `podvm-dev check`
+for the complete Linux check ([the gate](docs/methodology/gate.md)).
 
 The Windows lane on wsl-toolkit is parked. [Container procedures](docs/containers.md)
 keep its steps.

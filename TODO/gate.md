@@ -6022,3 +6022,17 @@ An existing output kept its files. A candidate that failed to make a
 manual left no output. An Alpine container with only the bundle mounted
 ran the candidate as uid 1000. The Claude wrapper was exercised on
 Codex with the Claude environment variables in a fixture.
+
+The cold-start recheck used a shallow checkout with no target directory
+or watcher state. With the host toolchain and Cargo cache present, both
+startup entry points and the record gate passed in 30 seconds. An agent
+with only the tracked files found the next item in `TODO/PROGRESS.md`.
+The resume page now links to the current record and the operator
+procedure. The procedure starts the product build only when a task
+needs it.
+
+Hosted gate 45580001625 had two bootstrap failures while downloading
+Zig from ziglang.org. The x86_64 cloud setup and CI bootstrap now use the
+same pinned mirror downloader. A live x86_64 mirror download matched the
+Zig 0.16.0 SHA-256 pin. A wrong archive on the direct download path
+failed the checksum and was removed.

@@ -3,7 +3,7 @@
 The state on 2026-11-25, 03:40 (UTC), at the end of a session (the owner
 restarts the session). `main` is
 at the commit that changes this file or later. A fresh session with no
-memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
+memory reads `AGENTS.md` first, then this file, `TODO/PROGRESS.md` and
 `docs/decisions.md`. The handoffs before this one are in git: `git show
 0cb62f18:docs/HANDOFF.md`. Remove this file when each step below is done.
 
@@ -74,7 +74,7 @@ memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
 2. T-2078 remaining 3: a run on the hosted runner of
    PodUtils/podrunner#346 with the next beta (remaining 1 is done,
    experiment 472).
-3. Sweep the 52 open issues at each session start (`AGENTS.md`, section 8
+3. Sweep the current open issues at each session start (`AGENTS.md`, section 8
    item 7), and map each new issue to the entry of its own finding.
 4. podrunner: #583 (T-1964 pool with a quota, T-1968), #596 and #599 (the
    hosted snapshot: T-1994, T-1996, T-1998, T-1999), #593 (T-1990,

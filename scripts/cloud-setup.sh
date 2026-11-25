@@ -5,10 +5,8 @@
 #
 #   sh scripts/cloud-setup.sh
 #
-# 1. zig from the mirrors that PodUtils/podcrates keeps (its fetch-zig.sh at
-#    a pinned commit), because ziglang.org can be outside the allowlist of
-#    the egress proxy of a cloud session. The version and the SHA-256 are
-#    the pins of scripts/common/bootstrap-env.sh.
+# 1. zig from the download procedure shared with scripts/common/bootstrap-env.sh.
+#    Both callers use the same version and SHA-256 pin.
 # 2. Rustup from the Rust distribution when it is absent. Rustup reads
 #    rust-toolchain.toml. scripts/common/bootstrap-env.sh checks the musl
 #    target and sets up cargo-bloat, gcc, the binary tools and OpenSSH.
@@ -23,30 +21,27 @@ root=$(cd "$here/.." && pwd)
 [ "$(uname -s)" = Linux ] || { echo "cloud-setup: Linux only" >&2; exit 2; }
 cd "$root" || exit 1
 
-PODCRATES_COMMIT=54427f6677b17cc96638f0fafc44b615e467fb4f
 ZIG_VERSION=0.16.0
 ZIG_SHA256=70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00
 tools=${PODVM_TOOLS:-$HOME/.local/podvm}
-work=$root/.work/cloud-setup
 cargo_bin=${CARGO_HOME:-$HOME/.cargo}/bin
 case "$cargo_bin" in /*) ;; *) cargo_bin=$root/$cargo_bin ;; esac
 rc=0
 
-mkdir -p "$work" "$tools" "$HOME/.local/bin" || exit 1
+mkdir -p "$tools" "$HOME/.local/bin" || exit 1
 case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) PATH=$HOME/.local/bin:$PATH; export PATH ;; esac
 
 if [ "$(zig version 2>/dev/null)" != "$ZIG_VERSION" ]; then
-    for f in fetch-zig.sh zig-mirrors.txt; do
-        curl -qfsSL --max-time 60 -o "$work/$f" \
-            "https://raw.githubusercontent.com/PodUtils/podcrates/$PODCRATES_COMMIT/scripts/$f" || rc=1
-    done
+    if ! command -v xz >/dev/null 2>&1; then
+        bash "$root/scripts/common/bootstrap-env.sh" tools || rc=1
+    fi
     if [ "$rc" -eq 0 ] &&
-        ZIG_SOURCE=podvm sh "$work/fetch-zig.sh" "$ZIG_VERSION" "$ZIG_SHA256" "$tools/zig.tar.xz" "$work/zig-mirrors.txt" &&
+        sh "$root/scripts/common/fetch-zig.sh" x86_64 "$ZIG_VERSION" "$ZIG_SHA256" "$tools/zig.tar.xz" &&
         tar -xJf "$tools/zig.tar.xz" -C "$tools"; then
         rm -f "$tools/zig.tar.xz"
         ln -sf "$tools/zig-x86_64-linux-$ZIG_VERSION/zig" "$HOME/.local/bin/zig"
     else
-        echo "cloud-setup: zig $ZIG_VERSION could not be fetched" >&2
+        echo "cloud-setup: zig $ZIG_VERSION could not be prepared" >&2
         rc=1
     fi
 fi

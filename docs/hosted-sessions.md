@@ -9,6 +9,7 @@ Code calls the same script through its `SessionStart` hook. The script
 sets the repository Git identity and hooks path. It also starts the
 organization and Actions watchers in the lead checkout.
 
+Use the [cold start](../TODO/RESUME.md) to find the current work.
 Follow the start order in `AGENTS.md`, section 8. Use the toolchain setup
 in [Operator procedure](../HUMAN.md#cloud-or-linux-session), including the
 `PATH` updates for a fresh shell. If the checkout is shallow, unshallow
