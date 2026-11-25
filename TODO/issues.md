@@ -560,6 +560,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #664 | COORD-248: pod-incus config PATCH for live instance limits (to podcrates) | open | T-2093 |
 | #665 | [gh action] requested | closed (direct dispatch started run 45593099465 on `04c8b7f4`) | the dispatch of the `incus` job of `kvm.yml` (experiment 474, T-1964) |
 | #666 | COORD-249: podvm took podcrates v0.84.0 (to podcrates) | closed (PodUtils/podcrates#260 lists `04c8b7f4` under Takes) | T-2096 |
+| #667 | COORD-250: required size-limited tmpfs mounts in pod-enter (to podcrates) | open | T-1968 |
 
 ## Messages whose title does not start with COORD-NNN
 

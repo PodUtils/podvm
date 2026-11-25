@@ -33,9 +33,13 @@ contains the commit that changes this file. A fresh session reads
   #663, closed: PodUtils/podcrates#259 lists the take). podrunner pins
   beta.40 in its `4fc871c` (#662, closed).
 * `main` takes podcrates `v0.84.0` and its shared gzip writer (T-2096,
-  `04c8b7f4`, #666, PodUtils/podcrates#260). The layer stream of T-2085
-  has a stand-in proof and needs the live `incusd` proof of experiment
-  434 clause 31.
+  `04c8b7f4`, #666, PodUtils/podcrates#260). T-2085 has a stand-in
+  proof. Hosted Incus run 45619039653 on `6bb0ae96` runs experiment 475
+  for the fresh and cached layer-stream assertions of experiment 434
+  clause 31.
+* T-2054's spare-tree helper now clears its environment. Both
+  `tree-prefill` paths worked with an empty environment in a private
+  Alpine store. T-2054 still tracks the helper's store path in argv.
 * The saved-state and layer-stream follow-up passed `sh scripts/dev/checks.sh`.
   The candidate, a static binary of 9,488,600 bytes, passed experiment 473
   under TCG. An earlier check during a QEMU run had one broker test fail.
@@ -89,7 +93,9 @@ contains the commit that changes this file. A fresh session reads
    experiment 472).
 3. Sweep the current open issues at each session start (`AGENTS.md`, section 8
    item 7), and map each new issue to the entry of its own finding.
-4. podrunner: #583 (T-1968, a sized writable disk), then #596 and #599 (the
+4. podrunner: #583 (T-1968, a sized writable disk). The machine tier
+   needs the disk-backed root of T-1994, and the namespace tier needs
+   the pod-enter mount requested in #667. Then #596 and #599 (the
    hosted snapshot: T-1994, T-1996, T-1998, T-1999), #593 (T-1990,
    T-1991). Then T-2088 and the open rows of T-2070, T-2079, T-2087.
 5. T-2085 remainder (run the layer stream proof against incusd,

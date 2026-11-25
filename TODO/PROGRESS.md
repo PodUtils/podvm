@@ -7,7 +7,7 @@ start.
 
 ## State
 
-667 entries: 23 open, 42 partial, 6 blocked, 596 done.
+667 entries: 22 open, 42 partial, 7 blocked, 596 done.
 
 * The newest release is `v0.2.0-beta.40` (2026-11-24). [CHANGELOG](../CHANGELOG.md)
   holds what each release ships, with its known gaps.
@@ -42,7 +42,8 @@ status with `podvm-count` in the same commit as the work.
    (on 2026-11-25: PodUtils/podrunner#354, [T-2093](machine.md), blocked
    on the pod-incus API requested in #664),
    then PodUtils/podrunner#277, #216, #189, #168, #110, #296 (the
-   sized writable disk in [T-1968](machine.md)), and #313
+   sized writable disk in [T-1968](machine.md), which needs the
+   disk-backed guest root and the pod-enter mount in #667), and #313
    and #316 (the hosted snapshot: [T-1996](machine.md), T-1999, which
    needs the machine-tier xattr proof, [T-1994](machine.md) and
    [T-1998](machine.md)). Then the asks of githome and cfb for their CI,

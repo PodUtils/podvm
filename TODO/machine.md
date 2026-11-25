@@ -5545,7 +5545,7 @@ As uid 1000, under KVM or TCG: `run --podvm-tier=machine --pids-limit 16 public.
 **Milestone:** none
 **Priority:** P2
 **Effort:** L
-**Status:** open
+**Status:** blocked
 
 ## Problem
 
@@ -5566,6 +5566,18 @@ Machine tier: a flag that sizes the writable disk of the guest. Namespace rung: 
 ## Prove
 
 `kvm.yml`: a machine guest with a 1 GiB writable disk gives `No space left on device` to a write of 2 GiB; as uid 1000, `run -d --tmpfs /w:size=64m` gives the same to a write of 100 MiB in `/w`.
+
+## Blocker
+
+The OCI machine guest currently uses a RAM-backed initrd and optional
+host-backed 9p volumes. T-1994 must supply its disk-backed writable root
+before T-1968 can size it. Podrunner currently binds its host unit work
+directory at `/podrunner-work` over 9p on the machine tier. A limit on the
+guest root cannot bound writes to that bind. The namespace work directory
+needs a required size-limited mount in pod-enter, requested in #667
+(COORD-250). On this host `unshare -Ur -m` could start, and the tmpfs mount returned
+`Permission denied`. The namespace proof needs a hosted lane that can
+mount tmpfs in its user and mount namespaces.
 
 # T-1993: On the incus tier, the init of the image (systemd) runs as PID 1
 
@@ -5661,6 +5673,13 @@ Experiment 434, a new clause with `--podvm-init=image --podvm-engine` of an imag
 ## Done
 
 Partial (2026-11-19): with `--podvm-init=image` the instance takes `security.idmap.isolated` and `security.idmap.size` 231072 (`incus::run::snapshot_keys`), the device `podvm-fuse` (`unix-char` `/dev/fuse`), and an empty `/etc/machine-id` before its start (`incus::verbs::detached`). The unit test `the_init_of_the_image_gets_the_ids_and_the_fuse_of_the_snapshot` passes. Experiment 434 on `6a0c609` gives "THE INCUS TIER RUNS"; clause 20 with ubi-init: two instances map 231072 ids each, open `/dev/fuse`, and have the machine-ids `8c6d1642...` and `87bf538c...`. Where incusd has fewer free ids, the error of incusd names what the flag needs and `/etc/subuid`; a host with no `/dev/fuse` starts the instance with no device. Remaining: rootless `podman run` and a `fuse-overlayfs` mount of a user with `165536:65536`, which ubi-init does not carry: podrunner's snapshot measures them.
+
+On 2026-11-25, hosted boot run 45276447058 confirmed systemd and a
+machine ID. The full hosted run 45521078992 confirmed `/dev/fuse`.
+Experiment 476 checks the nested UID and GID maps, runs one local OCI
+image offline with Podman as `runner`, and checks copy-up in an actual
+FUSE overlay. Shell syntax, map checks and refusal checks passed locally.
+The experiment still needs a run inside the hosted snapshot (#599).
 
 # T-1997: On the incus tier, the import of a large image keeps no third copy
 
