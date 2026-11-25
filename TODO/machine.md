@@ -5553,7 +5553,10 @@ githome's G-18 needs `limits.disk`: a job past the size of the writable layer an
 
 ## Premise
 
-incus: T-1964. Machine tier: the guest has a writable disk that podvm makes. Namespace rung with no root: no quota and no loop device are open; only a tmpfs with `size=` (memory) or a FUSE file system can hold a size.
+Incus uses the root quota of T-1964. The machine tier can use a bounded
+per-run block device for the writable layer and work directory. On the
+namespace rung, a user without root can use tmpfs with `size=` (memory)
+or a FUSE file system to limit bytes.
 
 ## Approach
 
@@ -5649,6 +5652,12 @@ the same fixture. The read-only image kept the ACL, both other xattrs,
 late parent metadata, numeric IDs, the setuid mode, the hard link and
 the symlink. The reader checked the exact attribute bytes offline.
 Guest kernel support and disk use on a large image need a proof.
+The shared static writer pin is requested in #668 (COORD-251). The
+verified Alpine 3.22.6 amd64 and arm64 kernel configs for
+`6.12.110-0-virt` disable EROFS. Each pinned modloop has virtio block,
+ext4 with ACL and security xattrs, and overlay modules. An EROFS guest
+proof needs a kernel pin with EROFS. An ext4 proof can use the current
+pins after the guest loads the required modules before switching root.
 
 ## Prove
 
@@ -5788,6 +5797,17 @@ Experiment 434, a new clause: an image whose `/bin/ping` has `cap_net_raw+ep`; `
 ## Done
 
 Partial (2026-11-19): podcrates `v0.76.0` (podcrates@T-957) is taken (`16f2395`): `pod-extract` sets each `SCHILY.xattr.*` record that the kernel lets it set, and names each other one in the sidecar row with its value. The unified tarball of the incus tier carries the attributes of the image as PAX records (`incus/xattrs.rs`): `security.capability` and `user.*` of the tree, and each attribute of the sidecar with a value; a v3 capability of the tree (the root id of the extracting user's namespace) goes as v2, so that the kernel of the instance sets its own root id. The unit test `the_sidecar_and_the_records_carry_each_attribute` passes. Experiment 434 on `1bbc6cd` gives "THE INCUS TIER RUNS" (the result is in `5d40e15`); clause 22: alpine with a layer whose `/usr/bin/capfile` carries `cap_net_raw+ep` in a PAX record; the sidecar names it (`EPERM`, the v2 value of the layer), and in the root of the instance of the incus tier the file has `security.capability` `01000003...0020...3fd64477`: `cap_net_raw` effective and permitted, v3 with the instance's own root id. Remaining: the root of the machine tier, on `kvm.yml`.
+
+Amended (2026-11-25). Hosted boot run 45276447058 showed
+`/usr/bin/ping cap_net_raw=ep` in the Incus hosted-core slice. The
+machine base archive writes `newc` ownership, modes, files and links
+and omits the xattrs. The machine proof needs a root path that
+preserves them, such as the disk path in T-1994. Use hosted-core slice
+`sha256:847604d919c0e56c3d391153b8778ebdc8c609471455b6f2e25f16c3e6795b65`.
+With only guest loopback up, `getcap` must show the file capability.
+As uid 1000, `ping -4 -n -e 0 -c 1 -W 1 127.0.0.1` must get a reply.
+The `-e 0` check requires a raw socket. An identical `0755` copy without
+the file capability must fail under the same credentials.
 
 # T-2008: The machine tier boots systemd at each run: a saved state of the guest for each digest
 
@@ -6975,7 +6995,7 @@ Both commands returned 0, gave the expected output and removed their
 instances. Experiments 471 and 474 also passed. Experiment 475 now
 tests the rest of clause 31 with a second fixture. A native run must
 create a tree, and a fresh Incus import must keep that tree at the same
-inode. That addition needs a hosted run.
+inode. For those assertions, hosted run 45621890257 is on `7fb9e481`.
 
 # T-2086: On a hosted runner with cgroup v2, `inspect` of an ended incus instance gives no peak memory and no OOM kill of a child
 

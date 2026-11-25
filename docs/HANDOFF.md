@@ -35,8 +35,9 @@ contains the commit that changes this file. A fresh session reads
 * `main` takes podcrates `v0.84.0` and its shared gzip writer (T-2096,
   `04c8b7f4`, #666, PodUtils/podcrates#260). Hosted Incus run 45619039653
   on `6bb0ae96` passed experiment 475 for the fresh and cached layer
-  streams. The added native-tree retention assertions of experiment 434
-  clause 31 need a second hosted run (T-2085, #657).
+  streams. Hosted run 45621890257 on `7fb9e481` covers the added
+  native-tree retention assertions of experiment 434 clause 31 (T-2085,
+  #657).
 * T-2054's spare-tree helper now clears its environment. Both
   `tree-prefill` paths worked with an empty environment in a private
   Alpine store. T-2054 still tracks the helper's store path in argv.
@@ -45,6 +46,12 @@ contains the commit that changes this file. A fresh session reads
   exit 7 under TCG. Hosted run 45153867720 already proves experiments 465
   and 468 with `warm::line` under KVM. T-2048 still tracks SIGTERM during
   an active save.
+* The current source built 37 release test binaries for `podvm` and
+  `podvm-supervise`. As uid 1000 on this host, 34 passed. Three hit host
+  limits: `pid_init_hidden` saw blank argv where `PR_SET_MM_MAP` returned
+  `EPERM`, `store_gates` could not mount the noexec store, and
+  `refusal_text` hit the missing Landlock check before its expected
+  path check. These constraints need a capable host for those tests.
 * The saved-state and layer-stream follow-up passed `sh scripts/dev/checks.sh`.
   The candidate, a static binary of 9,488,600 bytes, passed experiment 473
   under TCG. An earlier check during a QEMU run had one broker test fail.
@@ -103,10 +110,13 @@ contains the commit that changes this file. A fresh session reads
    the pod-enter mount requested in #667. Podrunner's 9p work mount also
    needs a bound (#583). Experiment 477 found that `sqfstar` 4.6.1 loses
    a valid POSIX ACL. Experiment 478 confirmed that EROFS full tar mode
-   keeps that ACL. A static builder, a guest mount and a large-image
-   measurement still need work. Experiment 476 needs the podrunner hosted-boot wiring
-   requested in #599. Then #596 and #599 (the
-   hosted snapshot: T-1994, T-1996, T-1998, T-1999), #593 (T-1990,
+   keeps that ACL. The static builder pin is requested in #668. Both
+   pinned Alpine kernels disable EROFS and carry virtio block, ext4 and
+   overlay modules. The EROFS path needs another kernel pin. T-1999
+   needs a machine root that keeps file capabilities. Experiment 476
+   needs the podrunner hosted-boot wiring requested in #599. Then #596
+   and #599 (the hosted snapshot: T-1994, T-1996, T-1998, T-1999),
+   #593 (T-1990,
    T-1991). Then T-2088 and the open rows of T-2070, T-2079, T-2087.
 5. T-2085 remainder (run the layer stream proof against incusd,
    PodUtils/podcrates#260, the answer to #657),
