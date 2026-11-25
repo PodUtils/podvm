@@ -129,8 +129,8 @@ The text of 2a and 2b is podcrates' docs/session-protocol.md at
   Read the quick card of a service first (`https://SERVICE.web.pkgforge.dev/llms.txt`).
   A 503 or a 429 is temporary: try again, then use the tool of the
   harness. Where the egress of the session refuses the host (403 from the
-  proxy), use the tool of the harness. Writes to GitHub (an issue, a
-  comment, a dispatch) use the GitHub MCP tools. Give this rule to each
+  proxy), use the tool of the harness. Use GitHub MCP for issues and
+  comments. Dispatch workflows as shown in section 9. Give this rule to each
   subagent in its brief.
 * Use CodeGraph before a source search when a `.codegraph/` exists.
 * The captured reference trees are not in the tree. Each reference is an
@@ -279,12 +279,13 @@ watches them.
      `taken` line ends the freeze. Write each fix of a frozen file as a
      COORD issue `(to podcrates)`, so that podcrates ports it.
 
-5. The lead dispatches the workflows of this repository with the session's
-   GitHub dispatch tool when available. Claude Code uses
-   `actions_run_trigger` (the owner's account). Read the run and job logs
+5. The lead dispatches the workflows of this repository. Claude Code uses
+   `actions_run_trigger` (the owner's account). In Codex, check `gh auth
+   status` and use `gh workflow run` when `gh` has access. Verify the
+   run and its revision after dispatch. Read the run and job logs
    by section 4 (`docs/decisions.md`, 2026-11-09, "Workflow dispatch").
 
-   When the dispatch tool is absent, or the session cannot start a run,
+   When the session cannot start a run through an available dispatch route,
    open a NEW issue in this repository titled
    exactly `[gh action] requested`, one for each run (`docs/decisions.md`,
    2026-11-13, "Workflow fallback"). COORD issues stay the channel to the

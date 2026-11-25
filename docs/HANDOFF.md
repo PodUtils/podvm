@@ -46,8 +46,8 @@ contains the commit that changes this file. A fresh session reads
   the commit of `podvm-dev build` (T-2091, #531). Gate 45536609832 on
   `a033f62` and gate 45539122840 on `07416ff` are green.
 * The start sweep found 52 open issues in GitHub and in the record.
-  #664 (the pod-incus request) and #665 (the hosted quota proof request)
-  are open. Podcrates lists the take under Takes in PodUtils/podcrates#260.
+  #664 (the pod-incus request) is open. Direct dispatch superseded #665.
+  Podcrates lists the take under Takes in PodUtils/podcrates#260.
   The record closes #666 when it is pushed and issue-sync runs.
 * The issue cleanup of 2026-11-24 is done: four agents checked each open
   issue against the code, the record and a run of the beta.40 binary. 87
@@ -86,8 +86,7 @@ contains the commit that changes this file. A fresh session reads
 3. Sweep the current open issues at each session start (`AGENTS.md`, section 8
    item 7), and map each new issue to the entry of its own finding.
 4. podrunner: #583 (experiment 474 in the `incus` job of `kvm.yml` for
-   the T-1964 quota proof, request #665, then T-1968). Keep the remote
-   `main` at `04c8b7f4` until #665 dispatches on that commit.
+   the T-1964 quota proof, run 45593099465 on `04c8b7f4`, then T-1968).
    Then #596 and #599 (the
    hosted snapshot: T-1994, T-1996, T-1998, T-1999), #593 (T-1990,
    T-1991). Then T-2088 and the open rows of T-2070, T-2079, T-2087.

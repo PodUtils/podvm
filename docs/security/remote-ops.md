@@ -41,8 +41,8 @@ Do not ask again for that same action.
 Use the approved scope and verify the exact target.
 A session can cut a beta release when it fits; no crate goes to crates.io
 ([decisions](../decisions.md), 2026-11-09).
-The lead uses the available GitHub dispatch tool for workflows of this
-repository. When it cannot start a run, it opens an issue titled
+The lead uses the session's dispatch tool or authenticated `gh workflow
+run` for workflows of this repository. When it cannot start a run, it opens an issue titled
 `[gh action] requested` (`AGENTS.md`, section 9, item 5).
 Do not delete a tag or a release.
 

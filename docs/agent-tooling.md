@@ -49,7 +49,8 @@ The workspace builds the target `x86_64-unknown-linux-musl`
 
 Use shell tools (`git`, `curl`, `cargo`, `gh`) before MCP tools.
 For a read-only query of GitHub, use a mirror that `AGENTS.md`, section 4, names.
-Use the session's GitHub dispatch tool for workflows of this repository.
+Use the session's dispatch tool or authenticated `gh workflow run` for
+workflows of this repository.
 When the lead cannot dispatch, use the issue procedure in `AGENTS.md`,
 section 9, item 5.
 [Remote rules](security/remote-ops.md) govern each route.

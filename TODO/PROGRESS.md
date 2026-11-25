@@ -19,8 +19,8 @@ start.
 * KVM is free (the owner, 2026-11-09). Probe `/dev/kvm` on the current host.
   `kvm.yml` (T-1682) gives a hosted runner with it, and `arm.yml` a hosted
   arm64 runner (T-1721).
-* A push starts the gate, `secrets` and `issue-sync`, and
-  `actions_run_trigger` dispatches each workflow. A newer push cancels the
+* A push starts the gate, `secrets` and `issue-sync`. The session
+  dispatches other workflows directly. A newer push cancels the
   gate of an older commit. The issue `[gh action] requested` is the
   fallback only (`docs/decisions.md`, 2026-11-13, "Workflow fallback").
 

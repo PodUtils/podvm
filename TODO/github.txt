@@ -554,5 +554,5 @@
 662 issue closed
 663 issue closed
 664 issue open
-665 issue open
+665 issue closed
 666 issue closed
