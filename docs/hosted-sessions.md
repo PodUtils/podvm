@@ -7,13 +7,16 @@ Use Claude Code or Codex for hosted repository work. Both use [AGENTS.md](../AGE
 From the checkout, run `sh scripts/session-start.sh` in Codex. Claude
 Code calls the same script through its `SessionStart` hook. The script
 sets the repository Git identity and hooks path. It also starts the
-organization and Actions watchers in the lead checkout.
+organization and Actions watchers in the lead checkout. It fast-forwards
+clean `main` checkouts and preserves dirty checkouts and unpublished
+commits. Startup checks the cached watcher files against pinned SHA-256
+sums. Each watcher holds a lock while it runs.
 
 Use the [cold start](../TODO/RESUME.md) to find the current work.
 Follow the start order in `AGENTS.md`, section 8. Use the toolchain setup
 in [Operator procedure](../HUMAN.md#cloud-or-linux-session), including the
-`PATH` updates for a fresh shell. If the checkout is shallow, unshallow
-it before you read a history range.
+`scripts/cloud-env.sh` step for each fresh shell. If the checkout is
+shallow, unshallow it before you read a history range.
 
 ## Lead and workers
 
@@ -43,7 +46,9 @@ The lead reads `.work/watch.log` for organization activity and COORD
 messages, and `.work/runs.log` for Actions. Check the logs between steps
 and after each push or dispatch. Restart a watcher that stops. Follow the
 fallback in `AGENTS.md`, section 9, when the session cannot dispatch a
-workflow.
+workflow. When work waits for a known Actions run, keep the turn active
+and use `gh run watch RUN_ID --repo PodUtils/podvm --exit-status`. The
+watcher logs are available to a later turn while the host is available.
 
 ## Check the current host
 

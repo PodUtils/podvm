@@ -29,7 +29,8 @@ case "$cargo_bin" in /*) ;; *) cargo_bin=$root/$cargo_bin ;; esac
 rc=0
 
 mkdir -p "$tools" "$HOME/.local/bin" || exit 1
-case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) PATH=$HOME/.local/bin:$PATH; export PATH ;; esac
+# shellcheck source=scripts/cloud-env.sh
+. ./scripts/cloud-env.sh || exit 1
 
 if [ "$(zig version 2>/dev/null)" != "$ZIG_VERSION" ]; then
     if ! command -v xz >/dev/null 2>&1; then
@@ -74,7 +75,6 @@ setup_rust() {
         install_rustup || return 1
     fi
     if [ -x "$cargo_bin/rustup" ]; then
-        case ":$PATH:" in *":$cargo_bin:"*) ;; *) PATH=$cargo_bin:$PATH; export PATH ;; esac
         # A later shell can find these commands on ~/.local/bin.
         for tool in cargo rustc rustup; do
             target=$HOME/.local/bin/$tool

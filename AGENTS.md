@@ -219,21 +219,26 @@ watches them.
    pull requests and the COORD messages of the organization) and `runs.py`
    (the Actions runs of one repository), from PodUtils/podcrates at a pinned
    commit (`5fd6fb7`: the tag `v0.83.0`, PodUtils/podcrates#259). Check
-   each with its self-test, and keep each running as a background process
-   with its log (`.work/watch.log`, `.work/runs.log`; start it again when
+   each with its SHA-256 and self-test. Keep each running as a background
+   process with its log (`.work/watch.log`, `.work/runs.log`; start it again when
    it ends). From the lead checkout, run `sh scripts/session-start.sh`
    to fetch, test, and restart them. Check both logs after a restart.
    If a watcher still cannot run, inspect the corresponding issues or
    Actions runs with the tools in section 4 until it runs again.
    `.work/` stays ignored. Ask podcrates for changes to the watchers.
 
-   For a push or a dispatch that a step waits for, run
-   `python3 -I .work/podcrates-agent/runs.py --repo PodUtils/podvm --until SHA`.
+   For a known run that the work waits for, use `gh run watch RUN_ID
+   --repo PodUtils/podvm --exit-status` with authenticated `gh`. To wait
+   for the runs of a commit, run `python3 -I` with `runs.py` from
+   `.work/podcrates-agent/5fd6fb7e3495d5e9a591e36c5752e268309f6e4a/`
+   and pass `--repo PodUtils/podvm --until SHA`.
    It exits 0 green, 1 red (with the failed
    jobs and steps), 3 when each run was cancelled (a newer push), 2 at its
    timeout. Keyless reads of the forge share 60 an hour for each egress
    address: keep `--every` at 120 or more, and where the forge refuses
-   reads (a 403), read the runs with the GitHub tool of the harness.
+   reads (a 403), read the runs with authenticated `gh` or the GitHub
+   tool of the harness. The background watchers write logs. A log entry
+   does not resume a turn that has ended.
 
    It prints one line for each event: each issue and pull request of this
    repository (new, commented, closed, reopened, merged, and a pull request

@@ -6036,3 +6036,16 @@ Zig from ziglang.org. The x86_64 cloud setup and CI bootstrap now use the
 same pinned mirror downloader. A live x86_64 mirror download matched the
 Zig 0.16.0 SHA-256 pin. A wrong archive on the direct download path
 failed the checksum and was removed.
+
+The follow-up uses the branch guard and verified watcher cache from the
+podrunner and podssh startup changes. A startup fixture fast-forwarded a
+clean `main`, preserved dirty and unpublished branches, and left the
+linked worktree without watcher state. Two concurrent startups left one
+watcher pair. A bad download failed the checksum, and a later valid
+download repaired the cache. Two live startup calls reused the same
+watcher pair. Sourcing `scripts/cloud-env.sh` twice kept one path entry
+per tool directory, and `sh scripts/cloud-setup.sh` found the installed
+Rust and Zig. The watcher logs record activity during the session.
+Use `gh run watch` while a turn waits for a result.
+[Podrunner startup](https://github.com/PodUtils/podrunner/commit/f18c7e114fff12dfb04b9da2118480c055fca36b)
+[PodSSH startup](https://github.com/PodUtils/podssh/commit/a13fef752a385565fd4ac721079663b06b539092)

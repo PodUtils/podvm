@@ -12,11 +12,7 @@ Use [Hosted sessions](docs/hosted-sessions.md) for Claude Code and Codex.
 
 ```sh
 sh scripts/cloud-setup.sh
-export PATH="$HOME/.local/bin:$PATH"
-export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-4}"
-if [ -f "${CARGO_HOME:-$HOME/.cargo}/env" ]; then
-    . "${CARGO_HOME:-$HOME/.cargo}/env"
-fi
+. ./scripts/cloud-env.sh
 cargo build --release -p podvm-gate -p podvm-release
 ./target/x86_64-unknown-linux-musl/release/podvm-gate
 ```

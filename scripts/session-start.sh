@@ -22,23 +22,38 @@ if [ "$git_dir" != "$common_dir" ]; then
   exit 0
 fi
 
-# Keep a dirty checkout and all local commits.
-branch=$(git symbolic-ref --short -q HEAD || :)
-if [ "$branch" != main ] && status=$(git status --porcelain) && [ -z "$status" ]; then
-  if git show-ref --verify --quiet refs/heads/main; then
-    git checkout -q main
-  else
-    timeout 60 git fetch -q origin main </dev/null
-    if git show-ref --verify --quiet refs/remotes/origin/main; then
-      git checkout -q -b main origin/main
+sync_main() {
+  changes=$(git status --porcelain) || return 1
+  if [ -n "$changes" ]; then
+    echo "session-start: keeping the checkout with local changes"
+    return 0
+  fi
+  upstream=refs/remotes/origin/main
+  if ! GIT_TERMINAL_PROMPT=0 timeout 60 git fetch -q origin "+refs/heads/main:$upstream" </dev/null; then
+    echo "session-start: could not fetch origin/main" >&2
+    return 1
+  fi
+  if [ "$(git symbolic-ref --short -q HEAD || :)" != main ]; then
+    if ! git merge-base --is-ancestor HEAD "$upstream"; then
+      echo "session-start: keeping the checkout with local commits or incomplete history" >&2
+      return 0
+    fi
+    if git show-ref --verify --quiet refs/heads/main; then
+      git switch -q main || return 1
     else
-      git checkout -q -b main FETCH_HEAD
+      git switch -q -c main --track origin/main || return 1
     fi
   fi
-fi
+  if ! git merge -q --ff-only "$upstream"; then
+    echo "session-start: local main could not fast-forward" >&2
+    return 1
+  fi
+}
 
 umask 077
-watcher_dir=.work/podcrates-agent
+# Watcher bytes and checksums come from podcrates v0.83.0.
+pin=5fd6fb7e3495d5e9a591e36c5752e268309f6e4a
+watcher_dir=.work/podcrates-agent/$pin
 mkdir -p "$watcher_dir"
 exec 9>.work/session-start.lock
 if ! flock -w 30 9; then
@@ -46,64 +61,66 @@ if ! flock -w 30 9; then
   exit 1
 fi
 
-# Both watchers come from the pinned podcrates v0.83.0 revision.
-pin=5fd6fb7e3495d5e9a591e36c5752e268309f6e4a
-if [ "$(cat "$watcher_dir/pin" 2>/dev/null || :)" != "$pin" ]; then
-  rm -f -- "$watcher_dir/watch.py" "$watcher_dir/watch_test.py" "$watcher_dir/runs.py"
-fi
-for file in watch.py watch_test.py runs.py; do
-  if [ ! -s "$watcher_dir/$file" ]; then
-    url="https://raw.githubusercontent.com/PodUtils/podcrates/$pin/scripts/agent/$file"
-    if ! curl -qfsSL --max-time 60 -o "$watcher_dir/$file.part" "$url" </dev/null; then
-      printf 'session-start: could not fetch %s from podcrates at %s\n' "$file" "$pin" >&2
-      exit 1
-    fi
-    mv -- "$watcher_dir/$file.part" "$watcher_dir/$file"
+fetch_watcher() (
+  file=$1
+  checksum=$2
+  cd "$watcher_dir"
+  if printf '%s  %s\n' "$checksum" "$file" | sha256sum --check --status 2>/dev/null; then
+    exit 0
   fi
-done
-printf '%s\n' "$pin" >"$watcher_dir/pin"
+  stage=$(mktemp "$file.XXXXXXXX")
+  trap 'rm -f -- "$stage"' EXIT
+  url=https://raw.githubusercontent.com/PodUtils/podcrates/$pin/scripts/agent/$file
+  if ! curl -qfsSL --proto '=https' --proto-redir '=https' --max-time 60 -o "$stage" "$url" </dev/null; then
+    printf 'session-start: could not fetch %s from podcrates at %s\n' "$file" "$pin" >&2
+    exit 1
+  fi
+  if ! printf '%s  %s\n' "$checksum" "$stage" | sha256sum --check --status; then
+    printf 'session-start: %s failed the SHA-256 check\n' "$file" >&2
+    exit 1
+  fi
+  mv -f -- "$stage" "$file"
+)
+
+status=0
+sync_main || status=1
+fetch_watcher watch.py 14702c073ba50d68572531f29dbbc10b366b25216ef69658da385ac60d4e9391
+fetch_watcher watch_test.py ff8d8a3d6ebbbde57135e174ee93b0330c237f611f479451f76e1173280a7568
+fetch_watcher runs.py 80754a64ba6281d7b0e03d59932bf6a7fe93aaab956bda907315854d81d13d36
 if ! timeout 20 python3 -I "$watcher_dir/watch.py" --self-test </dev/null >/dev/null ||
    ! timeout 20 python3 -I "$watcher_dir/runs.py" --self-test </dev/null >/dev/null; then
   echo "session-start: a podcrates watcher did not pass its self-test" >&2
   exit 1
 fi
 
-watcher_is_running() {
-  script=$1
-  shift
-  for pid in $(pgrep -fx "python3 -I \.work/podcrates-agent/${script}\.py $*"); do
-    if [ "$(readlink "/proc/$pid/cwd" 2>/dev/null)" = "$root" ]; then
-      return 0
-    fi
-  done
-  return 1
-}
-
 start_watcher() {
   name=$1
   shift
+  lock=.work/$name.lock
   log=.work/$name.log
-  if watcher_is_running "$name" "$@"; then
+  : >>"$lock" || return 1
+  if ! flock -n "$lock" true; then
     printf 'session-start: %s runs already. Log: %s\n' "$name" "$log"
     return 0
   fi
   if command -v setsid >/dev/null 2>&1; then
-    setsid -f python3 -I "$watcher_dir/$name.py" "$@" >>"$log" 2>&1 </dev/null 9>&-
+    setsid -f flock -nF "$lock" python3 -I -u "$watcher_dir/$name.py" "$@" \
+      >>"$log" 2>&1 </dev/null 9>&- || return 1
   else
-    nohup python3 -I "$watcher_dir/$name.py" "$@" >>"$log" 2>&1 </dev/null 9>&- &
+    nohup flock -nF "$lock" python3 -I -u "$watcher_dir/$name.py" "$@" \
+      >>"$log" 2>&1 </dev/null 9>&- &
   fi
   for attempt in 1 2 3 4 5; do
-    if watcher_is_running "$name" "$@"; then
+    sleep 1
+    if ! flock -n "$lock" true; then
       printf 'session-start: %s runs. Log: %s\n' "$name" "$log"
       return 0
     fi
-    sleep 1
   done
   printf 'session-start: %s did not start. See %s\n' "$name" "$log" >&2
   return 1
 }
 
-status=0
 start_watcher watch podvm --state .work/agent || status=1
 start_watcher runs --repo PodUtils/podvm --branch main --every 120 || status=1
 exit "$status"
