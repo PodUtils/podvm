@@ -40,6 +40,10 @@ contains the commit that changes this file. A fresh session reads
   The candidate, a static binary of 9,488,600 bytes, passed experiment 473
   under TCG. An earlier check during a QEMU run had one broker test fail.
   The test passed alone and the full check passed with QEMU stopped.
+* Hosted Incus run 45616608586 on `ddb185b1` passed experiments 471 and
+  474. T-1964 is done. A 1 GiB Btrfs root refused the large write with
+  `Quota exceeded` and exit 7 while the pool still had 7,507,083,264
+  bytes free. See `experiments/results/incus-root-quota.txt`.
 * On `main` after beta.40, not released (CHANGELOG, "Unreleased"): the
   room of an incus pool from incusd for each driver (T-2078 remaining 1,
   `a033f62`, experiment 472), what the namespace rung opens (T-2092, #546),
@@ -85,12 +89,7 @@ contains the commit that changes this file. A fresh session reads
    experiment 472).
 3. Sweep the current open issues at each session start (`AGENTS.md`, section 8
    item 7), and map each new issue to the entry of its own finding.
-4. podrunner: #583 (experiment 474 in the `incus` job of `kvm.yml` for
-   the T-1964 quota proof, run 45615157310 on `1697fe3d`, then T-1968).
-   In the first run, 45593099465, Incus reported a 1 GiB Btrfs root and
-   `inspect` gave `Stopped -`. The retry collects the write status and
-   output over Incus exec.
-   Then #596 and #599 (the
+4. podrunner: #583 (T-1968, a sized writable disk), then #596 and #599 (the
    hosted snapshot: T-1994, T-1996, T-1998, T-1999), #593 (T-1990,
    T-1991). Then T-2088 and the open rows of T-2070, T-2079, T-2087.
 5. T-2085 remainder (run the layer stream proof against incusd,

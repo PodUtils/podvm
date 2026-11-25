@@ -5383,11 +5383,14 @@ One table test: a `-v` host path with a comma gives one `-virtfs` option with th
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** partial
+**Status:** done
 
 ## Problem
 
-githome's units on the `incus` kind need a bounded root disk (40 GB), so that a job past it gets `ENOSPC` and the pool of the host stays bounded (podrunner@T-482).
+githome's units on the `incus` kind need a bounded root disk (40 GB).
+The filesystem must refuse writes above that quota while the host pool
+has room. Podrunner described the expected error as `ENOSPC`
+(podrunner@T-482).
 
 ## Premise
 
@@ -5410,7 +5413,16 @@ exit and the transcript records the kernel's error.
 
 ## Done
 
-**Partial (2026-11-18).** podcrates `v0.71.0` (PodUtils/podcrates#228, podcrates@T-925) gives `Client::profile` and `Client::instance_state`. `run -d --podvm-tier=incus --storage-opt size=N` (also `run` and `create`; `N` as `1G`, `1GB`, `1GiB`, `512MiB` or bytes, at least 64m) copies the `root` device of the default profile with `size` (`incus::run::apply_limits`); after the start, `incus::run::size_held` reads the state of the root disk, and a pool that reports no limit refuses the run and leaves no instance. Each other tier refuses the flag by name; docker's other options of the flag are refusals. Experiment 434 clause 17, on the `dir` pool of route A: `run -d --storage-opt size=1GiB` exits 125 with "the storage pool of the instance holds no size of its root disk", no instance stays, and a native run refuses the flag by name. The run found a fault, fixed in `d812a02`: `size=1GiB` was refused. `storage_opt_takes_each_spelling_of_a_size` pins the spellings. Remaining: a pool with a quota (btrfs, zfs, lvm) that bounds the disk; route A runs incusd in a user namespace, which can mount none of them, so podrunner's host or a hosted runner measures it.
+**Done (2026-11-25).** Hosted run 45616608586 at `ddb185b1` passed
+experiment 474 on Btrfs. Incus reported a root quota of 1,073,741,824
+bytes. The 16 MiB write succeeded. The 2 GiB write stopped at
+1,039,343,616 bytes with `Quota exceeded` and payload exit 7. The pool
+still had 7,507,083,264 bytes free. The experiment verified removal of
+the instance. The job also passed experiment 471.
+[Transcript](../experiments/results/incus-root-quota.txt)
+[Hosted run](https://github.com/PodUtils/podvm/actions/runs/45616608586)
+
+**Partial (2026-11-18).** podcrates `v0.71.0` (PodUtils/podcrates#228, podcrates@T-925) gives `Client::profile` and `Client::instance_state`. `run -d --podvm-tier=incus --storage-opt size=N` (also `run` and `create`; `N` as `1G`, `1GB`, `1GiB`, `512MiB` or bytes, at least 64m) copies the `root` device of the default profile with `size` (`incus::run::apply_limits`); after the start, `incus::run::size_held` reads the state of the root disk, and a pool that reports no limit refuses the run and leaves no instance. Each other tier refuses the flag by name; docker's other options of the flag are refusals. Experiment 434 clause 17, on the `dir` pool of route A: `run -d --storage-opt size=1GiB` exits 125 with "the storage pool of the instance holds no size of its root disk", no instance stays, and a native run refuses the flag by name. The run found a fault, fixed in `d812a02`: `size=1GiB` was refused. `storage_opt_takes_each_spelling_of_a_size` pins the spellings. The quota-backed pool proof followed on the hosted runner.
 
 
 Hosted run 45593099465 on `04c8b7f4` reported a 1 GiB Btrfs root, then

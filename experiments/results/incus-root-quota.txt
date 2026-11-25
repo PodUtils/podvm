@@ -1,0 +1,22 @@
+Experiment 474 on GitHub Actions run 45616608586, job 139213532388.
+Excerpt from the experiment step log.
+
+date     2026-11-25T12:47:47Z
+kernel   Linux 7.0.0-1017-azure
+revision ddb185b116d9649b4b21eae74b1a42bf07af9886
+podvm    podvm 0.2.0-beta.40
+pool     quota474 (btrfs)
+pool free before the run 8583872512 bytes
+image    mirror.gcr.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+root disk total 1073741824 bytes
+16+0 records in
+16+0 records out
+16777216 bytes (16.0MB) copied, 0.093646 seconds, 170.9MB/s
+small write passed
+dd: error writing '/quota-large': Quota exceeded
+992+0 records in
+991+0 records out
+1039343616 bytes (991.2MB) copied, 6.093628 seconds, 162.7MB/s
+write exit 7
+pool free after the writes 7507083264 bytes
+THE INCUS ROOT DISK QUOTA HOLDS
