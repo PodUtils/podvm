@@ -1,8 +1,9 @@
 #!/bin/sh
 # Question: does the Incus tier stream a fresh OCI image and reuse it?
 # TODO/machine.md T-2085. Run on the Incus job of kvm.yml before the other
-# experiments use this Alpine digest. The daemon must lack the image alias
-# for this podvm binary. Set PODVM_475_BIN to use a different build.
+# experiments use this Alpine digest. The daemon must lack both image aliases
+# for this podvm binary. The second fixture is from experiment 433. Set
+# PODVM_475_BIN to use a different build.
 # Exit 0: each clause passed. 1: a clause failed. 2: a prerequisite failed.
 set -eu
 
@@ -10,6 +11,7 @@ root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 bin=${PODVM_475_BIN:-$root/target/x86_64-unknown-linux-musl/release/podvm}
 out=$root/experiments/results/incus-layer-stream.txt
 image=mirror.gcr.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+retained_image=mirror.gcr.io/library/alpine@sha256:bc21487101ae47172509130ee1092cc273a831968d64b617776d1f69c81e42ab
 export PODVM_INCUS_SOCKET=${PODVM_INCUS_SOCKET:-/var/lib/incus/unix.socket}
 export INCUS_SOCKET=$PODVM_INCUS_SOCKET
 
@@ -76,10 +78,10 @@ check_tree() {
 
 run_payload() {
     phase=$1
+    shift
     token=incus-stream-475-$phase
     rc=0
-    podvm_call run --rm --name "$name" --podvm-tier=incus --podvm-net none \
-        --pull never --verbose "$image" /bin/echo "$token" \
+    podvm_call run --rm --pull never --verbose "$@" "$image" /bin/echo "$token" \
         </dev/null >"$work/$phase.out" 2>"$work/$phase.err" || rc=$?
     show "$phase exit $rc"
     sed 's/^/  stdout  /' "$work/$phase.out" | tee -a "$out"
@@ -87,25 +89,60 @@ run_payload() {
     [ "$rc" -eq 0 ] || fail "$phase payload exit was $rc"
     printf '%s\n' "$token" >"$work/want"
     cmp -s "$work/want" "$work/$phase.out" || fail "$phase payload output differed"
-    check_tree "$phase"
-    remaining=$(instances) || fail "could not list Incus instances after $phase"
-    if exists "$remaining"; then fail "$name stayed after $phase"; fi
-    show "$phase instance removed"
+}
+
+run_incus() {
+    run_payload "$1" --name "$name" --podvm-tier=incus --podvm-net none
+    remaining=$(instances) || fail "could not list Incus instances after $1"
+    if exists "$remaining"; then fail "$name stayed after $1"; fi
+    show "$1 instance removed"
+}
+
+fresh_import() {
+    run_incus "$1"
+    grep -Eq '^[[:xdigit:]]{12}: Flattened \(' "$work/$1.err" || fail "$1 import did not report a flattened layer"
+    if grep -Eq '^[[:xdigit:]]{12}: Extracted \(' "$work/$1.err"; then
+        fail "$1 import extracted a tree"
+    fi
+    imported_alias=$(sed -nE 's/^podvm run: incus tier: .* image (podvm-[0-9a-f]+-[0-9a-f]+-v[0-9]+) imported now .*/\1/p' "$work/$1.err")
+    [ -n "$imported_alias" ] || fail "$1 run did not report a fresh Incus import"
+    incus_call image info "local:$imported_alias" >>"$out" 2>&1 || fail "Incus could not read the imported image"
 }
 
 check_tree before
-run_payload fresh
-grep -Eq '^[[:xdigit:]]{12}: Flattened \(' "$work/fresh.err" || fail "the fresh import did not flatten a layer"
-if grep -Eq '^[[:xdigit:]]{12}: Extracted \(' "$work/fresh.err"; then
-    fail "the fresh import used the extracted-tree path"
-fi
-alias=$(sed -nE 's/^podvm run: incus tier: .* image (podvm-[0-9a-f]+-[0-9a-f]+-v[0-9]+) imported now .*/\1/p' "$work/fresh.err")
-[ -n "$alias" ] || fail "the first run did not report a fresh Incus import"
-incus_call image info "local:$alias" >>"$out" 2>&1 || fail "Incus could not read the imported image"
+fresh_import fresh
+check_tree fresh
+first_alias=$imported_alias
 
-run_payload cached
-grep -Fq "image $alias from incus (" "$work/cached.err" || fail "the second run did not take the same image from Incus"
+run_incus cached
+check_tree cached
+grep -Fq "image $first_alias from incus (" "$work/cached.err" || fail "the second run did not take the same image from Incus"
 if grep -Eq '^[[:xdigit:]]{12}: (Flattened|Extracted) \(' "$work/cached.err"; then
     fail "the cached run read OCI layers"
 fi
-show "THE INCUS LAYER STREAM AND CACHED RUN HOLD"
+# A second digest makes its Incus import fresh while the first alias stays
+# available for experiment 471.
+image=$retained_image
+show "native image $image"
+podvm_call pull "$image" </dev/null >>"$out" 2>&1 || skip "could not pull the native fixture"
+check_tree before_native
+run_payload native
+native_tree=$(podvm_call inspect --format '{{.RootfsPath}}' "$image" 2>>"$out") || fail "cannot look up the native tree"
+case "$native_tree" in
+    "$PODVM_STORE"/rootfs/sha256_*/rootfs) ;;
+    *) fail "the native tree path is outside the private store" ;;
+esac
+
+tree_id() {
+    [ -d "$native_tree" ] && [ -f "${native_tree%/rootfs}/.extracted" ] || return 1
+    stat -c '%d:%i' "$native_tree"
+}
+
+before=$(tree_id) || fail "the native run did not create a complete tree"
+show "native store tree device:inode $before"
+fresh_import retained
+[ "$imported_alias" != "$first_alias" ] || fail "the two fixtures have the same Incus alias"
+after=$(tree_id) || fail "the fresh import removed the native tree"
+[ "$before" = "$after" ] || fail "the fresh import replaced the native tree"
+show "retained store tree device:inode $after"
+show "THE INCUS LAYER STREAM, CACHED RUN AND NATIVE TREE HOLD"
