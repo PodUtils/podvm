@@ -5,10 +5,9 @@ A chat summary does not establish a result.
 
 ## Start
 
-`AGENTS.md`, section 8, gives the start procedure and its order:
-the session hook, `docs/HANDOFF.md` when it exists, the progress record,
-the decisions, the tree state, the CI runs and open issues, the watcher of
-the organization, and the toolchain with the record tools. Then:
+`AGENTS.md`, section 8, gives the lead's start procedure and its order.
+[Hosted sessions](../hosted-sessions.md) gives the startup command and
+worker assignments for Claude Code and Codex. After startup:
 
 1. Read the task's required documents (`AGENTS.md`, section 13).
 2. Inspect local changes before you edit them.

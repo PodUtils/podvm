@@ -171,6 +171,9 @@ The table "Superseded" of `docs/decisions.md` records each replacement.
 Subagents are the normal way to take this project, not an exception.
 Nothing in this section is optional and nothing in it needs the owner.
 
+The lead selects models and efforts from [Hosted sessions](../docs/hosted-sessions.md).
+The lead monitors COORD messages and Actions while workers run.
+
 **One writer for the record.** `podvm-count` rewrites the whole Counts
 block of `TODO/INDEX.md` from every row, and `check_tree` then reads the
 whole tree. Two agents editing `TODO/INDEX.md` are both green and the

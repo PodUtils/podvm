@@ -36,10 +36,8 @@ and 5). Do each step on the commit that the release takes:
    1000 --clear-groups`, `HOME` and `TMPDIR` in a new directory of mode 777
    under `/var/tmp`, and `CARGO_MANIFEST_DIR=$PWD/crates/podvm`. Each
    failure has a cause in the record that is a fault of the host.
-4. An outside pass: an agent with the release binary and `podvm man`
-   only, no source, tests the surface for about one hour as uid 1000 and
-   writes its findings. Each finding becomes an issue or an entry. No P0
-   or P1 finding stays open.
+4. Run [blind QA](methodology/quality.md#blind-qa) on the release candidate.
+   Its findings and dispositions must be in the record before publication.
 5. Dispatch `nightly.yml` with `trial=true` and `arm.yml` on `main`; both
    pass.
 6. The section of the version in `CHANGELOG.md` has a part "Known gaps":

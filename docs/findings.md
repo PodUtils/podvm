@@ -32,7 +32,7 @@ the evidence is a command in backticks or a file under
   the loopback as the only way out, 2026-11-03. bailey 0.2.4, nftables
   1.1.3, iproute2 6.15.0, podman 5.4.2, docker 26.1.5, QEMU 10.0.13,
   Python 3.13.5. One host only.
-* **C1**, the cloud host of podvm's sessions: Linux 6.18.44, x86_64, root
+* **C1**, the measured Claude Code cloud host: Linux 6.18.44, x86_64, root
   in a cloud container, no `/dev/kvm` (QEMU runs TCG), no Yama, egress
   through an HTTPS proxy with an allowlist, 2026-11-11.
 

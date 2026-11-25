@@ -1,12 +1,15 @@
 # Scripts
 
-Run `sh scripts/cloud-setup.sh` first in a cloud session or on a Linux host.
-Then run podvm-dev session (after `cargo build --release -p podvm-gate`).
-It reports the host and selects the lane.
+For hosted repository work, start the lead session as described in
+[Hosted sessions](../docs/hosted-sessions.md). Set up the toolchain and
+update `PATH` as shown in [Operator procedure](../HUMAN.md#cloud-or-linux-session).
+Then build `podvm-gate` and run `podvm-dev session` for the lane report.
 
 | Script | Purpose |
 | --- | --- |
-| cloud-setup.sh | zig from the podcrates mirrors, the Rust toolchain and the musl target, and a host report |
+| session-start.sh | Git identity and hook setup, and pinned watchers for the lead checkout |
+| cloud-setup.sh | Pinned Zig and Rust toolchains, including Cargo and the musl target, and a host report |
+| qa-bundle.sh BINARY OUTPUT_DIR | Copy a candidate binary, generate its manual, and write SHA256SUMS in a new directory |
 | podvm-dev session | Host report, CodeGraph update, and lane setup |
 | podvm-dev | Linux build, byte-based status, and full development check |
 | windows/run-in-base.sh | Parked lane: copied-workspace Linux job through the podvm base |
@@ -41,6 +44,7 @@ job by id. Keep the base and shared cache.
 
 [containers](../docs/containers.md) owns the lane procedure.
 [gate](../docs/methodology/gate.md) owns proof requirements.
+[Quality](../docs/methodology/quality.md#blind-qa) owns the blind QA handoff.
 [tooling](../docs/agent-tooling.md) owns source discovery and command paths.
 [twins history](../docs/history/twins-and-scripts.md) retains the imported
 check comparison.

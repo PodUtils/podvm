@@ -7,12 +7,15 @@
 
 ## Cloud or Linux session
 
-podvm is worked in Claude Code cloud sessions. `AGENTS.md`, section 8,
-gives the start procedure.
+Use [Hosted sessions](docs/hosted-sessions.md) for Claude Code and Codex.
+`AGENTS.md`, section 8, gives the lead's start procedure.
 
 ```sh
 sh scripts/cloud-setup.sh
-export PATH="$HOME/.local/podvm/zig-x86_64-linux-0.16.0:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
+if [ -f "${CARGO_HOME:-$HOME/.cargo}/env" ]; then
+    . "${CARGO_HOME:-$HOME/.cargo}/env"
+fi
 cargo build --release -p podvm-gate -p podvm-release
 ./target/x86_64-unknown-linux-musl/release/podvm-gate
 ```
@@ -36,7 +39,7 @@ changes to shared host resources. Existing session authorization remains valid.
 Task entries carry accepted choices. Do not ask for a choice that an entry settles.
 
 KVM is free since 2026-11-09 (`AGENTS.md`, section 2, gives the guest rules).
-The cloud host has no `/dev/kvm`.
+Check whether `/dev/kvm` opens on the current host before a KVM proof.
 
 The KVM proof of the Windows guest (`experiments/392-kvm-guest.sh`) runs
 only on the Windows host of the parked lane: it needs the `py` launcher

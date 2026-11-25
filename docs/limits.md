@@ -372,7 +372,8 @@ refuses each by name with exit 125 (T-1854).
 
 A session can start a KVM guest where `/dev/kvm` exists, with a timeout,
 and no emulator may stay after the run ([decisions](decisions.md), 2026-11-09).
-The cloud host has no `/dev/kvm`, so a cloud session runs guests under TCG.
+Check for usable KVM on this host. The machine tier uses TCG when KVM
+is unavailable and no accelerator is required.
 `kvm.yml` (T-1682) runs the KVM leg on a hosted runner.
 
 A ValidationOS or DOS guest has no network (a mailbox run with `-nic none`).

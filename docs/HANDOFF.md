@@ -56,9 +56,10 @@ memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
 * The bot issue-sync sets each issue from the record of the pushed commit:
   close an issue in the record first (`TODO/issues.md` and
   `TODO/github.txt`, pushed), then on GitHub, or the bot reopens it.
-* The cloud host has cgroup v1, no `/dev/kvm`, and an incusd with no
-  AppArmor; a fault that AppArmor or cgroup v2 makes shows only in the job
-  `incus` of `kvm.yml` (experiment 471, about 4 min).
+* The Claude Code host measured in this handoff has cgroup v1, no
+  `/dev/kvm`, and an incusd with no AppArmor; a fault that AppArmor or
+  cgroup v2 makes shows only in the job `incus` of `kvm.yml`
+  (experiment 471, about 4 min).
 
 ## Next steps, in order
 
@@ -96,7 +97,7 @@ memory reads this file first, then `AGENTS.md`, `TODO/PROGRESS.md` and
 * The cloud host can run a root incusd of apt (`/usr/libexec/incus/incusd
   --group root`) with a btrfs pool on a loop file; experiment 472 uses it.
 
-* The cloud host's incusd has no AppArmor: a fault of the incus tier that
+* The measured Claude Code host's incusd has no AppArmor: a fault of the incus tier that
   AppArmor makes shows only on a hosted runner. The job `incus` of
   `kvm.yml` (`only: incus`, about 4 min) runs experiment 471 against the
   system incusd of apt there (T-2086).

@@ -113,20 +113,24 @@ which records the rung, the exit code and the times of the run.
 
 ```sh
 sh scripts/cloud-setup.sh
-export PATH="$HOME/.local/podvm/zig-x86_64-linux-0.16.0:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
+if [ -f "${CARGO_HOME:-$HOME/.cargo}/env" ]; then
+    . "${CARGO_HOME:-$HOME/.cargo}/env"
+fi
 cargo build --release -p podvm-gate
 ./target/x86_64-unknown-linux-musl/release/podvm-dev build
 ./target/x86_64-unknown-linux-musl/release/podvm probe
 ./target/x86_64-unknown-linux-musl/release/podvm run alpine:latest /bin/echo hello
 ```
 
-`scripts/cloud-setup.sh` installs zig, the Rust toolchain and the musl
-target, and reports the host. The workspace builds static musl binaries
-under `target/x86_64-unknown-linux-musl/release/`.
+`scripts/cloud-setup.sh` installs the pinned Zig and Rust toolchains,
+including Cargo and the musl target, and reports the host. The workspace
+builds static musl binaries under `target/x86_64-unknown-linux-musl/release/`.
 `podvm-dev build` builds both interposer objects before the CLI embeds them.
 The build status verifies input and output bytes.
 
 For repository work, read [AGENTS.md](AGENTS.md) first.
+For Claude Code and Codex, see [Hosted sessions](docs/hosted-sessions.md).
 `podvm-dev session` reports the host, and `podvm-dev check` runs the
 complete Linux check ([the gate](docs/methodology/gate.md)).
 
@@ -237,6 +241,7 @@ Each later tag has the podvm identity and `podvm-*` assets. `podvm-verify` decid
 | --- | --- |
 | [AGENTS.md](AGENTS.md) | Session entry point and task routing |
 | [HUMAN.md](HUMAN.md) | Operator procedure |
+| [Hosted sessions](docs/hosted-sessions.md) | Claude Code and Codex startup and worker roles |
 | [Architecture](docs/architecture.md) | Execution paths and data boundaries |
 | [Code map](docs/code-map.md) | Source ownership |
 | [Limits](docs/limits.md) | Current constraints and proof gaps |

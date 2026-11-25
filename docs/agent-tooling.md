@@ -29,7 +29,9 @@ The workspace builds the target `x86_64-unknown-linux-musl`
 
 | Tool | Purpose |
 | --- | --- |
-| [cloud setup](../scripts/cloud-setup.sh) | Install zig and the toolchain, and report the host |
+| [Hosted sessions](hosted-sessions.md) | Start the lead session and select worker roles |
+| [cloud setup](../scripts/cloud-setup.sh) | Install pinned Zig and Rust toolchains and report the host |
+| [Blind QA](methodology/quality.md#blind-qa) | Prepare and transfer the candidate bundle |
 | `podvm-dev` `session`, `build`, `check` | Discover the host, build and check on Linux |
 | [record gate](../crates/podvm-gate/src/main.rs) | Check task and document consistency |
 | [count writer](../crates/podvm-gate/src/count.rs) | Derive task counts |
@@ -47,10 +49,9 @@ The workspace builds the target `x86_64-unknown-linux-musl`
 
 Use shell tools (`git`, `curl`, `cargo`, `gh`) before MCP tools.
 For a read-only query of GitHub, use a mirror that `AGENTS.md`, section 4, names.
-Dispatch a workflow of this repository with the GitHub tool
-`actions_run_trigger` (`AGENTS.md`, section 9, item 5).
-When the dispatch fails, open an issue titled `[gh action] requested` in the
-form of the same item.
+Use the session's GitHub dispatch tool for workflows of this repository.
+When the lead cannot dispatch, use the issue procedure in `AGENTS.md`,
+section 9, item 5.
 [Remote rules](security/remote-ops.md) govern each route.
 
 For the parked Windows lane, use `wsl-toolkit --instance podvm` from

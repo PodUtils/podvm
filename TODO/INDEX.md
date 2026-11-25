@@ -731,10 +731,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2092](cli.md) | P2 | S | none | cli | done | The documents, the probe field and the refusal of `--pid` say that the namespace rung opens no user, PID or UTS namespace |
 | [T-2093](machine.md) | P2 | M | none | machine | open | `podvm update --podvm-tier=incus NAME` changes the memory, CPU and process limits of a running instance |
 | [T-2094](machine.md) | P2 | L | none | machine | open | The saved state of the machine tier serves a run with `--podvm-channel` and `--pids-limit` |
+| [T-2095](gate.md) | P1 | M | none | gate | done | Claude Code and Codex share hosted setup and blind QA |
 
 ## Counts
 
-665 entries: 25 open, 43 partial, 5 blocked, 592 done.
+666 entries: 25 open, 43 partial, 5 blocked, 593 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -744,10 +745,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 22 | 0 | 269 | 294 |
+| P1 | 3 | 22 | 0 | 270 | 295 |
 | P2 | 17 | 16 | 4 | 203 | 240 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 25 | 43 | 5 | 592 | 665 |
+| **All** | 25 | 43 | 5 | 593 | 666 |
 
 ## Work order
 

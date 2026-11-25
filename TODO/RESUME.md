@@ -5,7 +5,7 @@ The cold start of a session, on 2026-11-13. This page gives no work order:
 
 ## Start
 
-1. Do the steps of `AGENTS.md`, section 8. They include the session hook,
+1. Do the steps of `AGENTS.md`, section 8. They include the shared startup,
    the handoff (`docs/HANDOFF.md`), the decisions (`docs/decisions.md`),
    the last CI runs, the watcher of the organization and
    `sh scripts/cloud-setup.sh`.
@@ -14,7 +14,10 @@ The cold start of a session, on 2026-11-13. This page gives no work order:
    code builds with zig from `sh scripts/cloud-setup.sh`:
 
    ```sh
-   export PATH="$HOME/.local/podvm/zig-x86_64-linux-0.16.0:$PATH"
+   export PATH="$HOME/.local/bin:$PATH"
+   if [ -f "${CARGO_HOME:-$HOME/.cargo}/env" ]; then
+       . "${CARGO_HOME:-$HOME/.cargo}/env"
+   fi
    cargo build --release -p podvm-gate -p podvm-release
    ./target/x86_64-unknown-linux-musl/release/podvm-gate
    ```
@@ -50,8 +53,8 @@ clauses in its own record:
 * KVM is free (the owner, 2026-11-09). A subagent starts a guest only
   when its brief says so. One guest runs at a time, with a timeout, and
   no emulator stays after the run (`AGENTS.md`, sections 2 and 7).
-* The cloud host has no `/dev/kvm`. T-1682 runs the Linux guest on a
-  hosted runner.
+* Probe `/dev/kvm` on the current host. T-1682 runs the Linux guest on a
+  hosted runner with KVM.
 * The Windows lane on wsl-toolkit is parked (`docs/containers.md`). A
   cloud session does not need it.
 * The files that podcrates imported are frozen until podvm takes the

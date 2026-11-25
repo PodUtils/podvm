@@ -7,16 +7,16 @@ Do not add a tool or model credit.
 Do not add an automatic coauthor trailer.
 The [commit hook](../../.githooks/commit-msg) checks this rule.
 
-`.claude/session-start.sh` sets the identity of `AGENTS.md`, section 3, and the hooks path.
+`scripts/session-start.sh` sets the identity of `AGENTS.md`, section 3, and the hooks path.
 Read the configured name and email.
 Do not invent an identity.
 
 ## 2. Branch and publication
 
-Work on `main`. Push no other branch, except a branch that the owner names.
-`AGENTS.md`, section 3, owns that policy.
-Agents that work in parallel use local worktrees under `.claude/worktrees/`
-on local branches. Their work lands on `main` as normal commits.
+The lead integrates on `main` and pushes only an authorized branch.
+`AGENTS.md`, section 3, owns the branch policy.
+[Hosted sessions](../hosted-sessions.md#lead-and-workers) gives the worker
+worktree procedure.
 Session authorization takes precedence over a generic default.
 
 A podvm session writes to no other repository.

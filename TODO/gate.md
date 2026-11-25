@@ -5953,3 +5953,72 @@ As uid 1000 with `0.2.0-beta.40`, the repro of each issue of this entry gives th
 ## Done
 
 **Done (2026-11-24).** Each issue is measured as uid 1000 on `0.2.0-beta.40`; the fix is in the commit that the row of the issue in `TODO/issues.md` names. 472: 8 detached `/bin/true` give 8 `Exited (0)`, and `wait` gives 0 (24dbea39). 501: 12 parallel `run --rm` exit 0, twice (24dbea39). 475: 3 refused `run --strict=all` leave no `memo-*.tmp` (6d2f6e77). 476: with `windows:dos` pulled, `--filter name=zzz` and `--filter label=zzz` list no row (14ce28be). 477: both re-packed tarballs load (d4e216cb). 480: `/etc/hosts` holds `127.0.0.1 bar` and `::1 six` (d4e216cb). 490: after a corrupt blob, `pull` repairs it and `verify` gives 0 mismatches (cd725444). 512: `run -w /tmp/newdir` prints `/tmp/newdir`. 515: `import` names gzip, xz and bzip2. 523: `inspect NAME` gives the container. 525: `import` refuses a hard link that comes before its target. 526: `system df` counts one extraction once. 527: `image prune` removes an old blob that no record names. 528 and 544: `linux/arm64` and `linux/arm64/v8` make one record. 548: `rmi TAG` of an image with a container is an untag. 555: `cp F CTR:/nodir/` names a directory and refuses. 534: `yes` piped into `head -1` exits 141 and leaves no record. 535: a SIGINT to podvm alone runs the trap of the payload. 536: pod-supervise opens the log with `O_NOFOLLOW` (podcrates 75d5cdfe, COORD-182, in v0.82.1), `start` gives ELOOP and the target file keeps its bytes. 549: against a daemon stand-in, `install-names` exits 125 and makes no link. 550: `logs -f` follows the second run after `restart`. 552: a mode-000 env file is refused before the payload. 553: the flag is refused by name. 554: the refusal names the emulate tier. 561: `probe` leaves no `/tmp/execprobe` and measures the row where the file exists. 563: `cp` into an image is refused, and `cp` into the container of a shared name writes the container. 565: a `-v` of two kinds names both paths and kinds. The issues 474 (T-2074), 557 (T-2053) and 562 (T-2001) map to the entries that fixed them. Still open, with their entries: 473, 481, 511, 516, 529, 537, 538, 539, 540, 547, 551, 558, 560, 566.
+
+# T-2095: Claude Code and Codex share hosted setup and blind QA
+
+**Source:** the owner, 2026-11-25, hosted setup and worker roles
+**Category:** gate
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** done
+
+## Problem
+
+The Claude Code hook contains the Git and watcher setup. On Codex, the
+watchers that it starts can exit with the calling shell. The Linux setup
+also assumes Cargo is present, and the default Docker bootstrap may try
+to start a new daemon on a host with managed Docker.
+
+## Premise
+
+Both hosts can run the same Linux shell procedures. On the Codex host,
+a detached process survives the startup shell. Its existing rootless
+Docker daemon can run a candidate with an artifact-only mount.
+
+## Approach
+
+Move Git and watcher setup into `scripts/session-start.sh`. Keep the
+Claude Code hook as a caller. Keep one watcher pair in the lead
+checkout and preserve worker branches. Bootstrap Rust from the
+repository toolchain file. Use the managed Docker endpoint where it
+exists. Give the outside tester the candidate and its generated manual
+with `scripts/qa-bundle.sh`.
+
+## Decision
+
+Use the model and effort for each role in `docs/hosted-sessions.md`.
+The lead owns the gate and the record. The outside tester chooses its
+own constrained containers with only the release artifacts as inputs.
+
+## Prove
+
+Run `sh scripts/session-start.sh` twice and `sh .claude/session-start.sh`
+from a different working directory. Check that one pair of watchers
+survives and that the worker worktree keeps its branch. Run
+`sh scripts/cloud-setup.sh` with a fresh tool directory and check
+`bash scripts/common/bootstrap-env.sh --check docker` against the
+managed daemon. Run `sh scripts/qa-bundle.sh BINARY OUTPUT_DIR` and
+`sha256sum -c SHA256SUMS` from the result. Execute the candidate in a
+container as uid 1000. Check that a bad candidate leaves no bundle.
+
+## Done
+
+**Done (2026-11-25).** On Codex Linux x86_64, both startup paths ran
+from outside the lead checkout. The startup fixture kept two detached
+watcher processes on repeat. The worker worktree kept its branch and
+created no watcher state. Both live watcher self-tests also passed.
+
+With empty Cargo and Rustup homes, the verified installer installed
+Rust 1.99.1 and the repository components and musl target. Zig and
+cargo-bloat were already present. A new shell found the tools. A
+second setup passed with downloads disabled. An installer with the
+wrong checksum failed. The managed Docker 29.9.2 check passed. The
+Docker stand-in checked an unreachable managed endpoint and an explicit
+Docker endpoint.
+
+The QA bundle held the candidate and manual with matching SHA-256 sums.
+An existing output kept its files. A candidate that failed to make a
+manual left no output. An Alpine container with only the bundle mounted
+ran the candidate as uid 1000. The Claude wrapper was exercised on
+Codex with the Claude environment variables in a fixture.

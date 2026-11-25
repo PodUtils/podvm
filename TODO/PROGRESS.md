@@ -7,14 +7,14 @@ start.
 
 ## State
 
-665 entries: 25 open, 43 partial, 5 blocked, 592 done.
+666 entries: 25 open, 43 partial, 5 blocked, 593 done.
 
 * The newest release is `v0.2.0-beta.40` (2026-11-24). [CHANGELOG](../CHANGELOG.md)
   holds what each release ships, with its known gaps.
 * Open first: the asks of podrunner (`docs/HANDOFF.md`, "Next steps").
 * podvm takes the crates of PodUtils/podcrates at `v0.83.0`. A change of
   moved code goes to podcrates as a COORD issue.
-* KVM is free (the owner, 2026-11-09). The cloud host has no `/dev/kvm`;
+* KVM is free (the owner, 2026-11-09). Probe `/dev/kvm` on the current host.
   `kvm.yml` (T-1682) gives a hosted runner with it, and `arm.yml` a hosted
   arm64 runner (T-1721).
 * A push starts the gate, `secrets` and `issue-sync`, and

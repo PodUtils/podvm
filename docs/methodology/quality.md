@@ -43,9 +43,41 @@ can be found again by one check, or prevented by one structure.
    rows, `--help` and the parser.
 4. **Say what was done, not what was asked.** Each banner and each
    inspect field is written from the mechanism after it entered.
-5. **An outside pass before each beta.** An agent with only the binary
-   and `podvm man`, and no source, works for one hour. Its P0 and P1
-   findings block the beta.
+5. **An outside pass before each beta.** An independent tester works
+   for about one hour with the candidate binary and its manual only.
+   Its P0 and P1 findings block the beta.
+
+## Blind QA
+
+The lead selects the QA model from [Hosted sessions](../hosted-sessions.md#lead-and-workers).
+Use a candidate binary built from the intended release revision. The
+bundle script copies that binary and generates the manual from it:
+
+```sh
+sh scripts/qa-bundle.sh BINARY OUTPUT_DIR
+```
+
+Use a new output directory. Record the candidate revision and its SHA-256
+in the lead's proof. Give the tester a fresh brief and only the bundle:
+`podvm`, `podvm.man`, and `SHA256SUMS`. Supply the test objective, allotted
+time, and resource limits. Keep source, task history, prior findings,
+implementation discussion, and prepared proof commands out of the brief.
+
+For tool-enforced blindness, give the tester an execution environment
+with artifact-only access to the project. Exclude source checkouts, Git
+credentials, and tools that can retrieve the source. A fresh agent
+context and a Docker mount alone leave any shared host tools available.
+Check what the tester's tools can reach before calling the pass blind.
+
+The tester runs `sha256sum -c SHA256SUMS` from the bundle directory.
+The tester designs and runs its own proofs in constrained containers as
+uid 1000. Include commands, expected and actual results, exit codes, and
+the container constraints that affect the result. Clean up test resources
+and return the findings and any gaps to the lead.
+
+The lead records each finding in an issue or task entry. Resolve P0 and
+P1 findings before the beta. Use the [release gate](../maintenance.md#releases)
+to check that the completed pass applies to the release candidate.
 
 ## What podvm does not do
 

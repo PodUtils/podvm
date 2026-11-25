@@ -349,13 +349,20 @@ fi
 
 # ------------------------------------------------------------------ docker
 #
-# ⛔ INSTALLED IS NOT RUNNING. dockerd does not survive between turns here, and
-# every experiment that needs it exits 2 rather than failing loudly, so a
-# session can spend a long time reading SKIP lines that mean "start the daemon".
+# Verify that the Docker client can reach its daemon. The Codex host runs
+# a managed daemon. Other hosts can start a local daemon when necessary.
 if want docker; then
+	managed_socket=/run/codex-docker/docker.sock
+	managed_host=""
+	if [ -S "$managed_socket" ] ||
+		[ "$(readlink /var/run/docker.sock 2>/dev/null)" = "$managed_socket" ]; then
+		managed_host="unix://$managed_socket"
+	fi
 	if ! have docker; then
 		if [ "$CHECK_ONLY" -eq 1 ]; then
 			skipped "docker: not on PATH (--check)"
+		elif [ -n "$managed_host" ]; then
+			bad "docker: client missing for the managed daemon at $managed_socket"
 		elif apt_install docker.io; then
 			have docker && did "docker: client and daemon installed" ||
 				bad "docker: did not appear after install"
@@ -366,6 +373,16 @@ if want docker; then
 	if have docker; then
 		if timeout 15 docker info >/dev/null 2>&1; then
 			ok "docker: daemon reachable, $(timeout 15 docker version --format '{{.Server.Version}}' 2>/dev/null)"
+		elif [ -n "$managed_host" ]; then
+			if [ -z "${DOCKER_HOST:-}${DOCKER_CONTEXT:-}" ] &&
+				[ "$(timeout 5 docker context show 2>/dev/null)" = default ] &&
+				timeout 15 docker --host "$managed_host" info >/dev/null 2>&1; then
+				ok "docker: managed daemon reachable. Set DOCKER_HOST=$managed_host for other Docker commands"
+			elif [ "$CHECK_ONLY" -eq 1 ]; then
+				skipped "docker: could not reach the selected daemon (--check). Managed socket is $managed_socket"
+			else
+				bad "docker: could not reach the selected daemon. Managed socket is $managed_socket"
+			fi
 		elif [ "$CHECK_ONLY" -eq 1 ]; then
 			skipped "docker: installed and NOT running (--check)"
 		else

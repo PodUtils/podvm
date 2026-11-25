@@ -28,6 +28,8 @@ Source and verified runs establish behavior.
 | `docs/runtime-state.md` | Generated source declarations |
 | `docs/agent-tooling.md` | Tools and source discovery |
 | `docs/containers.md` | Lane procedures |
+| `docs/hosted-sessions.md` | Hosted startup, worker roles, and lead coordination |
+| `docs/methodology/quality.md` | Quality rules and blind QA procedure |
 | `CHANGELOG.md` | Shipped changes and publication state |
 | `experiments/results/` | Captured measurements |
 | `docs/history/` | Superseded wording, research depth, and reviews |
