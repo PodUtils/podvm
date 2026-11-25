@@ -5644,6 +5644,12 @@ or refuse the image. A run with a requested disk size must refuse when
 the capped path is unavailable. The cached disk, overlay and guest boot
 proof are still open.
 
+Experiment 478 used `mkfs.erofs` 1.8.6 in full tar mode. A pipe supplied
+the same fixture. The read-only image kept the ACL, both other xattrs,
+late parent metadata, numeric IDs, the setuid mode, the hard link and
+the symlink. The reader checked the exact attribute bytes offline.
+Guest kernel support and disk use on a large image need a proof.
+
 ## Prove
 
 `kvm.yml`: `run --podvm-tier=machine --podvm-init=image` of an image with systemd boots from its disk image; `systemctl is-system-running` gives `running` or `degraded`; the exit code of the payload unit is the exit code of the run; a second run of the same digest reuses the disk image.
@@ -6961,6 +6967,15 @@ marker of a response that pod-incus truncated. In the worker checkout,
 Remaining (2): run experiment 434 clause 31 against a real incusd with
 this build. The new assertion requires a flattened import and rejects an
 extraction on that path.
+
+Hosted run 45619039653 on `6bb0ae96` passed experiment 475 against
+Incus 6.0.0. The fresh import flattened 517 entries and made no store
+tree. The second run used the same Incus alias without reading layers.
+Both commands returned 0, gave the expected output and removed their
+instances. Experiments 471 and 474 also passed. Experiment 475 now
+tests the rest of clause 31 with a second fixture. A native run must
+create a tree, and a fresh Incus import must keep that tree at the same
+inode. That addition needs a hosted run.
 
 # T-2086: On a hosted runner with cgroup v2, `inspect` of an ended incus instance gives no peak memory and no OOM kill of a child
 

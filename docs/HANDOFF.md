@@ -33,10 +33,10 @@ contains the commit that changes this file. A fresh session reads
   #663, closed: PodUtils/podcrates#259 lists the take). podrunner pins
   beta.40 in its `4fc871c` (#662, closed).
 * `main` takes podcrates `v0.84.0` and its shared gzip writer (T-2096,
-  `04c8b7f4`, #666, PodUtils/podcrates#260). T-2085 has a stand-in
-  proof. Hosted Incus run 45619039653 on `6bb0ae96` runs experiment 475
-  for the fresh and cached layer-stream assertions of experiment 434
-  clause 31.
+  `04c8b7f4`, #666, PodUtils/podcrates#260). Hosted Incus run 45619039653
+  on `6bb0ae96` passed experiment 475 for the fresh and cached layer
+  streams. The added native-tree retention assertions of experiment 434
+  clause 31 need a second hosted run (T-2085, #657).
 * T-2054's spare-tree helper now clears its environment. Both
   `tree-prefill` paths worked with an empty environment in a private
   Alpine store. T-2054 still tracks the helper's store path in argv.
@@ -102,8 +102,9 @@ contains the commit that changes this file. A fresh session reads
    needs the disk-backed root of T-1994, and the namespace tier needs
    the pod-enter mount requested in #667. Podrunner's 9p work mount also
    needs a bound (#583). Experiment 477 found that `sqfstar` 4.6.1 loses
-   a valid POSIX ACL, so the T-1994 disk builder still needs a candidate
-   that keeps it. Experiment 476 needs the podrunner hosted-boot wiring
+   a valid POSIX ACL. Experiment 478 confirmed that EROFS full tar mode
+   keeps that ACL. A static builder, a guest mount and a large-image
+   measurement still need work. Experiment 476 needs the podrunner hosted-boot wiring
    requested in #599. Then #596 and #599 (the
    hosted snapshot: T-1994, T-1996, T-1998, T-1999), #593 (T-1990,
    T-1991). Then T-2088 and the open rows of T-2070, T-2079, T-2087.

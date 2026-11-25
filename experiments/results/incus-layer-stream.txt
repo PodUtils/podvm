@@ -1,0 +1,44 @@
+question  does Incus import the OCI layers and reuse the image?
+date      2026-11-25T13:11:13Z
+host      Linux 7.0.0-1014-aws x86_64
+revision  6bb0ae9646cf916d25fbfa0fe00fa7c439023603
+image     mirror.gcr.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+podvm 0.2.0-beta.40
+Client version: 6.0.0
+Server version: 6.0.0
+3.20: Pulling from library/alpine
+25f1d6b1951a: Pull complete
+Digest: sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+Status: Downloaded newer image for mirror.gcr.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+podvm: probed this machine rather than using the cache: /tmp/podvm-475.cga8GEr7/store/probe.json does not exist yet
+before store tree entries 0
+fresh exit 0
+  stdout  incus-stream-475-fresh
+  stderr  25f1d6b1951a: Flattened (517 entries written, 0 hidden, 0 whiteouts)
+  stderr  podvm run: incus tier: incusd 6.0.0 at /var/lib/incus/unix.socket, image podvm-c64c687cbea93001-7856c9cd4091742f-v4 imported now (TODO/machine.md T-1718)
+fresh store tree entries 0
+fresh instance removed
+Fingerprint: 44b2d4b118bea2c8d7d678e2128ebcc10102b9f7bc8c2ec5193cde14a5b6169c
+Size: 16.77MiB
+Architecture: x86_64
+Type: container
+Public: no
+Timestamps:
+    Created: 1970/01/01 00:00 UTC
+    Uploaded: 2026/11/25 13:11 UTC
+    Expires: never
+    Last used: 2026/11/25 13:11 UTC
+Properties:
+    description: an OCI image of podvm
+Aliases:
+    - podvm-c64c687cbea93001-7856c9cd4091742f-v4
+Cached: no
+Auto update: disabled
+Profiles:
+    - default
+cached exit 0
+  stdout  incus-stream-475-cached
+  stderr  podvm run: incus tier: incusd 6.0.0 at /var/lib/incus/unix.socket, image podvm-c64c687cbea93001-7856c9cd4091742f-v4 from incus (TODO/machine.md T-1718)
+cached store tree entries 0
+cached instance removed
+THE INCUS LAYER STREAM AND CACHED RUN HOLD
