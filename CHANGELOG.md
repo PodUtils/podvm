@@ -8,10 +8,63 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+## 0.2.0-beta.41 (2026-11-26)
+
+### Known gaps: what the checks of 0.2.0-beta.41 prove, and what stays open, 2026-11-26
+
+Record: T-1949, T-2054, T-2070, T-2078, T-2079, T-2087, T-2100.
+Deployed: version 0.2.0-beta.41.
+
+What the checks of this beta prove: the gate, `arm.yml`, the nightly
+trial and `workloads.yml` on the version commit; the integration tests as
+uid 1000 (37 binaries, on `7c2b161`); experiment 479 on a hosted runner
+with cgroup v2 (`update` of a running incus instance, T-2093); experiment
+473 under TCG (a saved guest state with a channel and a process limit,
+T-2094); experiment 480 under TCG (a SIGTERM during a save, T-2048); and
+the tenth outside pass with the binary of `7c2b161` and `podvm man` only
+(T-2100): no P0 and no P1 finding.
+
+Each open fault that a user can meet:
+
+- The incus tier: the import expands the hard links of an image; a
+  payload can remove its own log; `exec -w` to a missing directory runs in
+  `/`; `--podvm-init=image` of an image with no init gives a raw error of
+  incusd and leaves the instance; `wait` and `kill` have no path of the
+  tier; a created instance reads `Stopped`; a `--rm` run that the OOM
+  killer ends can keep its instance (T-2079, T-2087, T-2100 OR-B41-07).
+- The incus tier: an image that an older podvm imported is not checked
+  against the room of the pool (T-2078). Each call to incusd after the
+  first of a verb has no time bound (T-2080).
+- The machine tier: the fetched QEMU and the records of a detached guest
+  go under `$HOME`, not `PODVM_STORE` (`PODVM_TOOLS_DIR` works around it);
+  `doctor` calls the tier refused where `run` fetches its own QEMU; a
+  guest with too little memory names no minimum (T-2087 OR-B40-07, T-2100
+  OR-B41-02, OR-B41-15).
+- The native tiers: the edits of a payload to `/etc/hosts` go at the next
+  `exec`; `run -it sh` and `exec -it CTR sh` have no job control; a
+  foreground run on the namespace rung reaps no orphan until it ends;
+  `--device HOST:GUEST` with another guest path is visible only in part;
+  a foreground `run --rm` that SIGPIPE ends keeps a `Created` record
+  (T-2079, T-2070, T-2087, T-1939, T-2100 OR-B41-06, OR-B41-08).
+- docker differences and texts of the outside passes: `login` contacts no
+  registry; `--env-file` refuses a line with no `=`; a name in use exits 1
+  from `create` and 125 from `run`; `run --rm` keeps the extracted tree of
+  the image; `--network host`, `--format json`, `'{{json .}}'`, `table`
+  and `index` are refused; a payload argument that is not UTF-8 is
+  refused; `cp` refuses `..` and an absolute link of the container; `run
+  -u` keeps the caller's privileges with no line; `--init` and `top` give
+  a reason that is false on the namespace rung; a missing argument exits 1
+  or 125 by verb; a reference has no bound of its length; `images` counts a
+  repeated layer each time; `system df` counts an extraction that failed
+  (T-2070, T-2079, T-2087, T-2100).
+- The namespace rung: podvm's descriptors of the memo and the log, and the
+  variables of the interposer reach the payload; a foreground run of uid 0
+  has no PID namespace (T-2054 items 1 to 3).
+
 ### Fixed: a signal during the save of a guest state, and three outside-pass findings, 2026-11-26
 
 Record: T-2048, T-2100 (OR-B41-03, OR-B41-05, OR-B41-16).
-Deployed: not deployed; for the next beta after 0.2.0-beta.40.
+Deployed: version 0.2.0-beta.41.
 
 - On the machine tier, a SIGTERM or another forwarded signal during the
   save of a guest state ends the run at once with one line. Before, the
@@ -27,7 +80,7 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.40.
 ### Fixed: no store path in the argv of the spare-tree helper, 2026-11-26
 
 Record: T-2054 (item 5).
-Deployed: not deployed; for the next beta after 0.2.0-beta.40.
+Deployed: version 0.2.0-beta.41.
 
 - The detached `podvm tree-prefill` gets its store and digest on a pipe,
   so `ps` of another user shows no path of the store.
@@ -35,7 +88,7 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.40.
 ### Fixed: repeated OCI layer descriptors, 2026-11-26
 
 Record: T-2098.
-Deployed: not deployed; for the next beta after 0.2.0-beta.40.
+Deployed: version 0.2.0-beta.41.
 
 - `podvm load` accepts repeated references to a blob verified from the
   same OCI archive and keeps the original layer order.
@@ -43,7 +96,7 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.40.
 ### Added: live Incus resource updates, 2026-11-26
 
 Record: T-2093.
-Deployed: not deployed; for the next beta after 0.2.0-beta.40.
+Deployed: version 0.2.0-beta.41.
 
 - `podvm update --podvm-tier=incus` changes memory, CPU or process
   limits on a running podvm container. It uses the instance ETag and
@@ -52,7 +105,7 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.40.
 ### Changed: podcrates `v0.85.0`, 2026-11-26
 
 Record: T-2097.
-Deployed: not deployed; for the next beta after 0.2.0-beta.40.
+Deployed: version 0.2.0-beta.41.
 
 - Extraction and broker policy errors report the step and the underlying
   cause with the new podcrates error format.
@@ -63,7 +116,7 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.40.
 ### Added: channels and process limits for saved Linux guests, 2026-11-25
 
 Record: T-2094.
-Deployed: not deployed; for the next beta after 0.2.0-beta.40.
+Deployed: version 0.2.0-beta.41.
 
 - On the machine tier, a saved guest can use `--podvm-channel` and
   `--pids-limit`. Each run supplies its socket, port and limit after the
@@ -72,7 +125,7 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.40.
 ### Changed: podcrates `v0.84.0` and the shared gzip writer, 2026-11-25
 
 Record: T-2085, T-2096.
-Deployed: not deployed; on main, for the next beta after 0.2.0-beta.40.
+Deployed: version 0.2.0-beta.41.
 
 - The incus tier uses `pod_gzip::Members` for compressed image uploads.
   The same space check selects a plain or compressed upload.
@@ -84,7 +137,7 @@ Deployed: not deployed; on main, for the next beta after 0.2.0-beta.40.
 ### Fixed: what the namespace rung opens, and the commit of a source build, 2026-11-25
 
 Record: T-2091 (#531), T-2092 (#546).
-Deployed: not deployed; on main, for the next beta after 0.2.0-beta.40.
+Deployed: version 0.2.0-beta.41.
 
 - `README.md`, `docs/architecture.md`, `SECURITY.md`, `docs/limits.md`,
   the probe field `rung_must_never_claim` and the refusal of `--pid`,
@@ -98,7 +151,7 @@ Deployed: not deployed; on main, for the next beta after 0.2.0-beta.40.
 ### Changed: the room of a storage pool from incusd, for each driver, 2026-11-25
 
 Record: T-2078.
-Deployed: not deployed; on main, for the next beta after 0.2.0-beta.40.
+Deployed: version 0.2.0-beta.41.
 
 - On the incus tier, where the server has a driver other than `dir`, or
   podvm does not see the directory of the pool (route A), podvm takes the
@@ -113,7 +166,7 @@ Deployed: not deployed; on main, for the next beta after 0.2.0-beta.40.
 ### Changed: podcrates `v0.83.0`, the bounds of each answer of incusd, 2026-11-24
 
 Record: T-2089.
-Deployed: not deployed; on main, for the next beta after 0.2.0-beta.40.
+Deployed: version 0.2.0-beta.41.
 
 - On the incus tier, each silence of incusd ends after 30 s with one line
   that names the socket, for each call, not only the first.

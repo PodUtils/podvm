@@ -562,4 +562,4 @@
 670 issue closed
 671 issue open
 672 issue open
-673 issue open
+673 issue closed
