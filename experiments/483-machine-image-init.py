@@ -30,8 +30,9 @@ Clauses:
   5. With the default state and `--storage-opt size=256m`, which a state
      does not serve, the run takes the route of clause 1 and exits 7.
   6. With the default state, the first run saves a state and the second
-     starts from it: each exits 7 with systemd as PID 1 of a PID namespace
-     (PID 2 is not kthreadd), as in 0.2.0-beta.41.
+     starts from it: each exits 7 with systemd as PID 1 of the guest
+     (PID 2 is kthreadd): the state is on the root disk (T-1994,
+     experiment 485).
   7. The control with PODVM_MACHINE_ROOT=initramfs and
      PODVM_MACHINE_STATE=0 (the route of T-2002) exits 7 with systemd as
      PID 1 of a PID namespace: PID 2 is not kthreadd.
@@ -241,7 +242,7 @@ def prove(binary, work):
     (c1, p1, e1, t1), (c2, p2, e2, t2) = states
     verdict(6, c1 == 7 and c2 == 7 and "saves its state" in e1
             and "starts from the saved state" in e2
-            and all(p.startswith("systemd ") and not p.endswith("kthreadd") for p in (p1, p2)),
+            and all(p == "systemd PID2=kthreadd" for p in (p1, p2)),
             f"the default state: the save exited {c1} in {t1:.0f} s, the load {c2} in "
             f"{t2:.0f} s; PID1={p1} and {p2}")
     code, out, _, _ = podvm(*run, IMAGE, "sh", "-c", PAYLOAD,

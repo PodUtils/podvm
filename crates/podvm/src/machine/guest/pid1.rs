@@ -51,14 +51,24 @@ pub const MASKS: [&str; 6] = [
     "systemd-firstboot.service",
 ];
 const ETC: &str = "/etc/systemd/system";
+/// The flag of a guest whose state podvm saves (TODO/machine.md T-2008):
+/// a fault before the job gives the marker of a job that the guest did
+/// not take ([`super::job::BAD`]), so that the host boots a guest with no
+/// state, in place of the end of the run.
+pub const HELD_FLAG: &str = "--held";
 
 /// The unit of the run: after `basic.target` (the default dependencies),
 /// wanted by `multi-user.target`, with the serial line of the markers as
-/// its output.
-pub fn unit(nonce: &str) -> String {
+/// its output. `held`: the guest of a saved state ([`HELD_FLAG`]).
+pub fn unit(nonce: &str, held: bool) -> String {
+    let flag = if held {
+        format!(" {HELD_FLAG}")
+    } else {
+        String::new()
+    };
     format!(
         "[Unit]\nDescription=The command of the run of podvm (TODO/machine.md T-1994)\n\n\
-         [Service]\nType=exec\nExecStart=/podvm/podvm {READY_VERB} {nonce} /podvm-init\n\
+         [Service]\nType=exec\nExecStart=/podvm/podvm {READY_VERB} {nonce} /podvm-init{flag}\n\
          StandardInput=null\nStandardOutput=tty\nStandardError=inherit\nTTYPath=/dev/ttyS0\n\
          TTYReset=no\nTTYVHangup=no\nTimeoutStartSec=infinity\nRestart=no\n"
     )
@@ -73,9 +83,9 @@ pub enum Entry {
 
 /// Each file that `guest-root` writes before the exec of the init: the
 /// unit, its want, the masks, and the status of the boot off the console.
-pub fn entries(nonce: &str) -> Vec<Entry> {
+pub fn entries(nonce: &str, held: bool) -> Vec<Entry> {
     let mut v = vec![
-        Entry::File(format!("{ETC}/{UNIT}"), unit(nonce)),
+        Entry::File(format!("{ETC}/{UNIT}"), unit(nonce, held)),
         Entry::Link(
             format!("{ETC}/multi-user.target.wants/{UNIT}"),
             format!("../{UNIT}"),
@@ -119,8 +129,8 @@ unsafe extern "C" {
 
 /// In `guest-root`, after the root moved: write [`entries`] and the
 /// deadline of the boot, and fork the watchdog of the unit.
-pub fn prepare(root: &Path, nonce: &str, bound: u64) -> Result<(), String> {
-    for e in entries(nonce) {
+pub fn prepare(root: &Path, nonce: &str, bound: u64, held: bool) -> Result<(), String> {
+    for e in entries(nonce, held) {
         let (path, made) = match &e {
             Entry::File(p, text) => (p, write_at(root, p, |at| std::fs::write(at, text))),
             Entry::Link(p, to) => (
@@ -146,7 +156,7 @@ pub fn prepare(root: &Path, nonce: &str, bound: u64) -> Result<(), String> {
             "fork of the watchdog: {}",
             std::io::Error::last_os_error()
         )),
-        0 => watchdog(nonce, deadline, bound),
+        0 => watchdog(nonce, deadline, bound, held),
         _ => Ok(()),
     }
 }
@@ -165,7 +175,7 @@ fn write_at(
 
 /// The child of `guest-root`: the end of the run where the unit did not
 /// start by the deadline.
-fn watchdog(nonce: &str, deadline: f64, bound: u64) -> ! {
+fn watchdog(nonce: &str, deadline: f64, bound: u64, held: bool) -> ! {
     loop {
         if Path::new(STARTED).exists() {
             // SAFETY: the end of a forked child.
@@ -173,14 +183,37 @@ fn watchdog(nonce: &str, deadline: f64, bound: u64) -> ! {
         }
         match uptime() {
             Ok(now) if now < deadline => std::thread::sleep(Duration::from_millis(500)),
-            _ => super::disk::end_run(
+            _ => fail(
                 nonce,
-                &line(&format!(
+                held,
+                &format!(
                     "the init of the image did not start the unit {UNIT} of the run in {bound} s"
-                )),
+                ),
             ),
         }
     }
+}
+
+/// The end of a guest before its command: for a guest of a saved state
+/// (`held`) first the marker of a job that it did not take, which the
+/// host reads as a state that does not serve; then the markers of a run
+/// that ends with 125 and the reset.
+fn fail(nonce: &str, held: bool, why: &str) -> ! {
+    if held {
+        bad(nonce, why);
+    }
+    super::disk::end_run(nonce, &line(why))
+}
+
+/// The marker of a job that the guest of a state did not take, with
+/// `why`: the host then boots a guest with no state.
+pub(crate) fn bad(nonce: &str, why: &str) {
+    use std::io::Write;
+    let mut o = std::io::stdout();
+    let why = why.replace('\n', " ");
+    o.write_all(format!("\n{}{nonce} {why}\n", super::job::BAD).as_bytes())
+        .and_then(|()| o.flush())
+        .unwrap_or(());
 }
 
 /// The line of a run that ends before its command.
@@ -257,9 +290,13 @@ fn wait_ready() -> Result<(), String> {
 /// return where the exec of the script works.
 pub fn ready_main(args: &[String]) -> i32 {
     use std::os::unix::process::CommandExt;
-    let [nonce, script] = args else {
-        eprintln!("podvm {READY_VERB}: the arguments are NONCE SCRIPT");
-        return 125;
+    let (nonce, script, held) = match args {
+        [n, s] => (n, s, false),
+        [n, s, f] if f == HELD_FLAG => (n, s, true),
+        _ => {
+            eprintln!("podvm {READY_VERB}: the arguments are NONCE SCRIPT [{HELD_FLAG}]");
+            return 125;
+        }
     };
     if let Err(e) = std::fs::write(STARTED, b"") {
         // The watchdog ends the run at the bound; say why first.
@@ -272,7 +309,7 @@ pub fn ready_main(args: &[String]) -> i32 {
         ),
         Err(e) => e,
     };
-    super::disk::end_run(nonce, &line(&why))
+    fail(nonce, held, &why)
 }
 
 /// Host side: the path in `rootfs` of the file that the image path `p`

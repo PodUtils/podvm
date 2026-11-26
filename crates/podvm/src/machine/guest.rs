@@ -263,10 +263,11 @@ pub fn boot(r: &Request) -> i32 {
     let kernel = assets.kernel;
     let init_image = r.env.iter().any(|e| e == crate::initns::MARK);
     let pinned = !assets.volume_modules.is_empty() && !assets.modules.is_empty();
-    // The saved state first where it serves the run (call C27, T-2008),
-    // else T-1994 step 2: systemd as PID 1 of the guest on the root disk.
+    // The saved state first where it serves the run (call C27, T-2008);
+    // on the root disk its guest has systemd as PID 1, as each other run of
+    // such an image (T-1994).
     let by_state = init_image && state::serves(r, pinned);
-    let mut pid1 = match pid1::of(r.rootfs, init_image, on_disk && !by_state) {
+    let pid1 = match pid1::of(r.rootfs, init_image, on_disk) {
         Ok(b) => b,
         Err(e) => return fail(e),
     };
@@ -291,28 +292,33 @@ pub fn boot(r: &Request) -> i32 {
     {
         return fail(why);
     }
-    // TODO/machine.md T-2008: the run from a saved state of the guest, or
-    // with the save of one; else the boot below.
-    if let (true, Some((base, _))) = (by_state, &base) {
-        let all: Vec<(String, PathBuf)> = assets
-            .modules
-            .iter()
-            .chain(&assets.volume_modules)
-            .map(|(n, p)| (n.to_string(), p.clone()))
-            .collect();
+    // T-2008: the run from a saved state, or with the save of one.
+    if by_state {
+        let mut all = modules.clone(); // with the modules of the root disk
+        for (n, p) in &assets.volume_modules {
+            if !all.iter().any(|(m, _)| m == n) {
+                all.push((n.to_string(), p.clone()));
+            }
+        }
         let ctx = state::Ctx {
             accel,
             qemu: &qemu,
             kernel: &kernel,
-            base,
+            base: base.as_ref().map(|b| b.0.as_path()),
+            root: pid1
+                .zip(root.as_ref())
+                .map(|(bound, (disk, _))| state::RootLine {
+                    disk,
+                    load: &disk_load,
+                    bound,
+                    nonce: "",
+                }),
             modules: &all,
             pinned_kernel: pinned,
         };
         if let state::Outcome::Done(code) = state::run(r, &ctx) {
             return code;
         }
-        // The state did not serve the run after all: the route of T-1994.
-        pid1 = pid1::of(r.rootfs, true, on_disk).unwrap_or(None);
     }
     let size = tty::size()
         .map(|(rows, cols)| format!("{rows}x{cols}"))
@@ -425,7 +431,13 @@ pub fn boot(r: &Request) -> i32 {
     );
     arch::adapt(&mut argv, r.arch);
     if root.is_some() {
-        disk::root::with_init(&mut argv, &disk_load, r.disk.is_some(), pid1, &nonce);
+        disk::root::with_init(
+            &mut argv,
+            &disk_load,
+            r.disk.is_some(),
+            pid1.map(|b| (b, false)),
+            &nonce,
+        );
     }
     argv.extend(r.keeper.iter().flat_map(exec::keeper_args));
     arch::err_port(&mut argv, r.arch);
