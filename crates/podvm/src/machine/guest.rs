@@ -31,6 +31,7 @@ pub(crate) mod kernel_arm64; // TODO/machine.md T-1890
 mod line;
 mod mem; // TODO/machine.md T-1922
 pub(crate) mod net;
+pub(crate) mod pid1; // TODO/machine.md T-1994, steps 2 and 3
 mod rundir; // TODO/machine.md T-1906
 pub(crate) mod sealed;
 pub(crate) mod signals; // TODO/machine.md T-2041
@@ -261,9 +262,17 @@ pub fn boot(r: &Request) -> i32 {
     };
     let kernel = assets.kernel;
     let init_image = r.env.iter().any(|e| e == crate::initns::MARK);
+    let pinned = !assets.volume_modules.is_empty() && !assets.modules.is_empty();
+    // The saved state first where it serves the run (call C27, T-2008),
+    // else T-1994 step 2: systemd as PID 1 of the guest on the root disk.
+    let by_state = init_image && state::serves(r, pinned);
+    let mut pid1 = match pid1::of(r.rootfs, init_image, on_disk && !by_state) {
+        Ok(b) => b,
+        Err(e) => return fail(e),
+    };
     // The base archive where the root is in the initramfs, and for the
     // saved state of T-2008, whose guest keeps its root there.
-    let base = match (!on_disk || init_image)
+    let base = match (!on_disk || (init_image && pid1.is_none()))
         .then(|| base_archive(r.store_root, r.digest, r.rootfs))
         .transpose()
     {
@@ -275,31 +284,16 @@ pub fn boot(r: &Request) -> i32 {
         Some(Ok(d)) => Some(d),
         Some(Err(e)) => return fail(e),
     };
-    if r.sealed.is_some() && tools.is_none() {
-        return fail(
-            "--podvm-sealed needs podvm in the guest, and the kernel of PODVM_MACHINE_KERNEL \
-             brings no module set for it (TODO/machine.md T-1751)"
-                .to_string(),
-        );
-    }
-    if init_image && tools.is_none() {
-        return fail(
-            "--podvm-init=image needs podvm in the guest, and the kernel of \
-             PODVM_MACHINE_KERNEL brings no module set for it (TODO/enter.md T-2002)"
-                .to_string(),
-        );
-    }
-    if r.tty && tools.is_none() {
-        return fail(
-            "-t needs podvm in the guest, and the kernel of PODVM_MACHINE_KERNEL brings no \
-             module set for it (TODO/machine.md T-1723)"
-                .to_string(),
-        );
+    if let Some(why) = tools
+        .is_none()
+        .then(|| archive::needs_tools(r, init_image))
+        .flatten()
+    {
+        return fail(why);
     }
     // TODO/machine.md T-2008: the run from a saved state of the guest, or
     // with the save of one; else the boot below.
-    if let (true, Some((base, _))) = (init_image, &base) {
-        let pinned = !assets.volume_modules.is_empty() && !assets.modules.is_empty();
+    if let (true, Some((base, _))) = (by_state, &base) {
         let all: Vec<(String, PathBuf)> = assets
             .modules
             .iter()
@@ -317,6 +311,8 @@ pub fn boot(r: &Request) -> i32 {
         if let state::Outcome::Done(code) = state::run(r, &ctx) {
             return code;
         }
+        // The state did not serve the run after all: the route of T-1994.
+        pid1 = pid1::of(r.rootfs, true, on_disk).unwrap_or(None);
     }
     let size = tty::size()
         .map(|(rows, cols)| format!("{rows}x{cols}"))
@@ -340,7 +336,11 @@ pub fn boot(r: &Request) -> i32 {
             let script = init::script(
                 &nonce,
                 &r.argv,
-                &r.env,
+                &if pid1.is_some() {
+                    pid1::image_env(&r.env)
+                } else {
+                    r.env.clone()
+                },
                 &r.workdir,
                 tools.is_some() && !r.net_none,
                 &vols,
@@ -351,7 +351,7 @@ pub fn boot(r: &Request) -> i32 {
                 }),
             );
             let script = init::with_pids(script, r.pids.as_deref(), &nonce);
-            let script = init::with_image_init(script, init_image); // T-2002
+            let script = init::with_image_init(script, init_image && pid1.is_none()); // T-2002
             let script = exec::with_server_if(script, r.keeper.is_some());
             let (script, more) = match &root {
                 Some(_) => (script, Vec::new()), // `guest-root` mounts the disk
@@ -376,7 +376,11 @@ pub fn boot(r: &Request) -> i32 {
             return fail(e);
         }
     };
-    if let Some(line) = notice(r, accel, &disk::root::source(&root, &base)) {
+    let mut source = disk::root::source(&root, &base);
+    if pid1.is_some() {
+        source.push_str(", systemd of the image as PID 1 of the guest (T-1994)");
+    }
+    if let Some(line) = notice(r, accel, &source) {
         eprintln!("{line}");
     }
     vol::notices(r.verb, &r.volumes, nine, r.disk.is_some());
@@ -421,7 +425,7 @@ pub fn boot(r: &Request) -> i32 {
     );
     arch::adapt(&mut argv, r.arch);
     if root.is_some() {
-        disk::root::with_init(&mut argv, &disk_load, r.disk.is_some(), &nonce);
+        disk::root::with_init(&mut argv, &disk_load, r.disk.is_some(), pid1, &nonce);
     }
     argv.extend(r.keeper.iter().flat_map(exec::keeper_args));
     arch::err_port(&mut argv, r.arch);

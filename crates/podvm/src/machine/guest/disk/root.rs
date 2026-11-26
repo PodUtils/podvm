@@ -314,7 +314,9 @@ pub fn source(root: &Option<(PathBuf, Got)>, base: &Option<(PathBuf, bool)>) -> 
 /// order, `disk` the sized disk of the upper layer, `nonce` the one of the
 /// markers. The words after `--` of the kernel line are the arguments of
 /// the init, so they come last.
-pub fn with_init(argv: &mut [String], load: &[String], disk: bool, nonce: &str) {
+/// `init`: the bound of the boot of the init of the image, which
+/// `guest-root` then execs as PID 1 (TODO/machine.md T-1994, step 2).
+pub fn with_init(argv: &mut [String], load: &[String], disk: bool, init: Option<u64>, nonce: &str) {
     let Some(i) = argv.iter().position(|a| a == "-append") else {
         return;
     };
@@ -322,10 +324,11 @@ pub fn with_init(argv: &mut [String], load: &[String], disk: bool, nonce: &str) 
         return;
     };
     let init = format!(
-        "rdinit=/podvm/podvm -- {} --load {}{} {nonce}",
+        "rdinit=/podvm/podvm -- {} --load {}{}{} {nonce}",
         super::ROOT_VERB,
         load.join(","),
-        if disk { " --disk" } else { "" }
+        if disk { " --disk" } else { "" },
+        init.map(|s| format!(" --init={s}")).unwrap_or_default()
     );
     *line = line.replace("rdinit=/podvm-init", &init);
 }

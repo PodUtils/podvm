@@ -46,6 +46,25 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
   kill each process of the namespace, so no process of the payload stays
   after the run.
 
+### Changed: systemd of the image is PID 1 of a machine guest, 2026-11-26
+
+Record: T-1994 steps 2 and 3 (PodUtils/podrunner#313 ask 2,
+PodUtils/podrunner#316 ask 2), T-2002.
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `run --podvm-tier=machine --podvm-init=image` of an image whose
+  `/sbin/init` is systemd boots systemd as PID 1 of the guest, on the
+  root disk of the image, where the saved state does not serve the run
+  (`PODVM_MACHINE_STATE=0`, `-t`, `run -d`, `--storage-opt size=` and the
+  other cases in [Limits](docs/limits.md)). The command runs in the unit
+  `podvm-run.service` after `systemctl is-system-running` gives
+  `running` or `degraded`, and its exit code is the exit code of the run.
+- A unit that does not start, or an init that is not ready within
+  `PODVM_INIT_BOOT_TIMEOUT` (180 s), ends the run with one line and 125.
+- The saved state keeps its priority: a run that it serves saves and
+  loads it as in 0.2.0-beta.41, with systemd in a PID namespace. An image
+  whose init is not systemd also keeps the PID namespace.
+
 ### Fixed: a C build on the syscall tier no longer spins for ever, 2026-11-26
 
 Record: T-1991 (PodUtils/podrunner#308, item 3).

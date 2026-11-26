@@ -141,10 +141,11 @@ fn main() -> std::process::ExitCode {
         Some(initns::VERB) => exit(initns::main(rest)),             // an init of the image, T-2002
         Some("guest-9p") => exit(machine::guest::vol::main(rest)),  // in a guest, T-1723
         Some("guest-disk") => exit(machine::guest::disk::guest_main(rest)), // in a guest, T-1968
+        Some(machine::guest::pid1::READY_VERB) => exit(machine::guest::pid1::ready_main(rest)), // T-1994
         Some("guest-job") => exit(machine::guest::job::guest_main(rest)), // in a guest, T-2008
         Some("guest-tty") => exit(machine::guest::tty::guest_main(rest)), // in a guest, T-1723
         Some("guest-signals") => exit(machine::guest::signals::guest_main(rest)), // T-2041
-        Some(run::spare::VERB) => exit(run::spare::main(rest)),     // TODO/image.md T-1781
+        Some(run::spare::VERB) => exit(run::spare::main(rest)),           // TODO/image.md T-1781
         Some("windows") => exit(windows::windows(rest)),
         Some("man") => exit(man::man(rest)),
         Some("profile") => exit(profile::main(rest)), // TODO/cli.md T-1654

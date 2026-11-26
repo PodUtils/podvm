@@ -421,3 +421,38 @@ fn a_run_loads_only_a_whole_state_of_its_own_fingerprint() {
     assert!(c.contains("has a comma"), "{c}");
     let _ = std::fs::remove_dir_all(&d);
 }
+
+/// TODO/machine.md T-1994 (call C27): the order of the routes of an init
+/// of the image. The saved state takes each run that it serves, with the
+/// variable on or wrong (the state route refuses a wrong value by name);
+/// with the variable 0, or a part of the run that a state does not hold,
+/// the run takes the route of systemd as PID 1 of the guest.
+#[test]
+fn the_saved_state_takes_each_run_that_it_serves_first() {
+    let served = Asks {
+        init_image: true,
+        native: true,
+        pinned_kernel: true,
+        ..Asks::default()
+    };
+    let disk = Asks {
+        disk: true,
+        ..served.clone()
+    };
+    let tty = Asks {
+        tty: true,
+        ..served.clone()
+    };
+    for (var, a, want) in [
+        (None, &served, true),
+        (Some("1"), &served, true),
+        (Some("pipe"), &served, true),
+        (Some("abc"), &served, true),
+        (Some("0"), &served, false),
+        (None, &disk, false),
+        (None, &tty, false),
+        (Some("0"), &disk, false),
+    ] {
+        assert_eq!(serves_with(var, a), want, "{var:?} {a:?}");
+    }
+}
