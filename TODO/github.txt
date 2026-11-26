@@ -577,6 +577,6 @@
 685 issue closed
 686 issue closed
 687 issue open
-688 issue open
+688 issue closed
 689 issue open
 690 issue open
