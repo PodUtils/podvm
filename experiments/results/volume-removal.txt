@@ -1,6 +1,6 @@
 Can the host user remove what a guest user wrote in a writable volume?
-2026-11-26T21:42:37Z Linux 6.18.44-fc-v880, uid 0, incus 6.0.0
-podvm SHA-256 fcbc74cb2296690d5e343a7e4309a04fc6c3de894ac5c21cc2217d87dd6316a0
+2026-11-26T22:34:01Z Linux 6.18.44-fc-v880, uid 0, incus 6.0.0
+podvm SHA-256 fd1129045a682bef5c2703c62dda84cf7b23f8bfe9a45c592cc81d386f7c61ed
 image mirror.gcr.io/library/alpine:3.20
   | write: exit 0: '1001 640 /data/f\n1001 700 /data/d' machine.md T-1875)
 podvm: 8 MiB of 17 MiB
@@ -17,13 +17,13 @@ PASS 4: uid 1000 rm -rf exit 0, 0 entries left
   | a file: exit 125: podvm run: -v "WORK/file:/data:mapped": the host path "WORK/file" is not a directory, and a mapped volume is a 9p share of a directory (TODO/enter.md T-2101, TODO/machine.md T-2103)
 PASS 5: 3 of 3 refusals by name at 125
 PASS 6: 0 emulator(s) of the runs stayed
-  | run -d a: exit 0: w486a podvm run: incus tier: incusd 6.0.0 at WORK/incus/unix.socket, image podvm-c64c687cbea93001-fcbc74cb2296690d-v4 imported now (TODO/machine.md T-1718)
-  | run -d b: exit 0: w486b podvm run: incus tier: incusd 6.0.0 at WORK/incus/unix.socket, image podvm-c64c687cbea93001-fcbc74cb2296690d-v4 from incus (TODO/machine.md T-1718)
-  | the record: 'v1\nhost /var/tmp/podvm-486-2viu9n7z/H2\nmap 1065536 65536\nmap 1131072 65536\n'
+  | run -d a: exit 0: w486a podvm run: incus tier: incusd 6.0.0 at WORK/incus/unix.socket, image podvm-c64c687cbea93001-fd1129045a682bef-v4 imported now (TODO/machine.md T-1718)
+  | run -d b: exit 0: w486b podvm run: incus tier: incusd 6.0.0 at WORK/incus/unix.socket, image podvm-c64c687cbea93001-fd1129045a682bef-v4 from incus (TODO/machine.md T-1718)
+  | the record: 'v1\nhost /var/tmp/podvm-486-f3ba75ur/H2\nmap 1065536 65536\nmap 1131072 65536\n'
 PASS 7: run -d, wait and its code [(0, 0, '0'), (0, 0, '0')], 1 record(s)
   | the entries: [('da', 1066537, '0o700'), ('db', 1132073, '0o700'), ('ea', 1066537, '0o755'), ('eb', 1132073, '0o755')]
 PASS 8: uid 1000 rm -rf exit 1: ["rm: cannot remove 'WORK/H2/da': Permission denied", "rm: cannot remove 'WORK/H2/ea/y': Permission denied", "rm: cannot remove 'WORK/H2/db': Permission denied", "rm: cannot remove 'WORK/H2/eb/y': Permission denied"]
-  | volume rm: exit 0 in 1.9 s: /var/tmp/podvm-486-2viu9n7z/H2 
+  | volume rm: exit 0 in 1.8 s: /var/tmp/podvm-486-f3ba75ur/H2 
 PASS 9: volume rm exit 0; H2 there: False
 PASS 10: instances [], records 0
   | /: exit 125: podvm volume rm: / is the root of the host (TODO/machine.md T-2103)

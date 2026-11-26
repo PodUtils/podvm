@@ -296,7 +296,7 @@ not the home directory or a directory above it, with no mount point at or
 under it. The walk follows no link. A directory that no run of the store
 recorded is removed by the caller alone; a failure there names the missing
 record. Experiment 486 removes what two instances of two isolated maps
-wrote in 1.9 s ([its run](../experiments/results/volume-removal.txt)).
+wrote in 1.8 s ([its run](../experiments/results/volume-removal.txt)).
 
 ## No network and one channel (T-1779)
 
