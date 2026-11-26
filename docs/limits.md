@@ -48,7 +48,10 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   userland rung, a rung that `PODVM_MODE` forces, the init of the image
   and the syscall tier (other than its `/tmp`) refuse it by name with
   125. podvm never gives a directory with no limit in its place. A
-  `--tmpfs` with no `size=` stays a directory of a foreground run.
+  `--tmpfs` with no `size=` stays a directory of a foreground run. The
+  option `mode=M` (octal, up to 7777) is the mode of that directory. A
+  mount with `size=` has the mode 1777 of the kernel, and a `mode=` of it
+  that is not 1777 is refused by name (OR-B38-16, T-2070).
 - On the namespace rung a volume (`-v HOST:GUEST`) is a bind mount:
   `/proc/mounts` lists it, and `/proc/self/mountinfo` names the host path
   (T-1920). On the userland rung a volume, `--tmpfs` and `--read-only` are

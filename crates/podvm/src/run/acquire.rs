@@ -340,6 +340,7 @@ pub(super) fn add_tmpfs(verb: &str, store: &podvm_image::Store, o: &mut Opts) ->
             eprintln!("podvm {verb}: --tmpfs {guest}: {}: {e}", dir.display());
             return Err(podvm_image::error::EXIT_RUNTIME_ERROR);
         }
+        super::tmpfs::give_mode(verb, guest, &dir, o)?; // T-2070
         o.volumes.push(podvm_enter::userland::Volume {
             guest: guest.clone(),
             host: dir.display().to_string(),

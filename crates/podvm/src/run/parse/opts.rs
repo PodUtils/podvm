@@ -120,6 +120,9 @@ pub(crate) struct Opts {
     /// The `size=` of each `--tmpfs`, in bytes: a tmpfs with a limit on the
     /// namespace rung (TODO/machine.md T-1968, `run::tmpfs`).
     pub(crate) tmpfs_sizes: Vec<(String, u64)>,
+    /// The `mode=` of each `--tmpfs`, as the bits of `chmod` (TODO/cli.md
+    /// T-2070, OR-B38-16, `run::tmpfs::mode`).
+    pub(crate) tmpfs_modes: Vec<(String, u32)>,
     /// `--ulimit` and `--security-opt no-new-privileges`. TODO/cli.md T-1655.
     pub(crate) hardening: podvm_supervise::table::Hardening,
     /// M5 and T-0804. ⚠ Carried in one struct so `run`, `create` and the
@@ -197,6 +200,7 @@ impl Opts {
             tmpfs: Vec::new(),
             tmp_size: None,
             tmpfs_sizes: Vec::new(),
+            tmpfs_modes: Vec::new(),
             hardening: Default::default(),
             ask: crate::complete::Ask::default(),
         }

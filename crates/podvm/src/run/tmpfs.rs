@@ -35,6 +35,49 @@ pub(super) fn sized(path: &str, value: &str, o: &mut Opts) -> Result<(), String>
     Ok(())
 }
 
+/// The mode that a tmpfs mount has when the options give none: the kernel's
+/// own default, and the one that docker's `--tmpfs P:mode=1777` spells.
+const MOUNT_MODE: u32 = 0o1777;
+
+/// The `mode=VALUE` of `--tmpfs PATH`: octal, up to 7777 (TODO/cli.md T-2070,
+/// OR-B38-16). `Err` is why VALUE is not a mode. The directory form of PATH
+/// takes the mode ([`super::add_tmpfs`]); the mount with a limit takes only
+/// [`MOUNT_MODE`] ([`take`]).
+pub(super) fn mode(path: &str, value: &str, o: &mut Opts) -> Result<(), String> {
+    let digits = value.trim_start_matches('0');
+    let octal = !value.is_empty() && value.bytes().all(|b| (b'0'..=b'7').contains(&b));
+    let bits = if octal && digits.len() <= 4 {
+        u32::from_str_radix(if digits.is_empty() { "0" } else { digits }, 8).ok()
+    } else {
+        None
+    };
+    let bits = bits.ok_or_else(|| format!("mode={value:?} is not an octal mode (0 to 7777)"))?;
+    o.tmpfs_modes.retain(|(p, _)| p != path);
+    o.tmpfs_modes.push((path.to_string(), bits));
+    Ok(())
+}
+
+/// Give the `mode=` of `--tmpfs GUEST` to the directory `dir` of the run, if
+/// the flag has one.
+pub(super) fn give_mode(
+    verb: &str,
+    guest: &str,
+    dir: &std::path::Path,
+    o: &Opts,
+) -> Result<(), i32> {
+    use std::os::unix::fs::PermissionsExt;
+    let Some((_, m)) = o.tmpfs_modes.iter().find(|(p, _)| p == guest) else {
+        return Ok(());
+    };
+    std::fs::set_permissions(dir, std::fs::Permissions::from_mode(*m)).map_err(|e| {
+        eprintln!(
+            "podvm {verb}: --tmpfs {guest}: mode={m:o} could not be given to {}: {e}",
+            dir.display()
+        );
+        EXIT_RUNTIME_ERROR
+    })
+}
+
 /// Is `a` the path `b` or a path under it?
 fn under(a: &str, b: &str) -> bool {
     let b = b.trim_end_matches('/');
@@ -55,6 +98,19 @@ pub(super) fn take(verb: &str, syscall: bool, o: &mut Opts) -> Result<Vec<TmpfsM
     };
     let mut out = Vec::new();
     for (guest, n) in &o.tmpfs_sizes {
+        // pod-enter gives a mount `size=N` and no `mode=` (podcrates
+        // `TmpfsMount`), so the mode of the mount is the kernel's 1777; a
+        // mode that the run cannot give is refused, not dropped (T-2070).
+        if let Some((_, m)) = o
+            .tmpfs_modes
+            .iter()
+            .find(|(p, m)| p == guest && *m != MOUNT_MODE)
+        {
+            let why = format!(
+                "mode={m:o} cannot be given to a mount with a limit, which has the mode 1777"
+            );
+            return Err(refuse(guest, *n, &why));
+        }
         if syscall {
             if guest != "/tmp" {
                 let why = "the syscall tier has no mount namespace, and it caps /tmp alone";

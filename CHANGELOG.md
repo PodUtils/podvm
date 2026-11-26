@@ -10,7 +10,7 @@ They describe their recorded revision, not the current build.
 
 ### Fixed: `--env-file`, `run -d`, `--tmpfs` mode, `cp` and `exec` faults of the outside passes, 2026-11-26
 
-Record: T-2070 (OR-B38-11, OR-B38-12), T-2087 (OR-B40-12).
+Record: T-2070 (OR-B38-11, OR-B38-12, OR-B38-16), T-2087 (OR-B40-12).
 Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 
 - `--env-file` takes a line with a name and no `=` as docker does: the
@@ -20,6 +20,10 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 - `run -d IMAGE /nonexistent` ends with 127 (126 for a command that is not
   invocable), as the foreground `run` and docker do. Before, it ended with
   125.
+- `--tmpfs P:mode=M` gives the mode M to the directory of the run. A mode
+  that is not octal up to 7777 is refused by name. A tmpfs with `size=` has
+  the mode 1777 of the kernel; each other mode is refused by name, and no
+  line was given before.
 
 ### Fixed: a foreground run of a user with no root leaves no zombie, 2026-11-26
 

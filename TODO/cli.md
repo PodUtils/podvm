@@ -6822,7 +6822,7 @@ Fix the two P1 findings and the P2 findings that the lead marked "fix"; give OR-
 | OR-B38-13, `run` with no `-i` passes stdin; `run -it` with a stdin that is no terminal is accepted with no line (docker refuses) | P3 | known gap | - | open |
 | OR-B38-14, `cp` prints paths of the store; `cp FILE CTR:/missing/dir/file` makes the parents (docker: an error) | P3 | known gap | - | open |
 | OR-B38-15, gaps of docker's `--format`, `--filter` and flags, each refused with a true line | P3 | documented | - | open |
-| OR-B38-16, `--tmpfs P:mode=1777` drops the mode with no line | P3 | known gap | - | open |
+| OR-B38-16, `--tmpfs P:mode=1777` drops the mode with no line | P3 | fix | [T-2070](cli.md) | done: `--tmpfs P:mode=M` gives M to the directory of the run; a mode that is not octal up to 7777 is refused by name (125); a mount with a limit has the mode 1777 of the kernel, and a mode that it cannot give is refused by name, not dropped. A mode for the mount needs `TmpfsMount::mode` in pod-enter (not yet asked of podcrates). Proof: the unit test `a_tmpfs_mode_is_given_or_refused_never_dropped`, and `run --tmpfs` as uid 1000 |
 | OR-B38-17, `run -it sh` and `exec -it CTR sh`: "can't access tty; job control turned off" (the pty is no controlling terminal) | P3 | known gap | - | open |
 | OR-B38-18, texts: 14 spaces in the note of an exec into a created container; `/proc/mounts` of `--read-only`; `--cap-drop ALL`; `pull http://x/y` names registry-1.docker.io; `system df --verbose`; `podvm help run`; `system df` after a refused extraction; the text of a refused hard link; `ps -a` on a store with no write; `rmi -f`; `pull -a` and schema 1; `HOSTNAME` and `hostname` with no `--hostname` | P3 | known gap | - | open |
 

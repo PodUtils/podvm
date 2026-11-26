@@ -129,3 +129,54 @@ fn each_entry_but_the_namespace_rung_refuses_a_tmpfs_by_name() {
         "{banner}"
     );
 }
+
+/// TODO/cli.md T-2070 (OR-B38-16): `--tmpfs P:mode=M` is not dropped. One
+/// table: a mode that does not parse is refused by name; the directory form
+/// gives M to the directory; the mount with a limit has the kernel's 1777
+/// and refuses each other mode.
+#[test]
+fn a_tmpfs_mode_is_given_or_refused_never_dropped() {
+    // The spellings that are not an octal mode up to 7777.
+    for bad in ["", "8", "17777", "rwx", "-1", "1777x", "0x1f"] {
+        let spec = format!("/w:mode={bad}");
+        assert_eq!(parsed(&["--tmpfs", &spec]).err(), Some(125), "{spec}");
+    }
+    // The directory form: the mode is kept for the directory, the last wins.
+    for (flags, want) in [
+        (&["--tmpfs", "/w:mode=1777"][..], Some(0o1777)),
+        (&["--tmpfs", "/w:rw,mode=0700,nosuid"], Some(0o700)),
+        (
+            &["--tmpfs", "/w:mode=755", "--tmpfs", "/w:mode=0750"],
+            Some(0o750),
+        ),
+        (&["--tmpfs", "/w:mode=0"], Some(0)),
+        (&["--tmpfs", "/w"], None),
+    ] {
+        let o = parsed(flags).unwrap();
+        let got = o.tmpfs_modes.iter().find(|(p, _)| p == "/w").map(|x| x.1);
+        assert_eq!(got, want, "{flags:?}");
+    }
+    // A directory of the run gets the mode.
+    let root = std::env::temp_dir().join(format!("podvm-tmpfs-mode-{}", std::process::id()));
+    let store = podvm_image::Store::open(&root).unwrap();
+    let mut o = parsed(&["--tmpfs", "/w:mode=0750"]).unwrap();
+    super::super::add_tmpfs("run", &store, &mut o).unwrap();
+    let host = std::path::PathBuf::from(&o.volumes.last().unwrap().host);
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let m = std::fs::metadata(&host).unwrap().permissions().mode();
+        assert_eq!(m & 0o7777, 0o750);
+    }
+    let _ = std::fs::remove_dir_all(&root);
+    // The mount with a limit: 1777 is its own mode; each other is refused.
+    let mut o = parsed(&["--tmpfs", "/w:size=1m,mode=1777"]).unwrap();
+    assert_eq!(take("run", false, &mut o).unwrap().len(), 1);
+    for spec in [
+        "/w:size=1m,mode=0755",
+        "/w:mode=700,size=1m",
+        "/w:size=1m,mode=777",
+    ] {
+        let mut o = parsed(&["--tmpfs", spec]).unwrap();
+        assert_eq!(take("run", false, &mut o).err(), Some(125), "{spec}");
+    }
+}
