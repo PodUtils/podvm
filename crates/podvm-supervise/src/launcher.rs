@@ -167,6 +167,9 @@ fn enter_in_launcher(
     let binds = binds_of(&env);
     let layers = overlays_of(&env); // TODO/enter.md T-2101
     env.retain(|e| !e.starts_with("PODVM_BINDS=") && !e.starts_with("PODVM_BINDS_BASE="));
+    // TODO/machine.md T-1968: the size-limited tmpfs mounts, as the volumes.
+    let tmpfs = tmpfs::of(&env)?;
+    tmpfs::drop_var(&mut env);
     if container.userland_exec.is_empty() {
         table::drop_host_paths(&mut env); // T-2054: an entry with a root
     }
@@ -221,6 +224,9 @@ fn enter_in_launcher(
         // the init of the PID namespace is a fork of this launcher; it sets
         // this title and an empty environment itself, and is not dumpable.
         relay_title: Some(podvm_enter::TITLE_INIT.into()),
+        // TODO/machine.md T-1968 (podcrates `v0.86.0`): only the namespace
+        // rung mounts them; each other entry of pod-enter refuses the plan.
+        tmpfs,
     };
 
     // ⭐ TODO/image.md T-0204 and T-0211. The image lock is taken here and
@@ -245,6 +251,15 @@ fn enter_in_launcher(
     // where the payload is entered. The fallback line joins the container
     // log: the launcher's stderr is /dev/null.
     let mut init = None;
+    // TODO/machine.md T-1968: the init of the image mounts no tmpfs of the
+    // plan, so a limit there would be lost; `create` refuses it, and so here.
+    if init_of_image(container) && !plan.tmpfs.is_empty() {
+        return Err(
+            "--tmpfs with size= is refused with --podvm-init=image: the init of the image \
+                    mounts no tmpfs with a limit (TODO/machine.md T-1968)"
+                .into(),
+        );
+    }
     let child = if init_of_image(container) {
         // TODO/enter.md T-2002: the init of the image is PID 1 of a PID
         // namespace, and the command of the record joins it after the boot.
@@ -344,6 +359,8 @@ fn enter_in_launcher(
 
 #[cfg(test)]
 mod tests;
+
+pub mod tmpfs; // TODO/machine.md T-1968
 
 /// Is `host` the directory `base` or a path under it?
 fn under(host: &str, base: &str) -> bool {
