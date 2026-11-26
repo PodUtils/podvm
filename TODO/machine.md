@@ -5819,6 +5819,15 @@ guest that runs holds the hold of its image, so the record of the image
 stays; podvm does not scan for an open file of a guest. Not measured: a
 removal during a build or a save under KVM.
 
+Amended (2026-11-26). Gate 45812348716 on `930bc0e` failed in the test
+`the_root_disk_keeps_each_kind_of_file_and_each_attribute` as the user of
+the runner: `image::write` opened a file of mode 0000 in a directory of
+mode 0000 after the walk had given each mode back, and the open gave
+`Permission denied`. `image::open_own` gives each directory above the file
+that its owner cannot search the owner's search bit for the open only,
+and gives each mode back after it. The whole unit test binary (647 tests)
+passes as uid 1000 and as root.
+
 # T-1996: On the incus tier, an instance of the hosted snapshot has 231,072 ids, `/dev/fuse` and a machine-id of its own
 
 **Source:** PodUtils/podrunner#316 (COORD-106 of podrunner, the owner's ruling "The hosted snapshot" of podrunner)
