@@ -567,6 +567,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #671 | COORD-254: podvm load accepts repeated OCI layers in runner archives (to podrunner) | open | T-2098 |
 | #672 | COORD-255: the answer to PodUtils/podrunner#359: bytes read through each volume is feasible with a counting layer that podvm serves; no counter exists today (to podrunner) | open | T-2099 |
 | #673 | [gh action] requested | closed (not run: the head check of the block named a wrong full SHA; #674 replaces it) | the gate and workloads runs of `2287890`, before the version bump of the next beta |
+| #674 | [gh action] requested | open | the release gate of 0.2.0-beta.41 on `332efaa` (the gate, workloads, the nightly trial, arm), then the release |
 
 ## Messages whose title does not start with COORD-NNN
 
