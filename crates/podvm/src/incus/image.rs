@@ -230,7 +230,8 @@ pub fn unified_tarball_to<W: std::io::Write>(
     let err = |e: std::io::Error| format!("the unified tarball of {}: {e}", rootfs.display());
     b.append_data(&mut h, "metadata.yaml", meta.as_bytes())
         .map_err(err)?;
-    walk(&mut b, rootfs, "", &meant, &unset).map_err(err)?;
+    let mut firsts = Firsts::new();
+    walk(&mut b, rootfs, "", &meant, &unset, &mut firsts).map_err(err)?;
     for (path, mode, data) in [
         ("rootfs/.podvm", 0o755, None),
         ("rootfs/.podvm/podvm", 0o755, Some(podvm)),
@@ -256,12 +257,45 @@ pub fn unified_tarball_to<W: std::io::Write>(
         .map_err(err)
 }
 
+/// TODO/cli.md T-2079 (OR-B39-08): the first name in the archive of each
+/// file of more than one link, by its device and inode, with the owner,
+/// the mode and the attributes that its entry gave.
+type Firsts = HashMap<(u64, u64), (String, (u64, u64, u32), Vec<super::xattrs::Attr>)>;
+
+/// The name in the archive that the file `md` at the path `at` is a hard
+/// link of: the first name of its inode, where that name gave the same
+/// owner, mode and attributes. `None` writes the file with its data, and
+/// records it as the first name of its inode where it has more links.
+fn link_of(
+    firsts: &mut Firsts,
+    md: &std::fs::Metadata,
+    at: &str,
+    ids: (u64, u64, u32),
+    attrs: &[super::xattrs::Attr],
+) -> Option<String> {
+    use std::os::unix::fs::MetadataExt;
+    if md.nlink() < 2 {
+        return None;
+    }
+    match firsts.get(&(md.dev(), md.ino())) {
+        Some((first, i, a)) if *i == ids && a == attrs => Some(first.clone()),
+        // A name with other records keeps them: a full copy.
+        Some(_) => None,
+        None => {
+            let first = (at.to_string(), ids, attrs.to_vec());
+            firsts.insert((md.dev(), md.ino()), first);
+            None
+        }
+    }
+}
+
 fn walk<W: std::io::Write>(
     b: &mut tar::Builder<W>,
     dir: &Path,
     rel: &str,
     meant: &HashMap<String, (u64, u64, u32)>,
     unset: &HashMap<String, Vec<super::xattrs::Attr>>,
+    firsts: &mut Firsts,
 ) -> std::io::Result<()> {
     let mut names: Vec<_> = std::fs::read_dir(dir)
         .and_then(|d| d.collect::<Result<_, _>>())
@@ -295,9 +329,21 @@ fn walk<W: std::io::Write>(
         h.set_gid(g);
         h.set_mode(mode & 0o7777);
         let at = format!("rootfs/{r}");
-        let ft = md.file_type();
         // T-1999: the attributes of the image, as PAX records before it.
         let attrs = super::xattrs::merge(super::xattrs::on_disk(&p), unset.get(&r));
+        let ft = md.file_type();
+        // T-2079 (OR-B39-08): each other name of a file goes out as a hard
+        // link entry, so that incusd unpacks one inode, not a copy each.
+        let first = match ft.is_file() {
+            true => link_of(firsts, &md, &at, (u, g, mode & 0o7777), &attrs),
+            false => None,
+        };
+        if let Some(first) = first {
+            h.set_entry_type(tar::EntryType::Link);
+            h.set_size(0);
+            b.append_link(&mut h, &at, first)?;
+            continue;
+        }
         if !attrs.is_empty() {
             let data = super::xattrs::pax_records(&attrs);
             let mut x = tar::Header::new_ustar();
@@ -318,7 +364,9 @@ fn walk<W: std::io::Write>(
             // (`/etc/shadow` of mode 0000 in ubi-init, experiment 434 clause
             // 19) is podvm's own: read it with the owner's bits, then restore
             // the image's mode. The header keeps the image's mode.
-            podvm_extract::tree::with_owner_bits(&p, 0o500, || walk(b, &p, &r, meant, unset))?;
+            podvm_extract::tree::with_owner_bits(&p, 0o500, || {
+                walk(b, &p, &r, meant, unset, firsts)
+            })?;
         } else if ft.is_file() {
             let f = owned(&p, 0o400, || std::fs::File::open(&p))?;
             b.append_data(&mut h, &at, f)?;

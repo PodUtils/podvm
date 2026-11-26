@@ -8,6 +8,19 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: the incus tier keeps the hard links of an image, 2026-11-26
+
+Record: T-2079 (OR-B39-08).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- An image that the incus tier imports from the extracted tree (an image
+  whose layers podvm cannot stream) keeps its hard links: each name of a
+  file after the first is a hard link, as in the image. Before,
+  `busybox:1.36` on this path took 392 MiB in `/bin` of each instance;
+  now it takes 1 MiB. The streamed import already kept the links.
+- The space check before the import counts the bytes of a linked file
+  once.
+
 ### Added: a sized writable disk for a guest of the machine tier, 2026-11-26
 
 Record: T-1968 (PodUtils/podrunner#296 ask 5).

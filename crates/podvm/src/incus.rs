@@ -34,6 +34,8 @@ mod held_tests; // TODO/machine.md T-2078
 #[cfg(test)]
 mod import_tests; // TODO/machine.md T-2085
 #[cfg(test)]
+mod links_tests; // TODO/cli.md T-2079
+#[cfg(test)]
 mod oom_tests; // TODO/machine.md T-2077
 #[cfg(test)]
 mod run_tests; // TODO/machine.md T-2080

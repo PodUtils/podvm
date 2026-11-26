@@ -106,6 +106,8 @@ pub fn need_of(rootfs: &Path, podvm_len: u64) -> Need {
     };
     let init_dir = rootfs.join(super::image::INIT_DIR);
     let init_file = rootfs.join(super::image::INIT_FILE);
+    use std::os::unix::fs::MetadataExt;
+    let mut inodes = std::collections::HashSet::new();
     let mut stack = vec![rootfs.to_path_buf()];
     while let Some(dir) = stack.pop() {
         let Ok(rd) = std::fs::read_dir(&dir) else {
@@ -119,6 +121,11 @@ pub fn need_of(rootfs: &Path, podvm_len: u64) -> Need {
             let Ok(md) = std::fs::symlink_metadata(&path) else {
                 continue;
             };
+            // T-2079 (OR-B39-08): the archive gives each other name of a
+            // file as a hard link, so its inode and its bytes count once.
+            if md.is_file() && md.nlink() > 1 && !inodes.insert((md.dev(), md.ino())) {
+                continue;
+            }
             if path != init_dir {
                 need.entries += 1;
             }
