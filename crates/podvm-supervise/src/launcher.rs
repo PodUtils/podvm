@@ -127,6 +127,33 @@ pub fn enter<'a>(
     move |container, launch| enter_in_launcher(store, record, container, launch)
 }
 
+/// The mark before the exit code in the text of a failed spawn. The text is
+/// the only thing that crosses from the launcher to `start` (podcrates
+/// `pod-supervise` gives it the class `Unavailable`), so the code of the
+/// failure rides in it, and [`take_code`] removes it again (TODO/cli.md
+/// T-2070, OR-B38-12: `run -d IMAGE /nonexistent` gave 125, a foreground
+/// run 127).
+const CODE_MARK: &str = "\u{1}exit=";
+
+/// The text of a failed spawn: the exit code that a foreground run gives,
+/// then the sentence.
+fn spawn_failure(e: podvm_enter::Error) -> String {
+    use podvm_enter::ExitCode;
+    format!("{CODE_MARK}{};{e}", e.exit_code())
+}
+
+/// Remove the mark and the code that [`spawn_failure`] put in `text`, and
+/// give the code. A text with no valid mark stays as it is.
+pub(crate) fn take_code(text: &mut String) -> Option<i32> {
+    let at = text.find(CODE_MARK)?;
+    let rest = &text[at + CODE_MARK.len()..];
+    let (num, _) = rest.split_once(';')?;
+    let code: i32 = num.parse().ok()?;
+    let end = at + CODE_MARK.len() + num.len() + 1;
+    text.replace_range(at..end, "");
+    Some(code)
+}
+
 fn enter_in_launcher(
     store: &Store,
     record: &podvm_image::Record,
@@ -296,13 +323,13 @@ fn enter_in_launcher(
                 )
             })
             .map_err(|e| format!("starting with an overlay volume: {e}"))?;
-        podvm_enter::spawn_namespace(&root, &plan, log).map_err(|e| e.to_string())?
+        podvm_enter::spawn_namespace(&root, &plan, log).map_err(spawn_failure)?
     } else if container.userland_exec.is_empty() {
         let findings = podvm_probe::run();
         let selection = podvm_probe::select::Selection::choose(&findings);
         // TODO/enter.md T-2054: the init of the PID namespace takes its
         // title (`Plan::relay_title`) in pod-enter, with one thread.
-        podvm_enter::spawn_selected(&root, &plan, selection.rung, log).map_err(|e| e.to_string())?
+        podvm_enter::spawn_selected(&root, &plan, selection.rung, log).map_err(spawn_failure)?
     } else {
         // ⭐ TODO/enter.md T-1653: the volumes of the record join the root
         // pair, so a working directory in a volume resolves in the volume.
@@ -332,7 +359,7 @@ fn enter_in_launcher(
             None,
             log,
         )
-        .map_err(|e| e.to_string())?
+        .map_err(spawn_failure)?
     };
     let pid = child.pid;
     Ok(Payload {
