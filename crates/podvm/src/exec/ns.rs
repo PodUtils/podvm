@@ -139,6 +139,10 @@ pub(super) fn hosts_of(
     match &hardening.hosts {
         Some(h) => {
             ask.container_name = h.name.clone();
+            // TODO/cli.md T-2079 (OR-B39-15): the run wrote the file at its
+            // start; an `exec` with no `--add-host` of its own leaves the
+            // file as the payload edited it.
+            ask.keep_hosts = ask.add_hosts.is_empty();
             let mine = std::mem::take(&mut ask.add_hosts);
             ask.add_hosts = h.added.clone();
             ask.add_hosts

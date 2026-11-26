@@ -23,6 +23,7 @@
 
 #![forbid(unsafe_op_in_unsafe_fn)]
 
+mod keep; // TODO/cli.md T-2079
 pub mod reach;
 pub mod shm;
 
@@ -75,6 +76,10 @@ pub struct Options {
     /// PodUtils/podvm#557: the entry mounts a `/proc` in the root (the
     /// namespace rung), so a link of `etc/mtab` into `/proc` stays.
     pub entry_mounts_proc: bool,
+    /// TODO/cli.md T-2079 (OR-B39-15): the file `/etc/hosts` of the root
+    /// stays as the run and its payload left it (an `exec` of a run that
+    /// wrote it at its start).
+    pub keep_hosts: bool,
 }
 
 impl Default for Options {
@@ -88,6 +93,7 @@ impl Default for Options {
             steps: true,
             reach_cache: None,
             entry_mounts_proc: false,
+            keep_hosts: false,
         }
     }
 }
@@ -330,9 +336,16 @@ pub fn settings(rootfs: &str, opts: &Options) -> pod_rootfs::Settings {
 /// caller turns it into a refusal.
 pub fn complete(rootfs: &str, opts: &Options) -> Result<Report> {
     let mut probe = reach::cached(opts.reach_cache.clone());
+    let held = opts
+        .keep_hosts
+        .then(|| keep::Held::take(Path::new(rootfs)))
+        .flatten();
     let mut r = pod_rootfs::complete(Path::new(rootfs), &settings(rootfs, opts), &mut probe)
         .map(Report::from)
         .map_err(|e| Error::Complete(e.to_string()))?;
+    if let Some(h) = held {
+        h.put_back(Path::new(rootfs), &mut r.fixups);
+    }
     r.fixups.push(shm::dev_shm(Path::new(rootfs)));
     r.fixups.push(shm::dev_pts(Path::new(rootfs)));
     Ok(r)

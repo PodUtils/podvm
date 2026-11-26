@@ -10,7 +10,7 @@ They describe their recorded revision, not the current build.
 
 ### Fixed: `--env-file`, `run -d`, `--tmpfs` mode, `cp` and `exec` faults of the outside passes, 2026-11-26
 
-Record: T-2070 (OR-B38-11, OR-B38-12, OR-B38-16, OR-B38-07, OR-B38-14), T-2087 (OR-B40-12).
+Record: T-2070 (OR-B38-11, OR-B38-12, OR-B38-16, OR-B38-07, OR-B38-14), T-2079 (OR-B39-15), T-2087 (OR-B40-12).
 Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 
 - `--env-file` takes a line with a name and no `=` as docker does: the
@@ -28,6 +28,8 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
   destination by the link or the file of the source, and writes through
   none. Before, it stopped half way. The lines of `cp` name the path of the
   container, no more a path of the store.
+- `exec` of a run with no `--add-host` of its own keeps the edits of the
+  payload to `/etc/hosts`. Before, each `exec` wrote the file again.
 
 ### Fixed: a foreground run of a user with no root leaves no zombie, 2026-11-26
 
