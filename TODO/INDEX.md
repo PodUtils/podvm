@@ -735,10 +735,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2096](deps.md) | P2 | M | none | deps | done | Take podcrates `v0.84.0` and its shared gzip writer |
 | [T-2097](deps.md) | P2 | M | none | deps | done | Take podcrates `v0.85.0` and keep the causes of failures |
 | [T-2098](image.md) | P1 | S | none | image | done | An OCI archive can name the same verified layer more than once |
+| [T-2099](machine.md) | P2 | L | none | machine | partial | The bytes that a payload reads through each volume, in `--report` |
 
 ## Counts
 
-669 entries: 22 open, 39 partial, 6 blocked, 602 done.
+670 entries: 22 open, 40 partial, 6 blocked, 602 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -749,9 +750,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 20 | 0 | 273 | 296 |
-| P2 | 14 | 14 | 5 | 209 | 242 |
+| P2 | 14 | 15 | 5 | 209 | 243 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 22 | 39 | 6 | 602 | 669 |
+| **All** | 22 | 40 | 6 | 602 | 670 |
 
 ## Work order
 

@@ -565,6 +565,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #669 | COORD-252: podvm took podcrates v0.85.0 (to podcrates) | closed (PodUtils/podcrates#262 lists `9466c984`) | T-2097 |
 | #670 | COORD-253: podvm took the shared hosted-session roles (to podcrates) | closed (PodUtils/podcrates#263 lists `5e872816`) | T-2095 |
 | #671 | COORD-254: podvm load accepts repeated OCI layers in runner archives (to podrunner) | open | T-2098 |
+| #672 | COORD-255: the answer to PodUtils/podrunner#359: bytes read through each volume is feasible with a counting layer that podvm serves; no counter exists today (to podrunner) | open | T-2099 |
 
 ## Messages whose title does not start with COORD-NNN
 

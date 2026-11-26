@@ -7225,3 +7225,83 @@ clock and different random bytes. All three jobs and the experiment
 exited 0, and each emulator ended. The transcript is
 `experiments/results/machine-state-channel.txt`. Send podrunner the beta
 tag when the release gate passes.
+
+# T-2099: The bytes that a payload reads through each volume, in `--report`
+
+**Source:** PodUtils/podrunner#359 (COORD-135 of podrunner, from a member of the team, 2026-11-26; podrunner task 649, githome G-19 and G-20)
+**Category:** machine
+**Milestone:** none
+**Priority:** P2
+**Effort:** L
+**Status:** partial
+
+## Problem
+
+podrunner's `run-report.v1` gives `cache_read_bytes` as unknown for a job
+with a cache. podrunner asks for the bytes read through each volume of a
+run, keyed by its guest path (`/podrunner-cache` first), on the machine
+tier (a 9p volume) and on the incus tier (a `disk` device). A measured
+zero must differ from an unknown count. podrunner asks for the
+feasibility and the limits of the counter before it selects the field.
+
+## Premise
+
+Read in the code on 2026-11-26 (`5377e4a`):
+
+* Machine tier: each `-v` is `-virtfs local,...,security_model=none` of
+  QEMU (`machine/guest/vol.rs`), mounted in the guest with
+  `trans=virtio,version=9p2000.L,msize=262144` and no `cache=`. The 9p
+  default is `cache=none`: the guest keeps no page cache for the volume,
+  so each read of the payload is a 9p read that QEMU serves.
+* QEMU serves each 9p device in its own process and threads, shared with
+  the block devices. QMP gives no counter for a 9p device. The trace
+  events of 9p carry the request tag, not the device. `/proc/PID/io` of
+  QEMU sums each device, the network and the monitor. The `proxy` fsdev
+  (an outside 9p server) left QEMU in 8.1. So no counter of a volume
+  exists on this tier today.
+* Incus tier: each instance is a container (`incus/update.rs` refuses any
+  other kind), and a volume is a `disk` device, a bind mount of the host
+  directory. The kernel of the host serves each read; no process is in
+  the path. `io.stat` of the cgroup counts reads of a block device that
+  miss the page cache, for each device and not for each directory. Two
+  volumes on one file system are not separable, and a read from the page
+  cache counts nothing.
+* podcrates `v0.85.0` has no 9p server, no FUSE server and no counter of
+  a volume (`codegraph.py similar`, 2026-11-26).
+
+## Approach
+
+1. Answer the feasibility first (COORD issue `(to podrunner)`), with the
+   routes and their limits. Wait for podrunner's choice of the route and
+   the field.
+2. The recommended route: a counting pass-through file system that podvm
+   serves in the guest (the machine tier, the init of the guest is root)
+   and in the container (the incus tier, with the `unix-char` device
+   `/dev/fuse` that `--podvm-init=image` already adds): mount the 9p or
+   bind source at a hidden path, serve the guest path through FUSE with
+   direct I/O, and count the bytes of each READ reply for each volume. The
+   count is then the bytes that the payload read through the volume; no
+   cache in the guest hides a read. A FUSE server is not in podcrates:
+   ask podcrates first (`AGENTS.md`, section 2a).
+3. The other route, for the machine tier only: one `virtiofsd` for each
+   counted volume and its `/proc/PID/io`; it needs a pinned static
+   `virtiofsd`, a shared memory backend, and a saved state (call C27)
+   that keeps the device.
+
+## Decision
+
+Pending podrunner's choice of the route and the field (PodUtils/podrunner#359).
+
+## Prove
+
+A table test of the counter against each kind of volume (rw, `:ro`, a
+volume with no reads). A run on the machine tier and a run on the incus
+tier (the job `incus` of `kvm.yml`) with two volumes, one `:ro`: the
+payload reads N bytes from the first and M bytes from the second, and
+`--report` gives N and M for each guest path, and a null for a volume
+whose count is unknown.
+
+## Done
+
+**Partial (2026-11-26).** The feasibility answer is COORD-255 (#672). Remaining:
+the route and field of podrunner, the counter, the proof.
