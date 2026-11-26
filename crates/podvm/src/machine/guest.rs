@@ -262,8 +262,11 @@ pub fn boot(r: &Request) -> i32 {
     };
     let kernel = assets.kernel;
     let init_image = r.env.iter().any(|e| e == crate::initns::MARK);
-    // T-1994, step 2: systemd as PID 1 of the guest on the root disk.
-    let pid1 = match pid1::of(r.rootfs, init_image && on_disk) {
+    let pinned = !assets.volume_modules.is_empty() && !assets.modules.is_empty();
+    // The saved state first where it serves the run (call C27, T-2008),
+    // else T-1994 step 2: systemd as PID 1 of the guest on the root disk.
+    let by_state = init_image && state::serves(r, pinned);
+    let mut pid1 = match pid1::of(r.rootfs, init_image, on_disk && !by_state) {
         Ok(b) => b,
         Err(e) => return fail(e),
     };
@@ -281,31 +284,16 @@ pub fn boot(r: &Request) -> i32 {
         Some(Ok(d)) => Some(d),
         Some(Err(e)) => return fail(e),
     };
-    if r.sealed.is_some() && tools.is_none() {
-        return fail(
-            "--podvm-sealed needs podvm in the guest, and the kernel of PODVM_MACHINE_KERNEL \
-             brings no module set for it (TODO/machine.md T-1751)"
-                .to_string(),
-        );
-    }
-    if init_image && tools.is_none() {
-        return fail(
-            "--podvm-init=image needs podvm in the guest, and the kernel of \
-             PODVM_MACHINE_KERNEL brings no module set for it (TODO/enter.md T-2002)"
-                .to_string(),
-        );
-    }
-    if r.tty && tools.is_none() {
-        return fail(
-            "-t needs podvm in the guest, and the kernel of PODVM_MACHINE_KERNEL brings no \
-             module set for it (TODO/machine.md T-1723)"
-                .to_string(),
-        );
+    if let Some(why) = tools
+        .is_none()
+        .then(|| archive::needs_tools(r, init_image))
+        .flatten()
+    {
+        return fail(why);
     }
     // TODO/machine.md T-2008: the run from a saved state of the guest, or
     // with the save of one; else the boot below.
-    if let (true, Some((base, _))) = (init_image, &base) {
-        let pinned = !assets.volume_modules.is_empty() && !assets.modules.is_empty();
+    if let (true, Some((base, _))) = (by_state, &base) {
         let all: Vec<(String, PathBuf)> = assets
             .modules
             .iter()
@@ -323,6 +311,8 @@ pub fn boot(r: &Request) -> i32 {
         if let state::Outcome::Done(code) = state::run(r, &ctx) {
             return code;
         }
+        // The state did not serve the run after all: the route of T-1994.
+        pid1 = pid1::of(r.rootfs, true, on_disk).unwrap_or(None);
     }
     let size = tty::size()
         .map(|(rows, cols)| format!("{rows}x{cols}"))

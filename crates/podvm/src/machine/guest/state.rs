@@ -187,6 +187,26 @@ pub fn refusal(a: &Asks) -> Option<String> {
     None
 }
 
+/// Whether the saved state takes the run `r` of an init of the image:
+/// [`VAR`] is not 0 and [`refusal`] gives none (TODO/machine.md T-1994:
+/// the state route keeps its priority, call C27). A bad value of [`VAR`]
+/// takes it too, so that [`run`] refuses it by name.
+pub fn serves(r: &Request, pinned_kernel: bool) -> bool {
+    serves_with(
+        std::env::var(VAR).ok().as_deref(),
+        &Asks::of(r, true, pinned_kernel),
+    )
+}
+
+/// [`serves`] for the value of [`VAR`] and the asks of a run.
+pub fn serves_with(var: Option<&str>, a: &Asks) -> bool {
+    match wanted(var) {
+        Ok(None) => false,
+        Ok(Some(_)) => refusal(a).is_none(),
+        Err(_) => true,
+    }
+}
+
 /// What a state depends on.
 pub struct Shape<'a> {
     pub digest: &'a str,

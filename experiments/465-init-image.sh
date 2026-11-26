@@ -419,8 +419,7 @@ fi
 # The first run saves the state that the later runs load and cut: no state
 # of another clause is in the store.
 if command -v qemu-system-x86_64 >/dev/null 2>&1; then
-	# The saved state keeps its root in the initramfs (TODO/machine.md T-1994).
-	m9() { as env XDG_RUNTIME_DIR="$NOBUS" PODVM_USERNS=0 PODVM_RUNSC=/nonexistent/runsc PODVM_MACHINE_ROOT=initramfs "$@"; }
+	m9() { as env XDG_RUNTIME_DIR="$NOBUS" PODVM_USERNS=0 PODVM_RUNSC=/nonexistent/runsc "$@"; }
 	# The run names the machine tier, or this clause tests nothing.
 	tier9() { grep -q 'takes the machine tier' "$1" || bad "clause 9: $2: the run names no machine tier"; }
 	find "$WORK/store/machine" -maxdepth 1 -name 'state-*' -exec rm -f {} + 2>/dev/null

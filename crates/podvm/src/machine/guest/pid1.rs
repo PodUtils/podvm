@@ -316,14 +316,16 @@ pub fn resolve(rootfs: &Path, p: &str) -> Option<PathBuf> {
 }
 
 /// Host side: the bound of the boot in seconds where the run boots
-/// systemd as PID 1 of the guest: `asked` (an init of the image on the
-/// root disk) and an image whose init is systemd. The saved state of
-/// T-2008 keeps the initramfs and the PID namespace of T-2002.
-pub fn of(rootfs: &Path, asked: bool) -> Result<Option<u64>, String> {
-    if !(asked && systemd_init(rootfs)) {
+/// systemd as PID 1 of the guest: an init of the image (`init_image`), a
+/// run that takes this route (`route`: the root disk, where the saved
+/// state of T-2008 does not serve it; call C27) and an image whose init is
+/// systemd. A bad bound is an error for each run of an init of the image.
+pub fn of(rootfs: &Path, init_image: bool, route: bool) -> Result<Option<u64>, String> {
+    if !init_image {
         return Ok(None);
     }
-    crate::incus::systemd::boot_bound().map(|d| Some(d.as_secs()))
+    let bound = crate::incus::systemd::boot_bound()?.as_secs();
+    Ok((route && systemd_init(rootfs)).then_some(bound))
 }
 
 /// Host side: whether the init of the image (`/sbin/init`) is systemd.

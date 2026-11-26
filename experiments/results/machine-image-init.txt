@@ -1,21 +1,21 @@
 Run: python3 -I experiments/483-machine-image-init.py as uid 1000 (setpriv), PODVM_483_BIN = the release build of this commit's tree. WORK names the owned scratch directory. A control byte of the console is written as \xNN.
 Is systemd of the image PID 1 of a machine guest, and does the exit code of the command come back?
-2026-11-26T12:47:30Z Linux 6.18.44-fc-v880, uid 1000, TCG, no /dev/kvm: True
-podvm SHA-256 138f7ec0e37154abe504f985e58602ecf2ce9a3b35b34a2a88a22b33b7b0f170
+2026-11-26T15:00:45Z Linux 6.18.44-fc-v880, uid 1000, TCG, no /dev/kvm: True
+podvm SHA-256 96fbf9f97227de881b4669640fa3695d675bbeb674c24a46de4d35cec61c23de
 image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b
 $ podvm pull -q ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b
-  | exit 0 in 14.0 s
+  | exit 0 in 11.6 s
 $ podvm save -o WORK/arch.tar ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b
-  | exit 0 in 0.6 s
+  | exit 0 in 1.4 s
   | podvm save: saved ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b as 6 blobs (185.4 MiB), digest sha256:9bef8f23f6fb578d4c8e309d14fe1714ffdea2e967a5e4652dad65abf69d75d9
 $ podvm load -i WORK/fail.tar
-  | exit 0 in 0.9 s
+  | exit 0 in 1.1 s
   | Loaded image: localhost/init483-fail:1
 $ podvm load -i WORK/hang.tar
-  | exit 0 in 0.9 s
+  | exit 0 in 0.8 s
   | Loaded image: localhost/init483-hang:1
-$ podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b sh -c PAYLOAD
-  | exit 7 in 45.9 s
+$ PODVM_MACHINE_STATE=0 podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b sh -c PAYLOAD
+  | exit 7 in 47.2 s
   | PID1=systemd PID2=kthreadd
   | STATE=running
   | FAILED=inactive
@@ -29,12 +29,12 @@ $ podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=im
   | podvm run: the store copy of QEMU 11.1.3 is in WORK/store/tools/qemu-11.1.3
   | podvm run: machine tier: a guest under TCG (the emulator process is the boundary, not hardware isolation), root disk built now, systemd of the image as PID 1 of the guest (T-1994) (TODO/machine.md T-1656)
 PASS 1: exit 7, PID1=systemd PID2=kthreadd, state running, cgroup 0::/system.slice/podvm-run.service
-$ podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b sh -c exit 0
-  | exit 0 in 23.5 s
+$ PODVM_MACHINE_STATE=0 podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b sh -c exit 0
+  | exit 0 in 22.7 s
   | podvm run: machine tier: a guest under TCG (the emulator process is the boundary, not hardware isolation), root disk from the cache, systemd of the image as PID 1 of the guest (T-1994) (TODO/machine.md T-1656)
 PASS 2: the run of exit 0 exited 0
-$ podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image localhost/init483-fail:1 sh -c PAYLOAD
-  | exit 7 in 47.0 s
+$ PODVM_MACHINE_STATE=0 podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image localhost/init483-fail:1 sh -c PAYLOAD
+  | exit 7 in 37.3 s
   | PID1=systemd PID2=kthreadd
   | STATE=degraded
   | FAILED=failed
@@ -47,8 +47,8 @@ $ podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=im
   | db52e8300def: Extracted (6 entries, 0 whiteouts)
   | podvm run: machine tier: a guest under TCG (the emulator process is the boundary, not hardware isolation), root disk built now, systemd of the image as PID 1 of the guest (T-1994) (TODO/machine.md T-1656)
 PASS 3: with a failed unit: exit 7, state degraded, the unit failed
-$ PODVM_INIT_BOOT_TIMEOUT=60 podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image localhost/init483-hang:1 sh -c PAYLOAD
-  | exit 125 in 84.4 s
+$ PODVM_INIT_BOOT_TIMEOUT=60 PODVM_MACHINE_STATE=0 podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image localhost/init483-hang:1 sh -c PAYLOAD
+  | exit 125 in 78.4 s
   | fccd9a525e0c: Extracted (33146 entries, 0 whiteouts); 0 extended attributes set, 2 not set (the first: security.capability of usr/bin/newgidmap, EPERM; the sidecar names each)
   | 8f1a3f638556: Extracted (10 entries, 0 whiteouts)
   | f9b891f38f9e: Extracted (2 entries, 0 whiteouts)
@@ -56,15 +56,44 @@ $ PODVM_INIT_BOOT_TIMEOUT=60 podvm run --rm --verbose --podvm-tier=machine --pod
   | f3362acb4168: Extracted (6 entries, 0 whiteouts)
   | podvm run: machine tier: a guest under TCG (the emulator process is the boundary, not hardware isolation), root disk built now, systemd of the image as PID 1 of the guest (T-1994) (TODO/machine.md T-1656)
   | podvm: machine tier: --podvm-init=image: the init of the image did not finish its boot in 60 s (PODVM_INIT_BOOT_TIMEOUT): systemctl is-system-running gives "starting":  (TODO/machine.md T-1994)
-PASS 4: with a unit that never ends its start: exit 125 after 84 s, 1 line(s) that name the bound, the command did not run
+PASS 4: with a unit that never ends its start: exit 125 after 78 s, 1 line(s) that name the bound, the command did not run
+$ podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image --storage-opt size=256m ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b sh -c PAYLOAD
+  | exit 7 in 31.7 s
+  | PID1=systemd PID2=kthreadd
+  | STATE=running
+  | FAILED=inactive
+  | CGROUP=0::/system.slice/podvm-run.service
+  | COMMAND-RAN
+  | podvm run: machine tier: a guest under TCG (the emulator process is the boundary, not hardware isolation), root disk from the cache, systemd of the image as PID 1 of the guest (T-1994) (TODO/machine.md T-1656)
+PASS 5: a run that a state does not serve: exit 7, PID1=systemd PID2=kthreadd
+$ podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b sh -c PAYLOAD
+  | exit 7 in 40.4 s
+  | PID1=systemd PID2=
+  | STATE=running
+  | FAILED=inactive
+  | CGROUP=0::/../..
+  | COMMAND-RAN
+  | podvm run: machine tier: the guest boots, and podvm saves its state for the next run of this image (TODO/machine.md T-2008)
+  | cat: /proc/2/comm: No such file or directory
+  | podvm run: machine tier: the state of the guest is saved: 1268 MiB in 3.9 s through file, WORK/store/machine/state-9bef8f23f6fb578d4c8e309d14fe1714ffdea2e967a5e4652dad65abf69d75d9-ab91fd6a03944cfd921c8849.vm (TODO/machine.md T-2008)
+$ podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b sh -c PAYLOAD
+  | exit 7 in 2.7 s
+  | PID1=systemd PID2=
+  | STATE=running
+  | FAILED=inactive
+  | CGROUP=0::/../..
+  | COMMAND-RAN
+  | podvm run: machine tier: the guest starts from the saved state of this image and guest shape; its clock and its random pool are the ones of this run, and its machine-id, its boot id and its service processes are the ones of the save (TODO/machine.md T-2008)
+  | cat: /proc/2/comm: No such file or directory
+PASS 6: the default state: the save exited 7 in 40 s, the load 7 in 3 s; PID1=systemd PID2= and systemd PID2=
 $ PODVM_MACHINE_ROOT=initramfs PODVM_MACHINE_STATE=0 podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b sh -c PAYLOAD
-  | exit 7 in 37.5 s
+  | exit 7 in 33.0 s
   | PID1=systemd PID2=
   | STATE=running
   | FAILED=inactive
   | CGROUP=0::/../supervisor
   | COMMAND-RAN
-  | podvm run: machine tier: a guest under TCG (the emulator process is the boundary, not hardware isolation), base archive built now (TODO/machine.md T-1656)
+  | podvm run: machine tier: a guest under TCG (the emulator process is the boundary, not hardware isolation), base archive from the cache (TODO/machine.md T-1656)
   | Failed to find module 'autofs4'
   | systemd 261.2-1-arch running in system mode (+PAM +AUDIT -SELINUX +APPARMOR -IMA +IPE +SMACK +SECCOMP +GCRYPT +GNUTLS +OPENSSL +ACL +BLKID +CURL +ELFUTILS +FIDO2 +IDN2 +KMOD +LIBCRYPTSETUP +LIBCRYPTSETUP_PLUGINS +LIBFDISK +PCRE2 +PWQUALITY +P11KIT +QRENCODE +TPM2 +BZIP2 +LZ4 +XZ +ZLIB +ZSTD +BPF_FRAMEWORK +BTF +XKBCOMMON +UTMP +LIBARCHIVE)
   | Detected virtualization container-other.
@@ -135,9 +164,9 @@ $ PODVM_MACHINE_ROOT=initramfs PODVM_MACHINE_STATE=0 podvm run --rm --verbose --
   | [  OK  ] Finished Remount Root and Kernel File Systems.
   | [  OK  ] Finished Apply Kernel Variables.
   | [  OK  ] Finished Load udev Rules from Credentials.
+  |          Starting User Database Manager...
   | [  OK  ] Started Journal Service.
   |          Starting Flush Journal to Persistent Storage...
-  |          Starting User Database Manager...
   | [  OK  ] Finished Flush Journal to Persistent Storage.
   | [  OK  ] Started User Database Manager.
   | [  OK  ] Finished Create Static Device Nodes in /dev gracefully.
@@ -159,9 +188,9 @@ $ PODVM_MACHINE_ROOT=initramfs PODVM_MACHINE_STATE=0 podvm run --rm --verbose --
   |          Starting Rebuild Dynamic Linker Cache...
   |          Starting Rebuild Journal Catalog...
   |          Starting Record System Boot/Shutdown in UTMP...
-  | [  OK  ] Finished Rebuild Dynamic Linker Cache.
   | [  OK  ] Finished Rebuild Journal Catalog.
   | [  OK  ] Finished Record System Boot/Shutdown in UTMP.
+  | [  OK  ] Finished Rebuild Dynamic Linker Cache.
   |          Starting Update is Completed...
   | [  OK  ] Finished Update is Completed.
   | [  OK  ] Reached target System Initialization.
@@ -191,11 +220,11 @@ $ PODVM_MACHINE_ROOT=initramfs PODVM_MACHINE_STATE=0 podvm run --rm --verbose --
   | [  OK  ] Started User Login Management.
   | [  OK  ] Reached target Multi-User System.
   | [  OK  ] Reached target Graphical Interface.
-  | \x1b]3008;start=df3c91ac7bdf437f9ed717b845342e09;user=root;hostname=archlinux;machineid=88781f4ac93e445895190d2e45e007ca;bootid=fc921ccdc11b4f3b9b5c01b473039fcf;pid=145;pidfdid=919;comm=(agetty);servicename=console-getty.service;invocationid=0f8b5906e8a34113b1a6925deff0ea47;type=service\x1b\cat: /proc/2/comm: No such file or directory
-PASS 5: the control of T-2002: exit 7, PID1=systemd PID2=
+  | \x1b]3008;start=aa71e643f30f43e3b1087a9b2a3abab2;user=root;hostname=archlinux;machineid=a68e69f2fa1b4044b55205c557515651;bootid=356fd918f6684b86902eb9adc0d5e901;pid=149;pidfdid=920;comm=(agetty);servicename=console-getty.service;invocationid=68dbefdf3e7f413696069b3f1ec63868;type=service\x1b\cat: /proc/2/comm: No such file or directory
+PASS 7: the control of T-2002: exit 7, PID1=systemd PID2=
 $ PODVM_INIT_BOOT_TIMEOUT=abc podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b true
   | exit 125 in 0.0 s
   | podvm run: machine tier: PODVM_INIT_BOOT_TIMEOUT=abc: not a number of seconds from 1 to 3600
-PASS 6: PODVM_INIT_BOOT_TIMEOUT=abc exited 125
-PASS 7: 0 emulator(s), and run directories or partial files []
+PASS 8: PODVM_INIT_BOOT_TIMEOUT=abc exited 125
+PASS 9: 0 emulator(s), and run directories or partial files []
 SYSTEMD OF THE IMAGE IS PID 1 OF THE GUEST, AND THE EXIT CODE COMES BACK

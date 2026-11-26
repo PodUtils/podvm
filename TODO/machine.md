@@ -5744,20 +5744,25 @@ overlay2 driver of an engine refuses a directory on overlayfs. The saved
 state of T-2008 keeps its root in the initramfs: its guest holds the base
 archive, and a run that cannot use a state boots on the root disk.
 
-Decision (2026-11-26, steps 2 and 3): on the root disk, where `/sbin/init`
-of the image resolves to systemd, systemd is PID 1 of the guest itself,
-and this replaces the PID namespace of T-2002 for such a run. The PID
-namespace stays for an init that is not systemd (podvm cannot ask such an
-init for its state), for `PODVM_MACHINE_ROOT=initramfs`, and for the saved
-state. The command runs in a unit of the image, `podvm-run.service`,
+Decision (2026-11-26, steps 2 and 3): the saved state of T-2008 keeps its
+priority. A run of `--podvm-init=image` on the machine tier takes the
+saved state where the state serves it (`PODVM_MACHINE_STATE` is not 0,
+and `state::refusal` gives no reason), with its root in the initramfs and
+the PID namespace of T-2002, as in 0.2.0-beta.41. The reason: call C27
+makes the save and the load the default, the owner's question Q10 on it
+is open, and the state with channels and process limits (T-2094) is
+podvm's answer to PodUtils/podrunner#355 in 0.2.0-beta.41. Each run that
+the state does not serve, on the root disk where `/sbin/init` of the
+image resolves to systemd, boots systemd as PID 1 of the guest itself; so
+does a run whose state falls back to a boot. This order holds until the
+saved state is on the root disk (the open clause below). The PID
+namespace also stays for an init that is not systemd (podvm cannot ask
+such an init for its state) and for `PODVM_MACHINE_ROOT=initramfs`. The command runs in a unit of the image, `podvm-run.service`,
 because then systemd owns each process of the run, as on a host. The
 exit code comes back in the exit marker on the serial line, as for each
 other guest: the marker already carries the code and the count of OOM
 kills, and `SuccessAction=exit-force` would give QEMU only the code of
-the guest. A run with systemd as PID 1 uses no saved state, because the
-saved guest has the PID namespace in the initramfs; T-2008 is P3 and
-T-1994 is P1. `PODVM_MACHINE_ROOT=initramfs` keeps the state, and
-experiments 465 and 468 set it for their state rows.
+the guest.
 
 ## Prove
 
@@ -5812,10 +5817,12 @@ file stayed. The unit tests `the_root_disk_keeps_each_kind_of_file_and_each_attr
 `the_root_of_the_guest_is_the_disk_where_it_can_be` pin the writer and
 the cache. [Transcript](../experiments/results/machine-disk-root.txt)
 
-**Partial (2026-11-26), steps 2 and 3.** `run --podvm-tier=machine
---podvm-init=image` of an image whose `/sbin/init` resolves to systemd
-(each link of each component in the image, `machine/guest/pid1.rs`)
-boots systemd as PID 1 of the guest on the root disk. The kernel line
+**Partial (2026-11-26), steps 2 and 3.** A run of `run
+--podvm-tier=machine --podvm-init=image` that the saved state does not
+serve (`state::serves`), of an image whose `/sbin/init` resolves to
+systemd (each link of each component in the image,
+`machine/guest/pid1.rs`), boots systemd as PID 1 of the guest on the root
+disk. The kernel line
 gives `guest-root --init=SECS`, the bound of `PODVM_INIT_BOOT_TIMEOUT`
 (180 s). After the root moves, `guest-root` writes `podvm-run.service`
 (after `basic.target`, wanted by `multi-user.target`, output on
@@ -5830,22 +5837,28 @@ before the command gives one line on stderr and exit 125. systemd writes
 terminal queries and its OSC 3008 context on the console with no
 newline, so the host now takes the ready marker at the end of a line.
 
-Proof: experiment 483 as uid 1000 under TCG, seven of seven clauses
-PASS, with the Arch Linux image of experiment 473 (systemd 261.2). PID 1
-was systemd and PID 2 kthreadd, the state `running`, the cgroup
-`/system.slice/podvm-run.service`, and the run gave 7 (46 s with the
-build of the root disk) and 0 (24 s). With a unit that fails, the state
+Proof: experiment 483 as uid 1000 under TCG, nine of nine clauses
+PASS, with the Arch Linux image of experiment 473 (systemd 261.2).
+Clauses 1 to 4 set `PODVM_MACHINE_STATE=0`. PID 1 was systemd and PID 2
+kthreadd, the state `running`, the cgroup
+`/system.slice/podvm-run.service`, and the run gave 7 (47 s with the
+build of the root disk) and 0 (23 s). With a unit that fails, the state
 was `degraded`, and the command ran and gave 7. With a unit that never
 ends its start and `PODVM_INIT_BOOT_TIMEOUT=60`, the run gave 125 after
-84 s with one line that named the bound and the state `starting`, and the
-command did not run. The control with `PODVM_MACHINE_ROOT=initramfs` and
-`PODVM_MACHINE_STATE=0` gave 7 with systemd in a PID namespace. A bad
-bound gave 125 with no boot. No emulator, run directory or partial file
-stayed. The unit tests of `pid1/tests.rs`
-(`the_init_of_an_image_is_systemd_through_each_link`,
+78 s with one line that named the bound and the state `starting`, and the
+command did not run. With the default state, a run with `--storage-opt
+size=256m`, which a state does not serve, took this route and gave 7.
+Two runs with the default state kept the order of call C27: the first
+saved a state and gave 7 in 40 s, the second started from it and gave 7
+in 3 s, each with systemd in a PID namespace. The control with
+`PODVM_MACHINE_ROOT=initramfs` and `PODVM_MACHINE_STATE=0` gave 7 with
+systemd in a PID namespace. A bad bound gave 125 with no boot. No
+emulator, run directory or partial file stayed. The unit tests of
+`pid1/tests.rs` (`the_init_of_an_image_is_systemd_through_each_link`,
 `the_unit_of_the_run_and_its_masks`, `the_deadline_of_the_boot_reads_back`,
-`the_command_gets_no_variable_of_podvm`, `the_arguments_of_guest_root`)
-and `the_exit_marker_needs_the_nonce_of_the_run` pin the new parts.
+`the_command_gets_no_variable_of_podvm`, `the_arguments_of_guest_root`),
+`the_saved_state_takes_each_run_that_it_serves_first` and
+`the_exit_marker_needs_the_nonce_of_the_run` pin the new parts.
 [Transcript](../experiments/results/machine-image-init.txt)
 
 Amended (2026-11-26). `rmi` and `image prune` now remove the machine files
@@ -5876,9 +5889,9 @@ that its owner cannot search the owner's search bit for the open only,
 and gives each mode back after it. The whole unit test binary (647 tests)
 passes as uid 1000 and as root.
 
-Remaining: steps 1 to 3 under KVM on `kvm.yml` (and experiment 465
-there, whose machine clauses now take this route); the saved state of
-T-2008 on the root disk with systemd as PID 1; `run -d`, `exec` and `-t`
+Remaining: steps 1 to 3 under KVM on `kvm.yml`; the saved state of
+T-2008 on the root disk with systemd as PID 1, after which the default
+run can take this route; `run -d`, `exec` and `-t`
 with systemd as PID 1, which this proof did not run; an arm64 guest; the
 kernel and the initrd of the image itself (PodUtils/podrunner#316 ask 2).
 

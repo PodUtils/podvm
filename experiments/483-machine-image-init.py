@@ -11,7 +11,9 @@ The script pulls the pinned Arch Linux image of experiment 473 and makes
 two more images from it with `save` and `load`: one with a unit that
 fails at the boot, and one with a unit that never ends its start. Each run
 is `run --rm --verbose --podvm-tier=machine --podvm-net none
---podvm-init=image`.
+--podvm-init=image`. The saved state of T-2008 takes each run that it
+serves first (call C27), so clauses 1 to 4 set PODVM_MACHINE_STATE=0, and
+clause 5 is a run that a state does not serve.
 
 Clauses:
   1. A run exits 7: PID 1 of the guest is systemd and PID 2 is kthreadd
@@ -25,12 +27,17 @@ Clauses:
      the run exits 125 with one line that names the bound, the command
      does not run, and the run ends before 60 s and the boot of the kernel
      plus 180 s.
-  5. The control with PODVM_MACHINE_ROOT=initramfs and
+  5. With the default state and `--storage-opt size=256m`, which a state
+     does not serve, the run takes the route of clause 1 and exits 7.
+  6. With the default state, the first run saves a state and the second
+     starts from it: each exits 7 with systemd as PID 1 of a PID namespace
+     (PID 2 is not kthreadd), as in 0.2.0-beta.41.
+  7. The control with PODVM_MACHINE_ROOT=initramfs and
      PODVM_MACHINE_STATE=0 (the route of T-2002) exits 7 with systemd as
      PID 1 of a PID namespace: PID 2 is not kthreadd.
-  6. PODVM_INIT_BOOT_TIMEOUT=abc exits 125 and names the variable, with no
+  8. PODVM_INIT_BOOT_TIMEOUT=abc exits 125 and names the variable, with no
      boot.
-  7. No emulator, no run directory and no partial file stay.
+  9. No emulator, no run directory and no partial file stay.
 
 Exit 0 is a match, 1 is a failed clause or a missing row, and 2 means a
 required input was absent.
@@ -62,7 +69,8 @@ PAYLOAD = (
     "echo CGROUP=$(cat /proc/self/cgroup); echo COMMAND-RAN; exit 7"
 )
 RUN_BOUND = 900
-CLAUSES = 7
+CLAUSES = 9
+OFF = {"PODVM_MACHINE_STATE": "0"}
 UNITS = {
     "fail": "[Unit]\nDescription=A unit that fails\n\n[Service]\nType=oneshot\n"
             "ExecStart=/usr/bin/false\n",
@@ -199,7 +207,7 @@ def prove(binary, work):
 
     run = ["run", "--rm", "--verbose", "--podvm-tier=machine", "--podvm-net", "none",
            "--podvm-init=image"]
-    code, out, err, _ = podvm(*run, IMAGE, "sh", "-c", PAYLOAD)
+    code, out, err, _ = podvm(*run, IMAGE, "sh", "-c", PAYLOAD, extra=OFF)
     pid = field(out, "PID1") or ""
     verdict(1, code == 7 and pid == "systemd PID2=kthreadd"
             and field(out, "STATE") in ("running", "degraded")
@@ -207,34 +215,48 @@ def prove(binary, work):
             and "systemd of the image as PID 1 of the guest" in err,
             f"exit {code}, PID1={pid}, state {field(out, 'STATE')}, "
             f"cgroup {field(out, 'CGROUP')}")
-    code, _, _, _ = podvm(*run, IMAGE, "sh", "-c", "exit 0")
+    code, _, _, _ = podvm(*run, IMAGE, "sh", "-c", "exit 0", extra=OFF)
     verdict(2, code == 0, f"the run of exit 0 exited {code}")
-    code, out, _, _ = podvm(*run, refs["fail"], "sh", "-c", PAYLOAD)
+    code, out, _, _ = podvm(*run, refs["fail"], "sh", "-c", PAYLOAD, extra=OFF)
     verdict(3, code == 7 and field(out, "STATE") == "degraded"
             and field(out, "FAILED") == "failed" and "COMMAND-RAN" in out,
             f"with a failed unit: exit {code}, state {field(out, 'STATE')}, "
             f"the unit {field(out, 'FAILED')}")
     code, out, err, took = podvm(*run, refs["hang"], "sh", "-c", PAYLOAD,
-                                 extra={"PODVM_INIT_BOOT_TIMEOUT": "60"})
+                                 extra={"PODVM_INIT_BOOT_TIMEOUT": "60", **OFF})
     lines = [l for l in err.splitlines() if "did not finish its boot in 60 s" in l]
     verdict(4, code == 125 and len(lines) == 1 and "COMMAND-RAN" not in out and took < 240,
             f"with a unit that never ends its start: exit {code} after {took:.0f} s, "
             f"{len(lines)} line(s) that name the bound, the command "
             f"{'ran' if 'COMMAND-RAN' in out else 'did not run'}")
-    code, out, _, _ = podvm(*run, IMAGE, "sh", "-c", PAYLOAD,
-                            extra={"PODVM_MACHINE_ROOT": "initramfs",
-                                   "PODVM_MACHINE_STATE": "0"})
+    code, out, err, _ = podvm(*run, "--storage-opt", "size=256m", IMAGE, "sh", "-c", PAYLOAD)
     pid = field(out, "PID1") or ""
-    verdict(5, code == 7 and pid.startswith("systemd ") and not pid.endswith("kthreadd"),
+    verdict(5, code == 7 and pid == "systemd PID2=kthreadd"
+            and "systemd of the image as PID 1 of the guest" in err,
+            f"a run that a state does not serve: exit {code}, PID1={pid}")
+    states = []
+    for _ in range(2):
+        code, out, err, took = podvm(*run, IMAGE, "sh", "-c", PAYLOAD)
+        states.append((code, field(out, "PID1") or "", err, took))
+    (c1, p1, e1, t1), (c2, p2, e2, t2) = states
+    verdict(6, c1 == 7 and c2 == 7 and "saves its state" in e1
+            and "starts from the saved state" in e2
+            and all(p.startswith("systemd ") and not p.endswith("kthreadd") for p in (p1, p2)),
+            f"the default state: the save exited {c1} in {t1:.0f} s, the load {c2} in "
+            f"{t2:.0f} s; PID1={p1} and {p2}")
+    code, out, _, _ = podvm(*run, IMAGE, "sh", "-c", PAYLOAD,
+                            extra={"PODVM_MACHINE_ROOT": "initramfs", **OFF})
+    pid = field(out, "PID1") or ""
+    verdict(7, code == 7 and pid.startswith("systemd ") and not pid.endswith("kthreadd"),
             f"the control of T-2002: exit {code}, PID1={pid}")
     code, _, err, _ = podvm(*run, IMAGE, "true", bound=120,
                             extra={"PODVM_INIT_BOOT_TIMEOUT": "abc"})
-    verdict(6, code == 125 and "PODVM_INIT_BOOT_TIMEOUT=abc" in err,
+    verdict(8, code == 125 and "PODVM_INIT_BOOT_TIMEOUT=abc" in err,
             f"PODVM_INIT_BOOT_TIMEOUT=abc exited {code}")
     left = emulators(store)
     stale = sorted(p.name for p in (store / "machine").glob("run-*")) + sorted(
         p.name for p in (store / "machine").glob("*partial*"))
-    verdict(7, not left and not stale,
+    verdict(9, not left and not stale,
             f"{len(left)} emulator(s), and run directories or partial files {stale}")
 
     missing = [n for n in range(1, CLAUSES + 1) if n not in rows]

@@ -159,9 +159,9 @@ pub const USER: &[Group] = &[
                  saves the state of its guest in the store, and each later run starts from it. \
                  0 boots each guest. pipe saves and loads through a pipe of cat. Another value \
                  exits 125. Each run of one state shares the machine-id, the boot id and what \
-                 a service made at its start (call C27). A run with systemd as PID 1 of the \
-                 guest on the root disk uses no state; PODVM_MACHINE_ROOT=initramfs selects it \
-                 (T-1994).",
+                 a service made at its start (call C27). A run that a state does not serve, and \
+                 each run with 0, boots systemd of the image as PID 1 of the guest on the root \
+                 disk where the image has it (T-1994).",
             ),
             v(
                 "PODVM_MACHINE_ROOT",
