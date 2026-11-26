@@ -584,6 +584,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #688 | [gh action] requested | closed (on `f8b2d9e`: gate 45857683010 and kvm `init` 45857688665 passed) | the gate and the `init` job of `kvm.yml` after T-1994 steps 2 and 3 and T-2054 item 1 |
 | #689 | COORD-264: pod-enter: an overlay kind of volume in Plan::volumes (to podcrates) | open | T-2101 |
 | #690 | COORD-265: podvm took podcrates v0.86.0 (T-2102) and answers #667 with --tmpfs GUEST:size=N (to podcrates) | open | T-2102, T-1968 |
+| #691 | [gh action] requested | open | the gate and the `kvm.yml` jobs `init` and `guest` after the saved state on the disk root (T-1994, T-2008) |
 
 ## Messages whose title does not start with COORD-NNN
 
