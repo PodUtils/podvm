@@ -45,9 +45,8 @@ Each open fault that a user can meet:
   incusd and leaves the instance; `wait` and `kill` have no path of the
   tier; a created instance reads `Stopped`; a `--rm` run that the OOM
   killer ends can keep its instance (T-2079, T-2087, T-2100 OR-B41-07).
-- The incus tier: an image that an older podvm imported is not checked
-  against the room of the pool (T-2078). Each call to incusd after the
-  first of a verb has no time bound (T-2080).
+- The incus tier: an image that an older podvm imported is checked only
+  against the size of its image file in incusd, a lower bound (T-2078).
 - The machine tier: the fetched QEMU and the records of a detached guest
   go under `$HOME`, not `PODVM_STORE` (`PODVM_TOOLS_DIR` works around it);
   `doctor` calls the tier refused where `run` fetches its own QEMU; a
