@@ -5640,6 +5640,17 @@ proof needs a lane that can mount tmpfs in its user and mount namespaces.
 The earlier TCG probe of the virtio ext4 disk is in
 [the virtio ext4 transcript](../experiments/results/machine-virtio-ext4.txt).
 
+Amended (2026-11-26). podcrates imported `disk/ext.rs` into `pod-guest`
+(`pod_guest::ext4`, podcrates task 1500, the answer to COORD-260, #680)
+and found one fault (PodUtils/podcrates#273): the superblock copy of a
+group past 65535 kept only the low 16 bits of its group number in
+`s_block_group_nr` (group 78125 gave 12589); `mke2fs` records 65535.
+`ext::group_nr` gives `min(group, 65535)`; the table test
+`a_superblock_copy_past_group_65535_records_65535` holds it. Only a disk
+over 8 TiB has such a group. podvm takes `pod_guest::ext4` at the next tag
+of podcrates and removes its copy.
+
+
 # T-1993: On the incus tier, the init of the image (systemd) runs as PID 1
 
 **Source:** PodUtils/podrunner#313 (COORD-103 of podrunner), ask 1; the owner's ruling "GitHub-hosted parity" (2026-11-19)

@@ -8,6 +8,15 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: the group number of a superblock copy past group 65535, 2026-11-26
+
+Record: T-1968 (PodUtils/podcrates#273).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- The ext4 writer of the machine tier records 65535 as the group number
+  of a superblock copy past group 65535, as `mke2fs` does. Only a disk
+  over 8 TiB has such a group.
+
 ### Fixed: a C build on the syscall tier no longer spins for ever, 2026-11-26
 
 Record: T-1991 (PodUtils/podrunner#308, item 3).

@@ -1,6 +1,6 @@
 //! TODO/machine.md T-1968: the sized disk of a machine guest.
 
-use super::ext::{has_super, Layout, BLOCK};
+use super::ext::{group_nr, has_super, Layout, BLOCK};
 use super::*;
 
 /// One table for the kept value of `--storage-opt size=` and each refusal
@@ -48,6 +48,21 @@ fn the_superblock_copies_are_in_the_sparse_groups() {
 
 /// Each size gives whole groups and a last group that holds its metadata,
 /// and the free blocks are the size less the metadata.
+/// PodUtils/podcrates#273 (COORD-159 of podcrates): the group number of a
+/// superblock copy is a field of 16 bits; past 65535 it records 65535.
+#[test]
+fn a_superblock_copy_past_group_65535_records_65535() {
+    for (g, want) in [
+        (0, 0),
+        (1, 1),
+        (65_535, 65_535),
+        (65_536, 65_535),
+        (78_125, 65_535),
+    ] {
+        assert_eq!(group_nr(g), want, "group {g}");
+    }
+}
+
 #[test]
 fn a_layout_has_room_in_each_group() {
     for (bytes, groups, blocks) in [
