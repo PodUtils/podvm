@@ -379,6 +379,17 @@ files with capabilities. Three changes serve it on the incus tier.
   Clause 22 checks `cap_net_raw+ep` on a file of an alpine layer in the
   root of the instance. The root of the machine tier is not proven (T-1999
   keeps it for `kvm.yml`).
+* **Hard links (T-2079, OR-B39-08).** Each path of the import writes the
+  data of a file once. Each other name of the file is a hard link entry
+  (tar type `1`) to the first name, so incusd unpacks one inode. The
+  stream of the layers (`pod-extract`) and the tree of the extraction path
+  (`incus/image.rs`) keep this rule. Where a later layer removes or
+  replaces the first name, the data goes out under a name that stays, and
+  no link points to a removed name. The fallback tarball writes a full
+  copy for a name whose owner, mode or attributes differ from the first
+  name. The space check counts the bytes and the inode of a linked file
+  once. `busybox:1.36` (one binary with 405 names) takes 1 MiB in `/bin`
+  of each instance.
 
 ## The room of the pool (T-2078)
 
