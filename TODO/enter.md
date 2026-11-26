@@ -5291,6 +5291,14 @@ Faults that the runs found, each fixed:
 
 Remaining: (1) as before: `kvm.yml` with a real delegated subtree (clause 10 runs there with clause 1). (2) A caller that is uid 0 of the host gets no namespace rung: a foreground run takes the next route, and `run -d` refuses by name. (3) An `exec` with no `-t` has the descriptors of the caller: a terminal among them has no name in the image. (4) A command of `exec` runs in the cgroup of the run only where the host lets the caller move a process there. (5) The relay of `-t` looks at the window size each 250 ms. (6) A `-t` of a guest of the machine tier keeps `/dev/hvc0` (measured: `tty` gives `/dev/hvc0` there). (7) `run -d` on the runsc tier and on the machine tier with the init stay refused by name. (8) The numbers 5 to 7 of the first list.
 
+Amended (2026-11-26, T-1994). On the machine tier, a run that the saved
+state does not serve, on the root disk of an image whose `/sbin/init` is
+systemd, boots systemd as PID 1 of the guest itself, not of a PID
+namespace: experiment 483 clauses 1 and 5. The PID namespace of this
+entry stays on the machine tier for each run that the saved state serves
+(the default, call C27: clause 6), for an init that is not systemd and
+for `PODVM_MACHINE_ROOT=initramfs` (clause 7).
+
 # T-2003: On the userland rung, a program with a library in a directory of its RUNPATH does not load (`systemctl`)
 
 **Source:** the measure of T-2002 (2026-11-19); the research bundle of the owner (2026-11-19, `run/libpath.rs` of a branch that is not in this tree); COORD-207 (#603) asks podcrates
@@ -5810,7 +5818,7 @@ The size cut of the branch `wip/oq-run` (2026-11-21, under call C24), reviewed a
 
 Remaining:
 
-1. A foreground run of uid 0 has no PID namespace (T-2053 names it in the banner): the payload sees the processes of the host, podvm's argv too, and holds the lock descriptor (T-0204).
+1. Done (2026-11-26). A foreground run of uid 0 has no PID namespace (T-2053 names it in the banner): the payload sees the processes of the host, podvm's argv too, and holds the lock descriptor (T-0204).
 2. The memo descriptor (17) and the log of `run -d` (descriptors 1 and 2) name host paths of the store in `/proc/self/fd`; the memo is the interface of the interposer (T-0710), and the log is the design of `pod-supervise`.
 3. `PODVM_MEMO_FD`, `PODVM_MEMO_ID`, `PODVM_GUEST_EXE`, `PODVM_ACTIVE_MODE` and `LD_PRELOAD` reach the payload: the interposer reads them; a copy in the interposer and a restore at each exec would lose them in a child that a raw `execve` starts (a Go program).
 4. Done (T-2084). The relay of pod-enter's join, as uid 0 with `-t`, takes no title (the threads of the pty relay); the init and the relay of pod-enter are dumpable, so a payload of the same ids can `ptrace` them and read the memory that holds podvm's environment. The ask to podcrates: the init of `Plan::pid_namespace` and the relay of `spawn_joined` set their own title and an empty environment (`PR_SET_MM_MAP`, `exe_fd` -1) and `PR_SET_DUMPABLE` 0 after the maps of the user namespace and before the fork of the payload; `podvm_enter::title` is the code to take (rule 2a). The draft of the COORD issue of this ask is with the lead (2026-11-23). podvm's own pid 1 and pid 2 stay dumpable: a non-dumpable process has its `/proc/PID` files owned by the root of the host, so the outer podvm of uid 1000 cannot write `uid_map` and `exec` of a join cannot open `/proc/PID/ns/*` of it (`PTRACE_MODE_READ`). `PR_SET_DUMPABLE` 0 of these two needs the maps written first and the join to open the namespaces through a descriptor that the run holds.
@@ -5833,6 +5841,51 @@ the binary of `7c2b161` gave `.../podvm tree-prefill /var/tmp/qa-b41/work/store`
 The table test `a_job_goes_on_the_pipe_and_back_or_is_refused_by_name` and
 `a_store_path_that_is_not_utf8_goes_on_the_pipe_and_back` hold the rule.
 Items 1, 2 and 3 stay, so the entry stays partial.
+
+Amended (2026-11-26, later). Item 1 is done, by the session's call: C21
+opens podvm's own namespaces only for a caller that is not uid 0, because
+uid 0 needs no user namespace for the mounts; it does not rule that uid 0
+has no PID namespace, and `run -d` of uid 0 has one since T-1930. A
+foreground entry of the namespace rung where podvm opened no PID namespace
+of its own (uid 0, and `PODVM_USERNS=0`) now sets `Plan::pid_namespace`
+and `Plan::relay_title`, as the launcher of `run -d` does
+(`run/foreground/pid_ns.rs`). The init of pod-enter (`podvm-init`) is
+PID 1, reaps each orphan at once, and its end ends each process of the
+namespace, so podvm keeps the image lock and the payload gets no
+descriptor of it. A forced launch rung (`PODVM_MODE`), the loader family
+and the init of an image (T-2002) keep their entries. Where pod-enter falls
+back to chroot (an image with no `/tmp`, a mount that the host refuses
+after the probe), it refuses a plan with a PID namespace; the run then
+hands the lock to the payload and enters again with none, so the fallback
+works as before, with the same one line. The facts of the entry
+(`isolation::Facts::pid_init`, formerly `detached`) say `pid` for these
+runs, so the banner, `inspect` and the manual name it, and `--init` holds.
+Measured as root on the cloud host with `mirror.gcr.io/library/alpine:3.20`.
+Before (`4afcb38`): PID 1 of the payload was the init of the host
+(`/process_api ...`), descriptor 5 named `store/locks/<digest>.lock`, and
+five orphans stayed in state `Z` under podvm. After: `ps` lists
+`1 podvm-init`, the payload and its own processes only, no descriptor names
+a lock, no orphan stays a zombie, and `exec NAME ps` of a running
+foreground run lists `1 podvm-init`, `2 sleep 8` and the `exec`;
+`inspect` gives `join | filesystem+pid+mount`; `run --init` runs with
+`podvm-init` as PID 1; `-t` keeps the pty; `stop` ends the run with 143;
+`hello-world` (no `/tmp`) gives the fallback line and its text, as
+before; as uid 1000 with `PODVM_USERNS=0`, PID 1 is `podvm-init`. The cost,
+20 runs of `run --rm IMAGE true` of each binary in turn on a shared host:
+the median 530 ms before and 554 ms after (min 352 ms and 265 ms), which
+is in the noise of the host (an estimate). The table test
+`each_statement_of_an_entry_reads_its_facts`, the unit test
+`the_refusal_of_a_pid_namespace_is_known_by_its_words`, and
+`crates/podvm/tests/orphan_reap.rs` (the default entry and
+`PODVM_USERNS=0`, as root and as uid 1000) hold it.
+
+Items 2 and 3 stay, because neither is a small change. Item 2: the memo is
+a file of the store that the interposer opens by its descriptor and that
+`run -d` keeps beside the record (T-0710), so a memory file in its place
+changes the interface of the interposer and of the record; the log of
+`run -d` is the design of `pod-supervise`. Item 3: the interposer reads
+each variable in the payload, and a child that a raw `execve` starts loses
+a copy that only the interposer holds. The entry stays partial.
 
 # T-2055: `--podvm-volume-base` on the loader family: a link under DIR resolves into the image, not to ELOOP
 

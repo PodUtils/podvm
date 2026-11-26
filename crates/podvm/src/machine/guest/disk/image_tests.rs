@@ -414,6 +414,7 @@ fn the_root_of_the_guest_is_the_disk_where_it_can_be() {
         &mut argv,
         &["virtio_blk".into(), "ext4".into()],
         true,
+        None,
         "abc",
     );
     assert_eq!(

@@ -214,6 +214,13 @@ pub struct Names<'a> {
     pub label: &'a [u8],
 }
 
+/// `s_block_group_nr` of the superblock copy in group `g`: a field of 16
+/// bits, so a group past 65535 records 65535, as `mke2fs` does (podcrates
+/// COORD-159, PodUtils/podcrates#273: group 78125 gave 12589).
+pub fn group_nr(g: u64) -> u64 {
+    g.min(u64::from(u16::MAX))
+}
+
 /// The superblock of the copy in group `g` (1024 bytes), with the counts
 /// of each group.
 fn superblock(l: &Layout, g: u64, n: &Names, counts: &[Counts], now: u64) -> Vec<u8> {
@@ -236,7 +243,7 @@ fn superblock(l: &Layout, g: u64, n: &Names, counts: &[Counts], now: u64) -> Vec
     put32(&mut s, 76, 1); // dynamic revision
     put32(&mut s, 84, FIRST_INO.into());
     put16(&mut s, 88, INODE_SIZE);
-    put16(&mut s, 90, g);
+    put16(&mut s, 90, group_nr(g));
     put32(&mut s, 92, (COMPAT_EXT_ATTR | COMPAT_DIR_INDEX).into());
     put32(&mut s, 96, (INCOMPAT_FILETYPE | INCOMPAT_EXTENTS).into());
     put32(

@@ -83,7 +83,11 @@ fn setup() -> String {
     // TODO/machine.md T-1780: cgroup2 where an engine or a payload looks
     // for it; `lo` up in each guest that carries podvm, and the modules of
     // `--podvm-engine` where the archive names them.
-    s.push_str("mount -t cgroup2 cgroup2 /sys/fs/cgroup 2>/dev/null\n");
+    // The init of the image (T-1994) mounts it before the run.
+    s.push_str(
+        "[ -e /sys/fs/cgroup/cgroup.controllers ] || \
+         mount -t cgroup2 cgroup2 /sys/fs/cgroup 2>/dev/null\n",
+    );
     s.push_str(&format!(
         "[ -x /podvm/podvm ] && /podvm/podvm guest-net --load $([ -f {l} ] && cat {l})\n",
         l = super::archive::ENGINE_LIST
@@ -316,7 +320,13 @@ impl Console {
     pub fn line<'a>(&mut self, raw: &'a str) -> Line<'a> {
         let raw = raw.trim_end_matches('\r');
         if !self.ready {
-            if raw.trim() == format!("PODVM-READY-{}", self.nonce) {
+            // TODO/machine.md T-1994: systemd as PID 1 writes terminal
+            // queries and its context (OSC 3008) on the console with no
+            // newline, so the marker can end a line of them.
+            if raw
+                .trim_end()
+                .ends_with(&format!("PODVM-READY-{}", self.nonce))
+            {
                 self.ready = true;
                 return Line::Ready;
             }

@@ -128,3 +128,21 @@ pub fn base_archive(
     std::fs::rename(&tmp, &path).map_err(|e| format!("{}: {e}", path.display()))?;
     Ok((path, false))
 }
+
+/// Why the run `r` cannot boot a guest with no podvm in it (the kernel of
+/// `PODVM_MACHINE_KERNEL` brings no module set), or `None`.
+pub(super) fn needs_tools(r: &super::Request, init_image: bool) -> Option<String> {
+    let (what, entry) = if r.sealed.is_some() {
+        ("--podvm-sealed", "TODO/machine.md T-1751")
+    } else if init_image {
+        ("--podvm-init=image", "TODO/enter.md T-2002")
+    } else if r.tty {
+        ("-t", "TODO/machine.md T-1723")
+    } else {
+        return None;
+    };
+    Some(format!(
+        "{what} needs podvm in the guest, and the kernel of PODVM_MACHINE_KERNEL brings no \
+         module set for it ({entry})"
+    ))
+}

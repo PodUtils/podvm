@@ -30,7 +30,10 @@ mod tree;
 
 use std::path::{Path, PathBuf};
 
+pub(crate) use guest::end_run;
 pub use guest::main as guest_main;
+#[cfg(test)]
+pub(crate) use guest::root_args;
 pub use guest::root_main as guest_root_main;
 
 /// The modules of the disk, out of the pinned modloop, with each module
