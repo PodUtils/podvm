@@ -17,6 +17,35 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
   of a superblock copy past group 65535, as `mke2fs` does. Only a disk
   over 8 TiB has such a group.
 
+### Changed: a foreground run of uid 0 has a PID namespace, 2026-11-26
+
+Record: T-2054 (item 1).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- On the namespace rung, a foreground `run` of uid 0, and a run with
+  `PODVM_USERNS=0`, now has a PID namespace with `podvm-init` as PID 1, as
+  `run -d` has. Before, the payload saw each process of the host and the
+  command line of podvm, and held a descriptor of the image lock. Now it
+  sees only the processes of its run, PID 1 reaps each orphan at once, and
+  podvm keeps the lock.
+- `--init` holds for such a run, and the banner, `inspect` and the manual
+  name the PID namespace.
+- Where the namespace rung falls back to chroot (an image with no `/tmp`),
+  the run has no PID namespace, as before.
+
+### Fixed: a foreground run reaps an orphan of the payload at once, 2026-11-26
+
+Record: T-2087 (OR-B40-05).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- In the PID namespace of a foreground run of a user with no root, an
+  orphan of the payload that exited stayed a zombie until the run ended:
+  podvm was the child subreaper. podvm is no longer a subreaper in its own
+  namespace, so PID 1 (`podvm-init`) reaps each orphan at once, as the
+  PID 1 of docker does. The end of the run, and the bound of `--timeout`,
+  kill each process of the namespace, so no process of the payload stays
+  after the run.
+
 ### Fixed: a C build on the syscall tier no longer spins for ever, 2026-11-26
 
 Record: T-1991 (PodUtils/podrunner#308, item 3).

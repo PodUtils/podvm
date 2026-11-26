@@ -10,7 +10,9 @@
 //!
 //! Three processes: this one waits outside and forwards the shutdown
 //! signals; pid 1 of the PID namespace reaps and forwards; pid 2 runs the
-//! rest of podvm. When pid 2 ends, pid 1 exits with its code, and the kernel
+//! rest of podvm. pid 2 is no child subreaper, so an orphan of the payload
+//! goes to pid 1, which reaps it at once (OR-B40-05); at the end of the
+//! payload pid 2 ends each other process of the namespace (`end_tree`). When pid 2 ends, pid 1 exits with its code, and the kernel
 //! kills each process that stayed in the namespace.
 //!
 //! ⛔ Only a foreground `run`: `run -d`, `create` and `exec` keep pids in the
@@ -85,7 +87,7 @@ pub use host::{bind_devices, bind_onto, bind_volumes, check_volume_under_base, h
 pub(crate) use join::target;
 pub use join::{joined_pid, joined_pidfd, joined_root, rejoin};
 pub use range::{again_in_range, available as range_available, cp_in_range, enter_alone};
-pub use sweep::sweep;
+pub use sweep::{end_tree, kill_others, sweep};
 use title::HIDDEN;
 pub use title::{shown_line, TITLE_EXEC, TITLE_INIT, TITLE_RUN};
 

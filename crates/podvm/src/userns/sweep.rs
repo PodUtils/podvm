@@ -47,6 +47,68 @@ pub(super) extern "C" fn sweep_at_exit() {
     }
 }
 
+/// TODO/cli.md T-2087 (OR-B40-05): in pid 2, SIGKILL to each process of
+/// the PID namespace but pid 1 and pid 2. In pid 2, `kill(-1)` names
+/// exactly these. pid 2 is no child subreaper in its own namespace, so an
+/// orphan of the payload is a child of pid 1, which reaps it at once.
+/// False outside a namespace of podvm's own.
+pub fn kill_others() -> bool {
+    if !active() {
+        return false;
+    }
+    // SAFETY: kill takes two integers.
+    unsafe { kill(-1, 9) };
+    true
+}
+
+/// TODO/supervise.md T-1708 in pid 2: end each other process of the PID
+/// namespace but pid 1, reap the children of pid 2, and wait until no such
+/// process is left, for at most `bound`. The count of the processes that
+/// stayed; `Unknown` where `/proc` cannot count them. None outside a
+/// namespace of podvm's own: the caller ends its tree as before.
+pub fn end_tree(bound: std::time::Duration) -> Option<podvm_supervise::Residual> {
+    if !active() {
+        return None;
+    }
+    const WNOHANG: i32 = 1;
+    const ESRCH: i32 = 3;
+    let deadline = std::time::Instant::now() + bound;
+    loop {
+        let mut st = 0;
+        // SAFETY: st lives for the call; WNOHANG does not wait.
+        while unsafe { waitpid(-1, &mut st, WNOHANG) } > 0 {}
+        // SAFETY: signal 0 checks for a target only. ESRCH: no process of
+        // the namespace is left but pid 1 and pid 2 (a zombie of pid 1
+        // counts until pid 1 reaps it).
+        let none = unsafe { kill(-1, 0) } < 0 && unsafe { *__errno_location() } == ESRCH;
+        if none {
+            return Some(podvm_supervise::Residual::Count(0));
+        }
+        if std::time::Instant::now() >= deadline {
+            return Some(match others() {
+                Some(n) => podvm_supervise::Residual::Count(n),
+                None => podvm_supervise::Residual::Unknown,
+            });
+        }
+        kill_others();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+}
+
+/// The count of the processes of the PID namespace but pid 1 and this one,
+/// from the `/proc` of the namespace (`own_proc`); None where it cannot be
+/// read.
+fn others() -> Option<u64> {
+    let me = std::process::id();
+    let rd = std::fs::read_dir("/proc").ok()?;
+    let n = rd
+        .flatten()
+        .filter_map(|e| e.file_name().to_str().and_then(|n| n.parse::<u32>().ok()))
+        .filter(|p| *p != 1 && *p != me)
+        .count();
+    Some(n as u64)
+}
+
 pub(super) const SIGALRM: i32 = 14;
 /// How long pid 1 waits for the detached prefill after pid 2 ended.
 pub(super) const LINGER_SECS: u32 = 600;

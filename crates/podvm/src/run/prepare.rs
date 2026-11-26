@@ -345,7 +345,7 @@ pub(crate) fn prepare(
     // names it and what the entry opens (T-2053), from the probe of T-1317.
     let (mut banner, entered, opened) = entry_banner(
         &findings,
-        super::acquire::facts(&o, detached, &rootfs), // T-2053
+        super::acquire::facts(&o, detached || ladder.is_none(), &rootfs), // T-2053, T-2054
         userland.as_ref(),
         &interpose_note,
         &devices,
