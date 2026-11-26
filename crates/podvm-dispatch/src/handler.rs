@@ -30,6 +30,8 @@ const PR_SET_SYSCALL_USER_DISPATCH: i64 = 59;
 const VFORK_STACK: i64 = 256 << 10;
 const WINDOW: i64 = 256;
 const GETPID: i64 = 39;
+const MADVISE: i64 = 28;
+const MADV_DONTNEED: i64 = 4;
 const PROCESS_VM_READV: i64 = 310;
 
 /// The registers of `ucontext_t.uc_mcontext.gregs` (x86_64).
@@ -143,6 +145,21 @@ fn brk(want: i64) -> i64 {
         if r < 0 {
             return cur;
         }
+    } else if page(want) < page(cur) {
+        // ⛔ T-1991 (PodUtils/podrunner#308): the kernel unmaps each page
+        // above the new break, so a later growth gives zeros, and glibc's
+        // `calloc` does not clear the memory that `sbrk` gives. A page
+        // kept with its old bytes made a hash table of `cc1` that had no
+        // empty slot, and `cc1` probed it for ever. Where the pages cannot
+        // be discarded, the break stays where it is, as a failed `brk`.
+        let (from, len) = (page(want), page(cur) - page(want));
+        // SAFETY: the range lies in the reserved range of the break, above
+        // the new break: the payload gives it back with this call.
+        if unsafe { sc(MADVISE, from, len, MADV_DONTNEED) } < 0 {
+            return cur;
+        }
+        // SAFETY: as above; an access above the break then faults.
+        unsafe { sc(nr::MPROTECT, from, len, 0) };
     }
     BRK_CUR.store(want as usize, Ordering::Relaxed);
     want

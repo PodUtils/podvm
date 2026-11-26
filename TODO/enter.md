@@ -5147,7 +5147,7 @@ Partial (2026-11-18): the retry is on `main`. On the cloud host (kernel 6.18) ne
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -5155,11 +5155,17 @@ podrunner's job `docs` (`cargo doc` of ripgrep at `178cc027`) on the syscall tie
 
 ## Premise
 
-Not reproduced on the cloud host: ripgrep at `178cc027` in a volume, `rust:1-slim`, `cargo doc --offline` on the tier ends with exit 0 in 17.5 s with `0.2.0-beta.34` and in 12.1 s with `main`. COORD-197 (#593) asks podrunner for `uname -r`, the processes of the unit with their `wchan`, and the stack of the one that waits.
+The last line names the build of ripgrep, but the unit that hung is the build script of `pcre2-sys`, which runs beside it. On a runner image with no `libpcre2-dev`, that build script compiles PCRE2 with `cc`. On the cloud host the image `rust:1` has `libpcre2-dev`, so `pkg-config` found it, and no C file was compiled: that is why the earlier attempt did not reproduce it. With `PCRE2_SYS_STATIC=1` it reproduces each time.
+
+The process that does not end is `cc1` of `pcre2_match.c` (and of `pcre2_dfa_match.c`). It runs at 100 % of a CPU, with no system call: `/proc/PID/syscall` reads `running`, and the stack is the timer interrupt. gdb puts it in the probe loop of a `hash_set` under `walk_tree_1` and `c_genericize_control_stmt`, with a table of 8191 slots, after 1.9 x 10^9 probes. The table has no empty slot, and it lies in the break.
+
+podvm's handler gives the payload its break (`handler::brk`): a reserved range that it opens with `mprotect` as the break grows. A shrink only moved the count, and the pages above the new break kept their bytes. The kernel unmaps them, so a later growth gives zeros, and glibc's `calloc` does not clear the memory that `sbrk` gives (`MORECORE_CLEARS`). After `free` trimmed the top of the heap, a table that `calloc` took from a break that grew again held old data.
 
 ## Approach
 
-Reproduce it as uid 1000 under `scripts/dev/nouserns.c` with a Rust image on the tier; find the process that waits and its call.
+On a shrink, `handler::brk` discards each whole page above the new break (`madvise(MADV_DONTNEED)` of the private anonymous range) and takes its access away (`mprotect(PROT_NONE)`), as the kernel unmaps them. Where the discard fails, the break does not move, as a failed `brk`: no old byte reaches a later growth.
+
+The break of a static PIE program could not go just after it (`MAP_FIXED_NOREPLACE` gave EEXIST), and then each `brk` failed. `enter` now reserves the range where the kernel puts a map in that case.
 
 ## Decision
 
@@ -5167,7 +5173,11 @@ Reproduce it as uid 1000 under `scripts/dev/nouserns.c` with a Rust image on the
 
 ## Prove
 
-As uid 1000 under `scripts/dev/nouserns.c`: `cargo doc` of ripgrep at `178cc027` in `--podvm-tier=syscall` ends with exit 0 within the time it takes with no tier, plus a bound.
+The test `the_break_of_the_handler_answers_as_the_kernel_does` of `podvm-dispatch`: the probe verb `brk` grows, shrinks and grows the break again, counts the bytes that are not zero in the kept page and in the new pages, and asks for a break below the base and one past the end. Its line on the handler, with and without the tier, is the line of the kernel. `experiments/484-syscall-tier-cargo-doc.py` exits 0: as uid 1000 under `scripts/dev/nouserns.c`, `cargo doc` of ripgrep at `178cc027` with `PCRE2_SYS_STATIC=1` ends with exit 0 on the tier within four times its time with no tier plus 60 s, and compiles `pcre2_match.c`.
+
+## Done
+
+**Done (2026-11-26).** `handler::brk` discards the pages above a shrunk break; `enter` reserves the break of a static PIE program. The test fails before the fix (`fresh=4196`: 4196 old bytes in the new pages, against 0 on the kernel) and passes after it. Experiment 484 on the cloud host (Linux 6.18, 4 CPUs; `experiments/results/syscall-tier-cargo-doc.txt`): with the binary of `main` at `c98d590`, the run on the tier reached its bound of 137 s (no tier: 19.4 s); with the fix, it ended with exit 0 in 20.5 s (no tier: 19.3 s). By hand with the same job: before, two runs in two reached their bounds of 300 s and 600 s; after, three runs in three ended with exit 0 in 23.5 s, 24.4 s and 18.3 s, and the job with the `libpcre2-dev` of the image in 15.7 s.
 
 # T-1995: A Go program hangs on the userland rung at its first signal of preemption
 
@@ -5864,3 +5874,54 @@ As uid 1000 under `scripts/dev/nouserns.c` with `public.ecr.aws/docker/library/a
 ## Done
 
 **Done (2026-11-21).** Measured on the cloud host with `mirror.gcr.io/library/alpine:3.20` and the binary of this branch (`mode=userland`, the loader family): the repro of the pass prints `hostfile`, then `localhost` (the image's `/etc/hostname`) after the host swapped in the link; `ln -s /etc /d/esc; head -1 /d/esc/os-release` prints `NAME="Alpine Linux"`; a link of the payload to a host directory (`/var/tmp/oqr`) gives `No such file or directory`. `podvm man` says: "A link in a volume after the start resolves in guest names, as a link of the payload does, so it never reaches a host file out of DIR; a link that the host makes between that walk and the call gives ELOOP". `a_volume_under_the_base_reaches_no_file_out_of_the_base` (`crates/podvm-interpose/src/tests/volume_base.rs`) now also reads `image` through a link that the host makes to `/etc` and through a link that the payload makes to `/etc`; its other cases hold `ELOOP` for a link between the walk and the call.
+
+# T-2101: `-v HOST:GUEST:overlay`: a read-only host directory with a writable layer of the container
+
+**Source:** PodUtils/podrunner#368 (COORD-141 of podrunner, from a member of the team, 2026-11-26; podrunner tasks 480 and 650)
+**Category:** enter
+**Milestone:** none
+**Priority:** P2
+**Effort:** L
+**Status:** open
+
+## Problem
+
+podrunner gives a job of a pull request the cache of its scope read-only
+(`-v HOST:/podrunner-cache:ro`). npm, pnpm, Playwright and
+`actions/setup-node` write into their cache directory on each run, so
+such a step fails or warns. A copy of the cache on the host costs seconds
+for each 100,000 files on ext4 (no reflink). podvm's `-v` takes `rw`, `ro`,
+`z` and `Z` only.
+
+## Premise
+
+podrunner asks for a mode `overlay` of `-v`, also for `run -d`: the lower
+is HOST and no write, chmod, unlink or rename reaches it; the upper is in
+the directory of the container and goes with `rm` or the end of a
+foreground run; a read sees the upper over the lower, and a whiteout hides
+a removed lower file; with `--podvm-confine` GUEST is writable and
+executable; a rung that cannot hold it refuses it by name (a flag error)
+and never falls back to `rw`; `system info` or `probe --json` names the
+rungs that hold it. The rungs that matter to podrunner are userland,
+supervise and namespace.
+
+## Approach
+
+The namespace rung: an overlayfs mount in the user namespace of the run
+(Linux 5.11 and later), with the upper and work directories in the
+directory of the container. The userland and supervise rungs: find what
+the interposer and the path table can hold; refuse by name where they
+cannot. Ask podcrates where the mount belongs in `pod-enter`.
+
+## Decision
+
+-
+
+## Prove
+
+A confined `run -d` with `-v H:/c:overlay` as uid 1000 writes, changes
+and removes a lower file; the unit sees each change; H stays the same
+byte for byte (a SHA-256 of each file before and after); nothing stays
+after `rm`; each rung that cannot hold it refuses it by name; `system
+info` names the rungs.
+

@@ -486,7 +486,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #590 | COORD-194: the answer to PodUtils/podrunner#304: the tier hides no host process; run -d with --podvm-confine on the tier failed to start (fixed on main) (to podrunner) | closed (released in `v0.2.0-beta.35` (T-1982); the run of the tier is podrunner@T-261) | T-1982 |
 | #591 | COORD-195: podvm took podcrates v0.72.0 in b3ff9c3 (to podcrates) | closed (PodUtils/podcrates#229 lists the take) | T-1981 |
 | #592 | COORD-196: three limits of --podvm-confine that podvm's fourth outside pass found: exec= on the syscall tier, a program through ld.so, chmod and times (to podrunner) | closed (podrunner answered and closed PodUtils/podrunner#307) | T-1983, T-1984, T-1985, T-2013 |
-| #593 | COORD-197: the answer to PodUtils/podrunner#308: errno 11 is an openat2 that a rename or a mount raced (a retry on main); the cargo doc hang does not reproduce here (to podrunner) | open | T-1990, T-1991 |
+| #593 | COORD-197: the answer to PodUtils/podrunner#308: errno 11 is an openat2 that a rename or a mount raced (a retry since beta.36); the cargo doc hang is a stale brk of the syscall tier, fixed on main (to podrunner) | open | T-1990, T-1991 |
 | #594 | COORD-198: podvm took podcrates v0.73.0 in 20313a0 (to podcrates) | closed (PodUtils/podcrates#231 lists the take) | T-1955 |
 | #595 | COORD-199: podvm's entry for the ruling "ghcr.io": T-1992, image.yml in the form of C789 (to podcrates) | closed (T-1992 done: run 44452103325, index sha256:e11a9a70 in the notes of v0.2.0-beta.35) | T-1992 |
 | #596 | COORD-200: the answer to PodUtils/podrunner#313: systemd on the incus tier first (--podvm-init=image, T-1993), then the machine tier in three steps (T-1994) (to podrunner) | open | T-1993, T-1994 |
@@ -578,7 +578,8 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #682 | [gh action] requested | closed (kvm `init` 45815838261 passed on `2db078e`) | the `init` job of `kvm.yml` that the concurrency group cancelled in #681 |
 | #683 | COORD-261: a shared reader of the extended attributes of a path, with no silent loss (to podcrates) | open | T-1999 |
 | #684 | COORD-262: pod-enter: a walk in a root that keeps `..` at the root, as the kernel and docker do (to podcrates) | open | T-2087 |
-| #685 | [gh action] requested | open | the gate again after the fix of the root-disk test as a user with no root (`c287ca7`) |
+| #685 | [gh action] requested | closed (gate 45824118327 passed on `4afcb38`) | the gate again after the fix of the root-disk test as a user with no root (`c287ca7`) |
+| #686 | [gh action] requested | open | the gate after the fix of the syscall tier's `brk` (T-1991) and the native-tier fixes |
 
 ## Messages whose title does not start with COORD-NNN
 
