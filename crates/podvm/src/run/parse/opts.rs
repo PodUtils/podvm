@@ -110,6 +110,8 @@ pub(crate) struct Opts {
     /// T-1655: the interposer's read-only layer serves them with `EROFS`.
     pub(crate) read_only: bool,
     pub(crate) ro_volumes: Vec<String>,
+    /// The guest paths of the `:overlay` volumes (TODO/enter.md T-2101).
+    pub(crate) overlay_volumes: Vec<String>,
     /// The guest paths of `--tmpfs`, made writable directories of the run.
     pub(crate) tmpfs: Vec<String>,
     /// `size=` of `--tmpfs /tmp`: the cap of `/tmp` on the syscall tier
@@ -188,6 +190,7 @@ impl Opts {
             timeout: None,
             read_only: false,
             ro_volumes: Vec::new(),
+            overlay_volumes: Vec::new(),
             tmpfs: Vec::new(),
             tmp_size: None,
             hardening: Default::default(),

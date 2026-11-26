@@ -59,6 +59,22 @@ pub(crate) fn joins_the_run(
     state == podvm_supervise::table::State::Running && rung == "namespace" && pid.is_some()
 }
 
+/// TODO/enter.md T-2101: an overlay volume is a mount of the namespaces of
+/// the running unit only; an `exec` that does not join them would see the
+/// tree of the image at its guest path, so it refuses by name.
+pub(super) fn layers_need_join(env: &[String]) -> Result<(), i32> {
+    let layers = podvm_supervise::launcher::overlays_of(env);
+    let Some(l) = layers.first() else {
+        return Ok(());
+    };
+    eprintln!(
+        "podvm exec: -v {}:{}:overlay is a mount of the running container only, and this \
+         exec does not join it; start the container first (TODO/enter.md T-2101)",
+        l.host, l.guest
+    );
+    Err(podvm_image::error::EXIT_RUNTIME_ERROR)
+}
+
 /// TODO/cli.md T-2061: the refusal of `exec` into a container that ended,
 /// as docker words it, with its exit code; `None` where the entry goes on.
 pub(super) fn not_running(name: &str, state: podvm_supervise::table::State) -> Option<i32> {

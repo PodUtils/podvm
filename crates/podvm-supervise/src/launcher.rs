@@ -165,6 +165,7 @@ fn enter_in_launcher(
     // TODO/enter.md T-1920: the volumes that pod-enter binds on the
     // namespace rung ride in `PODVM_BINDS`; the payload does not see it.
     let binds = binds_of(&env);
+    let layers = overlays_of(&env); // TODO/enter.md T-2101
     env.retain(|e| !e.starts_with("PODVM_BINDS=") && !e.starts_with("PODVM_BINDS_BASE="));
     if container.userland_exec.is_empty() {
         table::drop_host_paths(&mut env); // T-2054: an entry with a root
@@ -257,6 +258,30 @@ fn enter_in_launcher(
         })?;
         init = Some(started.keep);
         podvm_enter::Child::of(started.pid)
+    } else if container.userland_exec.is_empty() && !layers.is_empty() {
+        // TODO/enter.md T-2101: pod-enter mounts no overlay volume yet, so
+        // this launcher takes a mount namespace of its own (and a user
+        // namespace where it is not root), mounts each layer on the tree,
+        // and enters the namespace rung there, whose mount namespace copies
+        // the layers. No other rung: a layer is never a writable bind.
+        if container.rung != "namespace" {
+            return Err(format!(
+                "-v {}:{}:overlay needs the namespace rung, and the record names {} \
+                 (TODO/enter.md T-2101)",
+                layers[0].host, layers[0].guest, container.rung
+            ));
+        }
+        let base = env.iter().find_map(|e| e.strip_prefix("PODVM_BINDS_BASE="));
+        podvm_enter::overlay::enter_own_namespace()
+            .and_then(|()| {
+                podvm_enter::overlay::mount_all(
+                    std::path::Path::new(&container.rootfs),
+                    &layers,
+                    base,
+                )
+            })
+            .map_err(|e| format!("starting with an overlay volume: {e}"))?;
+        podvm_enter::spawn_namespace(&root, &plan, log).map_err(|e| e.to_string())?
     } else if container.userland_exec.is_empty() {
         let findings = podvm_probe::run();
         let selection = podvm_probe::select::Selection::choose(&findings);
@@ -338,6 +363,9 @@ pub fn binds_of(env: &[String]) -> Vec<podvm_enter::VolumeBind> {
     v.split(',')
         .filter_map(|p| {
             let (guest, rest) = p.split_once(':')?;
+            if rest.ends_with(OVERLAY_SUFFIX) {
+                return None; // `overlays_of`
+            }
             let (host, read_only) = match rest.strip_suffix(":ro") {
                 Some(h) => (h, true),
                 None => (rest, false),
@@ -347,6 +375,28 @@ pub fn binds_of(env: &[String]) -> Vec<podvm_enter::VolumeBind> {
                 guest: guest.to_string(),
                 read_only,
                 host_base: base.filter(|b| under(host, b)).map(str::to_string),
+            })
+        })
+        .collect()
+}
+
+/// The suffix of an overlay volume in `PODVM_BINDS` (TODO/enter.md T-2101).
+const OVERLAY_SUFFIX: &str = ":overlay";
+
+/// The overlay volumes of `PODVM_BINDS` (`GUEST:HOST:overlay`), in their
+/// order, which the launcher mounts itself; [`binds_of`] leaves them out
+/// (TODO/enter.md T-2101).
+pub fn overlays_of(env: &[String]) -> Vec<podvm_enter::userland::Volume> {
+    let Some(v) = env.iter().find_map(|e| e.strip_prefix("PODVM_BINDS=")) else {
+        return Vec::new();
+    };
+    v.split(',')
+        .filter_map(|p| {
+            let (guest, rest) = p.split_once(':')?;
+            let host = rest.strip_suffix(OVERLAY_SUFFIX)?;
+            Some(podvm_enter::userland::Volume {
+                guest: guest.to_string(),
+                host: host.to_string(),
             })
         })
         .collect()

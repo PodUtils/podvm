@@ -5874,7 +5874,7 @@ As uid 1000 under `scripts/dev/nouserns.c` with `public.ecr.aws/docker/library/a
 **Milestone:** none
 **Priority:** P2
 **Effort:** L
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -5907,7 +5907,30 @@ cannot. Ask podcrates where the mount belongs in `pod-enter`.
 
 ## Decision
 
--
+The namespace rung holds the mode, and each other rung refuses it by name
+at 125; no rung falls back to a writable bind or to a path rewrite.
+`podvm_enter::overlay` mounts overlayfs on GUEST with HOST as the lower
+layer (a held descriptor: `lowerdir=.` of pod-enter's `overlay_options`,
+opened under `--podvm-volume-base` with no link where HOST is under it),
+the upper and work directories in `<store>/trees/<id>/overlay/<n>/`, and
+`userxattr` in a user namespace (no second try without it). pid 2 of a
+foreground run mounts it after the binds (`run::binds::bind`); the launcher
+of `run -d`, `create` and `start` reads `GUEST:HOST:overlay` of
+`PODVM_BINDS` (`launcher::overlays_of`), enters a user and a mount
+namespace of its own (`overlay::enter_own_namespace`), mounts each layer
+on the tree, and enters the namespace rung there. pod-enter's
+`Plan::volumes` binds and has no overlay: the ask to podcrates is an
+overlay kind of `VolumeBind`, mounted in the child at the place of the
+bind, so that the launcher needs no namespace of its own. The path table
+of the interposer and the handler of the native-static rung cannot hold a
+copy-up layer (a copy at the first write, a whiteout, a merged listing)
+safely through library calls, so the userland rung, the syscall and
+emulate tiers refuse it, with the machine, incus and runsc tiers and
+`--podvm-init=image`. No other volume may be at, over or under GUEST, and
+GUEST stays out of `/tmp`, `/dev`, `/proc` and `/sys`. Under
+`--podvm-confine` the caller names GUEST in `write=` and `exec=`, as for
+each other path; Landlock holds on the merged view. `system info` gives
+`.VolumeOverlay`.
 
 ## Prove
 
@@ -5917,3 +5940,6 @@ byte for byte (a SHA-256 of each file before and after); nothing stays
 after `rm`; each rung that cannot hold it refuses it by name; `system
 info` names the rungs.
 
+## Done
+
+**Done (2026-11-26).** `podvm_enter::overlay` (the layer), `run::overlay` (the refusals and the banner), `run::binds::bind` (pid 2 of a foreground run), `launcher::overlays_of` and the launcher's own namespaces (`run -d`, `create`, `start`), `exec::ns::layers_need_join`, `.VolumeOverlay` of `system info`, the help of `-v` and the parity row. The tests: `the_options_of_a_volume_give_one_mode` (each mode with the others; `overlay,ro`, `ro,overlay` and `overlay,rw` conflict; an overlay takes a directory), `an_overlay_volume_takes_a_guest_path_of_its_own`, and `overlay_layer` of podvm-enter (a test with its own `main`: as root and as uid 1000, a write, a change, a chmod, a rename and a removal through the layer; the lower directory stays the same byte for byte and mode for mode, and the upper one holds a whiteout). The removal of a tree failed on the `work/work` directory of overlayfs (mode 0000): `OpenOptions::custom_flags` loses `O_PATH` on musl, whose `O_ACCMODE` holds it, so `tree::open_dirs` opens with `sys::open` now (`a_tree_with_read_only_directories_is_removed_and_no_link_is_followed` has a directory of mode 0000). Experiment 485 as uid 1000 with a private store (`experiments/results/volume-overlay.txt`): 9 clauses in 9 pass: a confined `run -d` makes each change and runs a script of H, `exec` sees each one, the upper layer and its whiteout are in the tree of the container, `rm -f`, `run --rm` and `create`/`start`/`rm` leave no tree, the userland rung (`run` and `run -d` under `scripts/dev/nouserns.c`), `PODVM_USERNS=0` and the syscall, emulate, machine, incus and runsc tiers refuse by name at 125 (no guest started), `system info` gives `held` true here and false with no user namespace, and H keeps the SHA-256 and the mode of each file. The ask to podcrates (an overlay kind of `VolumeBind`) is in the report of the worker; podvm's launcher keeps its own namespaces until pod-enter has it.

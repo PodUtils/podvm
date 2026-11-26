@@ -1752,9 +1752,11 @@ dependencies = [
 name = "podvm-enter"
 version = "0.2.0-beta.41"
 dependencies = [
+ "pod-beneath",
  "pod-confine",
  "pod-core",
  "pod-enter",
+ "pod-hostprobe",
  "podvm-probe",
 ]
 

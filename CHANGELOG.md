@@ -8,6 +8,28 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Added: `-v HOST:GUEST:overlay`, a read-only host directory with a writable layer, 2026-11-26
+
+Record: T-2101 (PodUtils/podrunner#368).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `-v HOST:GUEST:overlay` gives the directory HOST as the read-only lower
+  layer of an overlayfs mount on GUEST, on the namespace rung, for a
+  foreground `run`, `run -d`, `create` and `start`. Each write, `chmod`,
+  `unlink` and `rename` goes to an upper layer in the tree of the
+  container in the store, and no change reaches HOST. A removed file of
+  HOST is a whiteout of the upper layer. `rm`, and the end of `run --rm`,
+  remove the layer with the tree.
+- Each rung and tier that cannot hold the layer refuses it by name with
+  125: the userland rung, the syscall, emulate, machine, incus and runsc
+  tiers, `--podvm-init=image`, a foreground run of uid 0 and
+  `PODVM_USERNS=0`. `overlay` with `ro` or `rw` is a flag error.
+- `system info --format '{{json .VolumeOverlay}}'` names the rungs that
+  hold the mode, and whether the rung of this host is one of them.
+- The removal of a tree opens a directory of mode 0000 (the `work/work`
+  directory of overlayfs). Before, musl's `O_ACCMODE` removed `O_PATH`
+  from the open, and the removal failed with "Permission denied".
+
 ### Fixed: a C build on the syscall tier no longer spins for ever, 2026-11-26
 
 Record: T-1991 (PodUtils/podrunner#308, item 3).

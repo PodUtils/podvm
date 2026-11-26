@@ -176,7 +176,7 @@ pub(super) fn tmpfs(verb: &str, spec: &str, o: &mut Opts) -> Result<(), i32> {
 /// One `-v`: the pair, and its guest path in the read-only list where the
 /// options hold `ro`. TODO/enter.md T-1653, TODO/cli.md T-1655.
 pub(super) fn volume(verb: &str, spec: &str, o: &mut Opts) -> std::result::Result<(), i32> {
-    let (mut v, ro) = crate::lifecycle::volume::parse(spec).map_err(|why| {
+    let (mut v, mode) = crate::lifecycle::volume::parse(spec).map_err(|why| {
         eprintln!("podvm {verb}: -v {spec:?}: {why}");
         EXIT_FLAG_ERROR
     })?;
@@ -186,9 +186,7 @@ pub(super) fn volume(verb: &str, spec: &str, o: &mut Opts) -> std::result::Resul
     v.guest = crate::lifecycle::volume::guest_spelling(&v.guest);
     o.volume_given
         .push(spec.split(':').next().unwrap_or_default().to_string());
-    if ro {
-        o.ro_volumes.push(v.guest.clone());
-    }
+    super::super::overlay::note_mode(mode, &v.guest, o); // :ro, :overlay (T-2101)
     o.volumes.push(v);
     Ok(())
 }

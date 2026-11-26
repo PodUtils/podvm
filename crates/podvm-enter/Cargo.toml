@@ -17,3 +17,13 @@ pod-core = { git = "https://github.com/PodUtils/podcrates", tag = "v0.85.0", def
 # The confinement of a payload (Landlock, a seccomp deny filter and
 # no_new_privs; TODO/enter.md T-1658).
 pod-confine = { git = "https://github.com/PodUtils/podcrates", tag = "v0.85.0" }
+# TODO/enter.md T-2101: the user namespace and the system calls of an
+# overlay volume, and the open of its lower layer under a volume base.
+pod-hostprobe = { git = "https://github.com/PodUtils/podcrates", tag = "v0.85.0" }
+pod-beneath = { git = "https://github.com/PodUtils/podcrates", tag = "v0.85.0" }
+
+# TODO/enter.md T-2101: a test with its own `main`, so that the process has
+# one thread and can enter a user namespace.
+[[test]]
+name = "overlay_layer"
+harness = false

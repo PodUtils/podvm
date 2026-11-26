@@ -26,9 +26,10 @@ pub(crate) fn prepare(
     if tier != crate::tier::Tier::Incus {
         super::cgroup::limits(verb, tier, &o.limits)?; // T-1897, T-1747, T-1967
     }
-    // ⭐ TODO/packaging.md T-1003. A forced launch rung is refused here, before
-    // anything is fetched, where the verb cannot honor it: only foreground
-    // `run` drives the ladder, and no guest tier reaches it (so it sits first).
+    super::overlay::refuse_tier(verb, tier, &o)?; // TODO/enter.md T-2101
+                                                  // ⭐ TODO/packaging.md T-1003. A forced launch rung is refused here, before
+                                                  // anything is fetched, where the verb cannot honor it: only foreground
+                                                  // `run` drives the ladder, and no guest tier reaches it (so it sits first).
     if let Err(text) = crate::ladder::refuse_where_undriven(verb, o.detach, guest) {
         eprintln!("podvm {verb}: {text}");
         return Err(podvm_image::error::EXIT_RUNTIME_ERROR);
@@ -275,6 +276,7 @@ pub(crate) fn prepare(
     crate::lifecycle::refuse_detached_userland(verb, userland.as_ref(), o.detach)?;
     let (vs, ul) = ((&o.volumes[..], &o.device_guests[..]), userland.as_ref());
     crate::lifecycle::volume::refuse_unserved(verb, vs, ul, ladder)?; // T-1653, T-1939
+    super::overlay::refuse_unserved(verb, &o, userland.as_ref())?; // T-2101
     super::binds::check_base_off_binds(verb, &o, userland.as_ref())?;
     // ⭐ T-0702, T-0706: classify and place the object BEFORE the banner, which
     // names the write. T-1649: a `#!` payload classifies its interpreter.

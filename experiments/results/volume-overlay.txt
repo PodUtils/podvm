@@ -1,0 +1,24 @@
+Does -v HOST:GUEST:overlay keep HOST as it was and give GUEST a layer?
+2026-11-26T15:33:42Z Linux 6.18.44-fc-v880, uid 0
+podvm SHA-256 fe1fa72aa53b1ce1dfcc8711d06a534be2eee64134c8ff393ac68d4d3816a3f5
+image mirror.gcr.io/library/alpine:3.20
+  | run -d: exit 0: 94003ee50042 
+PASS 1: run -d exit 0; the payload made each change
+PASS 2: exec sees 'changed\nnew\nbeta\nhello from H\n600\nend\n'
+PASS 3: 1 upper layer(s) in the trees of the store, with a whiteout of sub/c
+PASS 4: rm -f exit 0; trees before 1, after 0
+PASS 5: foreground exit 0, output 'changed\nnew\nbeta\nhello from H\n600\nend\n', trees after 0
+PASS 6: create 0, start 0, exec sees 'created\n', rm 0, trees after 0
+  | userland run: exit 125: podvm run: -v WORK/H:/c:overlay: the userland rung serves a volume through the path table of its interposer, which cannot hold a copy-up layer (a copy at the first write, a whiteout, a merged listing); only the namespace rung holds an overl
+  | userland run -d: exit 125: podvm run: -v WORK/H:/c:overlay: the userland rung serves a volume through the path table of its interposer, which cannot hold a copy-up layer (a copy at the first write, a whiteout, a merged listing); only the namespace rung holds an overl
+  | PODVM_USERNS=0: exit 125: podvm run: -v WORK/H:/c:overlay: the userland rung serves a volume through the path table of its interposer, which cannot hold a copy-up layer (a copy at the first write, a whiteout, a merged listing); only the namespace rung holds an overl
+  | syscall tier: exit 125: podvm run: -v WORK/H:/c:overlay: the native-static rung of this tier opens a volume as a directory of its handler, which has no copy-up layer; only the namespace rung holds an overlay (TODO/enter.md T-2101)
+  | emulate tier: exit 125: podvm run: -v WORK/H:/c:overlay: the native-static rung of this tier opens a volume as a directory of its handler, which has no copy-up layer; only the namespace rung holds an overlay (TODO/enter.md T-2101)
+  | machine tier: exit 125: podvm run: -v WORK/H:/c:overlay: --podvm-tier=machine shares a host directory over 9p; only the namespace rung holds an overlay (TODO/enter.md T-2101)
+  | incus tier: exit 125: podvm run: -v WORK/H:/c:overlay: --podvm-tier=incus gives a disk device of the instance; only the namespace rung holds an overlay (TODO/enter.md T-2101)
+  | runsc tier: exit 125: podvm run: -v WORK/H:/c:overlay: --podvm-tier=runsc binds a volume in its sandbox; only the namespace rung holds an overlay (TODO/enter.md T-2101)
+  | overlay,ro: exit 125: podvm run: -v "WORK/H:/c:overlay,ro": the options "overlay,ro" conflict: overlay keeps HOST read-only and makes GUEST writable, so it takes neither ro nor rw (TODO/enter.md T-2101)
+PASS 7: 9 of 9 refusals by name at 125
+PASS 8: here {"held":true,"rungs":["namespace"]}, with no user namespace {"held":false,"rungs":["namespace"]}
+PASS 9: H unchanged (6 paths), 0 process(es) of podvm stayed
+AN OVERLAY VOLUME KEEPS HOST AS IT WAS

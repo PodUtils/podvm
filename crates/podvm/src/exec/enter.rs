@@ -150,6 +150,9 @@ pub(super) fn enter(
     let userland = if joins_the_run(state, &container.rung, container.pid) {
         None
     } else {
+        if let Err(code) = super::ns::layers_need_join(&container.env) {
+            return code; // TODO/enter.md T-2101
+        }
         match crate::lifecycle::syscall::exec_entry(
             &container.env,
             &maps,

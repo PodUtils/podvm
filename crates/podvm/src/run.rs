@@ -54,14 +54,23 @@ pub const RUN_OPTIONS: &str = "\
                    bind does not refuse its writes); w alone keeps the
                    descriptor serve of the interposer; m parses and
                    grants nothing (TODO/enter.md T-0501, T-1939)
-  -v, --volume H:G[:rw]
+  -v, --volume H:G[:rw|:ro|:overlay]
                    show the host path H at the guest path G. Repeatable. A
                    path rewrite through PODVM_MAPS on the userland loader
                    family, not a mount: a write lands in H, and :ro refuses
                    a write (TODO/cli.md T-1655). A 9p mount on the machine
                    tier. A bind mount on the namespace rung, which
                    /proc/mounts lists. A -w or a first program inside G
-                   resolves in H (TODO/enter.md T-1653)
+                   resolves in H (TODO/enter.md T-1653). :overlay, the
+                   namespace rung only (also -d, create and start): the
+                   directory H is the read-only lower layer of an overlayfs
+                   mount on G, and each write, chmod, unlink or rename goes
+                   to an upper layer in the tree of the container, which
+                   rm (or the end of run --rm) removes; no other volume may
+                   be at, over or under G, nor G under /tmp, /dev, /proc or
+                   /sys. Each other rung and tier refuses it (125), never a
+                   writable fallback; `system info --format '{{json
+                   .VolumeOverlay}}'` names the rungs (TODO/enter.md T-2101)
   --unsafe-host-paths
                    podvm's own, userland rung only: opt into the
                    pass-through with no PODVM_MAPS anchoring, so absolute
@@ -394,6 +403,7 @@ mod acquire;
 pub(crate) mod binds; // TODO/enter.md T-1920
 pub(crate) mod cgroup; // TODO/cli.md T-1747
 mod devices; // TODO/enter.md T-1939
+pub(crate) mod overlay; // TODO/enter.md T-2101
 mod user_ns; // TODO/enter.md T-1927
 pub(crate) use acquire::*;
 

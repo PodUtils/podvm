@@ -52,6 +52,30 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   image), podvm prints why and refuses the volume on the chroot rung; it
   refuses one on the memfd family too. A working directory or a first program in a volume resolves
   through the same table, to the file of the volume.
+- `-v HOST:GUEST:overlay` (T-2101) holds on the namespace rung only, also
+  with `run -d`, `create` and `start`: HOST, a directory, is the read-only
+  lower layer of an overlayfs mount on GUEST, in a user namespace
+  (`userxattr`, Linux 5.11). Each write, `chmod`, `unlink` and `rename`
+  goes to the upper layer in `<store>/trees/<id>/overlay/<n>/`, beside the
+  rootfs, and a whiteout there hides a removed file of HOST; `rm`, and the
+  end of `run --rm`, remove it with the tree, and a stop and a `start` keep
+  it, as docker keeps the layer of a container. pid 2 of a foreground run
+  mounts it; the launcher of a detached run enters a user and a mount
+  namespace of its own and mounts it there before the entry of pod-enter,
+  whose `Plan::volumes` (podcrates `v0.85.0`) has no overlay. A lower file whose owner the
+  user namespace does not map can be read, and a change of it fails
+  (`EOVERFLOW` at the copy-up). No other volume may be at, over or under
+  GUEST, and GUEST may not be at or under `/tmp`, `/dev`, `/proc` or
+  `/sys`, where the rung mounts its own file systems after the volumes.
+  HOST and the store must not hold each other. The userland rung (the path
+  table cannot hold a copy-up layer), the native-static rung, the syscall
+  and emulate tiers, the machine, incus and runsc tiers,
+  `--podvm-init=image`, a foreground run of uid 0 and `PODVM_USERNS=0`
+  refuse it by name at 125, never with a writable fallback. An `exec` that
+  does not join the running unit refuses it too. `system info --format
+  '{{json .VolumeOverlay}}'` gives `{"held":B,"rungs":["namespace"]}`.
+  Under `--podvm-confine`, a `write=` and an `exec=` rule of GUEST hold on
+  the merged view (experiment 485).
 - podvm writes no file of its own into a volume (T-2072). A volume over a
   path that podvm completes (`/etc`, `/etc/ssl`, `/dev`) hides the
   fixups there: with `-v DIR:/etc` the payload gets no `hosts`,
