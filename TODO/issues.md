@@ -573,7 +573,8 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #677 | COORD-258: pod-oci: the config gives rootfs.diff_ids, and a check of their count against the layers of the manifest (to podcrates) | open | T-2100 |
 | #678 | COORD-259: pod-oci: bounds of a reference (name 255, tag 128) and pod-enter: the refusal of a missing working directory of exec (to podcrates) | open | T-2100 |
 | #679 | [gh action] requested | closed (on `d9c687a`: gate 45798323008 and the `incus` job of `kvm.yml` 45798328658 passed) | the gate and the `incus` job of `kvm.yml` on `main` after the merges of T-1968, T-2079, T-2087 and T-2100 |
-| #680 | COORD-260: pod-guest: take podvm's writer of an empty ext4 disk beside fat16 and squashfs (to podcrates) | open | T-1968 |
+| #680 | COORD-260: pod-guest: take podvm's ext4 writer (an empty disk and a whole tree) beside fat16 and squashfs (to podcrates) | open | T-1968, T-1994 |
+| #681 | [gh action] requested | open | the gate and the KVM jobs `guest`, `init` and `mem` after the disk root of T-1994 and the sized disk of T-1968 |
 
 ## Messages whose title does not start with COORD-NNN
 
