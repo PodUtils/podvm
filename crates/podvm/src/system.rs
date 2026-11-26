@@ -279,6 +279,8 @@ pub(crate) fn wrap(text: &str, width: usize, indent: &str) -> String {
 
 mod df_info;
 pub use df_info::*;
+mod info_text;
+use info_text::*;
 mod rung_why; // TODO/probe.md T-1903
 
 #[cfg(test)]

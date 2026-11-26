@@ -129,15 +129,7 @@ fn parse_flags_with(
                 "--podvm-channel" => {
                     o.channel = Some(crate::machine::guest::channel::parse(verb, a)?)
                 }
-                "--podvm-mem" => match crate::tier::parse_mem(a) {
-                    Some(m) => o.mem = Some(m),
-                    None => {
-                        eprintln!(
-                            "podvm {verb}: --podvm-mem takes a byte count with an optional K/M/G/T suffix, not {a:?}"
-                        );
-                        return Err(EXIT_FLAG_ERROR);
-                    }
-                },
+                "--podvm-mem" => o.mem = Some(opts::mem_arg(verb, a)?),
                 "--podvm-cpus" => o.cpus = Some(cpus(verb, a)?),
                 "--podvm-volume-base" => volume_base::set(verb, a, &mut o)?,
                 "--publish" => o.publish.push(publish::parse(verb, a)?),
@@ -216,6 +208,7 @@ fn parse_flags_with(
                 return Err(0);
             }
             "--rm" => o.rm = true,
+            "--init" => o.init = true, // TODO/cli.md T-2087 (OR-B40-06)
             "-d" | "--detach" => o.detach = true,
             "--name" => expecting = Some("--name"),
             other if other.starts_with("--name=") => {
@@ -412,28 +405,14 @@ fn parse_flags_with(
                 o.cpus = Some(cpus(verb, &other["--podvm-cpus=".len()..])?)
             }
             other if other.starts_with("--podvm-mem=") => {
-                match crate::tier::parse_mem(&other["--podvm-mem=".len()..]) {
-                    Some(m) => o.mem = Some(m),
-                    None => {
-                        eprintln!(
-                            "podvm {verb}: --podvm-mem takes a byte count with an optional K/M/G/T suffix, not {:?}",
-                            &other["--podvm-mem=".len()..]
-                        );
-                        return Err(EXIT_FLAG_ERROR);
-                    }
-                }
+                o.mem = Some(opts::mem_arg(verb, &other["--podvm-mem=".len()..])?)
             }
             other if other.starts_with("--insecure-registry=") => {
                 o.insecure.push(other[20..].to_string())
             }
-            other if other.starts_with("--tls-verify=") => match &other[13..] {
-                "true" | "1" => o.tls_verify = Some(true),
-                "false" | "0" => o.tls_verify = Some(false),
-                v => {
-                    eprintln!("podvm {verb}: --tls-verify takes true or false, not {v:?}");
-                    return Err(EXIT_FLAG_ERROR);
-                }
-            },
+            other if other.starts_with("--tls-verify=") => {
+                o.tls_verify = Some(opts::tls_eq(verb, &other[13..])?)
+            }
             other if other.starts_with('-') => {
                 // ⛔ Unreachable through the table above, and it is here as an
                 // assertion rather than as a fallback: the table admitted this

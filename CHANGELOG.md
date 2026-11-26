@@ -25,6 +25,31 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
   releases. The saved state of a guest of systemd now needs
   `PODVM_MACHINE_ROOT=initramfs`. [Limits](docs/limits.md) has the rules.
 
+### Fixed: `rmi` and `image prune` remove the machine files of an image, 2026-11-26
+
+Record: T-1994.
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `rmi` of the last name of an image, and `image prune`, remove the root
+  disk, the base archive and the saved states of the image from the store
+  (`machine/`). Before, they stayed for ever. A second name or a container
+  that keeps the image keeps its files. A file that a build or a save of a
+  run holds under its lock stays, and a line names it.
+- `image prune` also removes the machine files of a digest that no image
+  names.
+- `system df` counts the machine files in a new line, and in "Reclaimable".
+
+### Fixed: an image with many extended attributes keeps all of them, 2026-11-26
+
+Record: T-1999.
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- The incus tier and the machine tier read the extended attributes of a
+  file of the image into a buffer of 4096 bytes. A file with more names
+  lost all its attributes with no message. podvm now sizes the buffer from
+  the kernel, and a read that fails stops the build with a line that names
+  the file.
+
 ### Changed: the root of a machine guest is a disk of its image, 2026-11-26
 
 Record: T-1994 (PodUtils/podrunner#313 ask 2, PodUtils/podrunner#316
@@ -96,6 +121,60 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 - Where the payload removed `/.podvm`, `logs` says that the payload removed
   the log, not a 404 of incusd; `wait` and `inspect` still give the exit
   code.
+
+### Fixed: `--network host`, 2026-11-26
+
+Record: T-2087 (OR-B40-14).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `run --network host` and `create --network host` hold where the payload
+  shares the network of this machine: each rootfs rung and the runsc
+  tier. The machine and incus tiers refuse it by name. `--network` still
+  refuses each other value, and `host` with `broker`.
+
+### Fixed: `run -u` names the access that the payload keeps, 2026-11-26
+
+Record: T-2087 (OR-B40-17).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `run -u` and `create -u` say one line where the payload keeps the
+  caller's access to the tree (a user namespace that maps one id, with no
+  subordinate range), as `exec -u` says it.
+
+### Fixed: `--init` on the namespace rung, and the note of `top`, 2026-11-26
+
+Record: T-2087 (OR-B40-06).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `run --init` and `create --init` hold where the run has a PID
+  namespace: its PID 1 is podvm's init already. A rung with no PID
+  namespace and each guest tier refuse `--init` by name.
+- The refusal of `top` names each rung truly and names
+  `podvm exec NAME ps` for the namespace rung.
+
+### Fixed: `--device` with another guest path, 2026-11-26
+
+Record: T-1939 (#473), T-2100 (OR-B41-08).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- A `--device` that reads goes as a volume of one file: a bind on the
+  namespace rung and the path table on the userland rung. `stat`, a
+  listing and each open of the payload see the host node at the guest
+  path, and a write reaches the host. `r` alone is read-only; the
+  namespace rung refuses `r` alone for a device node by name, because a
+  read-only bind does not refuse a write to a device node.
+
+### Fixed: `cp` through a link of the container, 2026-11-26
+
+Record: T-2087 (OR-B40-16), T-2100 (OR-B41-04).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `cp` resolves the container path in the root of the container, as
+  docker does, in both directions: a link with an absolute target (stock
+  alpine `/var/run -> /run`) and a `..` that stays in the root work. A
+  `..` above the root, a loop of links and a link to a path that the
+  container does not have are refused by name, and no host path is read
+  or written.
 
 ### Fixed: an incus `--rm` run that the OOM killer ends, and the QEMU copy in the store, 2026-11-26
 

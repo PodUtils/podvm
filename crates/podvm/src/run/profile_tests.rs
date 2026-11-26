@@ -220,3 +220,28 @@ fn e_name_takes_the_value_of_the_caller() {
     .unwrap();
     assert_eq!(o.env, v(&[&format!("PATH={path}"), "A=1"]));
 }
+
+/// TODO/cli.md T-2087 (OR-B40-14): `--network` takes host or broker, one
+/// of them; each other value, and both, are a flag error.
+#[test]
+fn network_takes_host_or_broker_one_of_them() {
+    // (the values of --network, host, broker; None for a refusal)
+    type Want = Option<(bool, bool)>;
+    let rows: [(&[&str], Want); 6] = [
+        (&["host"], Some((true, false))),
+        (&["broker"], Some((false, true))),
+        (&["host", "host"], Some((true, false))),
+        (&["host", "broker"], None),
+        (&["bridge"], None),
+        (&["none"], None),
+    ];
+    for (values, want) in rows {
+        let mut args = Vec::new();
+        for n in values {
+            args.push(format!("--network={n}"));
+        }
+        args.push("img".to_string());
+        let got = parse("run", &args).ok().map(|o| (o.net_host, o.broker));
+        assert_eq!(got, want, "{values:?}");
+    }
+}

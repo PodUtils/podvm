@@ -85,6 +85,34 @@ pub fn check_rung(verb: &str, o: &crate::run::Opts, rung: &str) -> Result<(), i3
     refused(verb, wrong_rung(stays, rung))
 }
 
+/// TODO/cli.md T-2087 (OR-B40-06): `--init` holds where the run has a PID
+/// namespace, whose PID 1 is podvm's init; elsewhere it is refused by name.
+pub fn check_init(verb: &str, init: bool, pid: bool, rung: &str) -> Result<(), i32> {
+    if !init || pid {
+        return Ok(());
+    }
+    eprintln!(
+        "podvm {verb}: --init needs a PID namespace for its init, and the {rung} rung of this \
+         host opens none; the launcher (or podvm, for a foreground run) is the child subreaper \
+         of the payload's tree and kills each descendant at the end (TODO/supervise.md T-1708)"
+    );
+    Err(podvm_image::error::EXIT_RUNTIME_ERROR)
+}
+
+/// TODO/cli.md T-2087 (OR-B40-14): `--network host` holds where the entry
+/// opens no network namespace (each rootfs rung today); a rung that opens
+/// one refuses it by name, as the payload would not share this machine's.
+pub fn check_net(verb: &str, host: bool, net: bool, rung: &str) -> Result<(), i32> {
+    if !host || !net {
+        return Ok(());
+    }
+    eprintln!(
+        "podvm {verb}: --network host is refused: the {rung} rung opens a network namespace, \
+         so the payload does not share the network of this machine (TODO/cli.md T-2087)"
+    );
+    Err(podvm_image::error::EXIT_RUNTIME_ERROR)
+}
+
 fn refused(verb: &str, why: Option<String>) -> Result<(), i32> {
     let Some(why) = why else {
         return Ok(());

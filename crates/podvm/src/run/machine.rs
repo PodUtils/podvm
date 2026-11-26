@@ -348,6 +348,8 @@ pub(super) fn unhonoured_flags(o: &Opts) -> Vec<&'static str> {
     let h = &o.hardening;
     [
         (o.confine.is_some(), "--podvm-confine"),
+        (o.init, "--init"),
+        (o.net_host, "--network host"), // T-2087: the guest has its own network
         (o.user.is_some(), "--user"),
         (o.hostname.is_some(), "--hostname"),
         (!o.ask.add_hosts.is_empty(), "--add-host"),

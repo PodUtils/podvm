@@ -401,19 +401,24 @@ pub(super) fn cpus(verb: &str, a: &str) -> std::result::Result<u32, i32> {
     }
 }
 
-/// `--network`: `broker` only (TODO/net.md T-1665). podvm has no network
-/// namespace to select, so each other value is refused by name.
+/// `--network`: `broker` (TODO/net.md T-1665) or `host` (TODO/cli.md
+/// T-2087: the network of this machine, which a rung with no network
+/// namespace gives), one of them; podvm has no network namespace to select.
 pub(super) fn network(verb: &str, a: &str, o: &mut Opts) -> Result<(), i32> {
-    if a == "broker" {
-        o.broker = true;
-        return Ok(());
+    match a {
+        "broker" if !o.net_host => o.broker = true,
+        "host" if !o.broker => o.net_host = true,
+        _ => {
+            eprintln!(
+                "podvm {verb}: --network takes broker or host, one of them, not {a:?}: podvm has \
+                 no network namespace to select; `--network host` shares the network of this \
+                 machine, and `--network broker` holds the payload to an egress broker \
+                 (TODO/net.md T-1665)"
+            );
+            return Err(EXIT_FLAG_ERROR);
+        }
     }
-    eprintln!(
-        "podvm {verb}: --network takes broker only, not {a:?}: podvm has no network \
-         namespace to select; `--network broker` holds the payload to an egress \
-         broker (TODO/net.md T-1665)"
-    );
-    Err(EXIT_FLAG_ERROR)
+    Ok(())
 }
 
 /// `--ports`: a list of ports, 1 to 65535, for the broker.

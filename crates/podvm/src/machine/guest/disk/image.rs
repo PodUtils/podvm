@@ -188,12 +188,47 @@ impl<'a> Alloc<'a> {
     }
 }
 
+/// Open the file `src` of the tree for reading. The walk read it with the
+/// owner's bits, then gave each mode back: a file of mode 0000 in a
+/// directory of mode 0000 (an image can have both) is the user's own but
+/// cannot be reached by a user that is not root. Where the open is
+/// refused, each directory above `src` that its owner cannot search gets
+/// the owner's search bit, from the top down, for the open only; each mode
+/// goes back after it, from the bottom up. An open descriptor reads on.
+fn open_own(src: &std::path::Path) -> std::io::Result<File> {
+    use std::os::unix::fs::PermissionsExt;
+    let open = || podvm_extract::tree::with_owner_bits(src, 0o400, || File::open(src));
+    match open() {
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {}
+        r => return r,
+    }
+    let mut above: Vec<&std::path::Path> = src.ancestors().skip(1).collect();
+    above.reverse();
+    let mut given: Vec<(&std::path::Path, u32)> = Vec::new();
+    for dir in above {
+        let Ok(md) = std::fs::symlink_metadata(dir) else {
+            continue;
+        };
+        let mode = md.permissions().mode() & 0o7777;
+        if md.is_dir()
+            && mode & 0o100 == 0
+            && std::fs::set_permissions(dir, std::fs::Permissions::from_mode(mode | 0o100)).is_ok()
+        {
+            given.push((dir, mode));
+        }
+    }
+    let r = open();
+    for (dir, mode) in given.into_iter().rev() {
+        let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(mode));
+    }
+    r
+}
+
 /// Copy the `size` bytes of `src` into `runs`; a chunk of zeros stays a
 /// hole. Err where the file has another count of bytes than the walk saw.
 fn copy(f: &File, src: &std::path::Path, size: u64, runs: &[(u64, u64)]) -> Result<(), String> {
     let what = |e: std::io::Error| format!("{}: {e}", src.display());
-    let mut from =
-        podvm_extract::tree::with_owner_bits(src, 0o400, || File::open(src)).map_err(what)?;
+    let mut from = open_own(src).map_err(what)?;
     let mut buf = vec![0u8; 1 << 20];
     let mut left = size;
     for &(start, len) in runs {

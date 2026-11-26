@@ -23,10 +23,15 @@ usage: podvm cp [-r|--recursive] <container|image>:<path> <dest>
     SRC a file, DEST a directory       DEST/basename(SRC)
     SRC a file, DEST a file or missing written as DEST; DEST/ must exist
   A missing DEST needs its parent directory: podvm makes no parent. A
-  directory onto a file is refused. Symlinks are replicated as symlinks, never followed,
-  and every rootfs-side path passes the same containment gate as a
-  single file; special files are refused by name rather than recreated
-  (TODO/cli.md T-1323).
+  directory onto a file is refused. The container path resolves in the
+  root of the container, as docker resolves it: a link on the way, also
+  one with an absolute target, and a `..` stay in that root; a `..` above
+  the root is refused (TODO/cli.md T-2087). The last name of a source
+  that is a link copies as a link; a destination that is a link to a
+  directory takes that directory. Symlinks in a tree are replicated as
+  symlinks, never followed, and every rootfs-side path passes the same
+  containment gate as a single file; special files are refused by name
+  rather than recreated (TODO/cli.md T-1323).
 
   A detached full Windows machine (run -d windows:2025) copies one file
   either way through its QEMU Guest Agent: NAME:C:\\path. A guest path

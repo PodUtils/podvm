@@ -85,7 +85,7 @@ fn run(args: &[&str], store: &Path) -> Output {
     child.wait_with_output().expect("collect the podvm output")
 }
 
-/// Clause 1: the 36 refused flags (`--ulimit`, `--security-opt`,
+/// Clause 1: the 34 refused flags (`--ulimit`, `--security-opt`,
 /// `--read-only` and `--tmpfs` work since TODO/cli.md T-1655). Each `run --rm <flag>` exits with the
 /// flag-error code and names status None, before any image work happens.
 /// `--log-driver` is not among them (it takes `json-file`) and `--device`
@@ -99,7 +99,7 @@ fn refused_run_flags_exit_125_naming_status_none() {
         "--blkio-weight", "--cgroup-parent", "--cidfile", "--cpu-period",
         "--cpu-quota", "--cpu-shares", "--cpuset-cpus", "--detach-keys",
         "--device-cgroup-rule", "--disable-content-trust", "--dns", "--dns-option",
-        "--dns-search", "--domainname", "--gpus", "--group-add", "--health-cmd", "--init",
+        "--dns-search", "--domainname", "--gpus", "--group-add", "--health-cmd",
         "--ipc", "--isolation", "--link", "--log-opt", "--mac-address",
         "--mount", "--oom-kill-disable", "--pid", "--runtime",
         "--shm-size", "--stop-signal", "--stop-timeout", "--sysctl",
@@ -107,9 +107,10 @@ fn refused_run_flags_exit_125_naming_status_none() {
     ];
     assert_eq!(
         flags.len(),
-        35,
-        // TODO/machine.md T-1897: --pids-limit is the incus tier's.
-        "the script refuses exactly 35 flags, not {}",
+        34,
+        // TODO/machine.md T-1897: --pids-limit is the incus tier's;
+        // TODO/cli.md T-2087: --init holds on the namespace rung.
+        "the script refuses exactly 34 flags, not {}",
         flags.len()
     );
     let mut bad = Vec::new();

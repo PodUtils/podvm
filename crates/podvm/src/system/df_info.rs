@@ -106,8 +106,14 @@ pub fn df(verb: &str, args: &[String]) -> i32 {
         .map(|(_, b)| b)
         .sum::<u64>()
         .saturating_add(store.strays(false).map(|s| s.bytes()).unwrap_or(0));
+    // TODO/machine.md T-1994: the machine files of the images that go, and
+    // of each digest that no record names.
+    let machine = crate::images::machine_files::reclaimable(store.root(), &rest, &images);
+    let orphans = crate::images::machine_files::orphans(&store)
+        .iter()
+        .fold(orphans, |t, (_, b)| t.saturating_add(*b));
     let reclaimable = match store.reclaimable_bytes(&rest) {
-        Ok(b) => b.saturating_add(orphans),
+        Ok(b) => b.saturating_add(orphans).saturating_add(machine),
         Err(e) => {
             eprintln!("podvm system df: {e}");
             return e.exit_code();
@@ -231,7 +237,11 @@ pub fn df(verb: &str, args: &[String]) -> i32 {
         podvm_image::space::mib(spares)
     );
     println!(
-        "Extractions and blobs no image names: {}",
+        "Machine files: {} (root disks, base archives, saved states)",
+        podvm_image::space::mib(crate::images::machine_files::all_bytes(store.root()))
+    );
+    println!(
+        "Extractions, blobs and machine files no image names: {}",
         podvm_image::space::mib(orphans)
     );
     println!(
@@ -440,59 +450,4 @@ pub(super) fn fields_from(
         ("VerbsStub", count(parity::Status::Stub)),
         ("VerbsNone", count(parity::Status::None)),
     ]
-}
-
-/// ⚠ Read from `/proc`, and a dash where it cannot be read. AGENTS.md
-/// absolute 3: a dash where a value is unknown, never a plausible-looking one.
-fn kernel_release() -> String {
-    std::fs::read_to_string("/proc/sys/kernel/osrelease")
-        .map(|s| s.trim().to_string())
-        .unwrap_or_else(|_| "-".into())
-}
-
-pub(super) fn pick(fields: &[(&str, String)], key: &str) -> String {
-    fields
-        .iter()
-        .find(|(k, _)| *k == key)
-        .map(|(_, v)| v.clone())
-        .unwrap_or_default()
-}
-
-fn human(fields: &[(&str, String)]) -> String {
-    let mut out = String::new();
-    out.push_str(&format!(
-        "podvm {}\n  rung          {}   (--strict would {})\n  entered with  {}\n  \
-         platform      {}\n  kernel        {}\n  store         {}\n\n",
-        pick(fields, "Version"),
-        pick(fields, "Rung"),
-        if pick(fields, "StrictOk") == "true" {
-            "pass"
-        } else {
-            "refuse"
-        },
-        pick(fields, "EnteredRung"),
-        pick(fields, "Platform"),
-        pick(fields, "Kernel"),
-        pick(fields, "Store"),
-    ));
-    out.push_str(&format!(
-        "parity (TOOL.md section 6.8): {} rows, {} verbs\n  \
-         Native {}   Degraded {}   Stub {}   None {}\n\n",
-        pick(fields, "ParityRows"),
-        pick(fields, "Verbs"),
-        pick(fields, "VerbsNative"),
-        pick(fields, "VerbsDegraded"),
-        pick(fields, "VerbsStub"),
-        pick(fields, "VerbsNone"),
-    ));
-    // ⛔ **WHICH INTERPOSER OBJECTS THIS BINARY CARRIES, and it is printed
-    // because a caller cannot otherwise tell.** A podvm built where
-    // `scripts/build-interpose.sh` could not run carries none and declines
-    // every payload, which is a different tool from one that carries both.
-    // `TOOL.md` section 4.1 forbids output that implies a capability podvm
-    // does not have, and silence here would imply one.
-    // `TODO/interpose.md` T-0702.
-    out.push_str(&format!("{}\n\n", crate::interpose::carried()));
-    out.push_str(&parity::text());
-    out
 }

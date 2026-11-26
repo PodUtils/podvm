@@ -54,6 +54,9 @@ pub(crate) struct Opts {
     /// `--podvm-init=image`: the init of the image is PID 1 of an incus
     /// instance (PodUtils/podrunner#313, TODO/machine.md T-1993).
     pub(crate) init_image: bool,
+    /// `--init` (TODO/cli.md T-2087, OR-B40-06): held where the run has a
+    /// PID namespace, whose PID 1 is podvm's init; refused elsewhere.
+    pub(crate) init: bool,
     /// `--podvm-volume-base DIR`: each `-v` source under DIR opens under it
     /// with no symbolic link, and the bind takes that descriptor
     /// (PodUtils/podrunner#277, T-1945).
@@ -78,6 +81,10 @@ pub(crate) struct Opts {
     /// `--network broker` with `--ports` and `--allow`: the egress broker
     /// of the run (TODO/net.md T-1665).
     pub(crate) broker: bool,
+    /// `--network host` (TODO/cli.md T-2087, OR-B40-14): the payload shares
+    /// the network of this machine, as each rung that opens no network
+    /// namespace gives it.
+    pub(crate) net_host: bool,
     /// `--podvm-confine=SPEC`: the confine layer (TODO/enter.md T-1658).
     pub(crate) confine: Option<podvm_enter::confine::Ask>,
     pub(crate) ports: Vec<u16>,
@@ -87,6 +94,9 @@ pub(crate) struct Opts {
     /// `--device`. Carried raw here and parsed now: a malformed shape is a
     /// flag error, before anything is fetched. TODO/enter.md T-0501.
     pub(crate) devices: Vec<String>,
+    /// The guest paths of the devices that go as volumes (`devices::fold`,
+    /// TODO/enter.md T-1939), for the line of a refusal.
+    pub(crate) device_guests: Vec<String>,
     /// `--unsafe-host-paths`. Opts into the userland pass-through with no
     /// `PODVM_MAPS` anchoring. TODO/enter.md T-1407.
     pub(crate) unsafe_host_paths: bool,
@@ -154,6 +164,7 @@ impl Opts {
             sealed: false,
             engine: false,
             init_image: false,
+            init: false,
             volume_base: None,
             volume_given: Vec::new(),
             volume_base_given: None,
@@ -165,11 +176,13 @@ impl Opts {
             drops: Vec::new(),
             needs: Vec::new(),
             broker: false,
+            net_host: false,
             confine: None,
             ports: Vec::new(),
             allow: Vec::new(),
             publish: Vec::new(),
             devices: Vec::new(),
+            device_guests: Vec::new(),
             unsafe_host_paths: false,
             volumes: Vec::new(),
             timeout: None,
@@ -288,6 +301,13 @@ pub(super) fn init_check(verb: &str, o: &Opts) -> Result<(), i32> {
         None => verb == "run" || verb == "create",
         Some(_) => false,
     };
+    if o.init && o.init_image {
+        eprintln!(
+            "podvm {verb}: --init and --podvm-init=image each name PID 1 of the run: give one \
+             (TODO/cli.md T-2087)"
+        );
+        return Err(podvm_image::error::EXIT_FLAG_ERROR);
+    }
     if !o.init_image || holds {
         return Ok(());
     }
@@ -298,4 +318,26 @@ pub(super) fn init_check(verb: &str, o: &Opts) -> Result<(), i32> {
          T-1993, TODO/enter.md T-2002, T-2007)"
     );
     Err(podvm_image::error::EXIT_FLAG_ERROR)
+}
+
+/// `--podvm-mem VALUE`: a byte count with an optional K/M/G/T suffix.
+pub(super) fn mem_arg(verb: &str, a: &str) -> Result<u64, i32> {
+    crate::tier::parse_mem(a).ok_or_else(|| {
+        eprintln!(
+            "podvm {verb}: --podvm-mem takes a byte count with an optional K/M/G/T suffix, not {a:?}"
+        );
+        podvm_image::error::EXIT_FLAG_ERROR
+    })
+}
+
+/// `--tls-verify=VALUE`: true or false.
+pub(super) fn tls_eq(verb: &str, v: &str) -> Result<bool, i32> {
+    match v {
+        "true" | "1" => Ok(true),
+        "false" | "0" => Ok(false),
+        _ => {
+            eprintln!("podvm {verb}: --tls-verify takes true or false, not {v:?}");
+            Err(podvm_image::error::EXIT_FLAG_ERROR)
+        }
+    }
 }

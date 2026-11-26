@@ -88,6 +88,17 @@ each step below is done.
 
 ## Rules learned
 
+* `scripts/dev/checks.sh` runs the unit tests as the user of the session
+  (root on the cloud host); the gate runs them as a user with no root.
+  Before a push of a change that reads files of an image, run the unit
+  test binary as uid 1000 too (`setpriv --reuid 1000 --regid 1000
+  --clear-groups`, absolute path to the binary): gate 45812348716 failed
+  on a file of mode 0000 that root could open.
+* `kvm.yml` has the concurrency group `kvm`: GitHub keeps one pending run
+  of a group, so a third dispatch cancels the second while the first runs
+  (#681: the `init` job, run 45812371884). Dispatch one `kvm.yml` job, or
+  run each job of one dispatch (`only` empty), not several dispatches at
+  once.
 * Write the full SHA in a request block from `git rev-parse HEAD`, never
   from memory: #673 did not run, because its head check named a wrong
   full SHA.
