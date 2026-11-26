@@ -42,11 +42,14 @@ contains the commit that changes this file. A fresh session reads
   PodUtils/podcrates#262). The existing diagnostics keep the step and
   cause of extraction and broker policy failures. The interposer
   pack keeps raw ELF hashes and placement, and the static candidate
-  is 8,792,472 bytes. The local checks passed.
+  is 8,792,472 bytes. The local checks passed. The take is `9466c984`,
+  with acknowledgement #669. The shared role table and worker brief
+  are in `5e872816` and acknowledgement #670.
 * T-2098 fixes a load failure for repeated references to one verified
-  OCI layer. All nine release layout tests passed. The failure came
-  from Podrunner runner-image run 45731427540 on both architectures.
-  Podrunner needs a rerun after it takes a beta with the fix.
+  OCI layer. All nine release layout tests passed. Both jobs in
+  Podrunner runner-image run 45731427540 reported a missing empty-layer
+  blob. The run kept no archive. #671 asks for a rerun after podrunner
+  takes a beta with the fix.
 * T-2054's spare-tree helper now clears its environment. Both
   `tree-prefill` paths worked with an empty environment in a private
   Alpine store. T-2054 still tracks the helper's store path in argv.
@@ -107,8 +110,10 @@ contains the commit that changes this file. A fresh session reads
    (COORD-133, a saved state of the machine tier for `--podvm-channel` and
    `--pids-limit`: T-2094). The podcrates `v0.85.0` tag at `1d1c9fc`
    has the typed PATCH and ETag API of #664. The T-2093 update command
-   passed local tests. Hosted experiment 479 checks enforcement and keeps
-   the init PID across updates. T-2094
+   passed local tests. Hosted run 45734572732 on `9466c984` passed the
+   stream and usage checks. Experiment 479 needed the project in the
+   query URL because Incus `query` rejects the global `--project` flag.
+   Repeat the live proof with that harness fix. T-2094
    passed experiment 473 under TCG. Answer each ask with a COORD issue
    `(to podrunner)` when its work is in a beta.
 2. T-2078 remaining 3: a run on the hosted runner of

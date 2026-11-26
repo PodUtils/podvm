@@ -562,6 +562,9 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #666 | COORD-249: podvm took podcrates v0.84.0 (to podcrates) | closed (PodUtils/podcrates#260 lists `04c8b7f4` under Takes) | T-2096 |
 | #667 | COORD-250: required size-limited tmpfs mounts in pod-enter (to podcrates) | open | T-1968 |
 | #668 | COORD-251: pinned static EROFS writer for a streamed OCI disk root (to podcrates) | open | T-1994 |
+| #669 | COORD-252: podvm took podcrates v0.85.0 (to podcrates) | open | T-2097 |
+| #670 | COORD-253: podvm took the shared hosted-session roles (to podcrates) | open | T-2095 |
+| #671 | COORD-254: podvm load accepts repeated OCI layers in runner archives (to podrunner) | open | T-2098 |
 
 ## Messages whose title does not start with COORD-NNN
 

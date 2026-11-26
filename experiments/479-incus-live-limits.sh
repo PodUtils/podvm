@@ -14,6 +14,7 @@ export INCUS_SOCKET=$PODVM_INCUS_SOCKET
 export LC_ALL=C
 
 incus_call() { timeout -k 5 15 incus --project default "$@" </dev/null; }
+query() { timeout -k 5 15 incus query "local:$1?project=default" </dev/null; }
 podvm_call() { timeout -k 5 180 "$bin" "$@" </dev/null; }
 show() { printf '%s\n' "$*" | tee -a "$out"; }
 fail() { show "FAIL: $*"; exit 1; }
@@ -43,7 +44,7 @@ attempted=0
 
 instances() { incus_call list local: --format csv -c n; }
 exists() { printf '%s\n' "$1" | grep -Fxq "$name"; }
-config() { incus_call query "local:/1.0/instances/$name"; }
+config() { query "/1.0/instances/$name"; }
 owned() {
     jq -e --arg name "$name" --arg image "$image" '
         .name == $name and .config["user.podvm"] == "1" and .config["user.podvm.image"] == $image
@@ -95,7 +96,7 @@ podvm_call run -d --name "$name" --podvm-tier=incus --podvm-net none --pull neve
     fail "could not start $name with the initial limits"
 
 init_pid() {
-    state=$(incus_call query "local:/1.0/instances/$name/state") || return 1
+    state=$(query "/1.0/instances/$name/state") || return 1
     printf '%s\n' "$state" | jq -er 'select(.status == "Running") | .pid | numbers | select(. > 0)'
 }
 pid=$(init_pid) || fail "Incus did not report a running instance and host init PID"
