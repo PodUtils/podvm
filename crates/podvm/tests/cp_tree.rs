@@ -90,7 +90,7 @@ fn cp_onto_a_directory_keeps_modes_and_names_a_refused_copy() {
 
     // A refusal of containment names the copy, in both directions.
     for args in [
-        &["cp", "c1:/etc/../etc/os-release", "x"][..],
+        &["cp", "c1:/../../etc/os-release", "x"][..],
         &["cp", "f.txt", "c1:/../../x"],
     ] {
         let o = podvm(&base, args);

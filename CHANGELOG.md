@@ -8,6 +8,18 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: `cp` through a link of the container, 2026-11-26
+
+Record: T-2087 (OR-B40-16), T-2100 (OR-B41-04).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `cp` resolves the container path in the root of the container, as
+  docker does, in both directions: a link with an absolute target (stock
+  alpine `/var/run -> /run`) and a `..` that stays in the root work. A
+  `..` above the root, a loop of links and a link to a path that the
+  container does not have are refused by name, and no host path is read
+  or written.
+
 ### Fixed: an incus `--rm` run that the OOM killer ends, and the QEMU copy in the store, 2026-11-26
 
 Record: T-2100 (OR-B41-02, OR-B41-07, OR-B41-13, OR-B41-14).

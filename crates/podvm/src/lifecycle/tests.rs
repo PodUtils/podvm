@@ -301,6 +301,7 @@ mod exec_fields; // TODO/cli.md T-2087
 mod fields_and_copy;
 // TODO/image.md T-1768, TODO/cli.md T-1772.
 mod copy_more;
+mod cp_root; // TODO/cli.md T-2087
 mod native;
 mod residual;
 mod script;
