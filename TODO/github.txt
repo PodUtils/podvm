@@ -556,7 +556,7 @@
 664 issue closed
 665 issue closed
 666 issue closed
-667 issue open
+667 issue closed
 668 issue open
 669 issue closed
 670 issue closed
@@ -579,3 +579,4 @@
 687 issue open
 688 issue open
 689 issue open
+690 issue open
