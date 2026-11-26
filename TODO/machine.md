@@ -5649,6 +5649,11 @@ group past 65535 kept only the low 16 bits of its group number in
 `a_superblock_copy_past_group_65535_records_65535` holds it. Only a disk
 over 8 TiB has such a group. podvm takes `pod_guest::ext4` at the next tag
 of podcrates and removes its copy.
+`e2fsck_finds_no_fault_in_the_disk` relies on `e2fsck -f -n` only, which
+exits 0 where only the free count of the superblock is wrong (e2fsprogs
+1.47.0, the note of PodUtils/podcrates#273); the test of `pod_guest::ext4`
+checks each count against the bitmaps, and the take of the next tag brings
+it (COORD-263, #687).
 
 
 # T-1993: On the incus tier, the init of the image (systemd) runs as PID 1
