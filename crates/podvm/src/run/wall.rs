@@ -6,7 +6,8 @@ use std::time::Duration;
 
 /// The wall bound of a foreground run (`--timeout`, TODO/cli.md T-1655):
 /// at the bound, a thread kills each descendant of this process with
-/// SIGKILL, as the launcher of a detached run does at its bound.
+/// SIGKILL (in podvm's own PID namespace, each process of it but pid 1),
+/// as the launcher of a detached run does at its bound.
 pub struct Wall {
     stop: std::sync::mpsc::Sender<()>,
     fired: std::sync::Arc<std::sync::atomic::AtomicBool>,
@@ -30,6 +31,11 @@ pub fn arm_wall(wall_ms: u64) -> Wall {
             return;
         }
         flag.store(true, std::sync::atomic::Ordering::SeqCst);
+        // OR-B40-05: in podvm's own PID namespace an orphan of the payload
+        // is a child of pid 1, not a descendant of this process.
+        if crate::userns::kill_others() {
+            return;
+        }
         let me = i64::from(std::process::id());
         if let Some(tree) = podvm_supervise::tree::descendants(Path::new("/proc"), me) {
             for pid in tree {

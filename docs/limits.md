@@ -89,7 +89,9 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
 - A pidfd addresses a direct child. The launcher, and podvm for a foreground
   run, is the child subreaper of the payload's tree and kills each
   descendant at the end (T-1708); a process that reparents above it stays
-  out of reach.
+  out of reach. In the PID namespace of a foreground run of a user with no
+  root, podvm is no subreaper: PID 1 of the namespace reaps each orphan at
+  once, and the end of the run kills each process of the namespace.
 - A denied terminal operation produces a named refusal.
 - Host CA completion changes payload trust data and can be disabled.
 - `--network broker` (T-1665) holds a payload to an egress broker of the

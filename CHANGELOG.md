@@ -8,6 +8,19 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: a foreground run reaps an orphan of the payload at once, 2026-11-26
+
+Record: T-2087 (OR-B40-05).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- In the PID namespace of a foreground run of a user with no root, an
+  orphan of the payload that exited stayed a zombie until the run ended:
+  podvm was the child subreaper. podvm is no longer a subreaper in its own
+  namespace, so PID 1 (`podvm-init`) reaps each orphan at once, as the
+  PID 1 of docker does. The end of the run, and the bound of `--timeout`,
+  kill each process of the namespace, so no process of the payload stays
+  after the run.
+
 ### Fixed: `rmi` and `image prune` remove the machine files of an image, 2026-11-26
 
 Record: T-1994.

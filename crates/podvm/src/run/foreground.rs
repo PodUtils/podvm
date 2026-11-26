@@ -271,14 +271,16 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
     };
     // ⛔ TODO/supervise.md T-1708: podvm is the child subreaper of the
     // payload's tree, so an orphan of the payload is reached at the end.
-    let reaper = podvm_supervise::tree::become_subreaper();
+    // In podvm's own PID namespace pid 1 takes each orphan and reaps it at
+    // once, as docker's init does, and the end of the run ends each process
+    // of the namespace (`userns::end_tree`; TODO/cli.md T-2087, OR-B40-05).
+    let own_ns = crate::userns::active();
+    let reaper = !own_ns && podvm_supervise::tree::become_subreaper();
     // TODO/enter.md T-2054 (OQ-08): in podvm's PID namespace no process of
     // the tree outlives podvm's end of it, so podvm keeps the lock and the
     // payload gets no descriptor of the store; elsewhere the payload holds
     // it (T-0204).
-    if !(reaper && crate::userns::active())
-        && let Err(e) = held.hand_to_payload()
-    {
+    if !own_ns && let Err(e) = held.hand_to_payload() {
         let _ = writeln!(err, "podvm run: {e}");
         fg_end(&store, fg, podvm_image::error::EXIT_RUNTIME_ERROR);
         drop(memo);

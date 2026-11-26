@@ -152,8 +152,12 @@ pub(super) fn store_note(store: &podvm_image::Store) -> String {
 
 /// ⛔ TODO/supervise.md T-1708: kill each process of the payload's tree that
 /// stayed after the payload, and name a count that is not 0.
+/// In podvm's own PID namespace the tree is each process of the namespace
+/// but pid 1 (`userns::end_tree`, OR-B40-05).
 pub(super) fn end_tree(reaper: bool, err: &mut dyn std::io::Write) {
-    match podvm_supervise::tree::end_own_tree() {
+    let bound = std::time::Duration::from_millis(podvm_supervise::tree::TREE_KILL_MS);
+    let end = crate::userns::end_tree(bound).unwrap_or_else(podvm_supervise::tree::end_own_tree);
+    match end {
         podvm_supervise::Residual::Count(0) => {}
         podvm_supervise::Residual::Count(n) => {
             let _ = writeln!(
@@ -163,7 +167,7 @@ pub(super) fn end_tree(reaper: bool, err: &mut dyn std::io::Write) {
             );
         }
         podvm_supervise::Residual::Unknown => {
-            let why = if reaper {
+            let why = if reaper || crate::userns::active() {
                 "/proc cannot list them"
             } else {
                 "the kernel refused PR_SET_CHILD_SUBREAPER"
