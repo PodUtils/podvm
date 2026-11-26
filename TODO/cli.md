@@ -7374,7 +7374,7 @@ The state of each finding (2026-11-26):
 | OR-B41-10, a name conflict exits 1 from `create` and 125 from `run` | P3 | known | [T-2087](cli.md), OR-B40-10 | open |
 | OR-B41-11, no bound of the length of a reference | P3 | gap | - | open |
 | OR-B41-12, `login` checks no password | P3 | known | [T-2087](cli.md), OR-B40-08 | open |
-| OR-B41-13, a missing argument exits 1 or 125 by verb | P3 | gap | - | open |
+| OR-B41-13, a missing argument exits 1 or 125 by verb | P3 | fix | [T-2100](cli.md) | done: by the published table a missing argument is a cli-error (1) and a missing required flag a flag-error (125); `notebook` with no NB was the one argument that gave 125, now 1 (rows of `the_arguments_parse_and_a_wrong_one_is_named`). `login` (no `-u`), `machine ssh` (no `--kernel`) and `update` (no `--podvm-tier=incus`) miss a flag, and `windows run` with no disk is a runtime-error: each 125 is the table's |
 | OR-B41-14, `system df` counts an extraction that failed | P3 | gap | - | open |
 | OR-B41-15, the machine tier with too little memory names no minimum | P3 | gap | - | open |
 | OR-B41-16, `update --memory` of a value too large says "at least 6m" | P3 | fix | [T-2100](cli.md) | done: an overflow says "larger than 16 EiB"; a row of the update test |

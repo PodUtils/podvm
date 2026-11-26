@@ -31,6 +31,12 @@ fn the_arguments_parse_and_a_wrong_one_is_named() {
     );
     assert!(parse(&v(&["nb.ipynb"])).unwrap_err().contains("--persist"));
     assert!(parse(&v(&["--persist", "k"])).unwrap_err().contains("NB"));
+    // T-2100 (OR-B41-13): a missing notebook is a missing argument (1).
+    assert_eq!(
+        main(&v(&["--persist", "k"])),
+        podvm_image::error::EXIT_CLI_ERROR
+    );
+    assert_eq!(main(&v(&["nb.ipynb"])), podvm_image::error::EXIT_FLAG_ERROR);
     assert!(parse(&v(&["nb", "--persist", "k", "--cycles", "0"]))
         .unwrap_err()
         .contains("--cycles"));

@@ -110,10 +110,15 @@ pub fn parse(args: &[String]) -> Result<Args, String> {
             _ => return Err(format!("one notebook only, and {arg:?} is a second")),
         }
     }
-    a.nb = nb.ok_or("the notebook NB is missing")?;
+    a.nb = nb.ok_or(MISSING_NB)?;
     a.persist = persist.ok_or("--persist DIR is missing: the kept directory")?;
     Ok(a)
 }
+
+/// The refusal of a missing notebook: a missing argument, the cli-error
+/// of the exit table (1), not a refusal of the flag parser (T-2100,
+/// OR-B41-13).
+const MISSING_NB: &str = "the notebook NB is missing";
 
 /// `podvm notebook ...`.
 pub fn main(args: &[String]) -> i32 {
@@ -125,7 +130,11 @@ pub fn main(args: &[String]) -> i32 {
         Ok(a) => a,
         Err(e) => {
             eprintln!("podvm notebook: {e}\n{USAGE}");
-            return EXIT_FLAG_ERROR;
+            return if e == MISSING_NB {
+                podvm_image::error::EXIT_CLI_ERROR
+            } else {
+                EXIT_FLAG_ERROR
+            };
         }
     };
     match run(&a) {
