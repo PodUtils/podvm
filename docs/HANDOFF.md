@@ -88,6 +88,11 @@ each step below is done.
 
 ## Rules learned
 
+* `kvm.yml` has the concurrency group `kvm`: GitHub keeps one pending run
+  of a group, so a third dispatch cancels the second while the first runs
+  (#681: the `init` job, run 45812371884). Dispatch one `kvm.yml` job, or
+  run each job of one dispatch (`only` empty), not several dispatches at
+  once.
 * Write the full SHA in a request block from `git rev-parse HEAD`, never
   from memory: #673 did not run, because its head check named a wrong
   full SHA.
