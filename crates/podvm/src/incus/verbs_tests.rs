@@ -54,6 +54,28 @@ fn stand_in(sock: &std::path::Path) -> Seen {
                     404,
                     json!({"type": "error", "error": "Instance not found", "error_code": 404}),
                 ),
+                // T-2100 (OR-B41-07): the first delete of `flip1` finds it
+                // still running; the second one works.
+                ("DELETE", p) if p.starts_with("/1.0/instances/flip1") => {
+                    // The log holds this request too.
+                    let before = log
+                        .lock()
+                        .unwrap()
+                        .iter()
+                        .filter(|(m, p)| m == "DELETE" && p.starts_with("/1.0/instances/flip1"))
+                        .count();
+                    if before == 1 {
+                        (
+                            400,
+                            json!({"type": "error", "error": "Instance is running", "error_code": 400}),
+                        )
+                    } else {
+                        (
+                            202,
+                            json!({"type": "async", "operation": "/1.0/operations/del", "metadata": {}}),
+                        )
+                    }
+                }
                 ("DELETE", _) => (
                     400,
                     json!({"type": "error", "error": "Instance is busy", "error_code": 400}),
@@ -84,11 +106,32 @@ fn incus_verbs_discard_and_rm_name_what_stays() {
         .unwrap();
     // A failed start: the instance is stopped and deleted, and one that
     // stays is named with the command that removes it.
-    let left = rt.block_on(super::verbs::discard(&c, "inc1"));
+    let gap = std::time::Duration::ZERO;
+    let left = rt.block_on(super::verbs::discard_within(&c, "inc1", gap));
     assert!(
-        left.contains("the instance inc1 stays") && left.contains("incus delete --force inc1"),
+        left.contains("the instance inc1 stays after 4 tries")
+            && left.contains("incus delete --force inc1"),
         "{left}"
     );
+    let deletes = |name: &str| {
+        seen.lock()
+            .unwrap()
+            .iter()
+            .filter(|(m, p)| m == "DELETE" && p.starts_with(&format!("/1.0/instances/{name}")))
+            .count()
+    };
+    assert_eq!(
+        deletes("inc1"),
+        super::verbs::DISCARD_TRIES,
+        "a busy instance"
+    );
+    // T-2100 (OR-B41-07): a delete that finds the instance still running
+    // takes a second stop and delete, and nothing stays.
+    assert_eq!(
+        rt.block_on(super::verbs::discard_within(&c, "flip1", gap)),
+        ""
+    );
+    assert_eq!(deletes("flip1"), 2);
     assert!(
         seen.lock()
             .unwrap()

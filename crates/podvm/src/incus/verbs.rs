@@ -438,16 +438,44 @@ pub(super) async fn one(c: &Client, verb: &str, name: &str, force: bool) -> Resu
 /// Empty where it went; else the text that names the instance that stays.
 /// A 404 of the delete (TODO/machine.md T-2080, OR-B39-12) is an instance
 /// that is not there: nothing stays.
+///
+/// T-2100 (OR-B41-07): after the OOM killer ended a payload, incusd can
+/// refuse the delete with 400 "Instance is running" while the instance
+/// stops. A refusal of 400 takes a new stop and delete, up to
+/// [`DISCARD_TRIES`] times, 1 s apart; the line of an instance that stays
+/// names the error of the last stop too.
 pub(super) async fn discard(c: &Client, name: &str) -> String {
-    let _ = c
-        .stop(name, true, Some(std::time::Duration::from_secs(10)))
-        .await;
-    match c.delete_instance(name).await {
-        Ok(_) => String::new(),
-        Err(e) if gone(&e) => String::new(),
-        Err(e) => {
-            format!("the instance {name} stays ({e}): `incus delete --force {name}` removes it")
+    discard_within(c, name, std::time::Duration::from_secs(1)).await
+}
+
+/// The tries of [`discard`].
+pub(super) const DISCARD_TRIES: usize = 4;
+
+/// [`discard`] with the pause `gap` between two tries.
+pub(super) async fn discard_within(c: &Client, name: &str, gap: std::time::Duration) -> String {
+    let mut tries = 0;
+    loop {
+        tries += 1;
+        let stop = c
+            .stop(name, true, Some(std::time::Duration::from_secs(10)))
+            .await
+            .err();
+        let e = match c.delete_instance(name).await {
+            Ok(_) => return String::new(),
+            Err(e) if gone(&e) => return String::new(),
+            Err(e) => e,
+        };
+        if e.status() == Some(400) && tries < DISCARD_TRIES {
+            tokio::time::sleep(gap).await;
+            continue;
         }
+        let stop = stop
+            .map(|s| format!("; the stop before it: {s}"))
+            .unwrap_or_default();
+        return format!(
+            "the instance {name} stays after {tries} tries ({e}{stop}): `incus delete --force \
+             {name}` removes it"
+        );
     }
 }
 

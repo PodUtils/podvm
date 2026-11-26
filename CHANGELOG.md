@@ -8,6 +8,15 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: an incus `--rm` run that the OOM killer ends, 2026-11-26
+
+Record: T-2100 (OR-B41-07).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- The incus tier stops and deletes the instance again where incusd says
+  that it still runs, up to four times, so a `--rm` run that the OOM
+  killer ends no longer keeps its instance.
+
 ## 0.2.0-beta.41 (2026-11-26)
 
 ### Known gaps: what the checks of 0.2.0-beta.41 prove, and what stays open, 2026-11-26
