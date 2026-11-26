@@ -4791,7 +4791,7 @@ not retain its input archive. Podrunner's rerun needs the fixed beta.
 **Milestone:** none
 **Priority:** P2
 **Effort:** S
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -4820,7 +4820,26 @@ value from its layers at the first `inspect`, or `-` with the reason.
 
 ## Decision
 
--
+* The field is `UnpackedBytes` in `INSPECT_FIELDS` and in the JSON of
+  `inspect`, a number or null (a dash in a template). The value counts the
+  sizes of the regular files only, as the entry asks; directories, links
+  and metadata count nothing, and podvm's own `/.podvm/podvm` of the incus
+  tier is not in it.
+* One walk of the layers: `podvm_image::unpacked` measures with
+  `pod_extract::flatten` and the tar count that the incus tier uses
+  (`count_tar`; `incus::image::need_from_tar` calls it too, so the two
+  cannot differ). `podvm_extract::layers` delegates to the shared list of
+  layers. `podvm-image` takes `pod-extract` for this (same tag; podvm-extract
+  already took it).
+* `Record.unpacked_bytes: Option<u64>`, `serde(default, skip_serializing_if)`:
+  no store version change, and a record of an older podvm reads as `None`.
+  `pull`, `load` and `import` call `unpacked::fill` before `put_written`;
+  it takes the value of another record of the same manifest, else measures,
+  and a failure leaves `None` (the pull does not fail, and prints nothing).
+* `inspect` calls `unpacked::complete`: a record with no value is measured
+  from its layers, and `Store::set_unpacked` keeps the value (a refusal of
+  the write is ignored). The reason goes to stderr under `--verbose`, which
+  is now accepted for an image (a container ignores it with one line).
 
 ## Prove
 
@@ -4830,3 +4849,29 @@ before any run gives the same number as the sum of the sizes in the
 extracted tree after a run; `--format '{{json .}}'` or the JSON of
 `inspect` carries it; an older record gives `-` and a reason under
 `--verbose`.
+
+## Done
+
+**Done (2026-11-26).** `inspect` gives `.UnpackedBytes` from the record,
+or from the layers for an older record. See the Decision. Proof: tests
+`the_unpacked_bytes_follow_the_final_tree_of_the_layers` and
+`an_unknown_unpacked_size_is_a_dash_with_its_reason` (podvm),
+`the_unpacked_bytes_of_a_record_read_back_and_an_old_record_has_none` and
+`import_records_the_unpacked_bytes_of_the_layer` (podvm-image).
+
+Live check (uid 1000, private store, release build, 2026-11-26): `pull`,
+then `inspect --format '{{.UnpackedBytes}}'` with `.Extracted` false, then
+a `run`, then `find ROOTFS -type f -printf '%i %s\n' | sort -u | awk ...`:
+
+| Image | `.Size` (stored) | `.UnpackedBytes` before the run | sum in the tree after the run |
+| --- | --- | --- | --- |
+| alpine:3.20 | 3630933 | 7802737 | 7802737 |
+| busybox:1.36 | 2206861 | 4417150 | 4417150 |
+
+The numbers are equal: the extracted tree holds no file that podvm adds
+(the namespace rung and the chroot rung add none to the store tree; the
+incus tier adds `/.podvm/podvm` to its own tarball only). A second store
+shows the value in `store.json` right after `pull`, with no `inspect`.
+An older record (key removed) gives the value at the first `inspect` and
+keeps it; with the layer blob removed it gives `-` (JSON null), and
+`--verbose` prints "the layer sha256:... is not in the store (...)".

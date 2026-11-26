@@ -36,6 +36,26 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 - `PODVM_MACHINE_ROOT=initramfs` keeps the state of earlier releases, with
   systemd in a PID namespace.
 
+### Added: `inspect` gives `.UnpackedBytes`, the unpacked bytes of an image, 2026-11-26
+
+Record: T-2104 (PodUtils/podrunner#372).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `podvm inspect --format '{{.UnpackedBytes}}' IMAGE` and the JSON of
+  `inspect` give the bytes of the unpacked root file system of the image:
+  the sum of the sizes of the regular files of the layers after the
+  whiteouts and the replacements of newer layers, each inode once. The
+  number is known before the first run. `pull`, `load` and `import`
+  measure it from the layers with the stream that the incus tier measures
+  (`pod_extract::flatten`) and keep it in the record.
+- A record of an older podvm has no value: the first `inspect` measures it
+  from the layers in the store and keeps it. Where podvm cannot tell (a
+  layer is not in the store, a layer does not read), the field is null in
+  the JSON and `-` in a template, and `inspect --verbose` prints the reason
+  on stderr. A failed measure never fails `pull`, `load` or `import`.
+- `inspect --verbose` is no longer refused for an image: it prints the
+  reason of a dash.
+
 ### Added: `-v HOST:GUEST:overlay`, a read-only host directory with a writable layer, 2026-11-26
 
 Record: T-2101 (PodUtils/podrunner#368).

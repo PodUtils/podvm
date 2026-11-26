@@ -13,13 +13,14 @@ fn the_fields_of_an_image_have_dockers_types() {
         tag: Some("latest".into()),
         layers: vec!["sha256:aa".into(), "sha256:bb".into()],
         stored_bytes: 42,
+        unpacked_bytes: None,
         ..a_record()
     };
     let name = r.name();
     let fields = inspect_fields(&r, &store);
     let doc: serde_json::Value = serde_json::from_str(&inspect_json(&r, &store)).unwrap();
     // (field, JSON of docker's type, the text of `{{.X}}`)
-    let table: [(&str, serde_json::Value, String); 9] = [
+    let table: [(&str, serde_json::Value, String); 10] = [
         ("Size", serde_json::json!(42), "42".into()),
         ("RepoTags", serde_json::json!([name]), format!("[{name}]")),
         (
@@ -27,6 +28,8 @@ fn the_fields_of_an_image_have_dockers_types() {
             serde_json::json!(["sha256:aa", "sha256:bb"]),
             "[sha256:aa sha256:bb]".into(),
         ),
+        // T-2104: a record with no measure gives null, a dash in a template.
+        ("UnpackedBytes", serde_json::Value::Null, "-".into()),
         ("Extracted", serde_json::json!(false), "false".into()),
         ("Os", serde_json::json!("linux"), "linux".into()),
         ("Config.Env", serde_json::Value::Null, "-".into()),

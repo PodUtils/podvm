@@ -382,7 +382,7 @@ pub const TABLE: &[Row] = &[
     Row { verb: "rmi", flag: Some("-h, --help"), status: Native, note: "prints this verb's usage and exits 0" },
     Row { verb: "inspect", flag: Some("-f, --format"), status: Native, note: "the same template shape as `images --format`" },
     Row { verb: "inspect", flag: Some("--podvm-tier"), status: Native, note: "podvm's own: incus inspects an instance of podvm in incus: JSON, or --format with .Id .Name .Image .State .State.Status .State.Running .State.ExitCode .Status .Running .ExitCode .Created .Cmd .EnteredRung .CpuSeconds .PeakMemoryBytes .OomKills; with no flag, tier = incus in $store/config routes a name that is an instance of podvm in incus (TODO/machine.md T-1722). A stopped instance gives the usage that its init wrote at the end of its command (TODO/machine.md T-2076)" },
-    Row { verb: "inspect", flag: Some("--verbose"), status: Native, note: "podvm's own, with --podvm-tier=incus: says on stderr why a value of .CpuSeconds .PeakMemoryBytes .OomKills is a dash; with no incus tier it is refused by name (TODO/machine.md T-2076)" },
+    Row { verb: "inspect", flag: Some("--verbose"), status: Native, note: "podvm's own, with --podvm-tier=incus: says on stderr why a value of .CpuSeconds .PeakMemoryBytes .OomKills is a dash; without it, it says on stderr why .UnpackedBytes of an image is a dash (TODO/machine.md T-2076, TODO/image.md T-2104)" },
     Row { verb: "inspect", flag: Some("-h, --help"), status: Native, note: "prints this verb's usage and exits 0" },
     Row { verb: "verify", flag: Some("-h, --help"), status: Native, note: "prints this verb's usage and exits 0" },
     Row { verb: "extract", flag: Some("--force"), status: Native, note: "extract again over an existing rootfs" },

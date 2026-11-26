@@ -17,6 +17,7 @@ fn image_messages_say_each_thing_once() {
             platform: "linux/amd64".into(),
             layers: Vec::new(),
             stored_bytes: 0,
+            unpacked_bytes: None,
             architecture: "amd64".into(),
             os: "linux".into(),
             created: None,

@@ -317,7 +317,7 @@ pub fn pull(
         }
     }
 
-    let record = store::record_of(
+    let mut record = store::record_of(
         &reference,
         &resolved,
         &top.media_type,
@@ -326,6 +326,8 @@ pub fn pull(
         &config,
         &served.unwrap_or_else(|| platform.to_string()),
     )?;
+    // T-2104: never a failure of the pull; the field stays empty.
+    crate::unpacked::fill(store, &manifest, &mut record);
     store.put_written(record.clone())?;
     // ⭐ TODO/image.md T-1321. How the bytes got here, recorded at pull
     // time rather than derived later: the sidecar never lives inside

@@ -35,6 +35,36 @@ fn load_stages_inside_the_store() {
     let _ = std::fs::remove_dir_all(s.root());
 }
 
+/// T-2104: `import` measures the unpacked bytes from the layer and records
+/// them; a failure of the measure leaves the field empty and fails nothing.
+#[test]
+fn import_records_the_unpacked_bytes_of_the_layer() {
+    let s = scratch("unpacked");
+    let tarball = std::env::temp_dir().join(format!("podvm-unpacked-{}.tar", std::process::id()));
+    std::fs::write(&tarball, rootfs_tar()).unwrap();
+    let record = import(&s, &tarball, Some("imp:u")).unwrap();
+    // `etc/hello` holds "hi".
+    assert_eq!(record.unpacked_bytes, Some(2));
+    assert_eq!(s.find_one("imp:u").unwrap().unpacked_bytes, Some(2));
+    // A layer that is gone: `fill` gives no value and no failure.
+    let manifest: oci::Manifest = serde_json::from_slice(
+        &s.read_blob(&Digest::parse(&record.manifest_digest).unwrap())
+            .unwrap(),
+    )
+    .unwrap();
+    let blob = s.blob_path(&manifest.layers[0].parsed_digest().unwrap());
+    std::fs::remove_file(blob).unwrap();
+    let mut again = Record {
+        unpacked_bytes: None,
+        manifest_digest: format!("sha256:{}", "9".repeat(64)),
+        ..record
+    };
+    crate::unpacked::fill(&s, &manifest, &mut again);
+    assert_eq!(again.unpacked_bytes, None);
+    let _ = std::fs::remove_dir_all(s.root());
+    let _ = std::fs::remove_file(&tarball);
+}
+
 /// T-1320: `import` builds a runnable record from a rootfs tar, with
 /// the digest recorded and the layer readable back.
 #[test]

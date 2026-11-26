@@ -423,6 +423,7 @@ fn record(repo: &str, tag: Option<&str>, seed: u8) -> Record {
         platform: "linux/amd64".into(),
         layers: vec![d(4), d(5)],
         stored_bytes: 100,
+        unpacked_bytes: None,
         architecture: "amd64".into(),
         os: "linux".into(),
         created: Some("2024-01-01T00:00:00Z".into()),
@@ -436,6 +437,7 @@ mod locks;
 use locks::*;
 mod refs;
 mod tree_alone; // TODO/machine.md T-2085
+mod unpacked; // TODO/image.md T-2104
 
 // TODO/supervise.md T-1715: the store root keeps the container table.
 mod modes;

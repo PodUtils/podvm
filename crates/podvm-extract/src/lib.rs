@@ -87,19 +87,9 @@ pub fn extract(
 
 /// The layers of a manifest in order, with their paths in this store.
 pub fn layers(store: &Store, manifest: &oci::Manifest) -> Result<Vec<Layer>> {
-    let mut layers = Vec::new();
-    for d in &manifest.layers {
-        // `?`: the error of the digest is the store's or `pod-oci`'s, and
-        // `Error` takes both.
-        let parsed = d.parsed_digest()?;
-        layers.push(Layer {
-            digest: parsed.to_string(),
-            media_type: d.media_type.clone(),
-            size: d.size,
-            blob: store.blob_path(&parsed),
-        });
-    }
-    Ok(layers)
+    // T-2104: the one list of the layers, shared with the measure of the
+    // unpacked bytes (`podvm_image::unpacked`).
+    Ok(podvm_image::unpacked::layers(store, manifest)?)
 }
 
 /// Has this image already been extracted, completely?

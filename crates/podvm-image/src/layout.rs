@@ -292,6 +292,7 @@ fn load_inner(
         record.repository = "<none>".to_string();
         record.tag = None;
     }
+    crate::unpacked::fill(store, &manifest, &mut record);
     store.put_written(record.clone())?;
     Ok(record)
 }

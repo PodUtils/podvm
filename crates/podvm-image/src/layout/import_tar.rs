@@ -134,7 +134,7 @@ pub fn import(store: &Store, tar: &Path, reference: Option<&str>) -> Result<Reco
         Some(r) => Reference::parse(r)?,
         None => Reference::parse("imported")?,
     };
-    let record = crate::store::record_of(
+    let mut record = crate::store::record_of(
         &reference,
         &manifest_digest,
         oci::MEDIA_OCI_MANIFEST,
@@ -143,6 +143,7 @@ pub fn import(store: &Store, tar: &Path, reference: Option<&str>) -> Result<Reco
         &config,
         &format!("{}/{}", config.os, config.architecture),
     )?;
+    crate::unpacked::fill(store, &manifest, &mut record);
     store.put_written(record.clone())?;
     Ok(record)
 }

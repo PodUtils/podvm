@@ -133,30 +133,18 @@ fn need_from_tar(
     read: impl std::io::Read,
     reserved_init: &mut bool,
 ) -> std::io::Result<super::space::Need> {
-    let mut need = super::space::Need::default();
-    let mut archive = tar::Archive::new(std::io::BufReader::new(read));
-    // pod-extract writes the full size and the rootfs prefix into its
-    // headers. Sizing does not have to interpret binary PAX attributes.
-    for entry in archive.entries()?.raw(true) {
-        let entry = entry?;
-        let path = entry.path_bytes();
-        let Some(path) = path.strip_prefix(b"rootfs/") else {
-            continue;
-        };
-        let kind = entry.header().entry_type();
+    // The count is the one of the unpacked bytes of `inspect`
+    // (`podvm_image::unpacked`, T-2104): the sizes of the file entries and
+    // the entries that are not hard links, below `rootfs/`.
+    let count = podvm_image::unpacked::count_tar(read, b"rootfs/", |path, kind| {
         if path == INIT_FILE.as_bytes() || (path == INIT_DIR.as_bytes() && !kind.is_dir()) {
             *reserved_init = true;
         }
-        if !kind.is_hard_link() {
-            need.entries = need.entries.saturating_add(1);
-        }
-        if kind.is_file() {
-            need.bytes = need.bytes.saturating_add(entry.size());
-        }
-    }
-    // The reader stops at the first end block. The writer ends after both.
-    std::io::copy(&mut archive.into_inner(), &mut std::io::sink())?;
-    Ok(need)
+    })?;
+    Ok(super::space::Need {
+        bytes: count.bytes,
+        entries: count.entries,
+    })
 }
 
 fn metadata(creation_date: u64) -> String {

@@ -26,6 +26,7 @@ fn record(s: &Store, tag: &str, platform: &str, config: &serde_json::Value) -> R
         platform: platform.into(),
         layers: vec![],
         stored_bytes: 0,
+        unpacked_bytes: None,
         architecture: arch,
         os: "linux".into(),
         created: None,

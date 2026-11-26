@@ -32,6 +32,7 @@ pod-hostprobe = { git = "https://github.com/PodUtils/podcrates", tag = "v0.86.0"
 # the resolve and the fetch pool. podvm gives its settings
 # (`registry::client`, `transport::resolve`, `platform::wanted`,
 # `credentials`) and keeps the store.
+pod-extract = { git = "https://github.com/PodUtils/podcrates", tag = "v0.86.0" }
 pod-oci = { git = "https://github.com/PodUtils/podcrates", tag = "v0.86.0" }
 # The advisory lock of the store (`store::Lock`): the index lock, the image
 # hold, the staging locks.

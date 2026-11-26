@@ -45,6 +45,7 @@ pub mod space;
 pub mod store;
 pub mod tls;
 pub mod transport;
+pub mod unpacked;
 
 pub use error::{Error, Result};
 pub use reference::Reference;
