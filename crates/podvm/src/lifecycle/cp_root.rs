@@ -13,6 +13,17 @@ use podvm_enter::abi::ResolveKind;
 
 use super::*;
 
+/// The words for `p` in a line of `cp`: the path of the container where
+/// `p` is under its root `root` (`/tmp/x`), and `p` as it is where not.
+/// A line never names a path of the store (TODO/cli.md T-2070, OR-B38-14).
+pub(super) fn shown(root: &Path, p: &Path) -> String {
+    match p.strip_prefix(root) {
+        Ok(rel) if rel.as_os_str().is_empty() => "/".to_string(),
+        Ok(rel) => format!("/{}", rel.display()),
+        Err(_) => p.display().to_string(),
+    }
+}
+
 /// The host path of the container path `inside` under `root`.
 ///
 /// Each name before the last is resolved in the root, links included. The
@@ -75,12 +86,7 @@ fn missing(
                 .ok()
                 .map(|h| (k, h))
         })
-        .ok_or_else(|| {
-            format!(
-                "the root of the container {} is not a directory",
-                root.display()
-            )
-        })?;
+        .ok_or_else(|| "the root of the container is not a directory".to_string())?;
     let next = host.join(walk[k]);
     if let Ok(target) = std::fs::read_link(&next) {
         return Err(format!(
@@ -131,7 +137,7 @@ pub(super) fn copy_one(
                 }
             },
             None => {
-                eprintln!("podvm cp: {} has no parent to gate", joined.display());
+                eprintln!("podvm cp: {} has no parent to gate", shown(root, &joined));
                 return EXIT_RUNTIME_ERROR;
             }
         }
@@ -166,14 +172,14 @@ pub(super) fn copy_one(
     if kind.is_dir() && !recursive {
         eprintln!(
             "podvm cp: {} is a directory; pass -r to copy it",
-            src.display()
+            shown(root, &src)
         );
         return EXIT_FLAG_ERROR;
     }
     if !kind.is_dir() && !kind.is_file() && !kind.is_symlink() {
         eprintln!(
             "podvm cp: {} is not a file or directory; special files are refused",
-            src.display()
+            shown(root, &src)
         );
         return EXIT_RUNTIME_ERROR;
     }
@@ -212,16 +218,16 @@ pub(super) fn copy_one(
     if is_link(&dst) {
         eprintln!(
             "podvm cp: {} is a symlink; writing through one is refused",
-            dst.display()
+            shown(root, &dst)
         );
         return EXIT_RUNTIME_ERROR;
     }
-    if !out_of && let Err(msg) = clear_of_symlinks(root, &dst) {
+    if !out_of && let Err(msg) = clear_of_symlinks(root, &dst, root, false) {
         eprintln!("podvm cp: {msg}");
         return EXIT_CLI_ERROR; // T-2062
     }
     if kind.is_symlink() {
-        return replicate_link(&src, &dst);
+        return replicate_link(&src, &dst, root);
     }
     if kind.is_dir() {
         return copy_tree(&src, &dst, root, out_of);
@@ -231,13 +237,17 @@ pub(super) fn copy_one(
             eprintln!(
                 "podvm cp: {} bytes {} -> {}",
                 n,
-                src.display(),
-                dst.display()
+                shown(root, &src),
+                shown(root, &dst)
             );
             0
         }
         Err(e) => {
-            eprintln!("podvm cp: {} -> {}: {e}", src.display(), dst.display());
+            eprintln!(
+                "podvm cp: {} -> {}: {e}",
+                shown(root, &src),
+                shown(root, &dst)
+            );
             EXIT_RUNTIME_ERROR
         }
     }

@@ -437,7 +437,9 @@ use cp_args::*;
 use cp_root::copy_one;
 
 mod copy_tree;
-pub use copy_tree::*;
+use copy_tree::*;
+mod inspect_fields;
+pub use inspect_fields::*;
 mod opened; // TODO/cli.md T-2087
 pub(crate) use opened::*;
 

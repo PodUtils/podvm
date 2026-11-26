@@ -8,67 +8,81 @@ pub(super) fn is_link(path: &std::path::Path) -> bool {
 /// Replicate one symlink as a symlink: the target bytes are copied, never
 /// resolved, so an absolute target escapes nothing. The caller gates the
 /// link's own path; the target is opaque here by design.
-pub(super) fn replicate_link(src: &std::path::Path, dst: &std::path::Path) -> i32 {
+pub(super) fn replicate_link(
+    src: &std::path::Path,
+    dst: &std::path::Path,
+    root: &std::path::Path,
+) -> i32 {
+    let shown = |p: &std::path::Path| super::cp_root::shown(root, p);
     let target = match std::fs::read_link(src) {
         Ok(t) => t,
         Err(e) => {
-            eprintln!("podvm cp: {}: {e}", src.display());
+            eprintln!("podvm cp: {}: {e}", shown(src));
             return EXIT_RUNTIME_ERROR;
         }
     };
     if let Some(parent) = dst.parent()
         && let Err(e) = std::fs::create_dir_all(parent)
     {
-        eprintln!("podvm cp: {}: {e}", parent.display());
+        eprintln!("podvm cp: {}: {e}", shown(parent));
         return EXIT_RUNTIME_ERROR;
     }
     match std::os::unix::fs::symlink(&target, dst) {
         Ok(()) => {}
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
             if dst.is_dir() && !is_link(dst) {
-                eprintln!("podvm cp: {} exists and is a directory", dst.display());
+                eprintln!("podvm cp: {} exists and is a directory", shown(dst));
                 return EXIT_RUNTIME_ERROR;
             }
             if let Err(e) = std::fs::remove_file(dst) {
-                eprintln!("podvm cp: {}: {e}", dst.display());
+                eprintln!("podvm cp: {}: {e}", shown(dst));
                 return EXIT_RUNTIME_ERROR;
             }
             if let Err(e) = std::os::unix::fs::symlink(&target, dst) {
-                eprintln!("podvm cp: {}: {e}", dst.display());
+                eprintln!("podvm cp: {}: {e}", shown(dst));
                 return EXIT_RUNTIME_ERROR;
             }
         }
         Err(e) => {
-            eprintln!("podvm cp: {}: {e}", dst.display());
+            eprintln!("podvm cp: {}: {e}", shown(dst));
             return EXIT_RUNTIME_ERROR;
         }
     }
-    eprintln!(
-        "podvm cp: symlink {} -> {}",
-        dst.display(),
-        target.display()
-    );
+    eprintln!("podvm cp: symlink {} -> {}", shown(dst), target.display());
     0
 }
 
 /// Every component of `path` below `base`, checked without following: a
 /// write through a pre-existing symlink would land where the link points,
 /// so the first symlink refuses the copy by name. `base` itself was gated
-/// by the caller and is not re-checked.
+/// by the caller and is not re-checked. `root` is the root of the container,
+/// so that the line names a path of the container, not of the store.
+///
+/// With `last_may_link`, the last name may be a link: the copy replaces it
+/// by the file or the link of the source and never writes through it
+/// (TODO/cli.md T-2070, OR-B38-07: docker replaces a link of the
+/// destination).
 pub(super) fn clear_of_symlinks(
     base: &std::path::Path,
     path: &std::path::Path,
+    root: &std::path::Path,
+    last_may_link: bool,
 ) -> std::result::Result<(), String> {
     let mut probe = base.to_path_buf();
-    let rel = path
-        .strip_prefix(base)
-        .map_err(|_| format!("{} escapes {}", path.display(), base.display()))?;
-    for component in rel.components() {
+    let rel = path.strip_prefix(base).map_err(|_| {
+        format!(
+            "{} escapes {}",
+            super::cp_root::shown(root, path),
+            super::cp_root::shown(root, base)
+        )
+    })?;
+    let n = rel.components().count();
+    for (i, component) in rel.components().enumerate() {
         probe.push(component);
-        if is_link(&probe) {
+        if is_link(&probe) && !(last_may_link && i + 1 == n) {
             return Err(format!(
                 "{} is a symlink; writing through one is refused",
-                probe.display()
+                super::cp_root::shown(root, &probe)
             ));
         }
     }
@@ -89,6 +103,8 @@ pub(super) fn copy_tree(
     out_of: bool,
 ) -> i32 {
     let gate = |p: &std::path::Path| podvm_image::contain::within(root, p);
+    // The lines name a path of the container, never a path of the store.
+    let shown = |p: &std::path::Path| super::cp_root::shown(root, p);
     // The destination side's base for the write-through check: the rootfs
     // on the way in, the fresh-or-merging top on the way out. A write
     // through a pre-existing link would land where the link points, so
@@ -112,7 +128,7 @@ pub(super) fn copy_tree(
                 // ⭐ T-0414: the listing is required (a tree copy walks
                 // it), so the refusal names the operation and the path
                 // with the kernel's errno, never a missing file.
-                eprintln!("podvm cp: cannot list {}: {e}", dir.display());
+                eprintln!("podvm cp: cannot list {}: {e}", shown(&dir));
                 return EXIT_RUNTIME_ERROR;
             }
         };
@@ -128,7 +144,7 @@ pub(super) fn copy_tree(
             let rel = match src_path.strip_prefix(src) {
                 Ok(r) => r,
                 Err(_) => {
-                    eprintln!("podvm cp: {} escapes {}", src_path.display(), src.display());
+                    eprintln!("podvm cp: {} escapes {}", shown(&src_path), shown(src));
                     return EXIT_RUNTIME_ERROR;
                 }
             };
@@ -137,7 +153,7 @@ pub(super) fn copy_tree(
             let kind = match std::fs::symlink_metadata(&src_path) {
                 Ok(m) => m.file_type(),
                 Err(e) => {
-                    eprintln!("podvm cp: {}: {e}", src_path.display());
+                    eprintln!("podvm cp: {}: {e}", shown(&src_path));
                     return EXIT_RUNTIME_ERROR;
                 }
             };
@@ -148,30 +164,39 @@ pub(super) fn copy_tree(
                     match src_path.parent() {
                         Some(parent) => parent,
                         None => {
-                            eprintln!("podvm cp: {} has no parent to gate", src_path.display());
+                            eprintln!("podvm cp: {} has no parent to gate", shown(&src_path));
                             return EXIT_RUNTIME_ERROR;
                         }
                     }
                 } else {
-                    &dst_path
+                    // TODO/cli.md T-2070 (OR-B38-07): the parent, so that a
+                    // link of the destination that points out of the root
+                    // (an absolute target) is replaced, not resolved.
+                    dst_path.parent().unwrap_or(&dst_path)
                 };
                 if let Err(e) = gate(own) {
                     eprintln!("podvm cp: the copy is refused: {e}");
                     return EXIT_CLI_ERROR; // TODO/cli.md T-2062: a refusal after the parse
                 }
-                if let Err(msg) = clear_of_symlinks(dst_base, &dst_path) {
+                if let Err(msg) = clear_of_symlinks(dst_base, &dst_path, root, true) {
                     eprintln!("podvm cp: {msg}");
                     return EXIT_CLI_ERROR; // T-2062
                 }
                 links.push((src_path, dst_path));
                 continue;
             }
-            let gated = if out_of { &src_path } else { &dst_path };
+            // A link of the destination under a file of the source is
+            // replaced (T-2070), so the gate takes its parent.
+            let gated = match (out_of, is_link(&dst_path), dst_path.parent()) {
+                (true, _, _) => &src_path,
+                (false, true, Some(parent)) if kind.is_file() => parent,
+                _ => &dst_path,
+            };
             if let Err(e) = gate(gated) {
                 eprintln!("podvm cp: the copy is refused: {e}");
                 return EXIT_CLI_ERROR; // TODO/cli.md T-2062: a refusal after the parse
             }
-            if let Err(msg) = clear_of_symlinks(dst_base, &dst_path) {
+            if let Err(msg) = clear_of_symlinks(dst_base, &dst_path, root, kind.is_file()) {
                 eprintln!("podvm cp: {msg}");
                 return EXIT_CLI_ERROR; // T-2062
             }
@@ -184,7 +209,7 @@ pub(super) fn copy_tree(
             if !kind.is_file() {
                 eprintln!(
                     "podvm cp: {} is not a file or directory; special files are refused",
-                    src_path.display()
+                    shown(&src_path)
                 );
                 return EXIT_RUNTIME_ERROR;
             }
@@ -197,21 +222,21 @@ pub(super) fn copy_tree(
     if is_link(dst) {
         eprintln!(
             "podvm cp: {} is a symlink; writing through one is refused",
-            dst.display()
+            shown(dst)
         );
         return EXIT_RUNTIME_ERROR;
     }
     if dst.is_file() {
-        eprintln!("podvm cp: {} exists and is not a directory", dst.display());
+        eprintln!("podvm cp: {} exists and is not a directory", shown(dst));
         return EXIT_RUNTIME_ERROR;
     }
     if let Err(e) = std::fs::create_dir_all(dst) {
-        eprintln!("podvm cp: {}: {e}", dst.display());
+        eprintln!("podvm cp: {}: {e}", shown(dst));
         return EXIT_RUNTIME_ERROR;
     }
     for dir in &dirs {
         if let Err(e) = std::fs::create_dir_all(dir) {
-            eprintln!("podvm cp: {}: {e}", dir.display());
+            eprintln!("podvm cp: {}: {e}", shown(dir));
             return EXIT_RUNTIME_ERROR;
         }
     }
@@ -226,7 +251,7 @@ pub(super) fn copy_tree(
         if let Some(parent) = to.parent()
             && let Err(e) = std::fs::create_dir_all(parent)
         {
-            eprintln!("podvm cp: {}: {e}", parent.display());
+            eprintln!("podvm cp: {}: {e}", shown(parent));
             return EXIT_RUNTIME_ERROR;
         }
         let id = std::fs::symlink_metadata(from).ok().and_then(|m| {
@@ -243,16 +268,24 @@ pub(super) fn copy_tree(
         if let Some(k) = id {
             first.insert(k, to.as_path());
         }
+        // TODO/cli.md T-2070 (OR-B38-07): a link of the destination is
+        // replaced by the file, never written through.
+        if is_link(to)
+            && let Err(e) = std::fs::remove_file(to)
+        {
+            eprintln!("podvm cp: {}: {e}", shown(to));
+            return EXIT_RUNTIME_ERROR;
+        }
         match std::fs::copy(from, to) {
             Ok(n) => bytes += n,
             Err(e) => {
-                eprintln!("podvm cp: {}: {e}", from.display());
+                eprintln!("podvm cp: {}: {e}", shown(from));
                 return EXIT_RUNTIME_ERROR;
             }
         }
     }
     for (from, to) in &links {
-        if replicate_link(from, to) != 0 {
+        if replicate_link(from, to, root) != 0 {
             return EXIT_RUNTIME_ERROR;
         }
     }
@@ -267,216 +300,8 @@ pub(super) fn copy_tree(
         "podvm cp: {} files ({bytes} bytes), {hard} hard links, {} symlinks {} -> {}",
         files.len() - hard,
         links.len(),
-        src.display(),
-        dst.display()
+        shown(src),
+        shown(dst)
     );
     0
-}
-
-/// `podvm inspect` against a container rather than an image.
-///
-/// ⚠ Tried after the image lookup fails, so a name that is both is an image, as
-/// docker resolves it.
-/// PodUtils/podvm#514: the document of the container `want` (its line of
-/// `template`, or its JSON object), for the caller to print with the others
-/// in one array; `None` where no container has the name.
-pub fn inspect_container(want: &str, template: Option<&str>) -> Option<Result<String, i32>> {
-    let s = podvm_image::open_store().ok()?;
-    // TODO/machine.md T-2042: a machine reads as a container (`target`).
-    let (c, fields) = match crate::windows::machine::find(want) {
-        Some(r) => super::target::fields(&s, &r),
-        None => {
-            let c = podvm_supervise::get(&s, want).ok()?;
-            let f = container_fields(&s, &c);
-            (c, f)
-        }
-    };
-    let typed = super::typed::fields(&fields, &c);
-    Some(match template {
-        Some(t) => format::render_typed(t, &typed, &super::typed::plain(&c)).map_err(|bad| {
-            eprintln!("podvm inspect: {bad}");
-            EXIT_CLI_ERROR
-        }),
-        None => Ok(super::typed::document(&typed).to_string()),
-    })
-}
-
-/// One field of the end of the last run, or a dash where no run ended.
-fn end_field(c: &Container, f: impl Fn(&podvm_supervise::End) -> String) -> String {
-    c.end.as_ref().map(f).unwrap_or_else(|| "-".into())
-}
-
-/// The word of an end reason, as the record writes it.
-pub(super) fn reason_word(r: podvm_supervise::Reason) -> &'static str {
-    match r {
-        podvm_supervise::Reason::Exit => "exit",
-        podvm_supervise::Reason::Signal => "signal",
-        podvm_supervise::Reason::Wall => "wall",
-    }
-}
-
-/// The count of the processes that stayed after the kill of the tree, or
-/// `unknown`, never a zero for an unknown count.
-pub(super) fn residual_word(r: podvm_supervise::Residual) -> String {
-    match r {
-        podvm_supervise::Residual::Count(n) => n.to_string(),
-        podvm_supervise::Residual::Unknown => "unknown".to_string(),
-    }
-}
-
-pub(super) fn container_fields(
-    s: &podvm_image::Store,
-    c: &Container,
-) -> Vec<(&'static str, String)> {
-    // T-0708: the emulation tally beside the container record. A dash where
-    // the tier never ran (no memo file); counts where it did, zero included.
-    let memo = podvm_supervise::table::memo_path(s, &c.id);
-    let em = memo
-        .exists()
-        .then(|| podvm_supervise::table::emulated_counts(&memo));
-    let count = |f: fn(&podvm_supervise::table::EmulatedCounts) -> u64| {
-        em.as_ref()
-            .map(f)
-            .map(|x| x.to_string())
-            .unwrap_or_else(|| "-".into())
-    };
-    let mknod = count(|e| e.mknod);
-    let mount = count(|e| e.mount);
-    let unshare = count(|e| e.unshare);
-    let clone = count(|e| e.clone);
-    // T-0413: the served /proc answers beside the four older stories.
-    let procfs = count(|e| e.procfs);
-    vec![
-        ("Id", c.id.clone()),
-        ("Name", c.name.clone()),
-        ("Image", c.image.clone()),
-        ("State", c.state.word().to_string()),
-        // TODO/cli.md T-2001 OP-06: docker's `.State.*` names. `.State`
-        // alone stays the word; the JSON nests these as docker does.
-        ("State.Status", c.state.word().to_string()),
-        (
-            "State.Running",
-            matches!(c.state, State::Running).to_string(),
-        ),
-        (
-            "State.ExitCode",
-            c.exit_code
-                .map(|p| p.to_string())
-                .unwrap_or_else(|| "-".into()),
-        ),
-        (
-            "State.Pid",
-            c.pid.map(|p| p.to_string()).unwrap_or_else(|| "0".into()),
-        ),
-        (
-            "State.StartedAt",
-            c.started_at.clone().unwrap_or_else(|| "-".into()),
-        ),
-        (
-            "State.FinishedAt",
-            c.finished_at.clone().unwrap_or_else(|| "-".into()),
-        ),
-        ("Status", c.status()),
-        (
-            "Pid",
-            c.pid.map(|p| p.to_string()).unwrap_or_else(|| "0".into()),
-        ),
-        (
-            "LauncherPid",
-            c.launcher_pid
-                .map(|p| p.to_string())
-                .unwrap_or_else(|| "0".into()),
-        ),
-        // ⛔ A dash where there is no code, never a zero. AGENTS.md
-        // absolute 3, and `wait` refuses for the same reason.
-        (
-            "ExitCode",
-            c.exit_code
-                .map(|p| p.to_string())
-                .unwrap_or_else(|| "-".into()),
-        ),
-        ("Created", c.created_at.clone()),
-        (
-            "StartedAt",
-            c.started_at.clone().unwrap_or_else(|| "-".into()),
-        ),
-        (
-            "FinishedAt",
-            c.finished_at.clone().unwrap_or_else(|| "-".into()),
-        ),
-        ("RootfsPath", c.rootfs.clone()),
-        (
-            "LogPath",
-            podvm_supervise::table::log_path(s, &c.id)
-                .display()
-                .to_string(),
-        ),
-        ("Rung", c.rung.clone()),
-        // TODO/enter.md T-1935: the tier on the rung, a dash for none.
-        (
-            "Tier",
-            match super::syscall::cap_of(&c.env) {
-                Some(_) => super::syscall::WORD.to_string(),
-                None => "-".to_string(),
-            },
-        ),
-        // TODO/cli.md T-1695: the labels of the run, KEY=VALUE, one comma
-        // between two.
-        ("Labels", c.hardening.labels.join(",")),
-        // ⭐ T-0804 rule 3. The mode a caller reads includes the shims, or the
-        // report says devices exist when they do not.
-        ("Complete.Fixups", c.completion_note()),
-        ("Complete.Degraded", c.completion_degraded.to_string()),
-        ("Command", c.argv.join(" ")),
-        // T-2060: docker's `.Config`. The strings are the flat text; the
-        // typed values come from `typed::fields`.
-        ("Config", String::new()),
-        ("Config.Env", c.env.join(" ")),
-        ("Config.Cmd", c.argv.join(" ")),
-        ("Config.Image", c.image.clone()),
-        ("Config.WorkingDir", c.working_dir.clone()),
-        ("Config.Labels", c.hardening.labels.join(",")),
-        // TODO/machine.md T-1968: each `--tmpfs` with a limit, as memory.
-        ("Tmpfs", crate::run::tmpfs::words(&c.env).join(",")),
-        // TODO/cli.md T-2053 (OQ-07): what `exec` into the running
-        // container shares, from what its entry opened.
-        ("Exec.Mode", exec_opened(c).exec_mode(&c.rung).to_string()),
-        ("Exec.Shares", exec_opened(c).exec_shares(&c.rung)),
-        // ⛔ SAID, NOT IMPLIED. TODO/supervise.md T-1708: the launcher is the
-        // child subreaper of the payload's tree and kills each descendant at
-        // the end. podvm has no PID namespace, so a process that reparents
-        // above the launcher stays out of reach, and a caller reads this
-        // rather than assuming docker's containment.
-        (
-            "Contains",
-            "the payload's tree: the launcher is its child subreaper and kills each \
-             descendant at the end; a process that reparents above the launcher is \
-             outside its reach"
-                .to_string(),
-        ),
-        ("Noticed", c.noticed.clone().unwrap_or_else(|| "-".into())),
-        // TODO/supervise.md T-1708: the end of the last run, as the launcher
-        // measured it. A dash where no run ended, never a zero.
-        (
-            "End.Reason",
-            end_field(c, |e| reason_word(e.reason).to_string()),
-        ),
-        ("End.RunMs", end_field(c, |e| e.run_ms.to_string())),
-        ("End.UserMs", end_field(c, |e| e.user_ms.to_string())),
-        ("End.SystemMs", end_field(c, |e| e.system_ms.to_string())),
-        ("End.MaxRssKiB", end_field(c, |e| e.max_rss_kib.to_string())),
-        (
-            "End.Residual",
-            end_field(c, |e| residual_word(e.residual_processes)),
-        ),
-        // T-0708: how many times the preloaded tier emulated an operation
-        // rather than running the kernel's answer. A dash where the tier
-        // never ran; `inspect --format` reads these names, `ps` does not.
-        // T-0413 adds the served /proc answers behind the same memo.
-        ("Interpose.Emulated.mknod", mknod),
-        ("Interpose.Emulated.mount", mount),
-        ("Interpose.Emulated.unshare", unshare),
-        ("Interpose.Emulated.clone", clone),
-        ("Interpose.Emulated.procfs", procfs),
-    ]
 }
