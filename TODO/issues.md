@@ -567,8 +567,9 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #671 | COORD-254: podvm load accepts repeated OCI layers in runner archives (to podrunner) | open | T-2098 |
 | #672 | COORD-255: the answer to PodUtils/podrunner#359: bytes read through each volume is feasible with a counting layer that podvm serves; no counter exists today (to podrunner) | open | T-2099 |
 | #673 | [gh action] requested | closed (not run: the head check of the block named a wrong full SHA; #674 replaces it) | the gate and workloads runs of `2287890`, before the version bump of the next beta |
-| #674 | [gh action] requested | open | the release gate of 0.2.0-beta.41 on `332efaa` (the gate, workloads, the nightly trial, arm), then the release |
+| #674 | [gh action] requested | closed (on `332efaa`: gate 45772974200, workloads 45772978726, nightly 45772982947, arm 45772987551 and release 45777325284 passed) | the release gate of 0.2.0-beta.41 on `332efaa` (the gate, workloads, the nightly trial, arm), then the release |
 | #675 | COORD-256: pod-hostprobe: the machine legs take the path of the emulator, for a QEMU copy that is not on PATH (to podcrates) | open | T-2100 |
+| #676 | COORD-257: podvm 0.2.0-beta.41: live Incus limits (podrunner#354), saved states with channels and process limits (podrunner#355), repeated OCI layers (#671) (to podrunner) | open | T-2093, T-2094, T-2098 |
 
 ## Messages whose title does not start with COORD-NNN
 

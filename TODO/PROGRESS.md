@@ -9,7 +9,7 @@ start.
 
 671 entries: 22 open, 40 partial, 6 blocked, 603 done.
 
-* The newest release is `v0.2.0-beta.40` (2026-11-24). [CHANGELOG](../CHANGELOG.md)
+* The newest release is `v0.2.0-beta.41` (2026-11-26). [CHANGELOG](../CHANGELOG.md)
   holds what each release ships, with its known gaps.
 * Open first: the asks of podrunner (`docs/HANDOFF.md`, "Next steps").
 * Experiment 473 proved the saved-state channel and process limits under

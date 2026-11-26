@@ -27,7 +27,7 @@ each step below is done.
   `issue-sync`, no `secrets`). Each run went through an issue `[gh action]
   requested` (#674). The scheduled `issue-sync` (06:17 UTC) writes the
   blocks of the issues that the session opened.
-* `v0.2.0-beta.41` RELEASE_STATE. Its gate 45772974200, `workloads.yml`
+* `v0.2.0-beta.41` is released (release run 45777325284 on `332efaa`, 59 assets, with the image on ghcr.io). Its gate 45772974200, `workloads.yml`
   45772978726, the nightly trial 45772982947 and `arm.yml` 45772987551
   passed on the version commit `332efaa`. The integration tests as uid
   1000 (37 binaries) passed on `7c2b161`. The tenth outside pass (T-2100,
@@ -58,13 +58,10 @@ each step below is done.
 
 ## Next steps, in order
 
-1. When release run 45777325284 ends green: push the local commits of
-   `main`, then open the COORD issue `(to podrunner)` from the draft in
-   the session (answers podrunner#354 and #355, and #671: rerun the
-   runner-image build with beta.41). Close #674 with its run ids. Make
-   the docs true for beta.41 (README, `docs/limits.md`, the per-release
-   state of `TODO/PROGRESS.md`), as after beta.40. If the run fails, read
-   the failed step and request a new run.
+1. Make the docs true for beta.41 (README, `docs/limits.md`, the
+   per-release state of `TODO/PROGRESS.md`), as after beta.40. Watch
+   COORD-257 (#676) for podrunner's take of beta.41 and its rerun of the
+   runner-image build (#671).
 2. T-2078 remaining 3 (a hosted run of podrunner#346 with beta.41).
 3. Sweep the open issues (`AGENTS.md`, section 8 item 7). Watch #672
    (COORD-255) for podrunner's choice, and #675 (COORD-256) for the tag
