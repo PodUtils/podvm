@@ -31,6 +31,7 @@ pub(crate) mod kernel_arm64; // TODO/machine.md T-1890
 mod line;
 mod mem; // TODO/machine.md T-1922
 pub(crate) mod net;
+pub(crate) mod pid1; // TODO/machine.md T-1994, steps 2 and 3
 mod rundir; // TODO/machine.md T-1906
 pub(crate) mod sealed;
 pub(crate) mod signals; // TODO/machine.md T-2041
@@ -261,9 +262,14 @@ pub fn boot(r: &Request) -> i32 {
     };
     let kernel = assets.kernel;
     let init_image = r.env.iter().any(|e| e == crate::initns::MARK);
+    // T-1994, step 2: systemd as PID 1 of the guest on the root disk.
+    let pid1 = match pid1::of(r.rootfs, init_image && on_disk) {
+        Ok(b) => b,
+        Err(e) => return fail(e),
+    };
     // The base archive where the root is in the initramfs, and for the
     // saved state of T-2008, whose guest keeps its root there.
-    let base = match (!on_disk || init_image)
+    let base = match (!on_disk || (init_image && pid1.is_none()))
         .then(|| base_archive(r.store_root, r.digest, r.rootfs))
         .transpose()
     {
@@ -340,7 +346,11 @@ pub fn boot(r: &Request) -> i32 {
             let script = init::script(
                 &nonce,
                 &r.argv,
-                &r.env,
+                &if pid1.is_some() {
+                    pid1::image_env(&r.env)
+                } else {
+                    r.env.clone()
+                },
                 &r.workdir,
                 tools.is_some() && !r.net_none,
                 &vols,
@@ -351,7 +361,7 @@ pub fn boot(r: &Request) -> i32 {
                 }),
             );
             let script = init::with_pids(script, r.pids.as_deref(), &nonce);
-            let script = init::with_image_init(script, init_image); // T-2002
+            let script = init::with_image_init(script, init_image && pid1.is_none()); // T-2002
             let script = exec::with_server_if(script, r.keeper.is_some());
             let (script, more) = match &root {
                 Some(_) => (script, Vec::new()), // `guest-root` mounts the disk
@@ -376,7 +386,11 @@ pub fn boot(r: &Request) -> i32 {
             return fail(e);
         }
     };
-    if let Some(line) = notice(r, accel, &disk::root::source(&root, &base)) {
+    let mut source = disk::root::source(&root, &base);
+    if pid1.is_some() {
+        source.push_str(", systemd of the image as PID 1 of the guest (T-1994)");
+    }
+    if let Some(line) = notice(r, accel, &source) {
         eprintln!("{line}");
     }
     vol::notices(r.verb, &r.volumes, nine, r.disk.is_some());
@@ -421,7 +435,7 @@ pub fn boot(r: &Request) -> i32 {
     );
     arch::adapt(&mut argv, r.arch);
     if root.is_some() {
-        disk::root::with_init(&mut argv, &disk_load, r.disk.is_some(), &nonce);
+        disk::root::with_init(&mut argv, &disk_load, r.disk.is_some(), pid1, &nonce);
     }
     argv.extend(r.keeper.iter().flat_map(exec::keeper_args));
     arch::err_port(&mut argv, r.arch);

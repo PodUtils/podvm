@@ -159,7 +159,9 @@ pub const USER: &[Group] = &[
                  saves the state of its guest in the store, and each later run starts from it. \
                  0 boots each guest. pipe saves and loads through a pipe of cat. Another value \
                  exits 125. Each run of one state shares the machine-id, the boot id and what \
-                 a service made at its start (call C27).",
+                 a service made at its start (call C27). A run with systemd as PID 1 of the \
+                 guest on the root disk uses no state; PODVM_MACHINE_ROOT=initramfs selects it \
+                 (T-1994).",
             ),
             v(
                 "PODVM_MACHINE_ROOT",
@@ -216,9 +218,12 @@ pub const USER: &[Group] = &[
                 "PODVM_INIT_BOOT_TIMEOUT",
                 "1 to 3600",
                 "Sets the bound in seconds of the boot of --podvm-init=image: on the incus tier, \
-                 the namespace rung and the runsc tier, podvm asks systemctl is-system-running \
-                 again while it gives offline, unknown, initializing or starting, until this \
-                 bound. With no value, 180. Another value is an error with exit 125.",
+                 the namespace rung, the runsc tier and the machine tier, podvm asks systemctl \
+                 is-system-running again while it gives offline, unknown, initializing or \
+                 starting, until this bound. On the machine tier with systemd as PID 1 of the \
+                 guest, the bound starts at the start of the init and holds the start of the \
+                 unit of the run too (T-1994). With no value, 180. Another value is an error \
+                 with exit 125.",
             ),
             v(
                 "PODVM_INCUS_SOCKET",

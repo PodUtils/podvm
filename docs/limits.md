@@ -498,11 +498,21 @@ C26). Experiment 465 measures each line below as uid 1000.
   in the guest under TCG.
 - Where the host has no runsc or no user namespace (the userland rung),
   the run takes the machine tier
-  and names the part on stderr. The init is then PID 1 of a PID
-  namespace of the guest, with real root and each controller of cgroup2.
-  The guest has the limits of "Guests" above: the root is the root disk
-  of the image (T-1994), and the saved state of T-2008 keeps its root in
-  the initramfs; a volume is a 9p mount, and the
+  and names the part on stderr. On the root disk of the image (T-1994),
+  where `/sbin/init` of the image is systemd, systemd is PID 1 of the
+  guest itself. podvm writes the unit `podvm-run.service` into the root,
+  masks the getty units of the console and `systemd-firstboot.service`,
+  and turns the status of the boot off. The unit waits until
+  `systemctl is-system-running` gives `running` or `degraded`, then runs
+  the command in its cgroup, and the exit code comes back on the serial
+  line. One bound from the start of the init (`PODVM_INIT_BOOT_TIMEOUT`,
+  180 s by default) ends a run whose unit does not start or whose init
+  does not get ready, with one line and exit 125 before the command.
+  With an init that is not systemd, with `PODVM_MACHINE_ROOT=initramfs`
+  and from a saved state, the init is PID 1 of a PID namespace of the
+  guest, with real root and each controller of cgroup2 (T-2002).
+  The guest has the limits of "Guests" above: the saved state of T-2008
+  keeps its root in the initramfs; a volume is a 9p mount, and the
   network is QEMU's user-mode network. Under TCG on the cloud host a run
   of `true` takes 24 s to 27 s with four vCPUs, and QEMU holds 2.6 GB of
   memory for an image of 584 MB; the namespace rung takes 3 s.
@@ -524,7 +534,9 @@ C26). Experiment 465 measures each line below as uid 1000.
   were used last for an image. Requests with `-t`, `run -d`,
   `--podvm-engine`, `--podvm-sealed`, `--network broker`, more than four
   volumes, more than 64 KiB of stdin, an arm64 guest or a kernel from
-  `PODVM_MACHINE_KERNEL` use a fresh boot. Each run of one state has the machine-id,
+  `PODVM_MACHINE_KERNEL` use a fresh boot. A run with systemd as PID 1
+  of the guest on the root disk of the image (T-1994) uses no state:
+  `PODVM_MACHINE_ROOT=initramfs` selects the state. Each run of one state has the machine-id,
   the boot id, the monotonic clock and the service processes of the
   save: a secret that a service made at its start (a session key, the
   state of a random generator in its memory) is the same in each run.

@@ -205,7 +205,7 @@ pub fn wait_boot(ns: &Namespaces, ended: &mut dyn FnMut() -> Option<i32>) -> Res
 /// True for a variable of podvm's own entry, which the command of an init
 /// of the image does not get: the tree has its real owners and a real
 /// root, so no interposer loads.
-fn internal(name: &str) -> bool {
+pub(crate) fn internal(name: &str) -> bool {
     name == "LD_PRELOAD" || (name.starts_with("PODVM_") && name != "PODVM_INIT")
 }
 

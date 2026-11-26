@@ -220,11 +220,12 @@ EOF
 	machine-save)
 		find "$WORK/store/machine" -maxdepth 1 -name 'state-*' -exec rm -f {} + 2>/dev/null
 		TIER=--podvm-tier=machine
-		one mach-sav as env PODVM_RUNSC=/nonexistent/runsc ${PODVM_468_ENV:-}
+		# The saved state keeps its root in the initramfs (T-1994).
+		one mach-sav as env PODVM_RUNSC=/nonexistent/runsc PODVM_MACHINE_ROOT=initramfs ${PODVM_468_ENV:-}
 		;;
 	machine-load)
 		TIER=--podvm-tier=machine
-		one mach-lod as env PODVM_RUNSC=/nonexistent/runsc ${PODVM_468_ENV:-}
+		one mach-lod as env PODVM_RUNSC=/nonexistent/runsc PODVM_MACHINE_ROOT=initramfs ${PODVM_468_ENV:-}
 		st=$(find "$WORK/store/machine" -maxdepth 1 -name 'state-*.vm' -exec stat -c %s {} + 2>/dev/null | awk '{s+=$1} END{print int(s/1048576)}')
 		bad=$(find "$WORK/store/machine" -maxdepth 1 -name 'state-*.bad' 2>/dev/null | wc -l)
 		say "$(printf '%-22s %-8s the state files: %s MiB; markers of a failed state: %s' "$LABEL" mach-lod "${st:-0}" "$bad")"

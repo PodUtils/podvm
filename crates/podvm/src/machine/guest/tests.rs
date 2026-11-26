@@ -80,7 +80,12 @@ fn the_exit_marker_needs_the_nonce_of_the_run() {
     assert_eq!(c.line("[    0.1] Linux version"), Line::Before);
     // A marker of another run before the ready marker is noise.
     assert_eq!(c.line("PODVM-EXIT-n1 3"), Line::Before);
-    assert_eq!(c.line("PODVM-READY-n1\r"), Line::Ready);
+    assert_eq!(c.line("PODVM-READY-n1x"), Line::Before);
+    // T-1994: the queries of systemd before the marker, on its line.
+    assert_eq!(
+        c.line("\u{1b}[6n\u{1b}]3008;type=boot\u{1b}\\PODVM-READY-n1\r"),
+        Line::Ready
+    );
     assert_eq!(c.line("hello\r"), Line::Out("hello"));
     // A forged marker without the nonce is output.
     assert_eq!(c.line("PODVM-EXIT-xx 9"), Line::Out("PODVM-EXIT-xx 9"));

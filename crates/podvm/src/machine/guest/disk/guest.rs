@@ -229,18 +229,28 @@ fn root_up(modules: &[&str], upper: Upper) -> Result<(), String> {
 /// with 125, and the reason on the second port (stderr where it is not
 /// there), then a reset, which ends the emulator (`-no-reboot`).
 fn root_fail(nonce: &str, why: &str) -> ! {
+    end_run(
+        nonce,
+        &format!(
+            "podvm: machine tier: the root of the guest is not on the disk of its image: {why} \
+             (TODO/machine.md T-1994)\n"
+        ),
+    )
+}
+
+/// The end of a run before its command: the ready marker of `nonce`,
+/// `line` on the second port (stderr where it is not there), the exit
+/// marker with 125, then a reset, which ends the emulator (`-no-reboot`).
+pub(crate) fn end_run(nonce: &str, line: &str) -> ! {
     use std::io::Write;
-    let line = format!(
-        "podvm: machine tier: the root of the guest is not on the disk of its image: {why} \
-         (TODO/machine.md T-1994)\n"
-    );
     let say = |text: &str| {
         let mut out = std::io::stdout();
         out.write_all(text.as_bytes())
             .and_then(|()| out.flush())
             .is_ok()
     };
-    say(&format!("PODVM-READY-{nonce}\n"));
+    // A line of its own: the console can hold the queries of an init.
+    say(&format!("\nPODVM-READY-{nonce}\n"));
     let to_port = std::fs::OpenOptions::new()
         .write(true)
         .open("/dev/ttyS1")
@@ -260,25 +270,81 @@ fn root_fail(nonce: &str, why: &str) -> ! {
     }
 }
 
+/// The arguments of `podvm guest-root`.
+#[derive(Debug, PartialEq, Eq)]
+pub struct RootArgs {
+    pub load: Vec<String>,
+    pub disk: bool,
+    /// `--init=SECS`: exec the init of the image (systemd) with the bound
+    /// of its boot (TODO/machine.md T-1994, step 2).
+    pub init: Option<u64>,
+    pub nonce: String,
+}
+
+/// `--load M1,M2,... [--disk] [--init=SECS] NONCE`.
+pub fn root_args(args: &[String]) -> Result<RootArgs, String> {
+    let usage = "the arguments are --load M1,M2,... [--disk] [--init=SECS] NONCE";
+    let (nonce, flags) = args.split_last().ok_or(usage)?;
+    if nonce.is_empty() || !nonce.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(format!("{nonce:?} is not the nonce of a run"));
+    }
+    let mut a = RootArgs {
+        load: Vec::new(),
+        disk: false,
+        init: None,
+        nonce: nonce.clone(),
+    };
+    let mut it = flags.iter();
+    while let Some(f) = it.next() {
+        match f.as_str() {
+            "--load" => {
+                let l = it.next().ok_or(usage)?;
+                a.load = l
+                    .split(',')
+                    .filter(|m| !m.is_empty())
+                    .map(String::from)
+                    .collect();
+            }
+            "--disk" => a.disk = true,
+            _ => match f.strip_prefix("--init=").map(str::parse::<u64>) {
+                Some(Ok(s)) if s > 0 => a.init = Some(s),
+                _ => return Err(format!("{f:?}: {usage}")),
+            },
+        }
+    }
+    Ok(a)
+}
+
+/// exec the init of the image as PID 1; it returns only on a failure.
+fn exec_init() -> std::io::Error {
+    use std::os::unix::process::CommandExt;
+    std::process::Command::new(crate::initns::INIT).exec()
+}
+
 /// `podvm guest-root`. It does not return.
 pub fn root_main(args: &[String]) -> i32 {
-    let (load, disk, nonce) = match args {
-        [flag, load, nonce] if flag == "--load" => (load, false, nonce),
-        [flag, load, d, nonce] if flag == "--load" && d == "--disk" => (load, true, nonce),
-        _ => {
-            eprintln!("podvm guest-root: the arguments are --load M1,M2,... [--disk] NONCE");
+    let a = match root_args(args) {
+        Ok(a) => a,
+        Err(e) => {
+            eprintln!("podvm guest-root: {e}");
             return 125;
         }
     };
-    if !nonce.bytes().all(|b| b.is_ascii_hexdigit()) {
-        eprintln!("podvm guest-root: {nonce:?} is not the nonce of a run");
-        return 125;
-    }
-    let modules: Vec<&str> = load.split(',').filter(|m| !m.is_empty()).collect();
-    let upper = if disk { Upper::Disk } else { Upper::Tmpfs };
-    let why = match root_up(&modules, upper) {
-        Ok(()) => format!("the init of the run: {}", exec_sh("/podvm-init")),
-        Err(e) => e,
+    let modules: Vec<&str> = a.load.iter().map(String::as_str).collect();
+    let upper = if a.disk { Upper::Disk } else { Upper::Tmpfs };
+    let why = match (root_up(&modules, upper), a.init) {
+        (Ok(()), None) => format!("the init of the run: {}", exec_sh("/podvm-init")),
+        (Ok(()), Some(bound)) => {
+            match crate::machine::guest::pid1::prepare(Path::new("/"), &a.nonce, bound) {
+                Ok(()) => format!(
+                    "the init of the image {}: {}",
+                    crate::initns::INIT,
+                    exec_init()
+                ),
+                Err(e) => format!("the unit of the run: {e}"),
+            }
+        }
+        (Err(e), _) => e,
     };
-    root_fail(nonce, &why)
+    root_fail(&a.nonce, &why)
 }

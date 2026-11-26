@@ -5277,6 +5277,13 @@ Faults that the runs found, each fixed:
 
 Remaining: (1) as before: `kvm.yml` with a real delegated subtree (clause 10 runs there with clause 1). (2) A caller that is uid 0 of the host gets no namespace rung: a foreground run takes the next route, and `run -d` refuses by name. (3) An `exec` with no `-t` has the descriptors of the caller: a terminal among them has no name in the image. (4) A command of `exec` runs in the cgroup of the run only where the host lets the caller move a process there. (5) The relay of `-t` looks at the window size each 250 ms. (6) A `-t` of a guest of the machine tier keeps `/dev/hvc0` (measured: `tty` gives `/dev/hvc0` there). (7) `run -d` on the runsc tier and on the machine tier with the init stay refused by name. (8) The numbers 5 to 7 of the first list.
 
+Amended (2026-11-26, T-1994). On the machine tier, a run on the root disk
+of an image whose `/sbin/init` is systemd boots systemd as PID 1 of the
+guest itself, not of a PID namespace: experiment 483 clause 1. The PID
+namespace of this entry stays on the machine tier for an init that is
+not systemd, for `PODVM_MACHINE_ROOT=initramfs` and for the saved state
+(experiment 483 clause 5).
+
 # T-2003: On the userland rung, a program with a library in a directory of its RUNPATH does not load (`systemctl`)
 
 **Source:** the measure of T-2002 (2026-11-19); the research bundle of the owner (2026-11-19, `run/libpath.rs` of a branch that is not in this tree); COORD-207 (#603) asks podcrates
