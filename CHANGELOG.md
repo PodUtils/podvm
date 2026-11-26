@@ -21,6 +21,23 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
   kill each process of the namespace, so no process of the payload stays
   after the run.
 
+### Fixed: a C build on the syscall tier no longer spins for ever, 2026-11-26
+
+Record: T-1991 (PodUtils/podrunner#308, item 3).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- On `--podvm-tier=syscall`, `cargo doc` of ripgrep printed `Compiling
+  ripgrep` and then nothing: `cc1` of the vendored PCRE2 spun in a hash
+  table with no empty slot. podvm's handler gives the payload its break
+  (`brk`), and a shrink kept the old bytes of the pages above the new
+  break. glibc's `calloc` does not clear memory that `sbrk` gives, so a
+  break that grew again gave a table full of old data. The handler now
+  discards each page above a shrunk break, as the kernel does, and a later
+  growth gives zeros. Where it cannot discard the pages, the break does not
+  move, as a failed `brk`.
+- A static PIE program whose break cannot go just after it gets a break
+  where the kernel puts a map. Before, each `brk` of such a program failed.
+
 ### Fixed: `rmi` and `image prune` remove the machine files of an image, 2026-11-26
 
 Record: T-1994.
