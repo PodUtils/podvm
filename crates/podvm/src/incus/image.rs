@@ -330,7 +330,10 @@ fn walk<W: std::io::Write>(
         h.set_mode(mode & 0o7777);
         let at = format!("rootfs/{r}");
         // T-1999: the attributes of the image, as PAX records before it.
-        let attrs = super::xattrs::merge(super::xattrs::on_disk(&p), unset.get(&r));
+        let attrs = super::xattrs::merge(
+            super::xattrs::on_disk_readable(&p, &md, super::xattrs::of_image)?,
+            unset.get(&r),
+        );
         let ft = md.file_type();
         // T-2079 (OR-B39-08): each other name of a file goes out as a hard
         // link entry, so that incusd unpacks one inode, not a copy each.

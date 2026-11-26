@@ -239,13 +239,24 @@ pub fn prune(verb: &str, args: &[String]) -> i32 {
         Ok(done) => {
             // TODO/image.md T-1781, T-1787: the extractions of the removed
             // records and each one that no record names, in the total (#526).
-            let mut freed = super::drop_extractions(&store, &digests);
+            let mut freed = super::drop_extractions(&store, &digests, "image prune");
             for (digest, bytes) in super::orphan_extractions(&store) {
                 if podvm_extract::remove_extracted(&store, &digest).is_ok() {
                     freed = freed.saturating_add(bytes);
                     println!(
                         "deleted: an extraction no image names, {}",
                         podvm_image::space::mib(bytes)
+                    );
+                }
+            }
+            // TODO/machine.md T-1994: the machine files that no image names.
+            for (digest, _) in super::machine_files::orphans(&store) {
+                let gone = super::machine_files::remove(store.root(), &digest, "image prune");
+                freed = freed.saturating_add(gone);
+                if gone > 0 {
+                    println!(
+                        "deleted: the machine files of an image no record names, {}",
+                        podvm_image::space::mib(gone)
                     );
                 }
             }
