@@ -574,10 +574,11 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #678 | COORD-259: pod-oci: bounds of a reference (name 255, tag 128) and pod-enter: the refusal of a missing working directory of exec (to podcrates) | open | T-2100 |
 | #679 | [gh action] requested | closed (on `d9c687a`: gate 45798323008 and the `incus` job of `kvm.yml` 45798328658 passed) | the gate and the `incus` job of `kvm.yml` on `main` after the merges of T-1968, T-2079, T-2087 and T-2100 |
 | #680 | COORD-260: pod-guest: take podvm's ext4 writer (an empty disk and a whole tree) beside fat16 and squashfs (to podcrates) | open | T-1968, T-1994 |
-| #681 | [gh action] requested | open | the gate and the KVM jobs `guest`, `init` and `mem` after the disk root of T-1994 and the sized disk of T-1968 |
-| #682 | [gh action] requested | open | the `init` job of `kvm.yml` that the concurrency group cancelled in #681 |
+| #681 | [gh action] requested | closed (on `930bc0e`: kvm `guest` 45812353746 and `mem` 45812389330 passed; `init` cancelled by the concurrency group, run by #682; gate 45812348716 failed on a unit test as a user with no root, fixed in `c287ca7`, #685) | the gate and the KVM jobs `guest`, `init` and `mem` after the disk root of T-1994 and the sized disk of T-1968 |
+| #682 | [gh action] requested | closed (kvm `init` 45815838261 passed on `2db078e`) | the `init` job of `kvm.yml` that the concurrency group cancelled in #681 |
 | #683 | COORD-261: a shared reader of the extended attributes of a path, with no silent loss (to podcrates) | open | T-1999 |
 | #684 | COORD-262: pod-enter: a walk in a root that keeps `..` at the root, as the kernel and docker do (to podcrates) | open | T-2087 |
+| #685 | [gh action] requested | open | the gate again after the fix of the root-disk test as a user with no root (`c287ca7`) |
 
 ## Messages whose title does not start with COORD-NNN
 

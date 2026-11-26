@@ -570,7 +570,8 @@
 678 issue open
 679 issue closed
 680 issue open
-681 issue open
-682 issue open
+681 issue closed
+682 issue closed
 683 issue open
 684 issue open
+685 issue open
