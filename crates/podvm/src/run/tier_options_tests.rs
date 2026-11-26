@@ -99,6 +99,7 @@ fn every_field_of_opts_is_classified(o: Opts) {
         allow: _,             // the broker
         publish: _,           // a detached Windows guest only (T-1869)
         devices: _,           // incus refuses
+        device_guests: _,     // after the dispatch of the tiers (T-1939)
         unsafe_host_paths: _, // the rootfs rungs
         volumes: _,           // TABLE: -v
         timeout: _,           // TABLE: --timeout

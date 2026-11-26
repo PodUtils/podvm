@@ -87,6 +87,9 @@ pub(crate) struct Opts {
     /// `--device`. Carried raw here and parsed now: a malformed shape is a
     /// flag error, before anything is fetched. TODO/enter.md T-0501.
     pub(crate) devices: Vec<String>,
+    /// The guest paths of the devices that go as volumes (`devices::fold`,
+    /// TODO/enter.md T-1939), for the line of a refusal.
+    pub(crate) device_guests: Vec<String>,
     /// `--unsafe-host-paths`. Opts into the userland pass-through with no
     /// `PODVM_MAPS` anchoring. TODO/enter.md T-1407.
     pub(crate) unsafe_host_paths: bool,
@@ -170,6 +173,7 @@ impl Opts {
             allow: Vec::new(),
             publish: Vec::new(),
             devices: Vec::new(),
+            device_guests: Vec::new(),
             unsafe_host_paths: false,
             volumes: Vec::new(),
             timeout: None,

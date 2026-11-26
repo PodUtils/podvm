@@ -8,6 +8,18 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: `--device` with another guest path, 2026-11-26
+
+Record: T-1939 (#473), T-2100 (OR-B41-08).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- A `--device` that reads goes as a volume of one file: a bind on the
+  namespace rung and the path table on the userland rung. `stat`, a
+  listing and each open of the payload see the host node at the guest
+  path, and a write reaches the host. `r` alone is read-only; the
+  namespace rung refuses `r` alone for a device node by name, because a
+  read-only bind does not refuse a write to a device node.
+
 ### Fixed: `cp` through a link of the container, 2026-11-26
 
 Record: T-2087 (OR-B40-16), T-2100 (OR-B41-04).

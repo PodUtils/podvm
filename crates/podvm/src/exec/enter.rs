@@ -165,7 +165,7 @@ pub(super) fn enter(
         }
     };
     if let Err(code) =
-        crate::lifecycle::volume::refuse_unserved("exec", &volumes, userland.as_ref(), None)
+        crate::lifecycle::volume::refuse_unserved("exec", (&volumes, &[]), userland.as_ref(), None)
     {
         return code;
     }

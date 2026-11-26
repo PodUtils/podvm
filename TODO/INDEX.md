@@ -601,7 +601,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1936](gate.md) | P1 | S | none | gate | done | A gate of the tools of a CI job: a raw syscall, a spawn, a pty, `uv` and `ruff` in a unit |
 | [T-1937](cli.md) | P2 | M | none | cli | done | The external QA of `0.2.0-beta.31`: the argument checks of the CLI |
 | [T-1938](supervise.md) | P1 | S | none | supervise | partial | The external QA of `0.2.0-beta.31`: two runs at once lose the table of containers or the exec probe |
-| [T-1939](enter.md) | P2 | M | none | enter | open | The external QA of `0.2.0-beta.31`: `--device` and `run -d --rm` |
+| [T-1939](enter.md) | P2 | M | none | enter | done | The external QA of `0.2.0-beta.31`: `--device` and `run -d --rm` |
 | [T-1940](image.md) | P2 | S | none | image | partial | The external QA of `0.2.0-beta.31`: `images --filter`, `load`, `verify` and `--add-host` |
 | [T-1941](machine.md) | P3 | S | none | machine | open | The built-in `machine` profile asks for 1 GiB, which a file-size ceiling under 1 GiB refuses |
 | [T-1942](gate.md) | P1 | M | none | gate | done | The external QA of `0.2.0-beta.31`: verify the second batch of reports |
@@ -740,7 +740,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-671 entries: 22 open, 40 partial, 6 blocked, 603 done.
+671 entries: 21 open, 40 partial, 6 blocked, 604 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -751,9 +751,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 19 | 0 | 274 | 296 |
-| P2 | 14 | 16 | 5 | 209 | 244 |
+| P2 | 13 | 16 | 5 | 210 | 244 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 22 | 40 | 6 | 603 | 671 |
+| **All** | 21 | 40 | 6 | 604 | 671 |
 
 ## Work order
 

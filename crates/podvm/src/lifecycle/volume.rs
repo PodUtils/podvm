@@ -106,7 +106,7 @@ pub fn parse(spec: &str) -> Result<(Volume, bool), String> {
 /// where one is forced.
 pub fn refuse_unserved(
     verb: &str,
-    volumes: &[Volume],
+    (volumes, devices): (&[Volume], &[String]),
     userland: Option<&Userland>,
     forced: Option<podvm_enter::ladder::Mode>,
 ) -> Result<(), i32> {
@@ -145,7 +145,7 @@ pub fn refuse_unserved(
              prctl(PR_SET_SYSCALL_USER_DISPATCH) and --unsafe-host-paths is absent"
             .to_string(),
     };
-    refuse(verb, volumes, &why)
+    refuse(verb, volumes, devices, &why)
 }
 
 /// TODO/cli.md T-1412, T-1772, T-2001: the working directory, as docker
@@ -228,11 +228,17 @@ pub fn make_mount_points(rootfs: &str, volumes: &[Volume]) {
     }
 }
 
-/// One refusal line at 125, naming the first volume.
-fn refuse(verb: &str, volumes: &[Volume], why: &str) -> Result<(), i32> {
+/// One refusal line at 125, naming the first volume: `--device` where its
+/// guest path is in `devices` (TODO/enter.md T-1939), else `-v`.
+fn refuse(verb: &str, volumes: &[Volume], devices: &[String], why: &str) -> Result<(), i32> {
     if let Some(v) = volumes.first() {
+        let flag = if devices.contains(&v.guest) {
+            "--device"
+        } else {
+            "-v"
+        };
         eprintln!(
-            "podvm {verb}: -v {}:{}: {why} (TODO/enter.md T-1653)",
+            "podvm {verb}: {flag} {}:{}: {why} (TODO/enter.md T-1653)",
             v.host, v.guest
         );
     }

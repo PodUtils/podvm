@@ -149,14 +149,17 @@ fn only_the_loader_family_serves_a_volume() {
     let loader = userland(Family::Loader);
     let memfd = userland(Family::Memfd);
     let err = Err(podvm_image::error::EXIT_RUNTIME_ERROR);
-    assert_eq!(refuse_unserved("run", &vs, Some(&loader), None), Ok(()));
-    assert_eq!(refuse_unserved("run", &[], None, None), Ok(()));
-    assert_eq!(refuse_unserved("run", &vs, None, None), err);
-    assert_eq!(refuse_unserved("run", &vs, Some(&memfd), None), err);
+    assert_eq!(
+        refuse_unserved("run", (&vs, &[]), Some(&loader), None),
+        Ok(())
+    );
+    assert_eq!(refuse_unserved("run", (&[], &[]), None, None), Ok(()));
+    assert_eq!(refuse_unserved("run", (&vs, &[]), None, None), err);
+    assert_eq!(refuse_unserved("run", (&vs, &[]), Some(&memfd), None), err);
     assert_eq!(
         refuse_unserved(
             "run",
-            &vs,
+            (&vs, &[]),
             Some(&loader),
             Some(podvm_enter::ladder::Mode::Memfd)
         ),

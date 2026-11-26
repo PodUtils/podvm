@@ -362,7 +362,7 @@
 470 issue open
 471 issue closed
 472 issue closed
-473 issue open
+473 issue closed
 474 issue closed
 475 issue closed
 476 issue closed

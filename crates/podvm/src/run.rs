@@ -46,11 +46,14 @@ pub const RUN_OPTIONS: &str = "\
                    the same order rule as --env-file (TODO/cli.md T-1971)
   -w, --workdir D  working directory inside the container
   --device H[:G[:P]]
-                   map a host device or file into the container: opened
-                   before the chroot and served as a duplicate of the host
-                   descriptor where the interposer holds. Repeatable.
-                   P takes r, w and m; m parses and grants nothing
-                   (TODO/enter.md T-0501)
+                   map a host device or file into the container at G, as
+                   a -v of one file: a bind on the namespace rung, the
+                   path table on the userland rung. Repeatable. P takes
+                   r, w and m; r alone is read-only, and the namespace
+                   rung refuses r alone for a device node (a read-only
+                   bind does not refuse its writes); w alone keeps the
+                   descriptor serve of the interposer; m parses and
+                   grants nothing (TODO/enter.md T-0501, T-1939)
   -v, --volume H:G[:rw]
                    show the host path H at the guest path G. Repeatable. A
                    path rewrite through PODVM_MAPS on the userland loader
@@ -385,6 +388,7 @@ fn wrapped(o: &Opts, argv: Vec<String>) -> Vec<String> {
 mod acquire;
 pub(crate) mod binds; // TODO/enter.md T-1920
 pub(crate) mod cgroup; // TODO/cli.md T-1747
+mod devices; // TODO/enter.md T-1939
 mod user_ns; // TODO/enter.md T-1927
 pub(crate) use acquire::*;
 
