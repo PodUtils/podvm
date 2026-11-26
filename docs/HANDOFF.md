@@ -1,10 +1,10 @@
 # Handoff
 
-The state on 2026-11-26 after work resumed in Codex. The local checkout
-contains the commit that changes this file. A fresh session reads
-`AGENTS.md` first, then this file, `TODO/PROGRESS.md` and
-`docs/decisions.md`. The handoffs before this one are in git: `git show
-0cb62f18:docs/HANDOFF.md`. Remove this file when each step below is done.
+The state on 2026-11-26 after the Claude Code session that released
+`0.2.0-beta.41`. A fresh session reads `AGENTS.md` first, then this file,
+`TODO/PROGRESS.md` and `docs/decisions.md`. The handoffs before this one
+are in git: `git show 5377e4a5:docs/HANDOFF.md`. Remove this file when
+each step below is done.
 
 ## The rulings that stay in force
 
@@ -21,130 +21,88 @@ contains the commit that changes this file. A fresh session reads
 
 ## Where things are
 
-* `v0.2.0-beta.40` is released (release run 45436996748 on `e6bf9aeb`,
-  the second attempt; the first stopped in the bootstrap of four builds of
-  the nightly run of the tag, a slow download of zig). Its gate
-  (45420327645), the nightly trial (45420327893), `arm.yml` (45420337077),
-  the job `incus` of `kvm.yml` (45405003660), `workloads.yml`
-  (45390483251), the integration tests as uid 1000 (37 binaries) and the
-  ninth outside pass (T-2087, its three P1 faults fixed) passed. #662
-  (COORD-246) tells podrunner.
-* podcrates `v0.83.0` is taken on `main` after the tag (T-2089, `a39f4c4f`;
-  #663, closed: PodUtils/podcrates#259 lists the take). podrunner pins
-  beta.40 in its `4fc871c` (#662, closed).
-* T-2096 took podcrates `v0.84.0` and its shared gzip writer (
-  `04c8b7f4`, #666, PodUtils/podcrates#260). Hosted Incus run 45619039653
-  on `6bb0ae96` passed experiment 475 for the fresh and cached layer
-  streams. Hosted run 45621890257 on `7fb9e481` also passed the
-  native-tree retention assertions of experiment 434 clause 31.
-  T-2085 is done and the record closes #657.
-* Podcrates `v0.85.0` is released and main takes it (T-2097,
-  PodUtils/podcrates#262). The existing diagnostics keep the step and
-  cause of extraction and broker policy failures. The interposer
-  pack keeps raw ELF hashes and placement, and the static candidate
-  is 8,792,472 bytes. The local checks passed. PodUtils/podcrates#262
-  lists `9466c984` and acknowledges #669. Its #263 lists `5e872816` and
-  acknowledges #670 for the shared role table and worker brief.
-* T-2098 fixes a load failure for repeated references to one verified
-  OCI layer. All nine release layout tests passed. Both jobs in
-  Podrunner runner-image run 45731427540 reported a missing empty-layer
-  blob. The run kept no archive. #671 asks for a rerun after podrunner
-  takes a beta with the fix.
-* T-2093 is done. Hosted Incus run 45735495867 on `9e49c275` passed
-  experiment 479 with Incus 6.0.0 and cgroup v2. The observed limits
-  were 512 to 256 MiB, 128 to 64 processes and two to one CPUs. The
-  init PID stayed the same. The stream, usage and Btrfs root-cap checks
-  also passed. Gate 45735495585 passed on the same revision. #664 is closed.
-  [Live-limits transcript](../experiments/results/incus-live-limits.txt)
-* T-2054 item 5 is done: the spare-tree helper takes its store and
-  digest on a pipe, with an empty environment. Items 1, 2 and 3 stay.
-* T-2050 and T-2066 are done. A machine-tier Alpine run fetched the pinned
-  static QEMU 11.1.3 into an empty tools store and returned the payload
-  exit 7 under TCG. Hosted run 45153867720 already proves experiments 465
-  and 468 with `warm::line` under KVM. T-2048 still tracks SIGTERM during
-  an active save.
-* The current source built 37 release test binaries for `podvm` and
-  `podvm-supervise`. As uid 1000 on this host, 34 passed. Three hit host
-  limits: `pid_init_hidden` saw blank argv where `PR_SET_MM_MAP` returned
-  `EPERM`, `store_gates` could not mount the noexec store, and
-  `refusal_text` hit the missing Landlock check before its expected
-  path check. These constraints need a capable host for those tests.
-* The saved-state and layer-stream follow-up passed `sh scripts/dev/checks.sh`.
-  The candidate, a static binary of 9,488,600 bytes, passed experiment 473
-  under TCG. An earlier check during a QEMU run had one broker test fail.
-  The test passed alone and the full check passed with QEMU stopped.
-* Hosted Incus run 45616608586 on `ddb185b1` passed experiments 471 and
-  474. T-1964 is done. A 1 GiB Btrfs root refused the large write with
-  `Quota exceeded` and exit 7 while the pool still had 7,507,083,264
-  bytes free. See `experiments/results/incus-root-quota.txt`.
-* On `main` after beta.40, not released (CHANGELOG, "Unreleased"): the
-  room of an incus pool from incusd for each driver (T-2078 remaining 1,
-  `a033f62`, experiment 472), what the namespace rung opens (T-2092, #546),
-  the commit of `podvm-dev build` (T-2091, #531). Gate 45536609832 on
-  `a033f62` and gate 45539122840 on `07416ff` are green.
-* The finish sweep reconciled the open issue list with `TODO/github.txt`.
-  The record closes #664, #669 and #670 after the hosted proof and
-  sibling acknowledgements. #652 records the hosted beta.40 low-space
-  control and keeps the current candidate's hosted retest open.
-* The issue cleanup of 2026-11-24 is done: four agents checked each open
-  issue against the code, the record and a run of the beta.40 binary. 87
-  issues are closed with a comment of evidence; 56 stay open, each with a
-  body that says what is true now (the bot block stays under it). GitHub
-  and `TODO/issues.md` agree: 56 open in both. The new entries are T-2088
-  (the QA faults of beta.31 that stay open) and T-2090 (the QA reports that
-  beta.40 passes).
-* The cause of the stale issues: an issue maps to an umbrella entry (for
-  example T-1951) that stayed partial while most of its findings were
-  fixed; the sync bot keeps an issue open while its row says open, and the
-  body keeps the text of the day it was opened. Map each new issue to the
-  entry of its own finding, and close its row in the same commit as the
-  fix.
-* The bot issue-sync sets each issue from the record of the pushed commit:
-  close an issue in the record first (`TODO/issues.md` and
-  `TODO/github.txt`, pushed), then on GitHub, or the bot reopens it.
-* The Claude Code host measured in this handoff has cgroup v1, no
-  `/dev/kvm`, and an incusd with no AppArmor; a fault that AppArmor or
-  cgroup v2 makes shows only in the job `incus` of `kvm.yml`
-  (experiment 471, about 4 min).
+* Workflow dispatch: in the Claude Code session of 2026-11-26, the GitHub
+  tool refused each dispatch ("Actions has been disabled for this user"),
+  and a push from the session started no workflow (no gate, no
+  `issue-sync`, no `secrets`). Each run went through an issue `[gh action]
+  requested` (#674). The scheduled `issue-sync` (06:17 UTC) writes the
+  blocks of the issues that the session opened.
+* `v0.2.0-beta.41` RELEASE_STATE. Its gate 45772974200, `workloads.yml`
+  45772978726, the nightly trial 45772982947 and `arm.yml` 45772987551
+  passed on the version commit `332efaa`. The integration tests as uid
+  1000 (37 binaries) passed on `7c2b161`. The tenth outside pass (T-2100,
+  [the report](history/outside-pass-2026-11-26.md)) found no P0 or P1
+  finding in the binary of `7c2b161`. The pass was not blind by a tool:
+  the tester ran as root on the host of the checkout.
+* The beta carries T-2093 (podrunner#354), T-2094 (podrunner#355), T-2098
+  (#671), T-2048 (a signal during the save of a guest state, experiment
+  480), T-2054 item 5 and three findings of the tenth pass.
+* On `main` after the beta (CHANGELOG, "Unreleased"): OR-B41-02 (the copy
+  of QEMU in `PODVM_STORE`), OR-B41-07 (an incus `--rm` run after the OOM
+  killer), OR-B41-13 (`notebook` with no notebook), OR-B41-14 (`system
+  df`).
+* PodUtils/podrunner#359 (COORD-135, bytes read through each volume):
+  T-2099 is partial. COORD-255 (#672) gives the feasibility: no counter
+  exists on either tier; the recommended route is a counting FUSE
+  pass-through in the guest and the container. It waits for podrunner's
+  choice of the route and the field.
+* COORD-256 (#675) asks podcrates for the path of the emulator in the
+  machine legs of `pod-hostprobe` (OR-B41-01, OR-B40-07).
+* The measured Claude Code host: cgroup v1, no `/dev/kvm`, the `incus`
+  package of apt is installed (incusd 6.0.0 runs as root with
+  `INCUS_DIR` in a private directory). The 37 integration test binaries
+  pass there as uid 1000, also `pid_init_hidden`, `store_gates` and
+  `refusal_text`, which failed on the host of 2026-11-25.
+* T-2078 remaining 3 still needs a run on the hosted runner of
+  PodUtils/podrunner#346 with the beta.
 
 ## Next steps, in order
 
-1. The next beta still needs the checks in
-   [the release checklist](maintenance.md#releases), including blind QA.
-   It carries T-2093 for PodUtils/podrunner#354 (live Incus limits) and
-   T-2094 for PodUtils/podrunner#355 (saved-state channels and process
-   limits). The T-2093 hosted proof and the T-2094 TCG proof passed.
-   Send a COORD for each after release, and name the released OCI layout
-   fix in #671 so podrunner can rerun its two-architecture image build.
-2. T-2078 remaining 3: a run on the hosted runner of
-   PodUtils/podrunner#346 with the next beta. Hosted beta.40 run
-   45731449004 already proves the `dir-small` refusal on the same runner.
-   The pool had 1.86 GiB free for at least 7.21 GiB of estimated need.
-   Experiment 472 proves the pool-resource API on the earlier main.
-3. Sweep the current open issues at each session start (`AGENTS.md`, section 8
-   item 7), and map each new issue to the entry of its own finding.
-4. podrunner: #583 (T-1968, a sized writable disk). The machine tier
-   needs a disk-backed writable layer, part of T-1994. The namespace tier needs
-   the pod-enter mount requested in #667. Podrunner's 9p work mount also
-   needs a bound (#583). Experiment 477 found that `sqfstar` 4.6.1 loses
-   a valid POSIX ACL. Experiment 478 confirmed that EROFS full tar mode
-   keeps that ACL. The static builder pin is requested in #668. Both
-   pinned Alpine kernels disable EROFS and carry virtio block, ext4 and
-   overlay modules. The EROFS path needs another kernel pin. A disposable
-   64 MiB virtio ext4 disk enforced its size through an overlay under
-   TCG with the current amd64 pins. Ext4 needed `crc32c_generic.ko` in
-   addition to its declared module dependencies. The guest root switch
-   still needs work. T-1999 needs a machine root that keeps file
-   capabilities. Experiment 476
+1. When release run 45777325284 ends green: push the local commits of
+   `main`, then open the COORD issue `(to podrunner)` from the draft in
+   the session (answers podrunner#354 and #355, and #671: rerun the
+   runner-image build with beta.41). Close #674 with its run ids. Make
+   the docs true for beta.41 (README, `docs/limits.md`, the per-release
+   state of `TODO/PROGRESS.md`), as after beta.40. If the run fails, read
+   the failed step and request a new run.
+2. T-2078 remaining 3 (a hosted run of podrunner#346 with beta.41).
+3. Sweep the open issues (`AGENTS.md`, section 8 item 7). Watch #672
+   (COORD-255) for podrunner's choice, and #675 (COORD-256) for the tag
+   of podcrates.
+4. The open rows of T-2100: OR-B41-06 (a `run --rm` that SIGPIPE ends
+   keeps its record: podvm dies with SIGPIPE by design, T-1769, and
+   `eprintln!` panics on EPIPE, so the fix needs a design), OR-B41-08
+   (T-1939), OR-B41-09 (needs `diff_ids` in `pod_oci::spec::Config`), the
+   P3 rows.
+5. podrunner: #583 (T-1968, a sized writable disk). The machine tier
+   needs a disk-backed writable layer, part of T-1994. The namespace tier
+   needs the pod-enter mount requested in #667. Podrunner's 9p work
+   mount also needs a bound (#583). Experiment 477 found that `sqfstar`
+   4.6.1 loses a valid POSIX ACL; experiment 478 confirmed that EROFS
+   full tar mode keeps it. The static builder pin is requested in #668.
+   Both pinned Alpine kernels disable EROFS. A disposable 64 MiB virtio
+   ext4 disk enforced its size through an overlay under TCG; ext4 needed
+   `crc32c_generic.ko`. The guest root switch still needs work. T-1999
+   needs a machine root that keeps file capabilities. Experiment 476
    needs the podrunner hosted-boot wiring requested in #599. Then #596
-   and #599 (the hosted snapshot: T-1994, T-1996, T-1998, T-1999),
-   #593 (T-1990,
-   T-1991). Then T-2088 and the open rows of T-2070, T-2079, T-2087.
-5. T-2054, T-2048, then the work order of
-   `TODO/PROGRESS.md`.
+   and #599 (T-1994, T-1996, T-1998, T-1999), #593 (T-1990, T-1991).
+   Then T-2088 and the open rows of T-2070, T-2079, T-2087.
+6. T-2054 items 1 to 3, then the work order of `TODO/PROGRESS.md`.
 
 ## Rules learned
 
+* Write the full SHA in a request block from `git rev-parse HEAD`, never
+  from memory: #673 did not run, because its head check named a wrong
+  full SHA.
+* `sh scripts/dev/checks.sh && git commit ...`, never `;`: a `;` commits
+  after a failed check.
+* A blind tester that runs as root can damage the bundle: `system
+  install-names` makes links to the binary, and a write to a link wrote
+  the binary. Give the tester a copy of the bundle, and check
+  `SHA256SUMS` after the pass.
+* The keyless reads of the forge refused `runs.py` (403) for the whole
+  session; `gh run view` without a token and the GitHub tool read the
+  runs.
 * The record gate refuses a closed issue whose entry is not done: where a
   fix closes one item of an umbrella entry (T-2088), give the item an entry
   of its own (T-2091, T-2092) and map the issue to it in the same commit.
