@@ -7581,3 +7581,53 @@ whose count is unknown.
 
 **Partial (2026-11-26).** The feasibility answer is COORD-255 (#672). Remaining:
 the route and field of podrunner, the counter, the proof.
+
+# T-2103: A writable host volume that the host user can remove, on the machine and incus tiers
+
+**Source:** PodUtils/podrunner#371 (COORD-143 of podrunner, from a member of the team, 2026-11-26; podrunner task 648)
+**Category:** machine
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+podrunner mounts its job cache (`/podrunner-cache`) in microvm guests and
+incus instances read-only only. On the machine tier the 9p share uses
+`security_model=none` and the 9p2000.L default `access=client`: the image's
+user writes only where its uid is the host uid. On the incus tier the
+instance writes files as ids of its map, so the user of podrunner cannot
+remove them under a 0755 directory; with `security.idmap.isolated` a later
+instance cannot write them either. `shift=true` lets the root of the
+instance write as host root.
+
+## Premise
+
+podrunner asks: (1) the machine tier: a volume mode with
+`security_model=mapped-xattr` (and `fmode=0644,dmode=0755` for files that
+the host makes), for `rw` and `ro` of one directory, so the guest keeps its
+owner and mode in xattrs and the host user owns each file; (2) the incus
+tier: a way for the host user to remove what an instance wrote in a volume
+with the map kept, preferably a removal through incusd (for example a
+`podvm volume rm`, or a cleanup run in a short instance with the same map)
+over a map of the caller's uid into the instance.
+
+## Approach
+
+Machine tier: a mode of `-v` (or a variable) that gives `-virtfs
+local,security_model=mapped-xattr,fmode=0644,dmode=0755` and mounts the tag
+with `access=any` or the access that the guest's owners need. Incus tier: a
+removal of a volume's content through a short instance with the same map,
+named by a verb. Name the version of each in the answer.
+
+## Decision
+
+-
+
+## Prove
+
+A `run -d` with a writable volume where the image's user (a uid other than
+the host's) writes a file; the host user then removes the directory with no
+root; on the machine tier the next guest reads the file with its owner and
+mode.
