@@ -26,7 +26,7 @@ use podvm_image::error::{EXIT_CLI_ERROR, EXIT_FLAG_ERROR};
 use podvm_image::platform::Platform;
 
 pub const EXEC_USAGE: &str = "\
-usage: podvm exec [options] <image> <command> [arg...]
+usage: podvm exec [options] <container|image> <command> [arg...]
 
   -i, --interactive
                    with -t, the pty takes stdin; with no -t a no-op: stdin

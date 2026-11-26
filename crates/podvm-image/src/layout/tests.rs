@@ -119,14 +119,14 @@ fn saved_with_index(
 fn layout_index_refuses_schema_9_and_records_no_tag_with_no_name() {
     let s = scratch("index9");
     let nine = saved_with_index(&s, "nine", |v| v["schemaVersion"] = 9.into());
-    let e = load(&s, &nine).unwrap_err().to_string();
+    let e = load(&s, &nine, &nine).unwrap_err().to_string();
     assert!(e.contains("schemaVersion 9"), "{e}");
     let unnamed = saved_with_index(&s, "anon", |v| {
         for m in v["manifests"].as_array_mut().unwrap() {
             m.as_object_mut().unwrap().remove("annotations");
         }
     });
-    let r = load(&s, &unnamed).unwrap();
+    let r = load(&s, &unnamed, &unnamed).unwrap();
     assert_eq!(r.tag, None);
     assert_eq!(r.repository, "<none>");
     let _ = std::fs::remove_file(&nine);
@@ -184,7 +184,7 @@ fn messages_name_the_entry_of_a_changed_blob() {
     assert!(changed, "no blob to change");
     std::fs::write(&saved, b.into_inner().unwrap()).unwrap();
     let fresh = scratch("changed-load");
-    let e = load(&fresh, &saved).unwrap_err().to_string();
+    let e = load(&fresh, &saved, &saved).unwrap_err().to_string();
     assert!(e.contains("for the entry blobs/sha256/"), "{e}");
     assert!(!e.contains("absent"), "{e}");
     let _ = std::fs::remove_file(&saved);
@@ -318,7 +318,7 @@ fn repeated_empty_layers_use_one_blob_from_the_archive() {
     let (tarball, manifest_digest) =
         layout_from_layers("repeated", [empty.clone(), base, empty], Order::IndexFirst);
     let store = scratch("repeated");
-    let record = load(&store, &tarball).unwrap();
+    let record = load(&store, &tarball, &tarball).unwrap();
     assert_eq!(record.manifest_digest, manifest_digest.to_string());
     assert_eq!(
         record.layers,
@@ -341,7 +341,7 @@ fn an_image_with_more_layers_than_the_lock_slots_loads_and_saves() {
         let tag = format!("{order:?}").to_lowercase();
         let (tarball, manifest_digest) = layered_layout(&tag, n, order);
         let s = scratch(&format!("t2068-{tag}"));
-        let r = load(&s, &tarball).unwrap_or_else(|e| panic!("{order:?}: load: {e}"));
+        let r = load(&s, &tarball, &tarball).unwrap_or_else(|e| panic!("{order:?}: load: {e}"));
         assert_eq!(r.layers.len(), n, "{order:?}");
         assert_eq!(r.manifest_digest, manifest_digest.to_string(), "{order:?}");
         for l in &r.layers {
@@ -360,7 +360,8 @@ fn an_image_with_more_layers_than_the_lock_slots_loads_and_saves() {
         drop(out);
         assert_eq!(done.blobs, n + 2, "{order:?}");
         let again = scratch(&format!("t2068-{tag}-again"));
-        let back = load(&again, &saved).unwrap_or_else(|e| panic!("{order:?}: reload: {e}"));
+        let back =
+            load(&again, &saved, &saved).unwrap_or_else(|e| panic!("{order:?}: reload: {e}"));
         assert_eq!(back.manifest_digest, r.manifest_digest, "{order:?}");
         for p in [&tarball, &saved] {
             let _ = std::fs::remove_file(p);

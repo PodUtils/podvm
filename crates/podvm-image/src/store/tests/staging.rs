@@ -210,7 +210,7 @@ fn a_saved_image_loads_into_a_fresh_store() {
     crate::layout::save(&a, "saved-test:v1", &mut f).unwrap();
     drop(f);
     let b = scratch("save-b");
-    let loaded = crate::layout::load(&b, &tarball).unwrap();
+    let loaded = crate::layout::load(&b, &tarball, &tarball).unwrap();
     assert_eq!(loaded.manifest_digest, dm.to_string());
     assert_eq!(loaded.layers, vec![dl.to_string()]);
     let found = b.find_one("saved-test:v1").unwrap();
@@ -267,7 +267,7 @@ fn a_tampered_tarball_is_refused_on_load() {
     bytes[at] ^= 1;
     std::fs::write(&tarball, &bytes).unwrap();
     let b = scratch("save-tamper-b");
-    let e = crate::layout::load(&b, &tarball).unwrap_err();
+    let e = crate::layout::load(&b, &tarball, &tarball).unwrap_err();
     assert!(format!("{e}").contains("mismatch"), "{e}");
     let _ = std::fs::remove_dir_all(a.root());
     let _ = std::fs::remove_dir_all(b.root());

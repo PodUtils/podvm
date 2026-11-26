@@ -62,8 +62,8 @@ impl crate::incus::import::Tree for IncusTree<'_> {
             Ok(Some(_locks)) => podvm_extract::put_aside(self.store, digest),
             Err(e) => {
                 return Some(format!(
-                    "the tree of the image stays in the store: its locks: {e}                      (TODO/machine.md T-2085)"
-                ))
+                "the tree of the image stays in the store: its locks: {e} (TODO/machine.md T-2085)"
+            ))
             }
         };
         match aside.map(|a| a.map(|p| (podvm_extract::remove_aside(&p), p))) {

@@ -123,7 +123,8 @@ const SETTLE_MS: u64 = 10_000;
 /// The usage of `rm` (TODO/cli.md T-1831: `-v` is in it).
 pub(crate) const RM_USAGE: &str =
     "usage: podvm rm [-f|--force] [-v|--volumes] [--podvm-tier incus] <container> [container...]
-  -v, --volumes  taken and does nothing: podvm has no named or anonymous volume";
+  -v, --volumes  taken and does nothing: podvm has no named or anonymous volume
+  --podvm-tier incus  an instance of incus; of the other flags it takes -f only";
 
 /// `podvm rm [-f] <container>...`
 pub fn rm(args: &[String]) -> i32 {

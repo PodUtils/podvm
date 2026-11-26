@@ -1,5 +1,5 @@
 //! TODO/gate.md T-1855: a scan of the product sources for the patterns
-//! behind four defects, as a ratchet. `crates/podvm-gate/patterns.baseline`
+//! behind five defects, as a ratchet. `crates/podvm-gate/patterns.baseline`
 //! holds the count of each pattern in each file as reviewed on 2026-11-15;
 //! a file with more hits of a pattern than its baseline fails the gate,
 //! with the path and the line of each hit. A fixed hit lowers the count,
@@ -13,7 +13,10 @@
 //!   `.so.tmp`, is predictable (T-1782, T-1844);
 //! * `byte_slice`: `&name[..N]` with a fixed N cuts user text inside a
 //!   character (T-1800);
-//! * `discard_write`: `let _ =` of a write hides a full stdout (T-1816).
+//! * `discard_write`: `let _ =` of a write hides a full stdout (T-1816);
+//! * `joined_literal`: a run of 8 or more spaces after the fourth word of
+//!   a string literal is the indentation of a continuation line that lost its
+//!   `\\`, and the user reads it (T-2100, OR-B41-17).
 //!
 //! The print macros of a verb (T-1816) are not scanned: 232 sites print
 //! through `println!`, and `tests/stdout_full.rs` holds the case of a full
@@ -56,6 +59,63 @@ fn has_byte_slice(line: &str) -> bool {
     false
 }
 
+/// True when a string literal of the line has a run of 8 or more spaces
+/// after a word that follows a space, and text after the run: the
+/// indentation of a continuation line that lost its `\\`. A run after the
+/// first word of a literal is the alignment of a column, and stays.
+fn has_joined_literal(line: &str) -> bool {
+    let mut inside = false;
+    let mut lit = String::new();
+    let mut chars = line.chars();
+    while let Some(c) = chars.next() {
+        match (inside, c) {
+            (true, '\\') => {
+                lit.push(c);
+                lit.extend(chars.next());
+            }
+            (true, '"') => {
+                if joined(&lit) {
+                    return true;
+                }
+                lit.clear();
+                inside = false;
+            }
+            (true, _) => lit.push(c),
+            (false, '"') => inside = true,
+            (false, _) => {}
+        }
+    }
+    false
+}
+
+/// The rule of [`has_joined_literal`] on the text of one literal.
+fn joined(lit: &str) -> bool {
+    let b = lit.as_bytes();
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] != b' ' {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < b.len() && b[i] == b' ' {
+            i += 1;
+        }
+        if i - start >= 8
+            && i < b.len()
+            && b[..start]
+                .trim_ascii_start()
+                .iter()
+                .filter(|c| **c == b' ')
+                .count()
+                >= 3
+        {
+            return true;
+        }
+    }
+    false
+}
+
 /// The names of the patterns that `line` holds.
 pub(super) fn hits(line: &str) -> Vec<&'static str> {
     let mut v = Vec::new();
@@ -72,6 +132,9 @@ pub(super) fn hits(line: &str) -> Vec<&'static str> {
         && (line.contains(".write_all(") || line.contains("writeln!(") || line.contains("write!("))
     {
         v.push("discard_write");
+    }
+    if has_joined_literal(line) {
+        v.push("joined_literal");
     }
     v
 }
@@ -161,6 +224,16 @@ mod tests {
         assert!(hits("let s = joined[..17].to_vec();").is_empty());
         assert_eq!(hits("let _ = out.write_all(b);"), ["discard_write"]);
         assert!(hits("out.write_all(b)?;").is_empty());
+        // T-2100: the continuation that lost its backslash, and the
+        // alignment of a column, a usage line and an escaped quote that stay.
+        assert_eq!(
+            hits(r#"eprintln!("a b c d,              e f");"#),
+            ["joined_literal"]
+        );
+        assert!(hits(r#"say("qemu flags        {}");"#).is_empty());
+        assert!(hits(r#"say("== build 1           {}");"#).is_empty());
+        assert!(hits(r#"say("a b c \"q\"              ");"#).is_empty());
+        assert!(hits(r#"x("  -t, --tty        give");"#).is_empty());
         let m = scan(
             "let _ = writeln!(o);\n// let _ = writeln!(o);\n#[cfg(test)]\nlet _ = writeln!(o);\n",
         );

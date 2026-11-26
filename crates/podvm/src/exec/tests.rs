@@ -27,6 +27,36 @@ fn exec_usage_is_plain_ascii() {
     assert_eq!(bad, 0, "exec usage carries {bad} non-ASCII bytes");
 }
 
+/// TODO/cli.md T-2100 (OR-B41-17): the words of `exec` about its target.
+/// `exec` takes a container first, so its usage and the refusal of a name
+/// that resolves to nothing name a container, and no line carries the
+/// indentation of a source line (a run of two spaces).
+#[test]
+fn the_words_of_exec_name_a_container_in_one_spacing() {
+    let first = EXEC_USAGE.lines().next().unwrap_or_default().to_string();
+    // (the text, the words that it must hold)
+    let cases: [(String, &[&str]); 3] = [
+        (
+            super::ns::created_note("c1"),
+            &["c1", "never started", "T-0505"],
+        ),
+        (
+            super::ns::not_in_store("nosuch"),
+            &["container", "nosuch", "never pulls"],
+        ),
+        (first, &["<container|image>"]),
+    ];
+    for (text, words) in &cases {
+        for w in *words {
+            assert!(text.contains(w), "{w:?} not in {text:?}");
+        }
+        assert!(
+            !text.trim_start().contains("  "),
+            "a run of spaces: {text:?}"
+        );
+    }
+}
+
 #[test]
 fn parsing_stops_at_the_image_name() {
     let o = parse(&v(&["-e", "A=1", "alpine", "ls", "-l", "-e"])).unwrap();

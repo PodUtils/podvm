@@ -42,12 +42,53 @@ pub fn failed(e: &std::io::Error) -> i32 {
     EXIT
 }
 
+/// The answer of a verb whose write to stdout failed, with the verb's own
+/// `line` (which names stdout) in place of the line of [`failed`]: one
+/// failure gives one line (TODO/cli.md T-2100, OR-B41-17).
+pub fn failed_line(line: &str) -> i32 {
+    if !REPORTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+        say(&format!("{line}\n"));
+    }
+    EXIT
+}
+
 /// `code`, or [`EXIT`] where the last flush of stdout fails.
 pub fn flushed(code: i32) -> i32 {
     match std::io::stdout().flush() {
         Ok(()) => code,
         Err(e) => failed(&e),
     }
+}
+
+/// While it lives, a write of podvm to a pipe that no process reads gives
+/// EPIPE, not the end of podvm by SIGPIPE (TODO/cli.md T-2100, OR-B41-06):
+/// a foreground run that wrote a line to a closed stderr ended before
+/// it removed or ended its record. A handler, not `SIG_IGN`: `execve`
+/// sets a caught signal back to its default, so the payload gets SIGPIPE
+/// as with no podvm. At the drop SIGPIPE goes back to its default
+/// (T-1769).
+pub struct PipeCaught(());
+
+/// Catch SIGPIPE until the [`PipeCaught`] drops.
+pub fn catch_pipe() -> PipeCaught {
+    extern "C" fn on_pipe(_: i32) {}
+    set_pipe(on_pipe as *const () as usize);
+    PipeCaught(())
+}
+
+impl Drop for PipeCaught {
+    fn drop(&mut self) {
+        set_pipe(0); // SIG_DFL
+    }
+}
+
+fn set_pipe(handler: usize) {
+    unsafe extern "C" {
+        fn signal(sig: i32, handler: usize) -> usize;
+    }
+    // SAFETY: SIGPIPE (13) and SIG_DFL or a handler that does nothing,
+    // which is safe in a signal.
+    unsafe { signal(13, handler) };
 }
 
 /// The text of the panic of a print macro on `stream`, if `msg` is one.

@@ -139,12 +139,16 @@ struct LoadedBlob {
 /// is written only where each blob that it names is in the store
 /// ([`Store::put_written`]). A blob that the manifest does not name stays
 /// a stray, which `image prune` removes.
-pub fn load(store: &Store, src: &Path) -> Result<Record> {
+///
+/// `shown` is the name of the archive in each message: `src` where the
+/// caller gave a file, and words of stdin where `src` is the spool of the
+/// store that took stdin (TODO/cli.md T-2100: the user did not name it).
+pub fn load(store: &Store, src: &Path, shown: &Path) -> Result<Record> {
     // PodUtils/podvm#527: a sweep keeps each blob until the record.
     let _writing = store.writing()?;
     let file = std::fs::File::open(src).map_err(|e| Error::io(src.display().to_string(), e))?;
     let mut archive = tar::Archive::new(file);
-    load_inner(store, src, &mut archive)
+    load_inner(store, shown, &mut archive)
 }
 
 fn load_inner(

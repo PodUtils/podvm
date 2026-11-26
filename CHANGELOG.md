@@ -21,6 +21,25 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 - `notebook` with no notebook exits 1, the code of a missing argument.
 - `system df` counts only whole extractions, as `inspect .Extracted` does.
 
+### Fixed: a `--rm` record after SIGPIPE, the code of a name in use, and words of the outside pass, 2026-11-26
+
+Record: T-2100 (OR-B41-06, OR-B41-10, OR-B41-17), T-2087 (OR-B40-10).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- A foreground `run --rm` whose reader of stdout and stderr goes away
+  removes its record: a closed pipe no longer ends podvm before the end
+  of the record. The payload still gets SIGPIPE.
+- A name that a container uses already exits 1 from `run` and `run -d`,
+  as from `create`: the cli-error of the published table.
+- The note of `exec` on a created container, a refusal of `windows` and
+  a line of the incus tier lost the indentation of the source lines in
+  them; `podvm-gate` counts that pattern.
+- `exec` names a container in its usage and in the refusal of an unknown
+  name; `load` of stdin names stdin, not a file of the store; the refusal
+  of `cp -` names both directions; `save` to a full stdout gives one
+  line; the usages of `stop`, `ps` and `rm` name the flags that the incus
+  tier refuses; a file on the path of the store root names the store.
+
 ## 0.2.0-beta.41 (2026-11-26)
 
 ### Known gaps: what the checks of 0.2.0-beta.41 prove, and what stays open, 2026-11-26

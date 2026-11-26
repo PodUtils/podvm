@@ -140,10 +140,7 @@ pub fn exec(args: &[String]) -> i32 {
     let others = found.other_platforms.clone();
     let Some(record) = found.one() else {
         if others.is_empty() {
-            eprintln!(
-                "podvm exec: {image} is not in the store. `podvm exec` never pulls: \
-                 `podvm run {image} ...` is what puts it there"
-            );
+            eprintln!("{}", super::ns::not_in_store(&image));
             // TODO/supervise.md T-1805, PodUtils/podvm#356: a name that
             // resolves to nothing is the caller's error, exit 1.
             return podvm_image::error::EXIT_CLI_ERROR;

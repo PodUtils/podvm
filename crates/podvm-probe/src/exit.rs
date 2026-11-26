@@ -75,7 +75,8 @@ pub const CASES: &[(&str, i32, &str)] = &[
         "cli-error",
         EXIT_CLI_ERROR,
         "the verb refused after the flags parsed: an invalid reference, a template \
-         no verb can answer, a name that resolves to nothing, a missing argument, \
+         no verb can answer, a name that resolves to nothing, a name that a \
+         container uses already (create, run), a missing argument, \
          an image that a container uses (rmi), an archive that load or import \
          will not read, a copy that leaves its tree (cp), or a verb neither \
          podvm nor docker has",

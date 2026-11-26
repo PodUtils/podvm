@@ -439,3 +439,4 @@ mod tree_alone; // TODO/machine.md T-2085
 
 // TODO/supervise.md T-1715: the store root keeps the container table.
 mod modes;
+mod root_file; // TODO/cli.md T-2100

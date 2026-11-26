@@ -96,7 +96,7 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
                 // OQ-03 of the outside pass (T-1970): a refused `run -d`
                 // (a name in use) leaves no tree, as `create` (T-1709).
                 super::drop_unrecorded(&store, &p.rootfs);
-                return podvm_image::error::EXIT_RUNTIME_ERROR;
+                return crate::lifecycle::code_of(&e); // T-2100
             }
         };
         let kept = podvm_supervise::set_wall(&store, &c.id, p.wall_ms)
@@ -258,6 +258,9 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
     // ⭐ TODO/supervise.md T-1421. The foreground record is created
     // before the entry, and the payload's stdout is teed to its log:
     // every foreground run leaves a record `ps -a` lists as `Exited`.
+    // TODO/cli.md T-2100 (OR-B41-06): no SIGPIPE ends podvm while the
+    // record is there; the record ends, or `--rm` removes it.
+    let _pipe = crate::names::stdout::catch_pipe();
     let mut fg = match fg_begin(&store, &p) {
         Ok(f) => f,
         Err(code) => {

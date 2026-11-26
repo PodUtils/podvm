@@ -35,7 +35,7 @@ A new gate check must have a plant that produces its own failure message.
 ## Patterns that `podvm-gate` counts
 
 TODO/gate.md T-1855. `podvm-gate` scans the product sources for these
-four patterns as a ratchet: `crates/podvm-gate/patterns.baseline` holds
+five patterns as a ratchet: `crates/podvm-gate/patterns.baseline` holds
 the reviewed count in each file, and a file with a new hit fails the
 gate. Lower a count when a fix removes a hit.
 
@@ -45,4 +45,5 @@ gate. Lower a count when a fix removes a hit.
 | `temp_dir()` with a pid, or `.so.tmp` (`tmp_pid`) | Another user can predict the name and plant a link (T-1782, T-1844) | a directory with a random part, made with `create_dir` |
 | `&name[..N]` with a fixed N (`byte_slice`) | A cut inside a character of user text panics (T-1800) | `chars().take(N)`, or a cut at `is_char_boundary`; a cut of bytes that are not text keeps the count |
 | `let _ =` of a write (`discard_write`) | A full stdout aborts nothing and loses output (T-1816) | `?` or a named error on stdout; a write to stderr may discard |
+| 8 or more spaces after the fourth word of a string literal (`joined_literal`) | A continuation line lost its `\`, and the message has its indentation (T-2100) | a `\` at the end of each continued line |
 

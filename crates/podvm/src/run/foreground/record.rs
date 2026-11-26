@@ -68,7 +68,7 @@ pub(super) fn fg_begin(
                 }
                 None => eprintln!("podvm run: the run could not be recorded: {e}"),
             }
-            return Err(podvm_image::error::EXIT_RUNTIME_ERROR);
+            return Err(crate::lifecycle::code_of(&e)); // T-2100
         }
     };
     let log_path = podvm_supervise::table::log_path(store, &c.id);
@@ -81,8 +81,8 @@ pub(super) fn fg_begin(
             hold: None,
         }),
         Err(why) => {
-            eprintln!("podvm run: the run's output could not be captured for its record: {why}");
             let _ = podvm_supervise::remove(store, &c.id, true);
+            eprintln!("podvm run: the run's output could not be captured for its record: {why}");
             Err(podvm_image::error::EXIT_RUNTIME_ERROR)
         }
     }
