@@ -8,6 +8,16 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: `--network host`, 2026-11-26
+
+Record: T-2087 (OR-B40-14).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `run --network host` and `create --network host` hold where the payload
+  shares the network of this machine: each rootfs rung and the runsc
+  tier. The machine and incus tiers refuse it by name. `--network` still
+  refuses each other value, and `host` with `broker`.
+
 ### Fixed: `run -u` names the access that the payload keeps, 2026-11-26
 
 Record: T-2087 (OR-B40-17).

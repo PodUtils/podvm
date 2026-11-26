@@ -95,6 +95,7 @@ fn every_field_of_opts_is_classified(o: Opts) {
         drops: _,             // the profile
         needs: _,             // the profile
         broker: _,            // machine; incus refuses
+        net_host: _,          // the rootfs rungs and runsc; machine and incus refuse
         confine: _,           // TABLE: --podvm-confine
         ports: _,             // incus refuses (incus_refuses)
         allow: _,             // the broker

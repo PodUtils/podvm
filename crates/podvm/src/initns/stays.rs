@@ -99,6 +99,20 @@ pub fn check_init(verb: &str, init: bool, pid: bool, rung: &str) -> Result<(), i
     Err(podvm_image::error::EXIT_RUNTIME_ERROR)
 }
 
+/// TODO/cli.md T-2087 (OR-B40-14): `--network host` holds where the entry
+/// opens no network namespace (each rootfs rung today); a rung that opens
+/// one refuses it by name, as the payload would not share this machine's.
+pub fn check_net(verb: &str, host: bool, net: bool, rung: &str) -> Result<(), i32> {
+    if !host || !net {
+        return Ok(());
+    }
+    eprintln!(
+        "podvm {verb}: --network host is refused: the {rung} rung opens a network namespace, \
+         so the payload does not share the network of this machine (TODO/cli.md T-2087)"
+    );
+    Err(podvm_image::error::EXIT_RUNTIME_ERROR)
+}
+
 fn refused(verb: &str, why: Option<String>) -> Result<(), i32> {
     let Some(why) = why else {
         return Ok(());

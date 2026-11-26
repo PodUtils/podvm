@@ -81,6 +81,10 @@ pub(crate) struct Opts {
     /// `--network broker` with `--ports` and `--allow`: the egress broker
     /// of the run (TODO/net.md T-1665).
     pub(crate) broker: bool,
+    /// `--network host` (TODO/cli.md T-2087, OR-B40-14): the payload shares
+    /// the network of this machine, as each rung that opens no network
+    /// namespace gives it.
+    pub(crate) net_host: bool,
     /// `--podvm-confine=SPEC`: the confine layer (TODO/enter.md T-1658).
     pub(crate) confine: Option<podvm_enter::confine::Ask>,
     pub(crate) ports: Vec<u16>,
@@ -172,6 +176,7 @@ impl Opts {
             drops: Vec::new(),
             needs: Vec::new(),
             broker: false,
+            net_host: false,
             confine: None,
             ports: Vec::new(),
             allow: Vec::new(),

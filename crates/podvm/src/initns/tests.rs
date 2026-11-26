@@ -416,3 +416,20 @@ fn init_holds_where_the_run_has_a_pid_namespace() {
         assert_eq!(got, refused, "{init} {pid} {rung}");
     }
 }
+
+/// TODO/cli.md T-2087 (OR-B40-14): `--network host` holds where the entry
+/// opens no network namespace, and is refused where one opens.
+#[test]
+fn network_host_holds_where_no_network_namespace_opens() {
+    // (--network host, a network namespace, refused)
+    let rows = [
+        (true, false, false),
+        (true, true, true),
+        (false, true, false),
+        (false, false, false),
+    ];
+    for (host, net, refused) in rows {
+        let got = stays::check_net("run", host, net, "namespace").is_err();
+        assert_eq!(got, refused, "{host} {net}");
+    }
+}

@@ -1,5 +1,6 @@
 use super::*;
 use podvm_enter::ExitCode as _;
+use podvm_probe::isolation::Part;
 
 /// Everything `run` and `create` both need: the image in the store, extracted,
 /// its plan resolved and the rung selected, with nothing entered yet.
@@ -353,8 +354,9 @@ pub(crate) fn prepare(
     );
     crate::initns::stays::check_rung(verb, &o, entered.word())?; // T-2002
     super::devices::check_rung(verb, &o, entered.word())?; // TODO/enter.md T-1939
-    let pid = opened.has(podvm_probe::isolation::Part::Pid);
+    let (pid, net) = (opened.has(Part::Pid), opened.has(Part::Net));
     crate::initns::stays::check_init(verb, o.init, pid, entered.word())?; // T-2087
+    crate::initns::stays::check_net(verb, o.net_host, net, entered.word())?; // T-2087
     banner.push_str(&store_note(store));
     banner.push_str(&tree.fill.line());
     // ⭐ M5. The completion layer runs HERE: after the rootfs exists and the
@@ -363,7 +365,7 @@ pub(crate) fn prepare(
     // somebody else's image and the payload can see it.
     let mut ask = o.ask.clone();
     ask.container_name = o.name.clone();
-    ask.entry_mounts_proc = opened.has(podvm_probe::isolation::Part::Proc);
+    ask.entry_mounts_proc = opened.has(Part::Proc);
     let mut completion = crate::complete::prepare(verb, &rootfs, &ask, &mut banner)?;
     super::binds::bind(verb, &o, rf, ul, &completion, &mut banner)?; // T-2072
     if !cfg.config.user.is_empty() && !super::user_ns::applied(&env) {
