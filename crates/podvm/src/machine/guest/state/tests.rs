@@ -82,13 +82,6 @@ fn a_state_serves_only_the_run_that_its_guest_can_hold() {
         ),
         (
             Asks {
-                mapped: true,
-                ..base.clone()
-            },
-            ":mapped",
-        ),
-        (
-            Asks {
                 tty: true,
                 ..base.clone()
             },
@@ -181,6 +174,7 @@ fn each_part_of_the_shape_changes_the_fingerprint_and_the_files() {
             mem,
             line,
             script,
+            root: None,
         })
         .unwrap()
     };
@@ -196,6 +190,7 @@ fn each_part_of_the_shape_changes_the_fingerprint_and_the_files() {
         "cpu \"tcg\"\n",
         "mem \"of-the-initrd\"\n",
         "machine \"-m\"\nmachine \"0M\"\n",
+        "root \"initramfs\"\n",
     ] {
         assert!(base.contains(want), "{want:?} is not in {base}");
     }
@@ -255,6 +250,39 @@ fn each_part_of_the_shape_changes_the_fingerprint_and_the_files() {
         "the emulator version",
         shape("sha256:aa", Accel::Tcg, &qemu3, &kernel, None, &line, "s"),
     ));
+    // TODO/machine.md T-1994: the root disk of systemd as PID 1, by the
+    // SHA-256 of its trailer: another disk of the same digest (a new
+    // format, a build of other bytes) is another state.
+    let rooted = |sha: &'static str| {
+        fingerprint(&Shape {
+            digest: "sha256:aa",
+            accel: Accel::Tcg,
+            qemu: &qemu,
+            kernel: &kernel,
+            mem: None,
+            line: &line,
+            script: "s",
+            root: Some(sha),
+        })
+        .unwrap()
+    };
+    let (one, two) = (rooted("11"), rooted("22"));
+    assert!(
+        one.contains(&format!(
+            "root \"disk 11 format {}\"\n",
+            crate::machine::guest::disk::root::FORMAT
+        )),
+        "{one}"
+    );
+    assert_ne!(
+        one, two,
+        "the SHA-256 of the root disk is not in the fingerprint"
+    );
+    assert_ne!(
+        files(&d, "sha256:aa", &one).state,
+        files(&d, "sha256:aa", &two).state
+    );
+    others.push(("the root disk", one));
     let own = files(&d, "sha256:aa", &base);
     for (what, text) in &others {
         assert_ne!(*text, base, "{what} is not in the fingerprint");
@@ -271,6 +299,7 @@ fn each_part_of_the_shape_changes_the_fingerprint_and_the_files() {
         mem: None,
         line: &line,
         script: "s",
+        root: None,
     });
     assert!(gone.is_err());
     let _ = std::fs::remove_dir_all(&d);

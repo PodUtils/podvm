@@ -159,9 +159,10 @@ pub const USER: &[Group] = &[
                  saves the state of its guest in the store, and each later run starts from it. \
                  0 boots each guest. pipe saves and loads through a pipe of cat. Another value \
                  exits 125. Each run of one state shares the machine-id, the boot id and what \
-                 a service made at its start (call C27). A run that a state does not serve, and \
-                 each run with 0, boots systemd of the image as PID 1 of the guest on the root \
-                 disk where the image has it (T-1994).",
+                 a service made at its start (call C27). On the root disk of an image whose init is \
+                 systemd, the guest of a state, and each run that a state does not serve, have \
+                 systemd as PID 1 of the guest (T-1994); PODVM_MACHINE_ROOT=initramfs keeps the \
+                 state of the initramfs, with the init in a PID namespace.",
             ),
             v(
                 "PODVM_MACHINE_ROOT",
@@ -351,6 +352,8 @@ pub const INTERNAL: &[&str] = &[
     "PODVM_MEMO_PATH",
     "PODVM_RO",
     "PODVM_SANDPROBE_HOST",
+    // `--tmpfs GUEST:size=N` in the record (TODO/machine.md T-1968).
+    "PODVM_TMPFS",
     "PODVM_USERNS_IDS",
     "PODVM_USERNS_JOIN",
     // `--podvm-volume-base` for the handler and the interposer (T-1972).

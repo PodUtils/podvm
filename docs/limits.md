@@ -41,6 +41,14 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   the table cannot map, and `io_uring_setup`, answer `ENOSYS`. A program
   that issues the `syscall` instruction itself (a static program, Go,
   liburing) passes the interposer (T-1652).
+- `--tmpfs GUEST:size=N` is a tmpfs in memory of N bytes on the
+  namespace rung, for `run`, `run -d` and `create` (T-1968). A write past
+  N fails with `ENOSPC`, `exec` sees the mount of the run, and `inspect`
+  (`.Tmpfs`) and `--report` name it as memory. The chroot rung, the
+  userland rung, a rung that `PODVM_MODE` forces, the init of the image
+  and the syscall tier (other than its `/tmp`) refuse it by name with
+  125. podvm never gives a directory with no limit in its place. A
+  `--tmpfs` with no `size=` stays a directory of a foreground run.
 - On the namespace rung a volume (`-v HOST:GUEST`) is a bind mount:
   `/proc/mounts` lists it, and `/proc/self/mountinfo` names the host path
   (T-1920). On the userland rung a volume, `--tmpfs` and `--read-only` are
@@ -116,6 +124,11 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   out of reach. In the PID namespace of a foreground run of a user with no
   root, podvm is no subreaper: PID 1 of the namespace reaps each orphan at
   once, and the end of the run kills each process of the namespace.
+- podvm waits for each process that it starts, except the processes that
+  outlive the verb by design: the launcher of `run -d` and `start`, the
+  fill of a spare tree, and PID 1 of the namespace of a foreground run
+  while that fill runs. The init or the subreaper of the caller reaps
+  them; an init that reaps late shows them as zombies until then.
 - A denied terminal operation produces a named refusal.
 - Host CA completion changes payload trust data and can be disabled.
 - `--network broker` (T-1665) holds a payload to an egress broker of the
@@ -535,10 +548,11 @@ C26). Experiment 465 measures each line below as uid 1000.
   in the guest under TCG.
 - Where the host has no runsc or no user namespace (the userland rung),
   the run takes the machine tier
-  and names the part on stderr. A run that the saved state below serves
-  takes the state first (call C27). Each other run on the root disk of
-  the image (T-1994), where `/sbin/init` of the image is systemd, boots
-  systemd as PID 1 of the guest itself. podvm writes the unit `podvm-run.service` into the root,
+  and names the part on stderr. On the root disk of the image (T-1994),
+  where `/sbin/init` of the image is systemd, systemd is PID 1 of the
+  guest itself: in a run that the saved state below serves (call C27),
+  in the guest that podvm boots to save the state, and in each other
+  run. podvm writes the unit `podvm-run.service` into the root,
   masks the getty units of the console and `systemd-firstboot.service`,
   and turns the status of the boot off. The unit waits until
   `systemctl is-system-running` gives `running` or `degraded`, then runs
@@ -546,11 +560,11 @@ C26). Experiment 465 measures each line below as uid 1000.
   line. One bound from the start of the init (`PODVM_INIT_BOOT_TIMEOUT`,
   180 s by default) ends a run whose unit does not start or whose init
   does not get ready, with one line and exit 125 before the command.
-  From a saved state, with an init that is not systemd and with
+  With an init that is not systemd and with
   `PODVM_MACHINE_ROOT=initramfs`, the init is PID 1 of a PID namespace of the
-  guest, with real root and each controller of cgroup2 (T-2002).
-  The guest has the limits of "Guests" above: the saved state of T-2008
-  keeps its root in the initramfs; a volume is a 9p mount, and the
+  guest, with real root and each controller of cgroup2 (T-2002), and a
+  saved state keeps its root in the initramfs.
+  The guest has the limits of "Guests" above; a volume is a 9p mount, and the
   network is QEMU's user-mode network. Under TCG on the cloud host a run
   of `true` takes 24 s to 27 s with four vCPUs, and QEMU holds 2.6 GB of
   memory for an image of 584 MB; the namespace rung takes 3 s.
@@ -573,7 +587,11 @@ C26). Experiment 465 measures each line below as uid 1000.
   `--podvm-engine`, `--podvm-sealed`, `--network broker`, more than four
   volumes, more than 64 KiB of stdin, an arm64 guest or a kernel from
   `PODVM_MACHINE_KERNEL` use a fresh boot, with systemd as PID 1 of the
-  guest on the root disk where the image has it (T-1994). Each run of one state has the machine-id,
+  guest on the root disk where the image has it (T-1994). On the root
+  disk the state holds the memory of the guest with its upper layer (a
+  tmpfs); the disk stays out of the state, and its SHA-256 (from its
+  trailer) is a part of the fingerprint, so the state of one disk never
+  loads with another. Each run of one state has the machine-id,
   the boot id, the monotonic clock and the service processes of the
   save: a secret that a service made at its start (a session key, the
   state of a random generator in its memory) is the same in each run.

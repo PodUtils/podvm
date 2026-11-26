@@ -83,3 +83,23 @@ fn the_probe_of_a_mapped_volume_leaves_no_attribute() {
     assert!(super::probe_xattrs(&gone, false).is_err());
     let _ = std::fs::remove_dir_all(&d);
 }
+
+/// TODO/machine.md T-2103: a saved state does not serve a mapped volume:
+/// its 9p devices use `security_model=none`.
+#[test]
+fn a_saved_state_refuses_a_mapped_volume() {
+    use crate::machine::guest::state::{refusal, Asks};
+    let base = Asks {
+        init_image: true,
+        native: true,
+        pinned_kernel: true,
+        ..Asks::default()
+    };
+    assert_eq!(refusal(&base), None);
+    let why = refusal(&Asks {
+        mapped: true,
+        ..base
+    })
+    .unwrap();
+    assert!(why.contains(":mapped"), "{why}");
+}

@@ -4783,3 +4783,50 @@ The source manifest still sets order and multiplicity. All nine release
 layout tests passed, including the repeated empty layer and the existing
 missing and incorrect digest tests. The failed two-architecture run did
 not retain its input archive. Podrunner's rerun needs the fixed beta.
+
+# T-2104: `inspect` gives the unpacked bytes of an image before its first run
+
+**Source:** PodUtils/podrunner#372 (COORD-144 of podrunner, from a member of the team, 2026-11-26; podrunner tasks 698 and 706)
+**Category:** image
+**Milestone:** none
+**Priority:** P2
+**Effort:** S
+**Status:** open
+
+## Problem
+
+podrunner must know the unpacked size of an image to refuse a `--mem` of
+a microvm guest that cannot hold the image and the reserve of the job.
+`inspect`, `images` and `.Size` give the stored bytes only; `system df -v`
+gives a ROOTFS column in MiB text, and only after an extraction.
+
+## Premise
+
+podrunner asks for a field `UnpackedBytes` of `inspect --format` and of
+its JSON for an image: the bytes of the unpacked root file system (the
+sum of the sizes of the files of the layers after whiteouts, as the guest
+root holds them), available before the first run (from the layer
+metadata, or computed at pull and kept in the store), and `-` (JSON null)
+where podvm cannot tell, with the reason on stderr under `--verbose`. The
+incus tier already measures the need of an image from its layers
+(`pod_extract::flatten_with`, T-2085).
+
+## Approach
+
+Compute the unpacked bytes once from the layers (the measure of the
+incus tier, one count for each inode) at pull, load and import, keep the
+value in the record, and give it in `inspect`. An older record gives the
+value from its layers at the first `inspect`, or `-` with the reason.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test -p podvm --bin podvm unpacked` passes with a table test of the
+measure (whiteouts, hard links, a layer that replaces a file); as uid 1000, `pull` then `inspect --format '{{.UnpackedBytes}}'`
+before any run gives the same number as the sum of the sizes in the
+extracted tree after a run; `--format '{{json .}}'` or the JSON of
+`inspect` carries it; an older record gives `-` and a reason under
+`--verbose`.

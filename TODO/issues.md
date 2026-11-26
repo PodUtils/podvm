@@ -560,7 +560,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #664 | COORD-248: pod-incus config PATCH for live instance limits (to podcrates) | closed (v0.85.0 taken and hosted run 45735495867 passed) | T-2093 |
 | #665 | [gh action] requested | closed (direct dispatch started run 45593099465 on `04c8b7f4`) | the dispatch of the `incus` job of `kvm.yml` (experiment 474, T-1964) |
 | #666 | COORD-249: podvm took podcrates v0.84.0 (to podcrates) | closed (PodUtils/podcrates#260 lists `04c8b7f4` under Takes) | T-2096 |
-| #667 | COORD-250: required size-limited tmpfs mounts in pod-enter (to podcrates) | open | T-1968 |
+| #667 | COORD-250: required size-limited tmpfs mounts in pod-enter (to podcrates) | closed (podcrates `v0.86.0` gives `Plan::tmpfs`, PodUtils/podcrates#272; taken in `ef541f1`, COORD-265 #690) | T-1968 |
 | #668 | COORD-251: pinned static EROFS writer for a streamed OCI disk root (to podcrates) | open | T-1994 |
 | #669 | COORD-252: podvm took podcrates v0.85.0 (to podcrates) | closed (PodUtils/podcrates#262 lists `9466c984`) | T-2097 |
 | #670 | COORD-253: podvm took the shared hosted-session roles (to podcrates) | closed (PodUtils/podcrates#263 lists `5e872816`) | T-2095 |
@@ -581,8 +581,10 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #685 | [gh action] requested | closed (gate 45824118327 passed on `4afcb38`) | the gate again after the fix of the root-disk test as a user with no root (`c287ca7`) |
 | #686 | [gh action] requested | closed (gate 45843797814 passed on `f9ffcaa`) | the gate after the fix of the syscall tier's `brk` (T-1991) and the native-tier fixes |
 | #687 | COORD-263: the answer to PodUtils/podcrates#273: podvm's copy of ext.rs records 65535 past group 65535 (846e733); podvm takes pod_guest::ext4 at the next tag (to podcrates) | open | T-1968, T-1994 |
-| #688 | [gh action] requested | open | the gate and the `init` job of `kvm.yml` after T-1994 steps 2 and 3 and T-2054 item 1 |
+| #688 | [gh action] requested | closed (on `f8b2d9e`: gate 45857683010 and kvm `init` 45857688665 passed) | the gate and the `init` job of `kvm.yml` after T-1994 steps 2 and 3 and T-2054 item 1 |
 | #689 | COORD-264: pod-enter: an overlay kind of volume in Plan::volumes (to podcrates) | open | T-2101 |
+| #690 | COORD-265: podvm took podcrates v0.86.0 (T-2102) and answers #667 with --tmpfs GUEST:size=N (to podcrates) | open | T-2102, T-1968 |
+| #691 | [gh action] requested | open | the gate and the `kvm.yml` jobs `init` and `guest` after the saved state on the disk root (T-1994, T-2008) |
 
 ## Messages whose title does not start with COORD-NNN
 

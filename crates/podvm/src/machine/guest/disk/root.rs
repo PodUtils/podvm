@@ -315,8 +315,15 @@ pub fn source(root: &Option<(PathBuf, Got)>, base: &Option<(PathBuf, bool)>) -> 
 /// markers. The words after `--` of the kernel line are the arguments of
 /// the init, so they come last.
 /// `init`: the bound of the boot of the init of the image, which
-/// `guest-root` then execs as PID 1 (TODO/machine.md T-1994, step 2).
-pub fn with_init(argv: &mut [String], load: &[String], disk: bool, init: Option<u64>, nonce: &str) {
+/// `guest-root` then execs as PID 1 (TODO/machine.md T-1994, step 2), and
+/// whether the guest is the one of a saved state (`--held`, T-2008).
+pub fn with_init(
+    argv: &mut [String],
+    load: &[String],
+    disk: bool,
+    init: Option<(u64, bool)>,
+    nonce: &str,
+) {
     let Some(i) = argv.iter().position(|a| a == "-append") else {
         return;
     };
@@ -328,7 +335,8 @@ pub fn with_init(argv: &mut [String], load: &[String], disk: bool, init: Option<
         super::ROOT_VERB,
         load.join(","),
         if disk { " --disk" } else { "" },
-        init.map(|s| format!(" --init={s}")).unwrap_or_default()
+        init.map(|(s, held)| format!(" --init={s}{}", if held { " --held" } else { "" }))
+            .unwrap_or_default()
     );
     *line = line.replace("rdinit=/podvm-init", &init);
 }

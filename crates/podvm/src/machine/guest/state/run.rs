@@ -8,13 +8,20 @@ use std::time::{Instant, SystemTime};
 use podvm_windows::plan::Accel;
 
 use super::super::job::Job;
-use super::super::{arch, channel, init, vol, Request};
+use super::super::{channel, init, vol, Request};
+use super::line::{line, Paths, RootLine};
 use super::save::Saved;
 use super::store::{files, mark_bad, plan, touch, Files, Plan};
 use super::{fingerprint, refusal, wanted, Asks, Shape, Transport, SLOTS, VAR};
 
-/// The job of a run for a guest of a state.
-pub fn job(r: &Request, nonce: &str, vols: &[vol::Vol]) -> Result<Vec<u8>, String> {
+/// The job of a run for a guest of a state; `held` is where its command
+/// runs (the PID namespace of a held init, or systemd as PID 1).
+pub fn job(
+    r: &Request,
+    nonce: &str,
+    vols: &[vol::Vol],
+    held: init::Held,
+) -> Result<Vec<u8>, String> {
     use std::io::Read;
     let mut seed = [0u8; 32];
     std::fs::File::open("/dev/urandom")
@@ -28,11 +35,16 @@ pub fn job(r: &Request, nonce: &str, vols: &[vol::Vol]) -> Result<Vec<u8>, Strin
         script: init::job(
             nonce,
             &r.argv,
-            &r.env,
+            &if held == init::Held::Pid1 {
+                super::super::pid1::image_env(&r.env)
+            } else {
+                r.env.clone()
+            },
             &r.workdir,
             vols,
             r.channel.as_ref().map(|(_, port)| *port),
             r.pids.as_deref(),
+            held,
         ),
         stdin: r.stdin.clone(),
         seed,
@@ -94,76 +106,16 @@ pub struct Ctx<'a> {
     pub accel: Accel,
     pub qemu: &'a Path,
     pub kernel: &'a Path,
-    /// The base archive of the image.
-    pub base: &'a Path,
-    /// The modules of the network and of the volumes, for the guest.
+    /// The base archive of the image, for a root in the initramfs.
+    pub base: Option<&'a Path>,
+    /// The root disk with systemd as PID 1 (TODO/machine.md T-1994): its
+    /// line, with the nonce of the state set by [`run`].
+    pub root: Option<RootLine<'a>>,
+    /// The modules of the network and of the volumes (and of the root
+    /// disk), for the guest.
     pub modules: &'a [(String, PathBuf)],
     /// True where the kernel is the pin, with podvm and the 9p modules.
     pub pinned_kernel: bool,
-}
-
-/// The paths of one emulator line.
-pub(super) struct Paths<'a> {
-    initrd: &'a Path,
-    err: &'a Path,
-    qmp: Option<&'a Path>,
-    /// The directory of each slot, and whether it is read-only.
-    slots: Vec<(PathBuf, bool)>,
-    incoming: Option<String>,
-}
-
-impl Paths<'static> {
-    fn fixed() -> Self {
-        Self {
-            initrd: Path::new("INITRD"),
-            err: Path::new("ERR"),
-            qmp: None,
-            slots: (0..SLOTS)
-                .map(|i| (PathBuf::from(format!("SLOT{i}")), true))
-                .collect(),
-            incoming: None,
-        }
-    }
-}
-
-/// The emulator line of a guest of a state: the line of each guest, with
-/// [`SLOTS`] 9p devices.
-pub(super) fn line(r: &Request, accel: Accel, mem: u64, kernel: &Path, p: &Paths) -> Vec<String> {
-    let mut extra = super::super::stderr::argv(p.err);
-    // The device has the same name at save and load. The fingerprint uses
-    // the fixed stderr name to derive this socket name as well.
-    if r.channel.is_some() {
-        extra.extend(channel::argv(&channel::socket_path(p.err)));
-    }
-    for (i, (dir, ro)) in p.slots.iter().enumerate() {
-        extra.push("-virtfs".to_string());
-        extra.push(vol::virtfs(
-            dir,
-            &vol::Vol {
-                tag: format!("podvm{i}"),
-                guest: String::new(),
-                ro: *ro,
-                mapped: false,
-            },
-        ));
-    }
-    extra.extend(r.qemu_args.iter().cloned());
-    if let Some(q) = p.qmp {
-        extra.push("-qmp".to_string());
-        extra.push(format!("unix:{},server=on,wait=off", q.display()));
-    }
-    if let Some(uri) = &p.incoming {
-        extra.push("-incoming".to_string());
-        extra.push(uri.clone());
-    }
-    let mut argv = super::super::qemu_argv(accel, mem, kernel, p.initrd, &extra);
-    arch::adapt(&mut argv, r.arch);
-    arch::err_port(&mut argv, r.arch);
-    if r.net_none {
-        super::super::no_nic(&mut argv);
-    }
-    super::super::with_cpus(&mut argv, r.cpus);
-    argv
 }
 
 /// Try the run from a saved state, or with the save of one.
@@ -192,15 +144,38 @@ pub fn run(r: &Request, c: &Ctx) -> Outcome {
         say(&format!("the guest boots: {why}"));
         return Outcome::Boot;
     }
-    // The fingerprint: the script and the line with fixed names.
+    // The fingerprint: the script and the line with fixed names; on the
+    // root disk (T-1994) also the SHA-256 of the disk, from its trailer.
+    let held = match c.root {
+        Some(_) => init::Held::Pid1,
+        None => init::Held::Ns,
+    };
+    let template = |n: &str| match held {
+        init::Held::Pid1 => init::template_pid1(n, !r.net_none),
+        _ => init::template(n, !r.net_none),
+    };
+    let sha = match c
+        .root
+        .as_ref()
+        .map(|l| super::super::disk::root::read_trailer(l.disk))
+    {
+        None => None,
+        Some(Ok((_, sha))) => Some(sha),
+        Some(Err(e)) => {
+            say(&format!("the guest boots: the root disk: {e}"));
+            return Outcome::Boot;
+        }
+    };
+    let fixed = Paths::fixed(c.root.as_ref());
     let shape = Shape {
         digest: r.digest,
         accel: c.accel,
         qemu: c.qemu,
         kernel: c.kernel,
         mem: r.mem,
-        line: &line(r, c.accel, 0, Path::new("KERNEL"), &Paths::fixed()),
-        script: &init::template("NONCE", !r.net_none),
+        line: &line(r, c.accel, 0, Path::new("KERNEL"), &fixed),
+        script: &template("NONCE"),
+        root: sha.as_deref(),
     };
     let print = match fingerprint(&shape) {
         Ok(p) => p,
@@ -217,14 +192,8 @@ pub fn run(r: &Request, c: &Ctx) -> Outcome {
             return Outcome::Boot;
         }
     };
-    let vols: Vec<vol::Vol> = vol::vols(
-        &r.volumes
-            .iter()
-            .map(|(_, g, ro)| (g.clone(), *ro))
-            .collect::<Vec<_>>(),
-        &r.mapped,
-    );
-    let frame = match job(r, &nonce, &vols) {
+    let vols = vol::of_run(&r.volumes, &r.mapped);
+    let frame = match job(r, &nonce, &vols, held) {
         Ok(f) => f,
         Err(e) => {
             say(&format!("the guest boots: {e}"));
@@ -233,7 +202,10 @@ pub fn run(r: &Request, c: &Ctx) -> Outcome {
     };
     // The memory of the guest of a state: the base archive, and the run
     // archive with podvm and the modules.
-    let base_bytes = std::fs::metadata(c.base).map(|m| m.len()).unwrap_or(0);
+    let base_bytes = c
+        .base
+        .and_then(|b| std::fs::metadata(b).ok())
+        .map_or(0, |m| m.len());
     let most = r
         .mem
         .unwrap_or_else(|| super::super::mem::estimate(base_bytes + (64 << 20)));
@@ -264,6 +236,10 @@ pub fn run(r: &Request, c: &Ctx) -> Outcome {
         .map(|(host, _, ro)| (host.clone(), *ro))
         .collect();
     slots.resize(SLOTS, (empty.clone(), true));
+    let root_line = c.root.as_ref().map(|l| RootLine {
+        nonce: &files.nonce,
+        ..l.clone()
+    });
     let started = Instant::now();
     let (argv, mut warm) = match &plan {
         Plan::Load(meta) => {
@@ -289,6 +265,7 @@ pub fn run(r: &Request, c: &Ctx) -> Outcome {
                 qmp: Some(&qmp),
                 slots,
                 incoming: Some(incoming),
+                root: root_line.clone(),
             };
             let argv = line(r, c.accel, meta.mem_mib << 20, c.kernel, &paths);
             let warm = Warm {
@@ -300,11 +277,16 @@ pub fn run(r: &Request, c: &Ctx) -> Outcome {
             (argv, warm)
         }
         Plan::Save { .. } => {
-            let script = init::template(&files.nonce, !r.net_none);
+            let script = template(&files.nonce);
             let made = super::super::archive::tools(c.modules, Vec::new())
                 .and_then(|tools| {
-                    std::fs::copy(c.base, &initrd)
-                        .map_err(|e| format!("{}: {e}", initrd.display()))?;
+                    // The root disk holds the image: the initrd has podvm's
+                    // files only (T-1994).
+                    match c.base {
+                        Some(b) => std::fs::copy(b, &initrd).map(drop),
+                        None => std::fs::write(&initrd, b""),
+                    }
+                    .map_err(|e| format!("{}: {e}", initrd.display()))?;
                     super::super::run_archive(&script, tools.as_ref(), &[], None)
                         .map_err(|e| format!("the archive of the guest: {e}"))
                 })
@@ -328,6 +310,7 @@ pub fn run(r: &Request, c: &Ctx) -> Outcome {
                 qmp: Some(&qmp),
                 slots,
                 incoming: None,
+                root: root_line.clone(),
             };
             let argv = line(r, c.accel, mem, c.kernel, &paths);
             let warm = Warm {

@@ -71,20 +71,19 @@ each step below is done.
    `eprintln!` panics on EPIPE, so the fix needs a design), OR-B41-08
    (T-1939), OR-B41-09 (needs `diff_ids` in `pod_oci::spec::Config`), the
    P3 rows.
-5. podrunner: #583 (T-1968, a sized writable disk). The machine tier
-   needs a disk-backed writable layer, part of T-1994. The namespace tier
-   needs the pod-enter mount requested in #667. Podrunner's 9p work
-   mount also needs a bound (#583). Experiment 477 found that `sqfstar`
-   4.6.1 loses a valid POSIX ACL; experiment 478 confirmed that EROFS
-   full tar mode keeps it. The static builder pin is requested in #668.
-   Both pinned Alpine kernels disable EROFS. A disposable 64 MiB virtio
-   ext4 disk enforced its size through an overlay under TCG; ext4 needed
-   `crc32c_generic.ko`. The guest root switch still needs work. T-1999
-   needs a machine root that keeps file capabilities. Experiment 476
-   needs the podrunner hosted-boot wiring requested in #599. Then #596
-   and #599 (T-1994, T-1996, T-1998, T-1999), #593 (T-1990, T-1991).
-   Then T-2088 and the open rows of T-2070, T-2079, T-2087.
-6. T-2054 items 1 to 3, then the work order of `TODO/PROGRESS.md`.
+5. podrunner: T-1968 is done on `main` (the machine tier's sized disk,
+   experiment 481; `--tmpfs GUEST:size=N` on the namespace rung with
+   podcrates `v0.86.0`, T-2102). Podrunner's 9p work mount stays unbounded
+   by the disk (#583 says so). T-1994 steps 1 to 3 are on `main` (a root
+   disk of each image, experiment 482; systemd as PID 1 of the guest,
+   experiment 483); the saved state on the disk root is in progress.
+   T-2101 (`-v HOST:GUEST:overlay`, podrunner#368, experiment 485) and
+   T-1991 (the syscall tier's `brk`, experiment 484) are on `main`. Each
+   waits for the next beta, then a COORD to podrunner. T-2103
+   (podrunner#371) is in progress. Then #596 and #599 (T-1996, T-1998,
+   T-1999), T-1990, T-2088 and the open rows of T-2070, T-2079, T-2087,
+   T-2100.
+6. T-2054 items 2 and 3, then the work order of `TODO/PROGRESS.md`.
 
 ## Rules learned
 

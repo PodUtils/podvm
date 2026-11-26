@@ -434,6 +434,7 @@ pub(super) fn enter(
         pid_namespace: false, // podcrates `v0.65.0`; T-1930 sets it for `run -d`
         // T-2054: the relay of a join of the run (PodUtils/podvm#646).
         relay_title: Some(podvm_enter::TITLE_EXEC.into()),
+        tmpfs: Vec::new(), // podcrates `v0.86.0` (T-2102)
     };
     if let Err(c) = serve_devices(&mut plan, &mut err) {
         return c;

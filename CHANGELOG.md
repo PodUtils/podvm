@@ -31,6 +31,34 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
   caller goes into a map. HOST must be a directory of the caller, not a
   link, not `/`, not the home directory, with no mount under it.
 
+### Fixed: a foreground run of a user with no root leaves no zombie, 2026-11-26
+
+Record: T-2087 (OR-B40-05, the follow-up of experiment 485).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- After a foreground `run`, `system info` or `probe` of a user with no
+  root, PID 1 of podvm's namespace ended after podvm and stayed a zombie
+  until the init of the host reaped it. podvm now reaps it, except while
+  the fill of a spare tree runs (`PODVM_SPARE_TREE=0` turns it off). The
+  launcher of `run -d` outlives the verb by design, as the shim of docker
+  does, and the init or the subreaper of the caller reaps it.
+
+### Changed: the saved state of a machine guest holds systemd as PID 1, 2026-11-26
+
+Record: T-1994, T-2008 (PodUtils/podrunner#313 ask 2, PodUtils/podrunner#355).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- The default `run --podvm-tier=machine --podvm-init=image` of an image
+  whose init is systemd saves and loads its state on the root disk of the
+  image, with systemd as PID 1 of the guest. The first run saves the
+  state; each later run starts from it in seconds.
+- A run with `--podvm-channel` and `--pids-limit` gets its own socket,
+  guest port and limit after the load, as on the route before.
+- The state of one root disk never loads with another: the SHA-256 of
+  the disk is a part of the fingerprint of the state.
+- `PODVM_MACHINE_ROOT=initramfs` keeps the state of earlier releases, with
+  systemd in a PID namespace.
+
 ### Added: `-v HOST:GUEST:overlay`, a read-only host directory with a writable layer, 2026-11-26
 
 Record: T-2101 (PodUtils/podrunner#368).
@@ -99,16 +127,40 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 
 - `run --podvm-tier=machine --podvm-init=image` of an image whose
   `/sbin/init` is systemd boots systemd as PID 1 of the guest, on the
-  root disk of the image, where the saved state does not serve the run
-  (`PODVM_MACHINE_STATE=0`, `-t`, `run -d`, `--storage-opt size=` and the
-  other cases in [Limits](docs/limits.md)). The command runs in the unit
+  root disk of the image, with or without the saved state (see the
+  section above). The command runs in the unit
   `podvm-run.service` after `systemctl is-system-running` gives
   `running` or `degraded`, and its exit code is the exit code of the run.
 - A unit that does not start, or an init that is not ready within
   `PODVM_INIT_BOOT_TIMEOUT` (180 s), ends the run with one line and 125.
-- The saved state keeps its priority: a run that it serves saves and
-  loads it as in 0.2.0-beta.41, with systemd in a PID namespace. An image
-  whose init is not systemd also keeps the PID namespace.
+- The saved state keeps its priority (call C27). An image whose init is
+  not systemd keeps the PID namespace.
+
+### Added: `--tmpfs PATH:size=N` is a tmpfs with a limit, 2026-11-26
+
+Record: T-1968, T-2102 (PodUtils/podvm#667, PodUtils/podrunner#296 ask 5).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- On the namespace rung, `--tmpfs PATH:size=N` is a tmpfs in memory of N
+  bytes for `run`, `run -d` and `create`. A write past N fails with "No
+  space left on device". `exec` sees the mount of the run. `inspect`
+  (`.Tmpfs`) and `run --report` (`tmpfs`) name it as memory. Before, it
+  was a directory with no limit, and `run -d` refused it.
+- Each other rung refuses such a run by name with 125, and podvm never
+  gives a directory with no limit in its place. On the syscall tier,
+  `--tmpfs /tmp:size=N` stays the cap of its handler. `size=0` is docker's
+  "no limit" and gives the directory of a foreground run, as before.
+
+### Changed: podcrates `v0.86.0`, 2026-11-26
+
+Record: T-2102.
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- podvm takes the shared crates at `v0.86.0`. Some failure lines of the
+  crates change: a refused TLS certificate is named in words (for example
+  "invalid peer certificate: a certificate that no trusted CA signed"),
+  a CA bundle that does not read names its path once, and the lines of
+  the crates keep the cause of a failure and drop ` (os error N)`.
 
 ### Fixed: a C build on the syscall tier no longer spins for ever, 2026-11-26
 

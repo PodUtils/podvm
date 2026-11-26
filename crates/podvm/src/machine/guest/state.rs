@@ -39,12 +39,14 @@ use podvm_windows::plan::Accel;
 
 use super::{arch, Request};
 
+mod line;
 mod run;
 mod save;
 mod store;
 
 #[cfg(test)]
 use super::init;
+pub(crate) use line::RootLine;
 pub use run::{run, send_job, Ctx, Driven, Mode, Outcome, Warm};
 pub use save::save;
 #[cfg(test)]
@@ -226,6 +228,10 @@ pub struct Shape<'a> {
     pub line: &'a [String],
     /// The script of the guest, with a fixed word in place of its nonce.
     pub script: &'a str,
+    /// The SHA-256 of the root disk of the image (its trailer), where
+    /// systemd is PID 1 of the guest on it (TODO/machine.md T-1994); none
+    /// for the root in the initramfs.
+    pub root: Option<&'a str>,
 }
 
 /// The text that a state is saved under and loaded by
@@ -264,6 +270,12 @@ pub fn fingerprint(s: &Shape) -> Result<String, String> {
             s.mem.map_or("of-the-initrd".to_string(), |m| m.to_string()),
         )
         .with("script", super::kernel::sha256_hex(s.script.as_bytes()))
+        .with(
+            "root",
+            s.root.map_or("initramfs".to_string(), |sha| {
+                format!("disk {sha} format {}", super::disk::root::FORMAT)
+            }),
+        )
         .machine(s.line);
     Ok(i.text())
 }

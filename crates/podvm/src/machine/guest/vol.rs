@@ -85,6 +85,12 @@ fn opt(s: &std::path::Path) -> String {
     s.display().to_string().replace(',', ",,")
 }
 
+/// The volumes of the `-v` of a run ([`super::Request::volumes`]).
+pub fn of_run(volumes: &[(std::path::PathBuf, String, bool)], mapped: &[String]) -> Vec<Vol> {
+    let g: Vec<_> = volumes.iter().map(|(_, g, ro)| (g.clone(), *ro)).collect();
+    vols(&g, mapped)
+}
+
 /// The emulator's argument of `-virtfs` for one volume that is not mapped.
 pub fn virtfs(host: &std::path::Path, v: &Vol) -> String {
     format!(

@@ -197,7 +197,16 @@ fn the_script_of_the_guest_and_the_job_of_a_run_are_two_texts() {
         &[("/data".to_string(), false), ("/ro".to_string(), true)],
         &[],
     );
-    let j = init::job("RNONCE", &argv, &env, "/w", &vols, None, None);
+    let j = init::job(
+        "RNONCE",
+        &argv,
+        &env,
+        "/w",
+        &vols,
+        None,
+        None,
+        init::Held::Ns,
+    );
     for want in [
         "/podvm/podvm guest-9p --hold /podvm/hold 'podvm0=/data' 'podvm1=/ro:ro' 2>/podvm-9p.err",
         "export A='the \"$@\" of a variable'\n",

@@ -5545,7 +5545,7 @@ As uid 1000, under KVM or TCG: `run --podvm-tier=machine --pids-limit 16 public.
 **Milestone:** none
 **Priority:** P2
 **Effort:** L
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -5595,7 +5595,48 @@ rung: as uid 1000, `run -d --tmpfs /w:size=64m` gives the same to a write of
 
 ## Done
 
-**Partial (2026-11-26).** The machine tier holds `--storage-opt size=N`.
+**Done (2026-11-26).** Both parts hold. The namespace rung: podcrates `v0.86.0` gives
+`Plan::tmpfs` (T-2102, #667). `--tmpfs GUEST:size=N` is now a tmpfs of
+pod-enter with `size=N`, `nosuid` and `nodev` on the namespace rung, for
+`run`, `run -d` and `create`. The record carries it in `PODVM_TMPFS`, and
+the foreground run and the launcher read it into the plan. The payload
+does not see the variable. `exec` joins the mount namespace of the run and
+mounts nothing. The banner (`--verbose`), `inspect` (`.Tmpfs`) and
+`--report` (`tmpfs`) name each mount as memory. The chroot rung, the
+userland rung, a rung that `PODVM_MODE` forces, `--podvm-init=image` and
+the syscall tier (other than its `/tmp` cap) refuse the run by name with
+125. podvm never gives a directory with no limit in their place. A path
+at, under or over a volume, a path with a comma and `ro` refuse by name.
+A `--tmpfs` with no `size=` stays the directory of T-1655.
+
+The earlier `Permission denied` of `unshare -Ur -m` did not come back:
+on this host, uid 1000 mounted a tmpfs with `size=64m` in its own user and
+mount namespaces. Proof as uid 1000 with a private store and
+`mirror.gcr.io/library/alpine:3.20`. Before (the release build of `main` in the
+lead checkout): a foreground `run --tmpfs /w:size=64m` wrote 100 MiB into
+`/w`, and `run -d` refused `--tmpfs`. After: the foreground run showed
+`tmpfs /w tmpfs rw,nosuid,nodev,relatime,size=65536k` in `/proc/mounts`.
+A write of 100 MiB stopped at 64 MiB with "No space left on device", and
+a write of 16 MiB passed. `run -d --tmpfs /w:size=64m` ran. `exec` saw the
+same mount, wrote 16 MiB, and the next write got "No space left on
+device". `inspect --format '{{json .Tmpfs}}'` gave
+`["/w:size=67108864 (memory)"]`. `create` and `start` gave `ENOSPC` past
+8 MiB. With `PODVM_USERNS=0`, pod-enter's own user namespace held the
+mount. Under `scripts/dev/nouserns.c`, `run`, `run -d` and `create` each
+refused with 125: "--tmpfs /w:size=67108864 is refused: it needs the
+namespace rung, and this host gives the userland rung, which has no mount
+namespace of its own; podvm does not give a directory with no limit in its
+place". No container stayed. The unit tests
+`each_tmpfs_with_a_size_is_a_mount_with_its_limit`,
+`each_entry_but_the_namespace_rung_refuses_a_tmpfs_by_name` and
+`the_record_reads_back_each_tmpfs_or_names_the_bad_part` pin the parser,
+the refusals and the record.
+
+Remaining: none for the namespace rung. A rule of the confinement on a
+tmpfs that the image does not hold stays open in podcrates (its
+`v0.86.0` notes).
+
+The machine tier (2026-11-26) holds `--storage-opt size=N`.
 podvm makes a sparse file of N bytes in the run directory. It writes an
 empty ext4 file system into the file. podvm gives the file to the guest as
 a virtio disk with the serial `podvm-disk`, `cache=unsafe` and
@@ -5633,10 +5674,6 @@ e2fsprogs on a 64 MiB disk and on a 9-group disk. It found the planted wrong
 count of free blocks.
 [Transcript](../experiments/results/machine-sized-disk.txt)
 
-Remaining: the namespace rung. Its work directory needs a required
-size-limited mount in pod-enter, requested in #667 (COORD-250). On this host
-`unshare -Ur -m` started, and the tmpfs mount gave `Permission denied`. The
-proof needs a lane that can mount tmpfs in its user and mount namespaces.
 The earlier TCG probe of the virtio ext4 disk is in
 [the virtio ext4 transcript](../experiments/results/machine-virtio-ext4.txt).
 
@@ -5770,8 +5807,9 @@ is open, and the state with channels and process limits (T-2094) is
 podvm's answer to PodUtils/podrunner#355 in 0.2.0-beta.41. Each run that
 the state does not serve, on the root disk where `/sbin/init` of the
 image resolves to systemd, boots systemd as PID 1 of the guest itself; so
-does a run whose state falls back to a boot. This order holds until the
-saved state is on the root disk (the open clause below). The PID
+does a run whose state falls back to a boot. Since the saved state is on
+the root disk (Decision of 2026-11-26 in T-2008), the state route also
+has systemd as PID 1 of the guest there. The PID
 namespace also stays for an init that is not systemd (podvm cannot ask
 such an init for its state) and for `PODVM_MACHINE_ROOT=initramfs`. The command runs in a unit of the image, `podvm-run.service`,
 because then systemd owns each process of the run, as on a host. The
@@ -5905,11 +5943,27 @@ that its owner cannot search the owner's search bit for the open only,
 and gives each mode back after it. The whole unit test binary (647 tests)
 passes as uid 1000 and as root.
 
-Remaining: steps 1 to 3 under KVM on `kvm.yml`; the saved state of
-T-2008 on the root disk with systemd as PID 1, after which the default
-run can take this route; `run -d`, `exec` and `-t`
-with systemd as PID 1, which this proof did not run; an arm64 guest; the
-kernel and the initrd of the image itself (PodUtils/podrunner#316 ask 2).
+**Partial (2026-11-26), the saved state on the root disk.** The default
+`run --podvm-tier=machine --podvm-init=image` of an image whose init is
+systemd saves and loads its state on the root disk, with systemd as PID 1
+of the guest; T-2008 has the parts. Experiment 486 as uid 1000 under TCG,
+seven of seven clauses PASS: the first run saved a state of 175 MiB in
+0.9 s and gave 7 in 48 s with PID 2 kthreadd; the second started from it
+and gave its first output after 1.6 s, with the boot id of the save; the
+channel and the process limit of three runs (one save, two loads) held;
+another digest saved a state of its own; after a changed byte the disk
+was built again with the same SHA-256 and the state loaded; and
+`PODVM_MACHINE_ROOT=initramfs` saved a state of 1274 MiB with systemd in
+a PID namespace. Experiment 483 clause 6 now expects systemd as PID 1 in
+the saved and the loaded guest, and passed nine of nine clauses again.
+[Transcript](../experiments/results/machine-disk-state.txt)
+
+Remaining: steps 1 to 3 and the state under KVM on `kvm.yml` (the step
+of experiment 469 now makes its base archive with
+`PODVM_MACHINE_ROOT=initramfs`, as the routes of 468 keep the root on the
+disk); `run -d`, `exec` and `-t` with systemd as PID 1, which this proof
+did not run; an arm64 guest; the kernel and the initrd of the image
+itself (PodUtils/podrunner#316 ask 2).
 
 # T-1996: On the incus tier, an instance of the hosted snapshot has 231,072 ids, `/dev/fuse` and a machine-id of its own
 
@@ -6109,6 +6163,23 @@ Boot the init of the image once for each digest and each guest shape, save the s
 
 ## Decision
 
+Decision (2026-11-26, T-1994): on the root disk of an image whose init is
+systemd, the guest of a state has systemd as PID 1 of the guest itself.
+The guest that podvm boots to save a state is the guest of T-1994 step 2
+with `guest-root --init=SECS --held`: its unit of the run waits until
+systemd is up, loads the 9p modules, prints the marker of a held guest
+and reads the job from `/dev/ttyS0`; the job runs the command in that
+unit (`init::Held::Pid1`). The root disk stays out of the state and is
+attached read-only at the save and at the load; the fingerprint holds the
+SHA-256 of its trailer, and the line holds the disk under a fixed name.
+A fault of that guest before its job gives the marker of a job that it
+did not take, so the rule of a failed state holds (one line, a boot with
+no state, three failures in a row hold the state for one day). The state
+route keeps its priority (call C27, Q10): it takes each run that it
+serves, now with systemd as PID 1 where the image has it.
+`PODVM_MACHINE_ROOT=initramfs` keeps the state of the initramfs and the
+PID namespace of T-2002.
+
 Calls of the session of 2026-11-20 (a change of one belongs to the owner): (1) the save is automatic, in the first run of an image and a guest shape; `PODVM_MACHINE_STATE=0` turns it off. (2) The job of a run goes to the guest on the serial line as one frame of text with a length and a SHA-256, not on a second device: the saved guest needs no device for it. (3) A state is one file for each fingerprint, and the store keeps the two that were used last for an image. (4) The guest of a state has four 9p devices; a run with more volumes boots. (5) A failure before the command gives a boot, and three failures in a row hold the state for one day. (6) The guest stops for the save (`stop`, `migrate`, `cont`), as `pod_guest::warm::save` does, and the load waits for `running` on QMP before it gives the job.
 
 ## Prove
@@ -6149,6 +6220,23 @@ Remaining (added): (7) the cause under KVM: `kvm.yml`, job `init`, until one run
 The cause under KVM (2026-11-20, `kvm.yml` run 44749207855 on `55a3dce`, experiment 468 with the lines of podvm on the state): "the monitor of the emulator gave no answer to query-migrate within its bound (qmp read: Resource temporarily unavailable)". The emulator answers nothing while it writes the last part of the state, for longer than the read bound of 5 s of `pod_guest::qmp::Monitor`, which the caller cannot set (ask 3 of COORD-217, #618). Fixed in podvm: where one `query-migrate` gets no answer, `state::save::migrate` drops that connection, connects again (`reconnect`, tried until the bound of the save) and asks again; the late answer goes to the closed connection. The unit test `a_save_leaves_a_whole_state_or_nothing` has the case `Peer::Late` (a first `query-migrate` with no answer for 5.6 s, then a second connection that answers): the save holds. Remaining (added): a run of `kvm.yml` job `init` with the fix.
 
 Correction (2026-11-20, [T-2048](machine.md)): that fix opened the new connection while the old one was open. QEMU serves one client of its monitor at a time, so the save hung with no bound (`kvm.yml` run 44786700578: experiment 465 clause 2 and experiment 468 rows `mach-sav` and `mach-lod`, 900 s each). The stand-in of `Peer::Late` closed the first connection itself. T-2048 has the cause and the fix.
+
+Partial (2026-11-26, the state on the root disk, T-1994). `state/line.rs`
+(the line with the root disk and `guest-root --init=SECS --held`, the
+fixed names of the fingerprint), `state.rs` (the SHA-256 of the root disk
+in the fingerprint), `state/run.rs` (the template of systemd as PID 1, the
+initrd of podvm's files only, the job of `Held::Pid1`), `init.rs`
+(`template_pid1`, `Held`), `pid1.rs` (`--held`: the marker of a job that
+the guest did not take), `disk/guest.rs` (`--held`). The unit tests
+`each_part_of_the_shape_changes_the_fingerprint_and_the_files` (two
+root disks give two states),
+`the_state_of_systemd_as_pid1_has_the_root_disk_and_its_job_runs_in_the_unit`,
+`the_unit_of_the_run_and_its_masks` and `the_arguments_of_guest_root` pin
+the new parts. Experiment 486 (T-1994) passed seven of seven clauses
+under TCG: a state of 175 MiB in place of 1274 MiB with the root in the
+initramfs, a load with its first output after 1.6 s, and the channel and
+the process limit of T-2094 after a load.
+[Transcript](../experiments/results/machine-disk-state.txt)
 
 # T-2011: `run -d --podvm-init=image` of an image whose Entrypoint is its init runs `/sbin/init CMD` and not the command
 
