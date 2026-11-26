@@ -23,7 +23,7 @@ shallow, unshallow it before you read a history range.
 Select the model and reasoning effort for each assignment. Use a fresh
 brief for each worker. Ask podcrates for changes to the table in a COORD
 issue `(to podcrates)`.
-[Shared role table](https://github.com/PodUtils/podcrates/blob/v0.85.0/docs/hosted-sessions.md#lead-and-workers)
+[Shared role table](https://github.com/PodUtils/podcrates/blob/v0.86.0/docs/hosted-sessions.md#lead-and-workers)
 
 | Role | Assignment | Claude Code | Codex |
 | --- | --- | --- | --- |

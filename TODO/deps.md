@@ -2653,3 +2653,53 @@ The decode tests checked exact size, end of stream and checksum. On
 pinned Alpine, the musl SHA-256 reported by `version --verbose` matched
 the file placed at `/.podvm/interpose.so` (T-0702).
 PodUtils/podcrates#262 lists the take from #669.
+
+# T-2102: Take podcrates `v0.86.0` and the size-limited tmpfs of pod-enter
+
+**Source:** PodUtils/podcrates#272 (COORD-158 of podcrates), PodUtils/podvm#667 (COORD-250)
+**Category:** deps
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+podvm depends on podcrates `v0.85.0`. The `--tmpfs` of T-1968 needs a
+tmpfs with a byte limit on the namespace rung, and `v0.85.0` has none
+(COORD-250, PodUtils/podvm#667).
+
+## Premise
+
+Podcrates `v0.86.0` (`22d1a75`) gives `pod_enter::Plan::tmpfs` and
+`TmpfsMount { guest, bytes }`. The namespace rung mounts each one with
+`size=N`, `nosuid` and `nodev`, and reads the size back with `fstatfs`.
+The chroot rung, the ladder and the entry with no chroot refuse a plan
+with a tmpfs. A join of `exec` mounts nothing. `FileLock` unlocks at its
+drop. The texts of `pod-tls`, `pod-link`, `pod-manual`, `pod-rootfs`,
+`pod-supervise`, `pod-guest` and the blocking facade of `pod-relay` change.
+
+## Approach
+
+Take the tag in each manifest, in both locks and in `issue-sync.yml`. Add
+`tmpfs: Vec::new()` to each struct literal of `Plan`, and re-export the
+tmpfs items of `pod_enter` from `podvm-enter`. Then give `--tmpfs
+GUEST:size=N` to the plan of the namespace rung (T-1968).
+
+## Decision
+
+`adoption/podvm` of the tag holds `commit` and `repo` alone, with no
+patch and no run file. The take follows the section "podvm" of the
+release notes. podvm names no `FileLock` (`pod_supervise::lock::Lock` of
+the store is a different type), so the unlock at the drop changes no
+podvm code. No test or experiment of podvm pins a changed text: a search
+of `crates/` and `experiments/` for the old texts finds only
+`experiments/280-insecure-registry.sh`, which prints
+`invalid peer certificate[^)]*`, and the new words still match it.
+
+## Prove
+
+`cargo check --workspace --all-targets`, `sh scripts/dev/checks.sh`, the
+tests of `podvm-enter` and `podvm-supervise`, the unit tests of podvm as
+uid 1000, and `cargo check --target aarch64-unknown-linux-musl
+--workspace`.

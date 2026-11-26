@@ -220,6 +220,7 @@ fn enter_in_launcher(
         // the init of the PID namespace is a fork of this launcher; it sets
         // this title and an empty environment itself, and is not dumpable.
         relay_title: Some(podvm_enter::TITLE_INIT.into()),
+        tmpfs: Vec::new(), // podcrates `v0.86.0` (T-2102)
     };
 
     // ⭐ TODO/image.md T-0204 and T-0211. The image lock is taken here and

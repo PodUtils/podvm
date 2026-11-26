@@ -8,6 +8,17 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Changed: podcrates `v0.86.0`, 2026-11-26
+
+Record: T-2102.
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- podvm takes the shared crates at `v0.86.0`. Some failure lines of the
+  crates change: a refused TLS certificate is named in words (for example
+  "invalid peer certificate: a certificate that no trusted CA signed"),
+  a CA bundle that does not read names its path once, and the lines of
+  the crates keep the cause of a failure and drop ` (os error N)`.
+
 ### Fixed: a C build on the syscall tier no longer spins for ever, 2026-11-26
 
 Record: T-1991 (PodUtils/podrunner#308, item 3).

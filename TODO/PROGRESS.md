@@ -7,7 +7,7 @@ start.
 
 ## State
 
-672 entries: 20 open, 42 partial, 5 blocked, 605 done.
+673 entries: 20 open, 43 partial, 5 blocked, 605 done.
 
 * The newest release is `v0.2.0-beta.41` (2026-11-26). [CHANGELOG](../CHANGELOG.md)
   holds what each release ships, with its known gaps.
@@ -17,7 +17,7 @@ start.
   memory, CPU and process update of an incus instance (T-2093,
   experiment 479 on a hosted runner; PodUtils/podrunner#354). COORD-257
   (#676) asks podrunner to take the beta.
-* podvm takes the crates of PodUtils/podcrates at `v0.85.0`. A change of
+* podvm takes the crates of PodUtils/podcrates at `v0.86.0`. A change of
   moved code goes to podcrates as a COORD issue.
 * KVM is free (the owner, 2026-11-09). Probe `/dev/kvm` on the current host.
   `kvm.yml` (T-1682) gives a hosted runner with it, and `arm.yml` a hosted
