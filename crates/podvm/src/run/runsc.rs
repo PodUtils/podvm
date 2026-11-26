@@ -26,10 +26,11 @@ pub(crate) fn unserved(verb: &str, o: &Opts) -> Option<&'static str> {
         || o.channel.is_some()
         || o.sealed
         || o.engine
+        || o.init
     {
         return Some(
             "takes no --podvm-mem, --podvm-cpus, --podvm-qemu-arg, --podvm-net, \
-             --podvm-channel, --podvm-sealed, --podvm-engine, --network broker, --podvm-confine, --timeout or --tmpfs yet",
+             --podvm-channel, --podvm-sealed, --podvm-engine, --network broker, --podvm-confine, --timeout, --tmpfs or --init yet",
         );
     }
     None

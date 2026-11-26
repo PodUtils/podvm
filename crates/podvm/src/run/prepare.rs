@@ -1,5 +1,6 @@
 use super::*;
 use podvm_enter::ExitCode as _;
+use podvm_probe::isolation::Part;
 
 /// Everything `run` and `create` both need: the image in the store, extracted,
 /// its plan resolved and the rung selected, with nothing entered yet.
@@ -85,6 +86,7 @@ pub(crate) fn prepare(
     if let Some(f) = super::machine::guest_tier(tier) {
         return Err(f(verb, store, &o, &platform, &policy));
     }
+    super::devices::fold(&mut o); // TODO/enter.md T-1939: a device as a volume
     if !o.qemu_args.is_empty() {
         // ⛔ Refused rather than silently dropped. An emulator argument the
         // chroot tier accepts and ignores is a limit the caller believes is
@@ -271,7 +273,8 @@ pub(crate) fn prepare(
         )?
     };
     crate::lifecycle::refuse_detached_userland(verb, userland.as_ref(), o.detach)?;
-    crate::lifecycle::volume::refuse_unserved(verb, &o.volumes, userland.as_ref(), ladder)?; // T-1653
+    let (vs, ul) = ((&o.volumes[..], &o.device_guests[..]), userland.as_ref());
+    crate::lifecycle::volume::refuse_unserved(verb, vs, ul, ladder)?; // T-1653, T-1939
     super::binds::check_base_off_binds(verb, &o, userland.as_ref())?;
     // ⭐ T-0702, T-0706: classify and place the object BEFORE the banner, which
     // names the write. T-1649: a `#!` payload classifies its interpreter.
@@ -300,25 +303,9 @@ pub(crate) fn prepare(
         dropped_preload = dropped;
     }
     let path_dirs = Plan::path_from(&env);
-    // ⭐ TODO/enter.md T-0501. The device spec travels in the environment,
-    // beside the descriptors it names: the entering process (foreground
-    // `run` here, the launcher for `start`) opens the host paths before
-    // the root changes and serves duplicates where the interposer holds.
-    // Parsed twice (here and in `parse`) so a malformed shape is a flag
-    // error up front and this one is unreachable rather than re-checked.
-    let mut devices = Vec::with_capacity(o.devices.len());
-    for d in &o.devices {
-        match podvm_enter::device::parse(d) {
-            Ok(m) => devices.push(m),
-            Err(why) => {
-                eprintln!("podvm {verb}: --device {why}");
-                return Err(EXIT_FLAG_ERROR);
-            }
-        }
-    }
-    podvm_enter::device::push_spec(&mut env, &devices);
-    // ⭐ TODO/complete.md T-0413, T-1707. The payload's guest path for the
-    // interposer's `/proc/self/exe`; a caller's value is scrubbed first.
+    let devices = super::devices::push_spec(verb, &o, &mut env)?; // TODO/enter.md T-0501
+                                                                  // ⭐ TODO/complete.md T-0413, T-1707. The payload's guest path for the
+                                                                  // interposer's `/proc/self/exe`; a caller's value is scrubbed first.
     let exe = podvm_enter::program_in(gargv.first().map_or("", String::as_str), &working_dir);
     push_guest_exe(&mut env, &maps, &exe, &path_dirs);
     // ⭐ TODO/enter.md T-1407 and T-1409. On a userland entry the
@@ -366,6 +353,10 @@ pub(crate) fn prepare(
         &userland_note,
     );
     crate::initns::stays::check_rung(verb, &o, entered.word())?; // T-2002
+    super::devices::check_rung(verb, &o, entered.word())?; // TODO/enter.md T-1939
+    let (pid, net) = (opened.has(Part::Pid), opened.has(Part::Net));
+    crate::initns::stays::check_init(verb, o.init, pid, entered.word())?; // T-2087
+    crate::initns::stays::check_net(verb, o.net_host, net, entered.word())?; // T-2087
     banner.push_str(&store_note(store));
     banner.push_str(&tree.fill.line());
     // ⭐ M5. The completion layer runs HERE: after the rootfs exists and the
@@ -374,7 +365,7 @@ pub(crate) fn prepare(
     // somebody else's image and the payload can see it.
     let mut ask = o.ask.clone();
     ask.container_name = o.name.clone();
-    ask.entry_mounts_proc = opened.has(podvm_probe::isolation::Part::Proc);
+    ask.entry_mounts_proc = opened.has(Part::Proc);
     let mut completion = crate::complete::prepare(verb, &rootfs, &ask, &mut banner)?;
     super::binds::bind(verb, &o, rf, ul, &completion, &mut banner)?; // T-2072
     if !cfg.config.user.is_empty() && !super::user_ns::applied(&env) {

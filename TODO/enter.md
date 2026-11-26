@@ -4470,7 +4470,7 @@ As uid 1000 on the cloud host under the seccomp filter of the Problem: `run -d` 
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -4494,6 +4494,10 @@ Measured as uid 1000 on `main`. 473: the gate of the interposer compares the poi
 ## Prove
 
 As uid 1000 on both rungs: the repro of 473 reads `hostdev`, a write lands in the host file, and `ls -l /dev/hostdev` lists it; `run -d --rm IMAGE sleep 1` leaves no record and no tree after 3 s.
+
+## Done
+
+**Done (2026-11-26).** 473: a `--device` that reads goes as a volume of one file at its guest path (`run::devices::fold`, after the dispatch of the guest tiers): a bind on the namespace rung and an entry of the path table on the userland rung, so `stat`, a listing, `test -e` and each open of the payload see the host node, and a write reaches the host file. `r` alone is a read-only volume; the namespace rung refuses `r` alone for a device node by name (`run::devices::check_rung`), because a read-only bind does not refuse a write to a device node (the kernel checks a read-only mount for a file, a directory and a link only); the userland rung answers EROFS. `w` alone keeps the descriptor serve. A rung that serves no volume refuses the device with `--device` in its line. The table tests `a_device_that_reads_goes_as_a_volume` and `a_read_only_device_node_is_refused_on_the_namespace_rung`. As uid 1000, `run --rm --device FILE:/dev/hostdev alpine:3.20 sh -c 'cat /dev/hostdev; echo add >> /dev/hostdev; ls -l /dev/hostdev'`: the binary before the fix (`main`, 0.2.0-beta.41) wrote a file of 4 bytes into the tree on the namespace rung and gave ENOENT for the read on the userland rung (under `scripts/dev/nouserns.c`), and the host file kept `host`; the fix read `host` on both rungs and the host file became `host` and `add`. `--device /dev/zero:/dev/z` gives a character device at `/dev/z` that `head` reads, in a foreground run, in `run -d` with `exec`, and after `create` and `start`. 474 is done by T-2074 (above).
 
 # T-1953: The external QA of `0.2.0-beta.31`, third batch: signals, rungs and runs
 

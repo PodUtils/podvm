@@ -85,6 +85,7 @@ fn every_field_of_opts_is_classified(o: Opts) {
         sealed: _,            // machine only; incus refuses
         engine: _,            // machine only; incus refuses
         init_image: _,        // TABLE below: where_the_init_of_the_image_holds
+        init: _,              // the namespace rung; each guest tier refuses (OR-B40-06)
         volume_base: _,       // a bind of the namespace rung; each guest tier refuses
         volume_given: _,      // the check of --podvm-volume-base at the parse
         volume_base_given: _, // the check of --podvm-volume-base at the parse
@@ -94,11 +95,13 @@ fn every_field_of_opts_is_classified(o: Opts) {
         drops: _,             // the profile
         needs: _,             // the profile
         broker: _,            // machine; incus refuses
+        net_host: _,          // the rootfs rungs and runsc; machine and incus refuse
         confine: _,           // TABLE: --podvm-confine
         ports: _,             // incus refuses (incus_refuses)
         allow: _,             // the broker
         publish: _,           // a detached Windows guest only (T-1869)
         devices: _,           // incus refuses
+        device_guests: _,     // after the dispatch of the tiers (T-1939)
         unsafe_host_paths: _, // the rootfs rungs
         volumes: _,           // TABLE: -v
         timeout: _,           // TABLE: --timeout
