@@ -1783,6 +1783,7 @@ name = "podvm-image"
 version = "0.2.0-beta.41"
 dependencies = [
  "pod-core",
+ "pod-extract",
  "pod-hostprobe",
  "pod-oci",
  "pod-proxy",

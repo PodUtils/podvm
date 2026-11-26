@@ -234,6 +234,7 @@ mod tests {
             platform: "linux/amd64".to_string(),
             layers: vec![layer.to_string()],
             stored_bytes: 0,
+            unpacked_bytes: None,
             architecture: "amd64".to_string(),
             os: "linux".to_string(),
             created: None,

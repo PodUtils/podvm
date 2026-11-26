@@ -176,6 +176,7 @@ pub fn record_of(
         os: config.os.clone(),
         created: config.created.clone(),
         pulled_at: clock::now(),
+        unpacked_bytes: None,
     })
 }
 

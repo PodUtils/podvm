@@ -41,6 +41,7 @@ pub fn inspect(verb: &str, args: &[String]) -> i32 {
     }
     let mut template: Option<String> = None;
     let mut wanted: Vec<&str> = Vec::new();
+    let mut verbose = false;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -58,13 +59,9 @@ pub fn inspect(verb: &str, args: &[String]) -> i32 {
             other if other.starts_with("--format=") => {
                 template = Some(other["--format=".len()..].to_string())
             }
-            "--verbose" => {
-                eprintln!(
-                    "podvm inspect: --verbose serves --podvm-tier=incus only: it says why a \
-                     usage value of an instance is a dash (TODO/machine.md T-2076)"
-                );
-                return EXIT_FLAG_ERROR;
-            }
+            // T-2104: the reason of a dash of an image (`.UnpackedBytes`);
+            // T-2076 gives the same flag the reasons of an instance.
+            "--verbose" => verbose = true,
             other if other.starts_with('-') => {
                 if let Err(c) = crate::parity::admit(verb, other, INSPECT_USAGE) {
                     return c;
@@ -108,27 +105,37 @@ pub fn inspect(verb: &str, args: &[String]) -> i32 {
     let mut code = 0;
     for want in &wanted {
         if let Some(d) = crate::lifecycle::inspect_container(want, template.as_deref()) {
+            if verbose {
+                eprintln!("podvm inspect: {want}: --verbose has no effect on a container");
+            }
             match d {
                 Ok(d) => docs.push(d),
                 Err(c) => code = c,
             }
             continue;
         }
-        match store.find_one(want) {
-            Ok(r) => match &template {
-                Some(t) => match format::render_typed(t, &inspect_fields(&r, &store), &[]) {
-                    Ok(line) => docs.push(line),
-                    Err(bad) => {
-                        eprintln!("podvm inspect: {bad}");
-                        code = EXIT_CLI_ERROR;
-                    }
-                },
-                None => docs.push(inspect_json(&r, &store)),
-            },
+        let r = match store.find_one(want) {
+            Ok(r) => r,
             Err(e) => {
                 eprintln!("podvm inspect: {e}");
                 code = e.exit_code();
+                continue;
             }
+        };
+        // T-2104: the unpacked bytes, from the record or from its layers.
+        let (r, why) = podvm_image::unpacked::complete(&store, r);
+        if let (true, Some(why)) = (verbose, why) {
+            eprintln!("podvm inspect: {want}: .UnpackedBytes is a dash: {why}");
+        }
+        match &template {
+            Some(t) => match format::render_typed(t, &inspect_fields(&r, &store), &[]) {
+                Ok(line) => docs.push(line),
+                Err(bad) => {
+                    eprintln!("podvm inspect: {bad}");
+                    code = EXIT_CLI_ERROR;
+                }
+            },
+            None => docs.push(inspect_json(&r, &store)),
         }
     }
     if template.is_some() {
@@ -173,6 +180,8 @@ pub const INSPECT_FIELDS: &[&str] = &[
     "Created",
     "Platform",
     "Size",
+    // T-2104: the bytes of the unpacked root file system, null where unknown.
+    "UnpackedBytes",
     "Store",
     "Layers",
     // ⭐ M2. `TODO/extract.md` T-0302's Prove reads the sidecar at
@@ -319,6 +328,7 @@ fn inspect_doc(r: &Record, store: &Store) -> serde_json::Value {
         "Created": r.created,
         "Platform": r.platform,
         "Size": r.stored_bytes,
+        "UnpackedBytes": r.unpacked_bytes,
         "Store": store.root().display().to_string(),
         "Layers": r.layers,
         "ManifestDigest": r.manifest_digest,

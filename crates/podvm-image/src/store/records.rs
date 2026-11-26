@@ -217,6 +217,28 @@ impl Store {
         self.put_record_locked(record, &guard)
     }
 
+    /// TODO/image.md T-2104: keep the unpacked bytes that `inspect` measured
+    /// in each record of the manifest `manifest_digest`. A reader calls it,
+    /// so a failure is the reader's to ignore; a record that a writer
+    /// removed in between stays removed.
+    pub fn set_unpacked(&self, manifest_digest: &str, bytes: u64) -> Result<()> {
+        let _guard = self.lock()?;
+        let mut index = self.read_index()?;
+        let mut changed = false;
+        for r in index
+            .images
+            .iter_mut()
+            .filter(|r| r.manifest_digest == manifest_digest && r.unpacked_bytes != Some(bytes))
+        {
+            r.unpacked_bytes = Some(bytes);
+            changed = true;
+        }
+        if changed {
+            self.write_index(&index)?;
+        }
+        Ok(())
+    }
+
     /// The write of [`Store::put_record`], under the index lock `_guard`.
     fn put_record_locked(&self, record: Record, _guard: &Lock) -> Result<()> {
         let mut index = self.read_index()?;

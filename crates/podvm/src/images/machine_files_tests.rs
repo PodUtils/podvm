@@ -68,6 +68,7 @@ fn record(name: &str, hex: &str) -> podvm_image::Record {
         platform: "linux/amd64".into(),
         layers: vec![],
         stored_bytes: 0,
+        unpacked_bytes: None,
         architecture: "amd64".into(),
         os: "linux".into(),
         created: None,

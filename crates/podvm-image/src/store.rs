@@ -177,6 +177,11 @@ pub struct Record {
     /// From the image config. `None` where the config declares none.
     pub created: Option<String>,
     pub pulled_at: String,
+    /// TODO/image.md T-2104: the bytes of the unpacked root file system of
+    /// the layers ([`crate::unpacked`]). `None` in a record of an older
+    /// podvm, and where the measure failed: `inspect` measures again.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unpacked_bytes: Option<u64>,
 }
 
 impl Record {

@@ -144,10 +144,10 @@ usage: podvm image prune [-a|--all] [-f|--force]
 ";
 
 pub const INSPECT_USAGE: &str = "\
-usage: podvm inspect [--format T] [--podvm-tier incus [--verbose]] <image> [image...]
+usage: podvm inspect [--format T] [--verbose] [--podvm-tier incus] <image> [image...]
 
   Fields: .Id .Digest .RepoTags .RepoDigests .Architecture .Os .Created
-          .Platform .Size .Store .Layers .RootfsPath .Extracted
+          .Platform .Size .UnpackedBytes .Store .Layers .RootfsPath .Extracted
           .Exec.Mode .Exec.Shares
           .Config.Env .Config.Cmd .Config.Entrypoint .Config.WorkingDir
           .Config.User .Config.Labels .Config
@@ -156,6 +156,13 @@ usage: podvm inspect [--format T] [--podvm-tier incus [--verbose]] <image> [imag
     are those in `{{json .X}}`, and `{{.X}}` prints them as Go does:
     `[a b]`, `map[k:v]`, a dash for null. `--format` reads the fields
     that plain `inspect` prints (TODO/cli.md T-2060).
+
+  note: .Size is the compressed bytes in the store. .UnpackedBytes is the sum
+    of the sizes of the regular files of the layers after whiteouts and
+    replacements, each inode once: the bytes of the unpacked root file
+    system. `pull`, `load` and `import` keep it in the record; `inspect`
+    measures an older record from its layers. Null (a dash in a template)
+    where podvm cannot tell; `--verbose` says why on stderr (T-2104).
 
   note: .Config.* is what the image DECLARES, read through the stored
     config digest with docker's key names and null where the image omits
@@ -377,6 +384,8 @@ mod messages_tests;
 mod tests; // TODO/image.md T-1842 // TODO/image.md T-1836
 #[cfg(test)]
 mod types_tests; // TODO/cli.md T-2060
+#[cfg(test)]
+mod unpacked_tests; // T-2104
 
 /// docker's `image` sub-command group.
 pub fn group(args: &[String]) -> i32 {
