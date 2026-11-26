@@ -5545,7 +5545,7 @@ As uid 1000, under KVM or TCG: `run --podvm-tier=machine --pids-limit 16 public.
 **Milestone:** none
 **Priority:** P2
 **Effort:** L
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -5595,7 +5595,48 @@ rung: as uid 1000, `run -d --tmpfs /w:size=64m` gives the same to a write of
 
 ## Done
 
-**Partial (2026-11-26).** The machine tier holds `--storage-opt size=N`.
+**Done (2026-11-26).** Both parts hold. The namespace rung: podcrates `v0.86.0` gives
+`Plan::tmpfs` (T-2102, #667). `--tmpfs GUEST:size=N` is now a tmpfs of
+pod-enter with `size=N`, `nosuid` and `nodev` on the namespace rung, for
+`run`, `run -d` and `create`. The record carries it in `PODVM_TMPFS`, and
+the foreground run and the launcher read it into the plan. The payload
+does not see the variable. `exec` joins the mount namespace of the run and
+mounts nothing. The banner (`--verbose`), `inspect` (`.Tmpfs`) and
+`--report` (`tmpfs`) name each mount as memory. The chroot rung, the
+userland rung, a rung that `PODVM_MODE` forces, `--podvm-init=image` and
+the syscall tier (other than its `/tmp` cap) refuse the run by name with
+125. podvm never gives a directory with no limit in their place. A path
+at, under or over a volume, a path with a comma and `ro` refuse by name.
+A `--tmpfs` with no `size=` stays the directory of T-1655.
+
+The earlier `Permission denied` of `unshare -Ur -m` did not come back:
+on this host, uid 1000 mounted a tmpfs with `size=64m` in its own user and
+mount namespaces. Proof as uid 1000 with a private store and
+`mirror.gcr.io/library/alpine:3.20`. Before (the release build of `main` in the
+lead checkout): a foreground `run --tmpfs /w:size=64m` wrote 100 MiB into
+`/w`, and `run -d` refused `--tmpfs`. After: the foreground run showed
+`tmpfs /w tmpfs rw,nosuid,nodev,relatime,size=65536k` in `/proc/mounts`.
+A write of 100 MiB stopped at 64 MiB with "No space left on device", and
+a write of 16 MiB passed. `run -d --tmpfs /w:size=64m` ran. `exec` saw the
+same mount, wrote 16 MiB, and the next write got "No space left on
+device". `inspect --format '{{json .Tmpfs}}'` gave
+`["/w:size=67108864 (memory)"]`. `create` and `start` gave `ENOSPC` past
+8 MiB. With `PODVM_USERNS=0`, pod-enter's own user namespace held the
+mount. Under `scripts/dev/nouserns.c`, `run`, `run -d` and `create` each
+refused with 125: "--tmpfs /w:size=67108864 is refused: it needs the
+namespace rung, and this host gives the userland rung, which has no mount
+namespace of its own; podvm does not give a directory with no limit in its
+place". No container stayed. The unit tests
+`each_tmpfs_with_a_size_is_a_mount_with_its_limit`,
+`each_entry_but_the_namespace_rung_refuses_a_tmpfs_by_name` and
+`the_record_reads_back_each_tmpfs_or_names_the_bad_part` pin the parser,
+the refusals and the record.
+
+Remaining: none for the namespace rung. A rule of the confinement on a
+tmpfs that the image does not hold stays open in podcrates (its
+`v0.86.0` notes).
+
+The machine tier (2026-11-26) holds `--storage-opt size=N`.
 podvm makes a sparse file of N bytes in the run directory. It writes an
 empty ext4 file system into the file. podvm gives the file to the guest as
 a virtio disk with the serial `podvm-disk`, `cache=unsafe` and
@@ -5633,10 +5674,6 @@ e2fsprogs on a 64 MiB disk and on a 9-group disk. It found the planted wrong
 count of free blocks.
 [Transcript](../experiments/results/machine-sized-disk.txt)
 
-Remaining: the namespace rung. Its work directory needs a required
-size-limited mount in pod-enter, requested in #667 (COORD-250). On this host
-`unshare -Ur -m` started, and the tmpfs mount gave `Permission denied`. The
-proof needs a lane that can mount tmpfs in its user and mount namespaces.
 The earlier TCG probe of the virtio ext4 disk is in
 [the virtio ext4 transcript](../experiments/results/machine-virtio-ext4.txt).
 
@@ -7581,3 +7618,53 @@ whose count is unknown.
 
 **Partial (2026-11-26).** The feasibility answer is COORD-255 (#672). Remaining:
 the route and field of podrunner, the counter, the proof.
+
+# T-2103: A writable host volume that the host user can remove, on the machine and incus tiers
+
+**Source:** PodUtils/podrunner#371 (COORD-143 of podrunner, from a member of the team, 2026-11-26; podrunner task 648)
+**Category:** machine
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** open
+
+## Problem
+
+podrunner mounts its job cache (`/podrunner-cache`) in microvm guests and
+incus instances read-only only. On the machine tier the 9p share uses
+`security_model=none` and the 9p2000.L default `access=client`: the image's
+user writes only where its uid is the host uid. On the incus tier the
+instance writes files as ids of its map, so the user of podrunner cannot
+remove them under a 0755 directory; with `security.idmap.isolated` a later
+instance cannot write them either. `shift=true` lets the root of the
+instance write as host root.
+
+## Premise
+
+podrunner asks: (1) the machine tier: a volume mode with
+`security_model=mapped-xattr` (and `fmode=0644,dmode=0755` for files that
+the host makes), for `rw` and `ro` of one directory, so the guest keeps its
+owner and mode in xattrs and the host user owns each file; (2) the incus
+tier: a way for the host user to remove what an instance wrote in a volume
+with the map kept, preferably a removal through incusd (for example a
+`podvm volume rm`, or a cleanup run in a short instance with the same map)
+over a map of the caller's uid into the instance.
+
+## Approach
+
+Machine tier: a mode of `-v` (or a variable) that gives `-virtfs
+local,security_model=mapped-xattr,fmode=0644,dmode=0755` and mounts the tag
+with `access=any` or the access that the guest's owners need. Incus tier: a
+removal of a volume's content through a short instance with the same map,
+named by a verb. Name the version of each in the answer.
+
+## Decision
+
+-
+
+## Prove
+
+A `run -d` with a writable volume where the image's user (a uid other than
+the host's) writes a file; the host user then removes the directory with no
+root; on the machine tier the next guest reads the file with its owner and
+mode.

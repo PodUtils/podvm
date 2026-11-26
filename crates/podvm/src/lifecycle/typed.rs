@@ -41,6 +41,7 @@ pub const CONTAINER_INSPECT_FIELDS: &[&str] = &[
     "Config.Image",
     "Config.WorkingDir",
     "Config.Labels",
+    "Tmpfs",
     "Exec.Mode",
     "Exec.Shares",
     "Contains",
@@ -125,6 +126,7 @@ pub(super) fn fields(text: &[(&'static str, String)], c: &Container) -> Vec<(&'s
                 "Config" => config(c),
                 "Config.Env" => json!(visible_env(c)),
                 "Config.Cmd" => json!(c.argv),
+                "Tmpfs" => json!(crate::run::tmpfs::words(&c.env)), // T-1968
                 k if NUMBERS.contains(&k) => v.parse::<i64>().map_or(Value::Null, Value::from),
                 k if TIMES.contains(&k) && v == "-" => Value::Null,
                 _ => Value::String(v.clone()),
@@ -186,6 +188,7 @@ mod tests {
                 "A=1".into(),
                 "PODVM_MEMO_FD=17".into(),
                 "LD_PRELOAD=x".into(),
+                "PODVM_TMPFS=/w:size=4096".into(),
             ],
             working_dir: "/w".into(),
             created_at: "now".into(),
@@ -226,6 +229,12 @@ mod tests {
             ("Config.Cmd", json!(["sleep", "9"]), "[sleep 9]"),
             ("Config.Image", json!("img"), "img"),
             ("Config.WorkingDir", json!("/w"), "/w"),
+            // TODO/machine.md T-1968: each tmpfs with a limit is memory.
+            (
+                "Tmpfs",
+                json!(["/w:size=4096 (memory)"]),
+                "[/w:size=4096 (memory)]",
+            ),
             ("Complete.Degraded", json!(0), "0"),
             ("End.RunMs", Value::Null, "-"),
             ("Name", json!("n"), "n"),

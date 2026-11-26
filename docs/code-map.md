@@ -2,8 +2,8 @@
 
 ## Crates of this tree
 
-podvm takes the shared crates from PodUtils/podcrates at the tag `v0.85.0`
-(podcrates commit `1d1c9fc`; `Cargo.lock` names it).
+podvm takes the shared crates from PodUtils/podcrates at the tag `v0.86.0`
+(podcrates commit `22d1a75`; `Cargo.lock` names it).
 A local crate gives podvm's names, paths and settings to its `pod-*` crate
 and keeps the parts that only podvm needs.
 The `Cargo.toml` of each crate names its `pod-*` dependencies.

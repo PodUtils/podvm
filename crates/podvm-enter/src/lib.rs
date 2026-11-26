@@ -19,6 +19,7 @@ pub use pod_enter::{
     Child, Error, Fds, Member, Names, NsMount, Plan, Program, Result, RootDir, VolumeBind,
     DEVPTS_FLAGS, DEVPTS_OPTIONS, ENTERED_RUNG, WAIT_FORWARDED,
 };
+pub use pod_enter::{tmpfs_label, TmpfsMount, TMPFS_MOST}; // `--tmpfs`, podcrates v0.86.0
 
 /// The title and the empty environment of a process of podvm in the PID
 /// namespace of a payload (TODO/enter.md T-2054): `pod_enter::title`, the
