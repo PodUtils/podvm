@@ -98,8 +98,14 @@ fn the_init_of_an_image_is_systemd_through_each_link() {
 /// markers, a target wants it, and each console unit is masked.
 #[test]
 fn the_unit_of_the_run_and_its_masks() {
-    let e = entries("n0");
-    let u = unit("n0");
+    let e = entries("n0", false);
+    let u = unit("n0", false);
+    let held = unit("n0", true);
+    assert!(
+        held.contains("ExecStart=/podvm/podvm guest-ready n0 /podvm-init --held\n"),
+        "{held}"
+    );
+    assert!(entries("n0", true).contains(&Entry::File(format!("{ETC}/{UNIT}"), held)));
     assert!(e.contains(&Entry::File(format!("{ETC}/{UNIT}"), u.clone())));
     for want in [
         "ExecStart=/podvm/podvm guest-ready n0 /podvm-init\n",
@@ -185,21 +191,39 @@ fn the_arguments_of_guest_root() {
         )
     );
     let plain = root_args(&s(&["--load", "a", "ab12"])).unwrap();
-    assert_eq!((plain.disk, plain.init), (false, None));
+    assert_eq!((plain.disk, plain.init, plain.held), (false, None, false));
+    let held = root_args(&s(&["--load", "a", "--init=9", "--held", "ab12"])).unwrap();
+    assert_eq!((held.init, held.held), (Some(9), true));
     for bad in [
         &["--load", "a"][..],
         &["--load", "a", "--init=0", "ab"],
         &["--load", "a", "--init=x", "ab"],
         &["--load", "a", "--other", "ab"],
+        &["--load", "a", "--held", "ab"],
         &["--load"],
         &[],
     ] {
         assert!(root_args(&s(bad)).is_err(), "{bad:?}");
     }
     let mut argv = s(&["-append", "console=ttyS0 rdinit=/podvm-init"]);
-    crate::machine::guest::disk::root::with_init(&mut argv, &s(&["ext4"]), false, Some(60), "ab");
+    let mut held = argv.clone();
+    crate::machine::guest::disk::root::with_init(
+        &mut argv,
+        &s(&["ext4"]),
+        false,
+        Some((60, false)),
+        "ab",
+    );
     assert_eq!(
         argv[1],
         "console=ttyS0 rdinit=/podvm/podvm -- guest-root --load ext4 --init=60 ab"
     );
+    crate::machine::guest::disk::root::with_init(
+        &mut held,
+        &s(&["ext4"]),
+        false,
+        Some((60, true)),
+        "ab",
+    );
+    assert!(held[1].ends_with("--init=60 --held ab"), "{}", held[1]);
 }

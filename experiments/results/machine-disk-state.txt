@@ -1,0 +1,92 @@
+Run: python3 -I experiments/486-machine-disk-state.py as uid 1000 (setpriv), PODVM_486_BIN = the release build of this commit's tree. WORK names the owned scratch directory. A control byte of the console is written as \xNN.
+Does the saved state of a machine guest hold systemd as PID 1 on the root disk?
+2026-11-26T20:55:41Z Linux 6.18.44-fc-v880, uid 1000, TCG, no /dev/kvm: True
+podvm SHA-256 1ed4c83ee6a8343daa772c3d2d3a9831f2eca2c8270fada7a8715e88d466a529
+image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b
+$ podvm pull -q ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b
+  | exit 0 in 10.2 s, first output after -
+$ podvm save -o WORK/arch.tar ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b
+  | exit 0 in 0.5 s, first output after -
+  | podvm save: saved ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b as 6 blobs (185.4 MiB), digest sha256:9bef8f23f6fb578d4c8e309d14fe1714ffdea2e967a5e4652dad65abf69d75d9
+$ podvm load -i WORK/other.tar
+  | exit 0 in 0.9 s, first output after 0.9 s
+  | Loaded image: localhost/state485:1
+$ podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b sh -c PAYLOAD
+  | exit 7 in 48.4 s, first output after 48.2 s
+  | PID1=systemd PID2=kthreadd
+  | CGROUP=0::/system.slice/podvm-run.service
+  | BOOT=2c87ef1c-9fde-45c7-a116-2ec067d85449
+  | fccd9a525e0c: Extracted (33146 entries, 0 whiteouts); 0 extended attributes set, 2 not set (the first: security.capability of usr/bin/newgidmap, EPERM; the sidecar names each)
+  | 8f1a3f638556: Extracted (10 entries, 0 whiteouts)
+  | f9b891f38f9e: Extracted (2 entries, 0 whiteouts)
+  | 2dacb2369e13: Extracted (6 entries, 0 whiteouts)
+  | podvm run: this host has no QEMU; podvm fetches the static QEMU 11.1.3 and its firmware (25 MiB) into WORK/store/tools/qemu-11.1.3 (TODO/machine.md T-1875)
+  | podvm run: the store copy of QEMU 11.1.3 is in WORK/store/tools/qemu-11.1.3
+  | podvm run: machine tier: the guest boots, and podvm saves its state for the next run of this image (TODO/machine.md T-2008)
+  | podvm run: machine tier: the state of the guest is saved: 175 MiB in 0.9 s through file, WORK/store/machine/state-9bef8f23f6fb578d4c8e309d14fe1714ffdea2e967a5e4652dad65abf69d75d9-f371b56e4f50f59bfae8f319.vm (TODO/machine.md T-2008)
+PASS 1: the first run exited 7 in 48 s, PID1=systemd PID2=kthreadd, 1 state file(s)
+$ podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b sh -c PAYLOAD
+  | exit 7 in 1.9 s, first output after 1.6 s
+  | PID1=systemd PID2=kthreadd
+  | CGROUP=0::/system.slice/podvm-run.service
+  | BOOT=2c87ef1c-9fde-45c7-a116-2ec067d85449
+  | podvm run: machine tier: the guest starts from the saved state of this image and guest shape; its clock and its random pool are the ones of this run, and its machine-id, its boot id and its service processes are the ones of the save (TODO/machine.md T-2008)
+PASS 2: the second run exited 7, first output after 1.6 s, PID1=systemd PID2=kthreadd, the boot id of the save: True
+$ podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image --podvm-channel WORK/1.sock:127.0.0.1:41001 --pids-limit 64 ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b bash -ec CHANNEL -- 41001 64 1
+  | exit 0 in 30.0 s, first output after 29.5 s
+  | CHANNEL=answer-1
+  | LIMIT=64
+  | PID1=systemd PID2=kthreadd
+  | BOOT=6f915e91-2a1b-4fa9-8b41-18a5b2067f16
+  | SEED=<measured>
+  | podvm run: machine tier: the guest boots, and podvm saves its state for the next run of this image (TODO/machine.md T-2008)
+  | podvm run: machine tier: the state of the guest is saved: 174 MiB in 0.4 s through file, WORK/store/machine/state-9bef8f23f6fb578d4c8e309d14fe1714ffdea2e967a5e4652dad65abf69d75d9-4d0779952c4c98908e51c00e.vm (TODO/machine.md T-2008)
+$ podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image --podvm-channel WORK/2.sock:127.0.0.1:41002 --pids-limit 64 ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b bash -ec CHANNEL -- 41002 64 2
+  | exit 0 in 2.2 s, first output after 1.7 s
+  | CHANNEL=answer-2
+  | LIMIT=64
+  | PID1=systemd PID2=kthreadd
+  | BOOT=6f915e91-2a1b-4fa9-8b41-18a5b2067f16
+  | SEED=<measured>
+  | podvm run: machine tier: the guest starts from the saved state of this image and guest shape; its clock and its random pool are the ones of this run, and its machine-id, its boot id and its service processes are the ones of the save (TODO/machine.md T-2008)
+$ podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image --podvm-channel WORK/3.sock:127.0.0.1:41003 --pids-limit 96 ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b bash -ec CHANNEL -- 41003 96 3
+  | exit 0 in 2.2 s, first output after 1.6 s
+  | CHANNEL=answer-3
+  | LIMIT=96
+  | PID1=systemd PID2=kthreadd
+  | BOOT=6f915e91-2a1b-4fa9-8b41-18a5b2067f16
+  | SEED=<measured>
+  | podvm run: machine tier: the guest starts from the saved state of this image and guest shape; its clock and its random pool are the ones of this run, and its machine-id, its boot id and its service processes are the ones of the save (TODO/machine.md T-2008)
+PASS 3: job 1: exit 0, limit 64, saved; job 2: exit 0, limit 64, loaded; job 3: exit 0, limit 96, loaded; 1 boot id(s), 3 seeds, 2 state files
+$ podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image localhost/state485:1 sh -c PAYLOAD
+  | exit 7 in 35.4 s, first output after 35.1 s
+  | PID1=systemd PID2=kthreadd
+  | CGROUP=0::/system.slice/podvm-run.service
+  | BOOT=8bc4274e-bb19-4b97-a0e8-165f729b7695
+  | fccd9a525e0c: Extracted (33146 entries, 0 whiteouts); 0 extended attributes set, 2 not set (the first: security.capability of usr/bin/newgidmap, EPERM; the sidecar names each)
+  | 8f1a3f638556: Extracted (10 entries, 0 whiteouts)
+  | f9b891f38f9e: Extracted (2 entries, 0 whiteouts)
+  | 2dacb2369e13: Extracted (6 entries, 0 whiteouts)
+  | b3a3d7deec3b: Extracted (1 entries, 0 whiteouts)
+  | podvm run: machine tier: the guest boots, and podvm saves its state for the next run of this image (TODO/machine.md T-2008)
+  | podvm run: machine tier: the state of the guest is saved: 172 MiB in 0.5 s through file, WORK/store/machine/state-96d4144fbfef29363a58975e9293fa395d7f34e1f3f93f24767dc70a794a4f4c-9ea113b0a981c5c352d3f000.vm (TODO/machine.md T-2008)
+PASS 4: another digest exited 7, saved its own state
+$ podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b sh -c PAYLOAD
+  | exit 7 in 6.8 s, first output after 6.6 s
+  | PID1=systemd PID2=kthreadd
+  | CGROUP=0::/system.slice/podvm-run.service
+  | BOOT=2c87ef1c-9fde-45c7-a116-2ec067d85449
+  | podvm run: machine tier: the root disk WORK/store/machine/root-9bef8f23f6fb578d4c8e309d14fe1714ffdea2e967a5e4652dad65abf69d75d9-v1.img of the cache was damaged (its SHA-256 is 051a70cebafb32f0d187c2ded1486493e9464cd59c8828c805e390811f72c1e1, and its trailer names a11b722f3023e265bfcdb11ad6ddcccab950b0d0edb795443a0f53cce096dd6a); podvm built it again (TODO/machine.md T-1994)
+  | podvm run: machine tier: the guest starts from the saved state of this image and guest shape; its clock and its random pool are the ones of this run, and its machine-id, its boot id and its service processes are the ones of the save (TODO/machine.md T-2008)
+PASS 5: after a changed byte the run exited 7, built the disk again with the same SHA-256: True, and started from the state
+$ PODVM_MACHINE_ROOT=initramfs podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b sh -c PAYLOAD
+  | exit 7 in 28.7 s, first output after 28.3 s
+  | PID1=systemd PID2=
+  | CGROUP=0::/../..
+  | BOOT=2a4440d6-c40d-4b62-b511-221e9c563e27
+  | podvm run: machine tier: the guest boots, and podvm saves its state for the next run of this image (TODO/machine.md T-2008)
+  | cat: /proc/2/comm: No such file or directory
+  | podvm run: machine tier: the state of the guest is saved: 1274 MiB in 2.7 s through file, WORK/store/machine/state-9bef8f23f6fb578d4c8e309d14fe1714ffdea2e967a5e4652dad65abf69d75d9-b3fd241e24307f8fcc8b8131.vm (TODO/machine.md T-2008)
+PASS 6: PODVM_MACHINE_ROOT=initramfs exited 7, PID1=systemd PID2=
+PASS 7: 0 emulator(s); run directories, partial files and failure markers []
+THE SAVED STATE HOLDS SYSTEMD AS PID 1 ON THE ROOT DISK

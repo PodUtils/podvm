@@ -20,6 +20,22 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
   launcher of `run -d` outlives the verb by design, as the shim of docker
   does, and the init or the subreaper of the caller reaps it.
 
+### Changed: the saved state of a machine guest holds systemd as PID 1, 2026-11-26
+
+Record: T-1994, T-2008 (PodUtils/podrunner#313 ask 2, PodUtils/podrunner#355).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- The default `run --podvm-tier=machine --podvm-init=image` of an image
+  whose init is systemd saves and loads its state on the root disk of the
+  image, with systemd as PID 1 of the guest. The first run saves the
+  state; each later run starts from it in seconds.
+- A run with `--podvm-channel` and `--pids-limit` gets its own socket,
+  guest port and limit after the load, as on the route before.
+- The state of one root disk never loads with another: the SHA-256 of
+  the disk is a part of the fingerprint of the state.
+- `PODVM_MACHINE_ROOT=initramfs` keeps the state of earlier releases, with
+  systemd in a PID namespace.
+
 ### Added: `-v HOST:GUEST:overlay`, a read-only host directory with a writable layer, 2026-11-26
 
 Record: T-2101 (PodUtils/podrunner#368).
@@ -88,16 +104,14 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 
 - `run --podvm-tier=machine --podvm-init=image` of an image whose
   `/sbin/init` is systemd boots systemd as PID 1 of the guest, on the
-  root disk of the image, where the saved state does not serve the run
-  (`PODVM_MACHINE_STATE=0`, `-t`, `run -d`, `--storage-opt size=` and the
-  other cases in [Limits](docs/limits.md)). The command runs in the unit
+  root disk of the image, with or without the saved state (see the
+  section above). The command runs in the unit
   `podvm-run.service` after `systemctl is-system-running` gives
   `running` or `degraded`, and its exit code is the exit code of the run.
 - A unit that does not start, or an init that is not ready within
   `PODVM_INIT_BOOT_TIMEOUT` (180 s), ends the run with one line and 125.
-- The saved state keeps its priority: a run that it serves saves and
-  loads it as in 0.2.0-beta.41, with systemd in a PID namespace. An image
-  whose init is not systemd also keeps the PID namespace.
+- The saved state keeps its priority (call C27). An image whose init is
+  not systemd keeps the PID namespace.
 
 ### Added: `--tmpfs PATH:size=N` is a tmpfs with a limit, 2026-11-26
 

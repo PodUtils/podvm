@@ -278,12 +278,14 @@ pub struct RootArgs {
     /// `--init=SECS`: exec the init of the image (systemd) with the bound
     /// of its boot (TODO/machine.md T-1994, step 2).
     pub init: Option<u64>,
+    /// `--held`: the guest of a saved state (TODO/machine.md T-2008).
+    pub held: bool,
     pub nonce: String,
 }
 
-/// `--load M1,M2,... [--disk] [--init=SECS] NONCE`.
+/// `--load M1,M2,... [--disk] [--init=SECS [--held]] NONCE`.
 pub fn root_args(args: &[String]) -> Result<RootArgs, String> {
-    let usage = "the arguments are --load M1,M2,... [--disk] [--init=SECS] NONCE";
+    let usage = "the arguments are --load M1,M2,... [--disk] [--init=SECS [--held]] NONCE";
     let (nonce, flags) = args.split_last().ok_or(usage)?;
     if nonce.is_empty() || !nonce.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err(format!("{nonce:?} is not the nonce of a run"));
@@ -292,6 +294,7 @@ pub fn root_args(args: &[String]) -> Result<RootArgs, String> {
         load: Vec::new(),
         disk: false,
         init: None,
+        held: false,
         nonce: nonce.clone(),
     };
     let mut it = flags.iter();
@@ -306,11 +309,15 @@ pub fn root_args(args: &[String]) -> Result<RootArgs, String> {
                     .collect();
             }
             "--disk" => a.disk = true,
+            "--held" => a.held = true,
             _ => match f.strip_prefix("--init=").map(str::parse::<u64>) {
                 Some(Ok(s)) if s > 0 => a.init = Some(s),
                 _ => return Err(format!("{f:?}: {usage}")),
             },
         }
+    }
+    if a.held && a.init.is_none() {
+        return Err(format!("--held needs --init=SECS: {usage}"));
     }
     Ok(a)
 }
@@ -335,7 +342,7 @@ pub fn root_main(args: &[String]) -> i32 {
     let why = match (root_up(&modules, upper), a.init) {
         (Ok(()), None) => format!("the init of the run: {}", exec_sh("/podvm-init")),
         (Ok(()), Some(bound)) => {
-            match crate::machine::guest::pid1::prepare(Path::new("/"), &a.nonce, bound) {
+            match crate::machine::guest::pid1::prepare(Path::new("/"), &a.nonce, bound, a.held) {
                 Ok(()) => format!(
                     "the init of the image {}: {}",
                     crate::initns::INIT,
@@ -346,5 +353,8 @@ pub fn root_main(args: &[String]) -> i32 {
         }
         (Err(e), _) => e,
     };
+    if a.held {
+        crate::machine::guest::pid1::bad(&a.nonce, &why);
+    }
     root_fail(&a.nonce, &why)
 }

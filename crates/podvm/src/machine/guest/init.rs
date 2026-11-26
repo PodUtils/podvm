@@ -46,7 +46,15 @@ pub fn script(
 ) -> String {
     let mut s = head();
     s.push_str(&body(
-        nonce, argv, env, workdir, net, vols, tty, channel, false,
+        nonce,
+        argv,
+        env,
+        workdir,
+        net,
+        vols,
+        tty,
+        channel,
+        Held::No,
     ));
     s
 }
@@ -132,11 +140,55 @@ pub fn template(nonce: &str, net: bool) -> String {
     s
 }
 
+/// TODO/machine.md T-1994: the init of a guest whose state podvm saves,
+/// with systemd of the image as PID 1 of the guest (the unit of the run,
+/// [`super::pid1`], runs it after the boot). It has nothing of a run: the
+/// network, the 9p modules, then the job of a run on the serial line
+/// (`guest-job`, which reads `/dev/ttyS0`: the unit has no stdin), and
+/// the script of the job ([`job`] with [`Held::Pid1`]).
+pub fn template_pid1(nonce: &str, net: bool) -> String {
+    let mut s = String::from(
+        "#!/bin/sh
+",
+    );
+    s.push_str(&setup());
+    if net {
+        s.push_str(
+            "/podvm/podvm guest-net
+",
+        );
+    }
+    s.push_str(
+        "/podvm/podvm guest-9p
+",
+    );
+    s.push_str(&format!(
+        "/podvm/podvm guest-job {nonce} 0 {JOB_FILE} </dev/ttyS0 || {{ sync; \
+         reboot -f 2>/dev/null; echo b > /proc/sysrq-trigger; }}\n"
+    ));
+    s.push_str(&format!(". {JOB_FILE}\n"));
+    s
+}
+
+/// Where the command of a run goes (TODO/machine.md T-2008, T-1994).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Held {
+    /// A guest with no held init: the init script runs the command.
+    No,
+    /// A held init of the image in a PID namespace ([`template`]): the
+    /// volumes mount in its mount namespace, the command runs in it.
+    Ns,
+    /// systemd as PID 1 of the guest ([`template_pid1`]): the command runs
+    /// in the unit of the run.
+    Pid1,
+}
+
 /// TODO/machine.md T-2008: the script of one run for a guest of
-/// [`template`]: the lines of [`script`] after the mounts, with the
-/// volumes mounted in the mount namespace of the held init and the command
-/// run in that init. The network of the guest is up from the save. The
+/// [`template`] (`held` [`Held::Ns`]: the volumes mounted in the mount
+/// namespace of the held init and the command run in that init) or of
+/// [`template_pid1`]. The network of the guest is up from the save. The
 /// channel listener and the process limit belong to the job.
+#[allow(clippy::too_many_arguments)]
 pub fn job(
     nonce: &str,
     argv: &[String],
@@ -145,17 +197,18 @@ pub fn job(
     vols: &[super::vol::Vol],
     channel_port: Option<u16>,
     pids: Option<&str>,
+    held: Held,
 ) -> String {
     let channel = channel_port.map(|port| Chan {
         port: Some(port),
         sealed: false,
     });
-    let script = body(nonce, argv, env, workdir, false, vols, None, channel, true);
+    let script = body(nonce, argv, env, workdir, false, vols, None, channel, held);
     with_pids(script, pids, nonce)
 }
 
-/// The lines of an init for one run, after [`setup`]. `held` is the run
-/// of a guest with a held init (TODO/machine.md T-2008).
+/// The lines of an init for one run, after [`setup`]. `held` is where the
+/// command runs (TODO/machine.md T-2008).
 #[allow(clippy::too_many_arguments)]
 fn body(
     nonce: &str,
@@ -166,12 +219,12 @@ fn body(
     vols: &[super::vol::Vol],
     tty: Option<&str>,
     channel: Option<Chan>,
-    held: bool,
+    held: Held,
 ) -> String {
     let mut s = String::new();
     if !vols.is_empty() {
         let args: Vec<String> = vols.iter().map(|v| sh_quote(&super::vol::arg(v))).collect();
-        let hold = if held {
+        let hold = if held == Held::Ns {
             format!("{} {HOLD_FILE} ", super::vol::HOLD_FLAG)
         } else {
             String::new()
@@ -220,7 +273,7 @@ fn body(
             "/podvm/podvm guest-channel {args} & i=0\nwhile [ ! -e {r} ] && [ $i -lt {tries} ]; do sleep 0.1; i=$((i+1)); done\n",
             r = super::channel::READY
         ));
-        if c.sealed || held {
+        if c.sealed || held != Held::No {
             let why = if c.sealed {
                 "the run bundle did not reach the guest"
             } else {
@@ -269,7 +322,7 @@ fn body(
     s.push_str(&format!(
         "{ERR_PORT}\nif [ -c \"$E\" ]; then cat /podvm-err >\"$E\" & else cat /podvm-err >&2 & fi\ne=$!\n"
     ));
-    let run = if held {
+    let run = if held == Held::Ns {
         format!(
             "/podvm/podvm {} --attach {HOLD_FILE} --cwd \"$PWD\" -- \"$@\"",
             crate::initns::VERB

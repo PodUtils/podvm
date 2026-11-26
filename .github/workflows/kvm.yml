@@ -585,6 +585,17 @@ jobs:
         run: |
           k=$(sudo sh -c 'ls /var/tmp/podvm-468-ci/store/machine/vmlinuz-* 2>/dev/null | head -1')
           i=$(sudo sh -c 'ls /var/tmp/podvm-468-ci/store/machine/base-*.cpio 2>/dev/null | head -1')
+          if [ -n "$k" ] && [ -z "$i" ]; then
+            # TODO/machine.md T-1994: each route of 468 keeps the root on the
+            # disk of the image; one run with the root in the initramfs
+            # makes the base archive of the image.
+            W=/var/tmp/podvm-468-ci
+            sudo runuser -u "$USER" -- env HOME="$W/home" PODVM_STORE="$W/store" \
+              PODVM_MACHINE_ROOT=initramfs PODVM_RUNSC=/nonexistent/runsc \
+              timeout 900 "$W/podvm" run --rm --podvm-tier=machine --podvm-net none \
+              localhost/svc-debian:12 true || true
+            i=$(sudo sh -c 'ls /var/tmp/podvm-468-ci/store/machine/base-*.cpio 2>/dev/null | head -1')
+          fi
           if [ -z "$k" ] || [ -z "$i" ]; then
             echo "no guest kernel or initrd from experiment 468: COULD NOT RUN"
             exit 2

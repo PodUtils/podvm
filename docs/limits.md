@@ -540,10 +540,11 @@ C26). Experiment 465 measures each line below as uid 1000.
   in the guest under TCG.
 - Where the host has no runsc or no user namespace (the userland rung),
   the run takes the machine tier
-  and names the part on stderr. A run that the saved state below serves
-  takes the state first (call C27). Each other run on the root disk of
-  the image (T-1994), where `/sbin/init` of the image is systemd, boots
-  systemd as PID 1 of the guest itself. podvm writes the unit `podvm-run.service` into the root,
+  and names the part on stderr. On the root disk of the image (T-1994),
+  where `/sbin/init` of the image is systemd, systemd is PID 1 of the
+  guest itself: in a run that the saved state below serves (call C27),
+  in the guest that podvm boots to save the state, and in each other
+  run. podvm writes the unit `podvm-run.service` into the root,
   masks the getty units of the console and `systemd-firstboot.service`,
   and turns the status of the boot off. The unit waits until
   `systemctl is-system-running` gives `running` or `degraded`, then runs
@@ -551,11 +552,11 @@ C26). Experiment 465 measures each line below as uid 1000.
   line. One bound from the start of the init (`PODVM_INIT_BOOT_TIMEOUT`,
   180 s by default) ends a run whose unit does not start or whose init
   does not get ready, with one line and exit 125 before the command.
-  From a saved state, with an init that is not systemd and with
+  With an init that is not systemd and with
   `PODVM_MACHINE_ROOT=initramfs`, the init is PID 1 of a PID namespace of the
-  guest, with real root and each controller of cgroup2 (T-2002).
-  The guest has the limits of "Guests" above: the saved state of T-2008
-  keeps its root in the initramfs; a volume is a 9p mount, and the
+  guest, with real root and each controller of cgroup2 (T-2002), and a
+  saved state keeps its root in the initramfs.
+  The guest has the limits of "Guests" above; a volume is a 9p mount, and the
   network is QEMU's user-mode network. Under TCG on the cloud host a run
   of `true` takes 24 s to 27 s with four vCPUs, and QEMU holds 2.6 GB of
   memory for an image of 584 MB; the namespace rung takes 3 s.
@@ -578,7 +579,11 @@ C26). Experiment 465 measures each line below as uid 1000.
   `--podvm-engine`, `--podvm-sealed`, `--network broker`, more than four
   volumes, more than 64 KiB of stdin, an arm64 guest or a kernel from
   `PODVM_MACHINE_KERNEL` use a fresh boot, with systemd as PID 1 of the
-  guest on the root disk where the image has it (T-1994). Each run of one state has the machine-id,
+  guest on the root disk where the image has it (T-1994). On the root
+  disk the state holds the memory of the guest with its upper layer (a
+  tmpfs); the disk stays out of the state, and its SHA-256 (from its
+  trailer) is a part of the fingerprint, so the state of one disk never
+  loads with another. Each run of one state has the machine-id,
   the boot id, the monotonic clock and the service processes of the
   save: a secret that a service made at its start (a session key, the
   state of a random generator in its memory) is the same in each run.
