@@ -355,6 +355,7 @@ mod list;
 pub use list::*;
 
 mod login_extract;
+pub(crate) mod machine_files; // TODO/machine.md T-1994
 pub use login_extract::*;
 mod login_usage;
 pub use login_usage::*;
@@ -421,11 +422,12 @@ const IMAGE_USAGE: &str = "usage: podvm image ls | rm | prune | tag | inspect | 
 /// spare tree. A digest that another tag still names keeps its extraction.
 /// It gives the bytes that it removed (PodUtils/podvm#526: `prune` counts
 /// them in its total).
-pub(crate) fn drop_extractions(store: &podvm_image::Store, before: &[String]) -> u64 {
+pub(crate) fn drop_extractions(store: &podvm_image::Store, before: &[String], verb: &str) -> u64 {
     let Ok(now) = store.list() else {
         return 0;
     };
-    let mut freed = 0u64;
+    // TODO/machine.md T-1994: the machine files of the same digests.
+    let mut freed = machine_files::drop_for(store.root(), before, &now, verb);
     for d in before {
         if !now.iter().any(|r| &r.manifest_digest == d) {
             let bytes = podvm_image::space::dir_bytes(&podvm_extract::paths(store, d).0);

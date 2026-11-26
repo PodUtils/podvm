@@ -309,7 +309,7 @@ pub fn rmi(verb: &str, args: &[String]) -> i32 {
             .unwrap_or_default();
         match store.remove(want) {
             Ok(done) => {
-                super::drop_extractions(&store, &digests);
+                super::drop_extractions(&store, &digests, "rmi");
                 for name in &done.untagged {
                     println!("Untagged: {name}");
                 }

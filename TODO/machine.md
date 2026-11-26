@@ -5797,10 +5797,27 @@ file stayed. The unit tests `the_root_disk_keeps_each_kind_of_file_and_each_attr
 the cache. [Transcript](../experiments/results/machine-disk-root.txt)
 
 Remaining: step 1 under KVM on `kvm.yml`; a disk of the image in the
-saved state of T-2008; the removal of a root disk with its image (`rmi`
-and `system prune` leave `root-*.img`, as they leave `base-*.cpio`); an
-arm64 guest. Steps 2 and 3 (the init of the image as PID 1 of the guest,
-and its exit status) are open.
+saved state of T-2008; an arm64 guest. Steps 2 and 3 (the init of the
+image as PID 1 of the guest, and its exit status) are open.
+
+Amended (2026-11-26). `rmi` and `image prune` now remove the machine files
+of an image with its last record: `base-HEX-vN.cpio`, `root-HEX-vN.img`
+with its `.ok` record and its lock, and each `state-HEX-*` file, with the
+partial files of each (`images/machine_files.rs`). A group of files that
+has a lock goes under the lock, taken with no wait. Where a run holds the
+lock, the group stays and a line names it. A second name of the image, and
+a container that references it, keep the record, so they keep the files.
+`image prune` also removes the files of a digest that no record and no
+container names (what an older podvm left). `system df` counts the bytes
+in a new line "Machine files", in the line of the files that no image
+names, and in "Reclaimable". podvm has no `system prune` verb; `image
+prune` is the verb that reclaims. The table-driven tests
+`the_machine_files_go_with_the_last_name_of_an_image_and_only_then`,
+`machine_files_that_no_record_names_are_orphans` and
+`only_a_name_with_a_sha256_digest_is_an_image_file` pin the rules. A
+guest that runs holds the hold of its image, so the record of the image
+stays; podvm does not scan for an open file of a guest. Not measured: a
+removal during a build or a save under KVM.
 
 # T-1996: On the incus tier, an instance of the hosted snapshot has 231,072 ids, `/dev/fuse` and a machine-id of its own
 
@@ -5957,6 +5974,26 @@ the initramfs had CapEff 0 for both, as the `newc` archive keeps no
 attribute. Remaining: the hosted-core slice on `kvm.yml` with `getcap` and
 `ping` as above.
 
+Amended (2026-11-26). `incus::xattrs::on_disk` read the names of the
+attributes of a file into 4096 bytes, and a file with a longer list gave
+an empty list: its attributes were lost with no word. The reader now asks
+the kernel for the size (`listxattr` with a NULL list), reads that size,
+and tries again where the list grew (`ERANGE`). A list over 64 KiB (the
+limit of the kernel), a name of the image that is not UTF-8, and each
+other failure of `listxattr` or `getxattr` are an error with the path;
+the build of the image or of the root disk fails with that line. A file
+system with no attributes (`ENOTSUP`) gives none, and an attribute that
+goes between the list and the read is skipped. A file of mode 0000 is read
+again with the owner's read bit where the first read gives `EACCES`; the
+incus tier and the machine tier share this path (`on_disk_readable`). On
+tmpfs, a file with 60 attributes of 100-byte names gave 0 of 60 before and
+gives 60 of 60 now. The table-driven test
+`a_list_of_names_of_any_size_is_read_in_full_or_refused_by_name` pins it.
+podcrates has no reader of the attributes of a file on disk: `pod-extract`
+reads PAX records, and `pod-hostprobe` has the system call numbers only.
+Ask for the next podcrates release: a reader of the attributes of a path
+with these bounds, so that podvm takes it (rule 2a).
+
 # T-2008: The machine tier boots systemd at each run: a saved state of the guest for each digest
 
 **Source:** the owner's direction of 2026-11-19, hint 7 of the scout (the backlog of #580, TH-35 and FE-02); T-2002
@@ -6007,7 +6044,7 @@ Measured on the cloud host of the session as uid 1000 (4 CPUs, 15 GB, no `/dev/k
 
 Faults that the runs found, each fixed: (1) a job that podvm wrote before the end of the load never came: the serial port of QEMU takes bytes before the load and the load drops them; podvm now waits for `running` on QMP, and each frame has a lead of 64 newlines. (2) QEMU that refused a state closed the pipe of the job, and SIGPIPE ended podvm with 141 before its boot of a guest; the writer thread blocks SIGPIPE. (3) QEMU 8.2.2 ended on SIGSEGV in the first seconds of a boot (T-2016); the guest that podvm boots to save its state boots again then, and the 9p modules load before the save, so that a guest from a state changes no PCI device. (4) The change time of podvm's binary in the fingerprint saved a second state for the same program, as experiment 468 copies the binary for each of its runs; the line holds the SHA-256 of the binary now (9 ms for 8.7 MB). (5) `init::with_image_init` replaced each `"$@"` of the script, also in an argument or a variable of the run (`sh -c 'exec "$@"'`): only the last one is the script's (T-2002).
 
-Remaining: (1) a run under KVM (`kvm.yml`): the save and the load with `-cpu host`, and the clock of the guest after a load; the cloud host has TCG only. (2) What a state does not serve boots as before: `-t`, `run -d`, `--pids-limit`, `--podvm-engine`, `--podvm-channel`, `--podvm-sealed`, `--network broker`, more than four volumes, more than 64 KiB of stdin, an arm64 guest, a kernel of `PODVM_MACHINE_KERNEL`, and each run with no `--podvm-init=image`. (3) `rmi` and `system prune` remove no state and no base archive of an image. (4) The pinned static QEMU 9.2.0 of the store is not measured (the host has QEMU 8.2.2); the pipe transport is measured with QEMU 8.2.2 by the variable, and the fall back of a QEMU before 8.2 from `file:` to the pipe by a stand-in of the monitor only. (5) podvm checks the length of a state file, not its bytes. (6) podcrates: `pod_guest::warm::save` and `restore` take a `Plan` of the UEFI flavour; podvm's `state::save` and `state::running` are a second form of them for a machine line of its own, and an ask for a form with no `Plan` is not written yet (rule 2a).
+Remaining: (1) a run under KVM (`kvm.yml`): the save and the load with `-cpu host`, and the clock of the guest after a load; the cloud host has TCG only. (2) What a state does not serve boots as before: `-t`, `run -d`, `--pids-limit`, `--podvm-engine`, `--podvm-channel`, `--podvm-sealed`, `--network broker`, more than four volumes, more than 64 KiB of stdin, an arm64 guest, a kernel of `PODVM_MACHINE_KERNEL`, and each run with no `--podvm-init=image`. (3) `rmi` and `image prune` remove the states and the base archive of an image with its last record (T-1994). (4) The pinned static QEMU 9.2.0 of the store is not measured (the host has QEMU 8.2.2); the pipe transport is measured with QEMU 8.2.2 by the variable, and the fall back of a QEMU before 8.2 from `file:` to the pipe by a stand-in of the monitor only. (5) podvm checks the length of a state file, not its bytes. (6) podcrates: `pod_guest::warm::save` and `restore` take a `Plan` of the UEFI flavour; podvm's `state::save` and `state::running` are a second form of them for a machine line of its own, and an ask for a form with no `Plan` is not written yet (rule 2a).
 
 Measured under KVM (2026-11-20, `kvm.yml` run 44709519610, job `init`, on `2a23242`; a GitHub-hosted runner, 4 CPUs, QEMU 10.2.1, experiment 468 with `--podvm-tier=machine`): a boot with no state, run 12.4 s, first output 9.5 s, peak 3,005 MiB; the boot that saves, 18.7 s and 15.8 s; the next run, 15.9 s and 13.0 s. The save failed under KVM (0 MiB of state, one marker `.bad`), so the next run booted: the cause is not in that transcript (experiment 468 prints each line of podvm on the state since `2cdf1e6`). The second run (`kvm.yml` run 44713826631 on `afe8257`) saved the state: a boot with no state, run 15.0 s, first output 12.0 s; the boot that saves, 13.6 s and 10.5 s; the run from the state, 3.9 s and 0.8 s, peak 2,040 MiB; the state 1,546 MiB, no marker. Remaining (added): the save under KVM failed in 1 of 2 runs, and that cause is not known; a run of the job that fails names it now.
 

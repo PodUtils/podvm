@@ -8,6 +8,31 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: `rmi` and `image prune` remove the machine files of an image, 2026-11-26
+
+Record: T-1994.
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `rmi` of the last name of an image, and `image prune`, remove the root
+  disk, the base archive and the saved states of the image from the store
+  (`machine/`). Before, they stayed for ever. A second name or a container
+  that keeps the image keeps its files. A file that a build or a save of a
+  run holds under its lock stays, and a line names it.
+- `image prune` also removes the machine files of a digest that no image
+  names.
+- `system df` counts the machine files in a new line, and in "Reclaimable".
+
+### Fixed: an image with many extended attributes keeps all of them, 2026-11-26
+
+Record: T-1999.
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- The incus tier and the machine tier read the extended attributes of a
+  file of the image into a buffer of 4096 bytes. A file with more names
+  lost all its attributes with no message. podvm now sizes the buffer from
+  the kernel, and a read that fails stops the build with a line that names
+  the file.
+
 ### Changed: the root of a machine guest is a disk of its image, 2026-11-26
 
 Record: T-1994 (PodUtils/podrunner#313 ask 2, PodUtils/podrunner#316

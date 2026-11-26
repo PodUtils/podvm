@@ -220,14 +220,7 @@ fn node(
     };
     // `user.*` reads need the read bit of the file: a file of mode 0000
     // is read with the owner's bit. A link has no mode of its own.
-    let mine = if md.file_type().is_symlink() || md.permissions().mode() & 0o400 != 0 {
-        xattrs::on_disk_where(path, of_image)
-    } else {
-        podvm_extract::tree::with_owner_bits(path, 0o400, || {
-            Ok(xattrs::on_disk_where(path, of_image))
-        })
-        .map_err(|e| at(path, e))?
-    };
+    let mine = xattrs::on_disk_readable(path, md, of_image).map_err(|e| e.to_string())?;
     Ok(Node {
         kind,
         perm,
