@@ -83,6 +83,7 @@ mod tests {
             userns_ids: None,
             pid_namespace: true,
             relay_title: None,
+            tmpfs: Vec::new(),
         };
         let mut out = Vec::new();
         let e = podvm_enter::spawn_namespace(&root, &plan, &mut out).unwrap_err();

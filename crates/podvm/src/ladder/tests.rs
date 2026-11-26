@@ -28,6 +28,7 @@ fn plan_of(program: &str) -> Plan {
         userns_ids: None,     // podcrates `v0.62.0`; T-1927 fills it for `run -d`
         pid_namespace: false, // podcrates `v0.65.0`; T-1930 sets it for `run -d`
         relay_title: None,    // podcrates `v0.82.1`: no init and no relay here
+        tmpfs: Vec::new(),    // podcrates `v0.86.0` (T-2102)
     }
 }
 

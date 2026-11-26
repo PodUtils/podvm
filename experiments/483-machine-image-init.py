@@ -32,7 +32,7 @@ Clauses:
   6. With the default state, the first run saves a state and the second
      starts from it: each exits 7 with systemd as PID 1 of the guest
      (PID 2 is kthreadd): the state is on the root disk (T-1994,
-     experiment 485).
+     experiment 486).
   7. The control with PODVM_MACHINE_ROOT=initramfs and
      PODVM_MACHINE_STATE=0 (the route of T-2002) exits 7 with systemd as
      PID 1 of a PID namespace: PID 2 is not kthreadd.

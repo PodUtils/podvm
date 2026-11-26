@@ -54,14 +54,23 @@ pub const RUN_OPTIONS: &str = "\
                    bind does not refuse its writes); w alone keeps the
                    descriptor serve of the interposer; m parses and
                    grants nothing (TODO/enter.md T-0501, T-1939)
-  -v, --volume H:G[:rw]
+  -v, --volume H:G[:rw|:ro|:overlay]
                    show the host path H at the guest path G. Repeatable. A
                    path rewrite through PODVM_MAPS on the userland loader
                    family, not a mount: a write lands in H, and :ro refuses
                    a write (TODO/cli.md T-1655). A 9p mount on the machine
                    tier. A bind mount on the namespace rung, which
                    /proc/mounts lists. A -w or a first program inside G
-                   resolves in H (TODO/enter.md T-1653)
+                   resolves in H (TODO/enter.md T-1653). :overlay, the
+                   namespace rung only (also -d, create and start): the
+                   directory H is the read-only lower layer of an overlayfs
+                   mount on G, and each write, chmod, unlink or rename goes
+                   to an upper layer in the tree of the container, which
+                   rm (or the end of run --rm) removes; no other volume may
+                   be at, over or under G, nor G under /tmp, /dev, /proc or
+                   /sys. Each other rung and tier refuses it (125), never a
+                   writable fallback; `system info --format '{{json
+                   .VolumeOverlay}}'` names the rungs (TODO/enter.md T-2101)
   --unsafe-host-paths
                    podvm's own, userland rung only: opt into the
                    pass-through with no PODVM_MAPS anchoring, so absolute
@@ -173,9 +182,12 @@ pub const RUN_OPTIONS: &str = "\
   --security-opt no-new-privileges
                    PR_SET_NO_NEW_PRIVS in the payload; each other option is
                    refused by name (TODO/cli.md T-1655)
-  --tmpfs P[:O]    an empty writable directory at P for a foreground run,
-                   removed at its end; not a mount, so size= is not enforced
-                   (TODO/cli.md T-1655)
+  --tmpfs P[:O]    with size=N: a tmpfs in memory of N bytes at P on the
+                   namespace rung, for run, run -d and create; a write past
+                   N gets ENOSPC, and each other rung refuses it with 125
+                   (TODO/machine.md T-1968). With no size=: an empty
+                   writable directory at P for a foreground run, removed at
+                   its end, not a mount (TODO/cli.md T-1655)
   --read-only      a write outside a writable volume fails with EROFS: through
                    the interposer of the userland loader family, and on the
                    namespace rung as a read-only root; elsewhere it is refused
@@ -394,6 +406,8 @@ mod acquire;
 pub(crate) mod binds; // TODO/enter.md T-1920
 pub(crate) mod cgroup; // TODO/cli.md T-1747
 mod devices; // TODO/enter.md T-1939
+pub(crate) mod overlay; // TODO/enter.md T-2101
+pub(crate) mod tmpfs; // TODO/machine.md T-1968
 mod user_ns; // TODO/enter.md T-1927
 pub(crate) use acquire::*;
 

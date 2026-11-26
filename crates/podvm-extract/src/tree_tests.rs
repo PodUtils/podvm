@@ -186,6 +186,12 @@ fn a_tree_with_read_only_directories_is_removed_and_no_link_is_followed() {
     fs::set_permissions(&outside, fs::Permissions::from_mode(0o500)).unwrap();
     std::os::unix::fs::symlink(&outside, f.rootfs.join("ro-link")).unwrap();
     fs::set_permissions(f.rootfs.join("etc"), fs::Permissions::from_mode(0o555)).unwrap();
+    // TODO/enter.md T-2101: a directory of mode 0000 with an entry (the
+    // `work/work` of overlayfs beside the rootfs) is opened too.
+    let shut = f.dir.join("overlay/0/work/work");
+    fs::create_dir_all(&shut).unwrap();
+    fs::write(shut.join("left"), b"x").unwrap();
+    fs::set_permissions(&shut, fs::Permissions::from_mode(0o000)).unwrap();
     assert!(remove(&s, &f.rootfs.to_string_lossy()).unwrap());
     assert!(!f.dir.exists());
     let mode = fs::metadata(&outside).unwrap().permissions().mode() & 0o777;

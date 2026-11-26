@@ -3,7 +3,7 @@
 root disk of the image?
 
 TODO/machine.md T-1994 and T-2008. Run with Python 3.11 or later on an
-x86_64 host, as a user that is not root. PODVM_485_BIN selects the
+x86_64 host, as a user that is not root. PODVM_486_BIN selects the
 binary. podvm fetches its own QEMU where none is on PATH, and the runs use
 TCG. The image is the pinned Arch Linux image of experiments 473 and 483.
 
@@ -333,7 +333,7 @@ def main():
         print("COULD NOT RUN: run as a user that is not root")
         return 2
     binary = Path(os.environ.get(
-        "PODVM_485_BIN", ROOT / "target/x86_64-unknown-linux-musl/release/podvm"
+        "PODVM_486_BIN", ROOT / "target/x86_64-unknown-linux-musl/release/podvm"
     )).resolve()
     if not os.access(binary, os.X_OK):
         print("COULD NOT RUN: give the podvm binary")

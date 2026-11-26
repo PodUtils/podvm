@@ -24,6 +24,28 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 - `PODVM_MACHINE_ROOT=initramfs` keeps the state of earlier releases, with
   systemd in a PID namespace.
 
+### Added: `-v HOST:GUEST:overlay`, a read-only host directory with a writable layer, 2026-11-26
+
+Record: T-2101 (PodUtils/podrunner#368).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `-v HOST:GUEST:overlay` gives the directory HOST as the read-only lower
+  layer of an overlayfs mount on GUEST, on the namespace rung, for a
+  foreground `run`, `run -d`, `create` and `start`. Each write, `chmod`,
+  `unlink` and `rename` goes to an upper layer in the tree of the
+  container in the store, and no change reaches HOST. A removed file of
+  HOST is a whiteout of the upper layer. `rm`, and the end of `run --rm`,
+  remove the layer with the tree.
+- Each rung and tier that cannot hold the layer refuses it by name with
+  125: the userland rung, the syscall, emulate, machine, incus and runsc
+  tiers, `--podvm-init=image`, a foreground run of uid 0 and
+  `PODVM_USERNS=0`. `overlay` with `ro` or `rw` is a flag error.
+- `system info --format '{{json .VolumeOverlay}}'` names the rungs that
+  hold the mode, and whether the rung of this host is one of them.
+- The removal of a tree opens a directory of mode 0000 (the `work/work`
+  directory of overlayfs). Before, musl's `O_ACCMODE` removed `O_PATH`
+  from the open, and the removal failed with "Permission denied".
+
 ### Fixed: the group number of a superblock copy past group 65535, 2026-11-26
 
 Record: T-1968 (PodUtils/podcrates#273).
@@ -78,6 +100,32 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
   `PODVM_INIT_BOOT_TIMEOUT` (180 s), ends the run with one line and 125.
 - The saved state keeps its priority (call C27). An image whose init is
   not systemd keeps the PID namespace.
+
+### Added: `--tmpfs PATH:size=N` is a tmpfs with a limit, 2026-11-26
+
+Record: T-1968, T-2102 (PodUtils/podvm#667, PodUtils/podrunner#296 ask 5).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- On the namespace rung, `--tmpfs PATH:size=N` is a tmpfs in memory of N
+  bytes for `run`, `run -d` and `create`. A write past N fails with "No
+  space left on device". `exec` sees the mount of the run. `inspect`
+  (`.Tmpfs`) and `run --report` (`tmpfs`) name it as memory. Before, it
+  was a directory with no limit, and `run -d` refused it.
+- Each other rung refuses such a run by name with 125, and podvm never
+  gives a directory with no limit in its place. On the syscall tier,
+  `--tmpfs /tmp:size=N` stays the cap of its handler. `size=0` is docker's
+  "no limit" and gives the directory of a foreground run, as before.
+
+### Changed: podcrates `v0.86.0`, 2026-11-26
+
+Record: T-2102.
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- podvm takes the shared crates at `v0.86.0`. Some failure lines of the
+  crates change: a refused TLS certificate is named in words (for example
+  "invalid peer certificate: a certificate that no trusted CA signed"),
+  a CA bundle that does not read names its path once, and the lines of
+  the crates keep the cause of a failure and drop ` (os error N)`.
 
 ### Fixed: a C build on the syscall tier no longer spins for ever, 2026-11-26
 

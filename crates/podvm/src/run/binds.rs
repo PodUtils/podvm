@@ -57,9 +57,11 @@ pub fn planned() -> bool {
 
 /// `PODVM_BINDS` of the volumes, in `env`, where pod-enter binds them on
 /// the namespace rung of this run.
+/// TODO/enter.md T-2101: `:overlay` for an overlay volume, which the
+/// launcher mounts itself (`launcher::overlays_of`).
 pub(super) fn push_env(
     volumes: &[podvm_enter::userland::Volume],
-    ro: &[String],
+    (ro, overlay): (&[String], &[String]),
     on_namespace: bool,
     base: Option<&str>,
     env: &mut Vec<String>,
@@ -71,8 +73,12 @@ pub(super) fn push_env(
     let pairs: Vec<String> = volumes
         .iter()
         .map(|v| {
-            let ro = if ro.contains(&v.guest) { ":ro" } else { "" };
-            format!("{}:{}{ro}", v.guest, v.host)
+            let mode = match (ro.contains(&v.guest), overlay.contains(&v.guest)) {
+                (_, true) => ":overlay",
+                (true, false) => ":ro",
+                (false, false) => "",
+            };
+            format!("{}:{}{mode}", v.guest, v.host)
         })
         .collect();
     env.push(format!("{VAR}={}", pairs.join(",")));
@@ -194,13 +200,21 @@ pub(super) fn bind(
     if userland.is_some() {
         return Ok(());
     }
+    banner.push_str(&super::overlay::banner(o, rootfs));
     let (_, rest) = split_tmp(&o.volumes);
-    crate::userns::bind_volumes(rootfs, &rest, &o.ro_volumes, o.volume_base.as_deref()).map_err(
-        |e| {
-            eprintln!("podvm {verb}: {e}");
-            podvm_image::error::EXIT_RUNTIME_ERROR
-        },
-    )
+    // TODO/enter.md T-2101: pid 2 mounts each overlay volume after the
+    // binds; no other volume shares a path with one (`overlay::refuse_tier`).
+    let (layers, rest) = super::overlay::split(&rest, &o.overlay_volumes);
+    let base = o.volume_base.as_deref();
+    let fail = |e: String| {
+        eprintln!("podvm {verb}: {e}");
+        podvm_image::error::EXIT_RUNTIME_ERROR
+    };
+    crate::userns::bind_volumes(rootfs, &rest, &o.ro_volumes, base).map_err(fail)?;
+    if crate::userns::active() {
+        podvm_enter::overlay::mount_all(rootfs, &layers, base).map_err(fail)?;
+    }
+    Ok(())
 }
 
 /// TODO/cli.md T-2072: one line of the banner for each volume that covers a

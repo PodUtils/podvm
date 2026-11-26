@@ -26,9 +26,10 @@ pub(crate) fn prepare(
     if tier != crate::tier::Tier::Incus {
         super::cgroup::limits(verb, tier, &o.limits)?; // T-1897, T-1747, T-1967
     }
-    // ⭐ TODO/packaging.md T-1003. A forced launch rung is refused here, before
-    // anything is fetched, where the verb cannot honor it: only foreground
-    // `run` drives the ladder, and no guest tier reaches it (so it sits first).
+    super::overlay::refuse_tier(verb, tier, &o)?; // TODO/enter.md T-2101
+                                                  // ⭐ TODO/packaging.md T-1003. A forced launch rung is refused here, before
+                                                  // anything is fetched, where the verb cannot honor it: only foreground
+                                                  // `run` drives the ladder, and no guest tier reaches it (so it sits first).
     if let Err(text) = crate::ladder::refuse_where_undriven(verb, o.detach, guest) {
         eprintln!("podvm {verb}: {text}");
         return Err(podvm_image::error::EXIT_RUNTIME_ERROR);
@@ -203,6 +204,7 @@ pub(crate) fn prepare(
         o.tmpfs.push("/tmp".to_string());
     }
     let tmp_cap = o.tmp_size.unwrap_or(crate::lifecycle::syscall::TMP_CAP);
+    let sized = super::tmpfs::take(verb, syscall, &mut o)?; // TODO/machine.md T-1968
     add_tmpfs(verb, store, &mut o)?; // TODO/cli.md T-1655
     let maps = crate::lifecycle::volume::maps(verb, &rootfs, &o.volumes)?;
     let mut env = Plan::env_for(&podvm_enter::NAMES, &cfg.config.env, &o.env);
@@ -275,6 +277,7 @@ pub(crate) fn prepare(
     crate::lifecycle::refuse_detached_userland(verb, userland.as_ref(), o.detach)?;
     let (vs, ul) = ((&o.volumes[..], &o.device_guests[..]), userland.as_ref());
     crate::lifecycle::volume::refuse_unserved(verb, vs, ul, ladder)?; // T-1653, T-1939
+    super::overlay::refuse_unserved(verb, &o, userland.as_ref())?; // T-2101
     super::binds::check_base_off_binds(verb, &o, userland.as_ref())?;
     // ⭐ T-0702, T-0706: classify and place the object BEFORE the banner, which
     // names the write. T-1649: a `#!` payload classifies its interpreter.
@@ -354,6 +357,10 @@ pub(crate) fn prepare(
     );
     crate::initns::stays::check_rung(verb, &o, entered.word())?; // T-2002
     super::devices::check_rung(verb, &o, entered.word())?; // TODO/enter.md T-1939
+    let forced = ladder.map(|m| m.name()); // TODO/machine.md T-1968: only pod-enter's rung
+    let ul_ = userland.is_some();
+    super::tmpfs::check_entry(verb, &sized, entered.word(), ul_, forced, o.init_image)?;
+    super::tmpfs::push(&mut env, &sized, &mut banner);
     let (pid, net) = (opened.has(Part::Pid), opened.has(Part::Net));
     crate::initns::stays::check_init(verb, o.init, pid, entered.word())?; // T-2087
     crate::initns::stays::check_net(verb, o.net_host, net, entered.word())?; // T-2087

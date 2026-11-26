@@ -59,7 +59,11 @@ usage: podvm system info [--format T]
 
   Fields: .Parity .ParityRows .ExitCodes .Version .Rung .EnteredRung
           .StrictOk .Store .Banner .Platform .Kernel .Verbs .VerbsNative
-          .VerbsDegraded .VerbsStub .VerbsNone
+          .VerbsDegraded .VerbsStub .VerbsNone .VolumeOverlay
+
+  .VolumeOverlay  {\"rungs\":[\"namespace\"],\"held\":B}: the rungs that hold
+               -v H:G:overlay, and B true where the rung of this host is
+               one of them (TODO/enter.md T-2101)
 
   --format T   {{.Field}} placeholders, plus `{{json .Field}}`. .Parity is
                already a JSON document, so both spellings print it.
@@ -100,6 +104,7 @@ const DOCUMENTS: &[&str] = &[
     "VerbsDegraded",
     "VerbsStub",
     "VerbsNone",
+    "VolumeOverlay",
 ];
 
 pub const FIELDS: &[&str] = &[
@@ -127,6 +132,8 @@ pub const FIELDS: &[&str] = &[
     "VerbsDegraded",
     "VerbsStub",
     "VerbsNone",
+    // TODO/enter.md T-2101: the rungs that hold `-v H:G:overlay`.
+    "VolumeOverlay",
 ];
 
 /// Whether this machine's `<store>/config` suppresses the mode banner.

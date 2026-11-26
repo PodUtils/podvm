@@ -150,6 +150,9 @@ pub(super) fn enter(
     let userland = if joins_the_run(state, &container.rung, container.pid) {
         None
     } else {
+        if let Err(code) = super::ns::layers_need_join(&container.env) {
+            return code; // TODO/enter.md T-2101
+        }
         match crate::lifecycle::syscall::exec_entry(
             &container.env,
             &maps,
@@ -431,6 +434,7 @@ pub(super) fn enter(
         pid_namespace: false, // podcrates `v0.65.0`; T-1930 sets it for `run -d`
         // T-2054: the relay of a join of the run (PodUtils/podvm#646).
         relay_title: Some(podvm_enter::TITLE_EXEC.into()),
+        tmpfs: Vec::new(), // podcrates `v0.86.0` (T-2102)
     };
     if let Err(c) = serve_devices(&mut plan, &mut err) {
         return c;

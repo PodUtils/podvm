@@ -370,8 +370,15 @@ pub(crate) fn workdir_of(recorded: &str) -> String {
 /// namespace holds it, and the tree of the image does not (OR-04 of the
 /// outside pass of 2026-11-18, TODO/cli.md T-1970).
 pub(crate) fn in_bind(env: &[String], dir: &str) -> bool {
-    podvm_supervise::launcher::binds_of(env).iter().any(|b| {
-        let g = b.guest.trim_end_matches('/');
+    // TODO/enter.md T-2101: an overlay volume of the record too.
+    let layers = podvm_supervise::launcher::overlays_of(env);
+    let binds = podvm_supervise::launcher::binds_of(env);
+    let guests = binds
+        .iter()
+        .map(|b| &b.guest)
+        .chain(layers.iter().map(|l| &l.guest));
+    guests.into_iter().any(|g| {
+        let g = g.trim_end_matches('/');
         dir == g || dir.strip_prefix(g).is_some_and(|r| r.starts_with('/'))
     })
 }

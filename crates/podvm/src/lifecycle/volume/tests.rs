@@ -27,14 +27,17 @@ fn a_volume_parses_to_the_canonical_host_path() {
     let link = link.to_str().unwrap();
     assert_eq!(
         parse(&format!("{link}:/data")).unwrap(),
-        (want.clone(), false)
+        (want.clone(), Mode::Rw)
     );
     assert_eq!(
         parse(&format!("{link}:/data:rw")).unwrap(),
-        (want.clone(), false)
+        (want.clone(), Mode::Rw)
     );
     // TODO/cli.md T-1655: `ro` reads, served by the read-only layer.
-    assert_eq!(parse(&format!("{link}:/data:ro")).unwrap(), (want, true));
+    assert_eq!(
+        parse(&format!("{link}:/data:ro")).unwrap(),
+        (want, Mode::Ro)
+    );
     let _ = std::fs::remove_dir_all(&d);
 }
 
@@ -51,9 +54,9 @@ fn a_volume_spelling_podvm_cannot_serve_is_refused() {
     refused(&format!("{h}:/data:nocopy"), "has nothing to act on");
     // TODO/cli.md T-2061: the SELinux labels are accepted and do nothing.
     for opts in ["z", "Z", "rw,z", "ro,Z"] {
-        let (v, ro) = parse(&format!("{h}:/data:{opts}")).unwrap();
+        let (v, mode) = parse(&format!("{h}:/data:{opts}")).unwrap();
         assert_eq!(v.guest, "/data", "{opts}");
-        assert_eq!(ro, opts.starts_with("ro"), "{opts}");
+        assert_eq!(mode == Mode::Ro, opts.starts_with("ro"), "{opts}");
     }
     refused("/data", "anonymous volume");
     refused("cache:/data", "named volume");
@@ -63,6 +66,46 @@ fn a_volume_spelling_podvm_cannot_serve_is_refused() {
         "refuses rather than creating",
     );
     refused("/a:/b:rw:x", "HOST:GUEST[:OPTIONS]");
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+/// TODO/enter.md T-2101: one table for the options of `-v`: each mode with
+/// the others, and the refusal of a pair that conflicts. `ro` wins over
+/// `rw`; `overlay` takes neither.
+#[test]
+fn the_options_of_a_volume_give_one_mode() {
+    let cases: &[(&str, Result<Mode, &str>)] = &[
+        ("", Ok(Mode::Rw)),
+        ("rw", Ok(Mode::Rw)),
+        ("ro", Ok(Mode::Ro)),
+        ("ro,rw", Ok(Mode::Ro)),
+        ("rw,ro", Ok(Mode::Ro)),
+        ("ro,z", Ok(Mode::Ro)),
+        ("overlay", Ok(Mode::Overlay)),
+        ("overlay,z", Ok(Mode::Overlay)),
+        ("Z,overlay", Ok(Mode::Overlay)),
+        ("overlay,overlay", Ok(Mode::Overlay)),
+        ("overlay,ro", Err("conflict")),
+        ("ro,overlay", Err("conflict")),
+        ("overlay,rw", Err("conflict")),
+        ("overlayfs", Err("has nothing to act on")),
+        ("nocopy", Err("has nothing to act on")),
+    ];
+    for (opts, want) in cases {
+        match (mode_of(opts), want) {
+            (Ok(m), Ok(w)) => assert_eq!(m, *w, "{opts}"),
+            (Err(e), Err(w)) => assert!(e.contains(w), "{opts}: {e}"),
+            (got, _) => panic!("{opts}: {got:?}, want {want:?}"),
+        }
+    }
+    // The whole parse: an overlay takes a directory.
+    let d = tmp("overlay");
+    std::fs::write(d.join("f"), b"x").unwrap();
+    let h = d.to_str().unwrap();
+    assert_eq!(parse(&format!("{h}:/c:overlay")).unwrap().1, Mode::Overlay);
+    let e = parse(&format!("{h}/f:/c:overlay")).unwrap_err();
+    assert!(e.contains("not a directory"), "{e}");
+    assert_eq!(parse(&format!("{h}/f:/c")).unwrap().1, Mode::Rw);
     let _ = std::fs::remove_dir_all(&d);
 }
 

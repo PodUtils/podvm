@@ -210,6 +210,7 @@ fn the_first_program_takes_the_rule_of_exec() {
         userns_ids: None,
         pid_namespace: false,
         relay_title: None,
+        tmpfs: Vec::new(), // podcrates `v0.86.0` (T-2102)
     };
     let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     let ld = "/lib64/ld-linux-x86-64.so.2";

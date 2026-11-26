@@ -352,6 +352,8 @@ pub const INTERNAL: &[&str] = &[
     "PODVM_MEMO_PATH",
     "PODVM_RO",
     "PODVM_SANDPROBE_HOST",
+    // `--tmpfs GUEST:size=N` in the record (TODO/machine.md T-1968).
+    "PODVM_TMPFS",
     "PODVM_USERNS_IDS",
     "PODVM_USERNS_JOIN",
     // `--podvm-volume-base` for the handler and the interposer (T-1972).

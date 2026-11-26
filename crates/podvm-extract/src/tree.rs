@@ -23,11 +23,12 @@
 
 use std::fs;
 use std::io;
-use std::os::fd::AsRawFd;
+use std::os::fd::{AsRawFd, FromRawFd};
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+use pod_hostprobe::sys;
 use podvm_image::Store;
 
 /// The directory of the container trees, under the store root.
@@ -210,11 +211,11 @@ pub fn remove(store: &Store, rootfs: &str) -> io::Result<bool> {
 }
 
 /// `O_PATH | O_NOFOLLOW | O_DIRECTORY`: a handle of the directory itself
-/// that never follows a link.
-#[cfg(target_arch = "x86_64")]
-const DIR_HANDLE: i32 = 0o10_000_000 | 0o400_000 | 0o200_000;
-#[cfg(not(target_arch = "x86_64"))]
-const DIR_HANDLE: i32 = 0o10_000_000 | 0o100_000 | 0o40_000; // aarch64, the generic table
+/// that never follows a link. ⛔ Not through `OpenOptions::custom_flags`:
+/// std masks `O_ACCMODE` out of them, and musl's `O_ACCMODE` holds
+/// `O_PATH`, so the open asked for read and a directory of mode 0000 (the
+/// `work/work` of overlayfs, TODO/enter.md T-2101) refused the removal.
+const DIR_HANDLE: u64 = sys::O_PATH | sys::O_NOFOLLOW | sys::O_DIRECTORY | sys::O_CLOEXEC;
 
 /// Add the owner's `rwx` to `dir` and to each directory under it. Each
 /// step goes through `/proc/self/fd/N` of an `O_PATH` handle opened with
@@ -222,15 +223,14 @@ const DIR_HANDLE: i32 = 0o10_000_000 | 0o100_000 | 0o40_000; // aarch64, the gen
 /// followed out of it, also when it takes the place of a directory during
 /// the walk.
 pub(crate) fn open_dirs(dir: &Path) -> io::Result<()> {
-    let h = match fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(DIR_HANDLE)
-        .open(dir)
-    {
-        Ok(h) => h,
+    let c = sys::CBuf::from_bytes(dir.as_os_str().as_encoded_bytes())
+        .ok_or_else(|| io::Error::other("a NUL byte in a path"))?;
+    let h = match sys::open(&c, DIR_HANDLE, 0) {
+        // SAFETY: the descriptor of this open, owned once.
+        Ok(fd) => unsafe { std::os::fd::OwnedFd::from_raw_fd(fd as i32) },
         // A link, or an entry that is gone: nothing to open.
-        Err(e) if matches!(e.raw_os_error(), Some(20 | 40 | 2)) => return Ok(()),
-        Err(e) => return Err(e),
+        Err(e) if matches!(e.0, 20 | 40 | 2) => return Ok(()),
+        Err(e) => return Err(io::Error::from_raw_os_error(e.0)),
     };
     let at = PathBuf::from(format!("/proc/self/fd/{}", h.as_raw_fd()));
     let mode = fs::metadata(&at)?.permissions().mode() & 0o7777;

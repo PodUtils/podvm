@@ -110,11 +110,16 @@ pub(crate) struct Opts {
     /// T-1655: the interposer's read-only layer serves them with `EROFS`.
     pub(crate) read_only: bool,
     pub(crate) ro_volumes: Vec<String>,
+    /// The guest paths of the `:overlay` volumes (TODO/enter.md T-2101).
+    pub(crate) overlay_volumes: Vec<String>,
     /// The guest paths of `--tmpfs`, made writable directories of the run.
     pub(crate) tmpfs: Vec<String>,
     /// `size=` of `--tmpfs /tmp`: the cap of `/tmp` on the syscall tier
     /// (TODO/enter.md T-1657); no other tier enforces it.
     pub(crate) tmp_size: Option<u64>,
+    /// The `size=` of each `--tmpfs`, in bytes: a tmpfs with a limit on the
+    /// namespace rung (TODO/machine.md T-1968, `run::tmpfs`).
+    pub(crate) tmpfs_sizes: Vec<(String, u64)>,
     /// `--ulimit` and `--security-opt no-new-privileges`. TODO/cli.md T-1655.
     pub(crate) hardening: podvm_supervise::table::Hardening,
     /// M5 and T-0804. ⚠ Carried in one struct so `run`, `create` and the
@@ -188,8 +193,10 @@ impl Opts {
             timeout: None,
             read_only: false,
             ro_volumes: Vec::new(),
+            overlay_volumes: Vec::new(),
             tmpfs: Vec::new(),
             tmp_size: None,
+            tmpfs_sizes: Vec::new(),
             hardening: Default::default(),
             ask: crate::complete::Ask::default(),
         }

@@ -107,8 +107,10 @@ fn every_field_of_opts_is_classified(o: Opts) {
         timeout: _,           // TABLE: --timeout
         read_only: _,         // TABLE: --read-only
         ro_volumes: _,        // -v ...:ro on each tier
+        overlay_volumes: _,   // T-2101: each guest tier refuses it first (run/overlay.rs)
         tmpfs: _,             // TABLE: --tmpfs
         tmp_size: _,          // with --tmpfs
+        tmpfs_sizes: _,       // with --tmpfs; the rung (run::tmpfs, T-1968)
         hardening: _,         // TABLE: --ulimit, --security-opt, --cap-drop, --label
         ask: _,               // TABLE: --add-host
     } = o;

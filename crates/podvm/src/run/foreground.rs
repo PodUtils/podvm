@@ -176,6 +176,9 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
     let mut env = p.env.clone();
     let volumes = podvm_supervise::launcher::binds_of(&env);
     env.retain(|e| !e.starts_with("PODVM_BINDS=") && !e.starts_with("PODVM_BINDS_BASE="));
+    // TODO/machine.md T-1968: the tmpfs mounts with a limit, as the volumes.
+    let tmpfs = podvm_supervise::launcher::tmpfs::of(&env);
+    podvm_supervise::launcher::tmpfs::drop_var(&mut env);
     if p.userland.is_none() {
         podvm_supervise::table::drop_host_paths(&mut env); // T-2054: a root
     }
@@ -256,6 +259,14 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
         // opened none (uid 0, `PODVM_USERNS=0`), as `run -d` (T-1930).
         pid_namespace: pid_init,
         relay_title: pid_init.then(|| podvm_enter::TITLE_INIT.into()), // podcrates `v0.82.1`
+        tmpfs: match tmpfs {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("podvm run: {e}"); // stderr is reentrant on this thread
+                let _ = std::fs::remove_file(&p.memo_host_path);
+                return podvm_image::error::EXIT_RUNTIME_ERROR;
+            }
+        },
     };
     // ⭐ T-0204 and T-0211. The lock is handed to the payload immediately
     // before the fork that leads to its exec, and to nothing else.

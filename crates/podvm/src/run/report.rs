@@ -52,6 +52,9 @@ pub struct Report {
     pub labels: Vec<String>,
     /// Each fixup of the completion layer that changed a byte or failed.
     pub degradations: Vec<String>,
+    /// Each `--tmpfs` with a limit, `GUEST:size=BYTES (memory)`
+    /// (TODO/machine.md T-1968).
+    pub tmpfs: Vec<String>,
     clock: Option<Instant>,
     /// The payload was entered (or, detached, started): its code is its
     /// own. False is a refusal of podvm.
@@ -90,6 +93,7 @@ impl Report {
             confine: None,
             labels: Vec::new(),
             degradations: Vec::new(),
+            tmpfs: Vec::new(),
             clock: Some(Instant::now()),
             ran: false,
         }
@@ -135,6 +139,7 @@ impl Report {
         self.confine = p.hardening.confine.clone();
         self.labels = p.hardening.labels.clone();
         self.degradations = p.completion.clone();
+        self.tmpfs = super::tmpfs::words(&p.env);
     }
 
     /// The end of the run with exit code `code`: the payload's code where
@@ -191,6 +196,10 @@ impl Report {
         // T-1969: an added optional field; the schema id stays.
         if let Some(n) = self.oom_kills {
             j["oom_kills"] = n.into();
+        }
+        // T-1968: an added optional field, as `oom_kills`.
+        if !self.tmpfs.is_empty() {
+            j["tmpfs"] = self.tmpfs.clone().into();
         }
         j
     }

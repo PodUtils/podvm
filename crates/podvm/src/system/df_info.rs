@@ -449,5 +449,15 @@ pub(super) fn fields_from(
         ("VerbsDegraded", count(parity::Status::Degraded)),
         ("VerbsStub", count(parity::Status::Stub)),
         ("VerbsNone", count(parity::Status::None)),
+        // TODO/enter.md T-2101: the rungs that hold `-v H:G:overlay`, and
+        // whether the rung of this host is one of them.
+        ("VolumeOverlay", overlay_json(selection)),
     ]
+}
+
+/// `{"rungs":["namespace"],"held":BOOL}` (TODO/enter.md T-2101).
+pub(super) fn overlay_json(selection: Rung) -> String {
+    let rungs = crate::run::overlay::RUNGS;
+    let held = rungs.contains(&selection.word());
+    serde_json::json!({ "rungs": rungs, "held": held }).to_string()
 }

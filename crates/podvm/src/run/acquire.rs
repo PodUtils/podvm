@@ -230,7 +230,7 @@ pub(super) fn hostname_env(
     let (at_tmp, _) = super::binds::split_tmp(&o.volumes);
     super::binds::push_env(
         &o.volumes,
-        &o.ro_volumes,
+        (&o.ro_volumes, &o.overlay_volumes),
         userland.is_none(),
         o.volume_base.as_deref(),
         env,
