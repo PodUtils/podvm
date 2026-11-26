@@ -7370,7 +7370,7 @@ The state of each finding (2026-11-26):
 | OR-B41-06, a foreground `run --rm` that SIGPIPE ends keeps a `Created` record | P2 | gap | - | open |
 | OR-B41-07, incus: a `--rm` run that the OOM killer ends can keep its instance | P2 | fix | [T-2100](cli.md) | done: `incus::verbs::discard` takes a new stop and delete after a 400 of the delete, up to 4 tries, 1 s apart, and names the error of the last stop; a stand-in row (`flip1`); live as root against a private incusd 6.0.0 on the cloud host: the binary of `7c2b161` kept the instance in 1 of 4 runs ("Instance is running"), the fix in 0 of 8 |
 | OR-B41-08, `--device HOST:GUEST` with another guest path is visible only in part | P2 | known | [T-1939](enter.md) | open |
-| OR-B41-09, a repeated layer counts in `.Size` each time; a manifest with more layers than `diff_ids` loads | P3 | gap | - | open |
+| OR-B41-09, a repeated layer counts in `.Size` each time; a manifest with more layers than `diff_ids` loads | P3 | gap | - | open: `pod_oci::spec::Config` has no `rootfs.diff_ids`; COORD-258 (#677) asks podcrates for the field and a check of the count |
 | OR-B41-10, a name conflict exits 1 from `create` and 125 from `run` | P3 | known | [T-2087](cli.md), OR-B40-10 | open |
 | OR-B41-11, no bound of the length of a reference | P3 | gap | - | open |
 | OR-B41-12, `login` checks no password | P3 | known | [T-2087](cli.md), OR-B40-08 | open |
