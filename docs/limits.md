@@ -41,6 +41,14 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   the table cannot map, and `io_uring_setup`, answer `ENOSYS`. A program
   that issues the `syscall` instruction itself (a static program, Go,
   liburing) passes the interposer (T-1652).
+- `--tmpfs GUEST:size=N` is a tmpfs in memory of N bytes on the
+  namespace rung, for `run`, `run -d` and `create` (T-1968). A write past
+  N fails with `ENOSPC`, `exec` sees the mount of the run, and `inspect`
+  (`.Tmpfs`) and `--report` name it as memory. The chroot rung, the
+  userland rung, a rung that `PODVM_MODE` forces, the init of the image
+  and the syscall tier (other than its `/tmp`) refuse it by name with
+  125. podvm never gives a directory with no limit in its place. A
+  `--tmpfs` with no `size=` stays a directory of a foreground run.
 - On the namespace rung a volume (`-v HOST:GUEST`) is a bind mount:
   `/proc/mounts` lists it, and `/proc/self/mountinfo` names the host path
   (T-1920). On the userland rung a volume, `--tmpfs` and `--read-only` are

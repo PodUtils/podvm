@@ -630,7 +630,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1965](machine.md) | P1 | M | none | machine | done | The incus tier gives no CPU time and no peak memory of an instance |
 | [T-1966](machine.md) | P2 | M | none | machine | done | The incus tier cannot run a container engine in an instance |
 | [T-1967](machine.md) | P1 | S | none | machine | done | The machine tier has no limit of processes in a guest |
-| [T-1968](machine.md) | P2 | L | none | machine | partial | No tier gives a sized writable disk to a unit |
+| [T-1968](machine.md) | P2 | L | none | machine | done | No tier gives a sized writable disk to a unit |
 | [T-1969](supervise.md) | P1 | M | none | supervise | done | The run report holds no OOM fact of a unit |
 | [T-1970](cli.md) | P1 | M | none | cli | partial | The outside pass of 2026-11-18: three P1 and seven P2 faults on the path of a unit |
 | [T-1971](cli.md) | P1 | S | none | cli | done | `--env-file` cannot hold a value with a newline |
@@ -738,11 +738,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2099](machine.md) | P2 | L | none | machine | partial | The bytes that a payload reads through each volume, in `--report` |
 | [T-2100](cli.md) | P2 | M | none | cli | partial | The faults of the tenth outside pass (2026-11-26, the gate of the beta after 0.2.0-beta.40) |
 | [T-2101](enter.md) | P2 | L | none | enter | open | `-v HOST:GUEST:overlay`: a read-only host directory with a writable layer of the container |
-| [T-2102](deps.md) | P2 | M | none | deps | partial | Take podcrates `v0.86.0` and the size-limited tmpfs of pod-enter |
+| [T-2102](deps.md) | P2 | M | none | deps | done | Take podcrates `v0.86.0` and the size-limited tmpfs of pod-enter |
 
 ## Counts
 
-673 entries: 20 open, 43 partial, 5 blocked, 605 done.
+673 entries: 20 open, 41 partial, 5 blocked, 607 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -753,9 +753,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 1 | 20 | 0 | 275 | 296 |
-| P2 | 14 | 18 | 4 | 210 | 246 |
+| P2 | 14 | 16 | 4 | 212 | 246 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 20 | 43 | 5 | 605 | 673 |
+| **All** | 20 | 41 | 5 | 607 | 673 |
 
 ## Work order
 

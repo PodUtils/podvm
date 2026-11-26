@@ -7,7 +7,7 @@ start.
 
 ## State
 
-673 entries: 20 open, 43 partial, 5 blocked, 605 done.
+673 entries: 20 open, 41 partial, 5 blocked, 607 done.
 
 * The newest release is `v0.2.0-beta.41` (2026-11-26). [CHANGELOG](../CHANGELOG.md)
   holds what each release ships, with its known gaps.
@@ -42,10 +42,7 @@ status with `podvm-count` in the same commit as the work.
 1. Asks of peer sessions come first (the watcher of `AGENTS.md`, section
    9; the owner's ruling "podrunner first", 2026-11-18,
    `docs/decisions.md`): each new COORD issue `(to podvm)` of podrunner,
-   then PodUtils/podrunner#277, #216, #189, #168, #110, #296 (the
-   sized writable disk in [T-1968](machine.md): the machine tier holds
-   `--storage-opt size=N`, and the namespace rung needs the pod-enter
-   mount in #667), and #313
+   then PodUtils/podrunner#277, #216, #189, #168, #110, #296, and #313
    and #316 (the hosted snapshot: [T-1996](machine.md), T-1999, which
    needs the machine-tier xattr proof, [T-1994](machine.md) and
    [T-1998](machine.md)). Then the asks of githome and cfb for their CI,

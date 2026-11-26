@@ -8,6 +8,21 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Added: `--tmpfs PATH:size=N` is a tmpfs with a limit, 2026-11-26
+
+Record: T-1968, T-2102 (PodUtils/podvm#667, PodUtils/podrunner#296 ask 5).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- On the namespace rung, `--tmpfs PATH:size=N` is a tmpfs in memory of N
+  bytes for `run`, `run -d` and `create`. A write past N fails with "No
+  space left on device". `exec` sees the mount of the run. `inspect`
+  (`.Tmpfs`) and `run --report` (`tmpfs`) name it as memory. Before, it
+  was a directory with no limit, and `run -d` refused it.
+- Each other rung refuses such a run by name with 125, and podvm never
+  gives a directory with no limit in its place. On the syscall tier,
+  `--tmpfs /tmp:size=N` stays the cap of its handler. `size=0` is docker's
+  "no limit" and gives the directory of a foreground run, as before.
+
 ### Changed: podcrates `v0.86.0`, 2026-11-26
 
 Record: T-2102.

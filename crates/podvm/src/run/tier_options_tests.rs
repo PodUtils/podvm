@@ -109,6 +109,7 @@ fn every_field_of_opts_is_classified(o: Opts) {
         ro_volumes: _,        // -v ...:ro on each tier
         tmpfs: _,             // TABLE: --tmpfs
         tmp_size: _,          // with --tmpfs
+        tmpfs_sizes: _,       // with --tmpfs; the rung (run::tmpfs, T-1968)
         hardening: _,         // TABLE: --ulimit, --security-opt, --cap-drop, --label
         ask: _,               // TABLE: --add-host
     } = o;

@@ -436,6 +436,8 @@ pub(super) fn container_fields(
         ("Config.Image", c.image.clone()),
         ("Config.WorkingDir", c.working_dir.clone()),
         ("Config.Labels", c.hardening.labels.join(",")),
+        // TODO/machine.md T-1968: each `--tmpfs` with a limit, as memory.
+        ("Tmpfs", crate::run::tmpfs::words(&c.env).join(",")),
         // TODO/cli.md T-2053 (OQ-07): what `exec` into the running
         // container shares, from what its entry opened.
         ("Exec.Mode", exec_opened(c).exec_mode(&c.rung).to_string()),

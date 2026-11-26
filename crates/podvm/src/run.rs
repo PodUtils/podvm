@@ -173,9 +173,12 @@ pub const RUN_OPTIONS: &str = "\
   --security-opt no-new-privileges
                    PR_SET_NO_NEW_PRIVS in the payload; each other option is
                    refused by name (TODO/cli.md T-1655)
-  --tmpfs P[:O]    an empty writable directory at P for a foreground run,
-                   removed at its end; not a mount, so size= is not enforced
-                   (TODO/cli.md T-1655)
+  --tmpfs P[:O]    with size=N: a tmpfs in memory of N bytes at P on the
+                   namespace rung, for run, run -d and create; a write past
+                   N gets ENOSPC, and each other rung refuses it with 125
+                   (TODO/machine.md T-1968). With no size=: an empty
+                   writable directory at P for a foreground run, removed at
+                   its end, not a mount (TODO/cli.md T-1655)
   --read-only      a write outside a writable volume fails with EROFS: through
                    the interposer of the userland loader family, and on the
                    namespace rung as a read-only root; elsewhere it is refused
@@ -394,6 +397,7 @@ mod acquire;
 pub(crate) mod binds; // TODO/enter.md T-1920
 pub(crate) mod cgroup; // TODO/cli.md T-1747
 mod devices; // TODO/enter.md T-1939
+pub(crate) mod tmpfs; // TODO/machine.md T-1968
 mod user_ns; // TODO/enter.md T-1927
 pub(crate) use acquire::*;
 

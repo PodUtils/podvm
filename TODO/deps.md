@@ -2661,7 +2661,7 @@ PodUtils/podcrates#262 lists the take from #669.
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -2682,8 +2682,9 @@ drop. The texts of `pod-tls`, `pod-link`, `pod-manual`, `pod-rootfs`,
 ## Approach
 
 Take the tag in each manifest, in both locks and in `issue-sync.yml`. Add
-`tmpfs: Vec::new()` to each struct literal of `Plan`, and re-export the
-tmpfs items of `pod_enter` from `podvm-enter`. Then give `--tmpfs
+`tmpfs: Vec::new()` to each struct literal of `Plan`, and re-export
+`TmpfsMount`, `tmpfs_label` and `TMPFS_MOST` of `pod_enter` from
+`podvm-enter`. Then give `--tmpfs
 GUEST:size=N` to the plan of the namespace rung (T-1968).
 
 ## Decision
@@ -2703,3 +2704,15 @@ of `crates/` and `experiments/` for the old texts finds only
 tests of `podvm-enter` and `podvm-supervise`, the unit tests of podvm as
 uid 1000, and `cargo check --target aarch64-unknown-linux-musl
 --workspace`.
+
+## Done
+
+**Done (2026-11-26).** `71a15d3` takes `v0.86.0` (`22d1a75`): each
+`pod-*` dependency, `Cargo.lock`, the lock of `podvm-interpose`,
+`issue-sync.yml`, `docs/code-map.md` and `docs/runtime-state.md`. Seven
+struct literals of `Plan` add `tmpfs: Vec::new()`. podvm names no
+`FileLock`, and no test or experiment pins a changed text. `sh
+scripts/dev/checks.sh` passed, the 647 unit tests of podvm passed as uid
+1000, and the tests of `podvm-enter` and `podvm-supervise` passed. The
+second commit gives `--tmpfs GUEST:size=N` on the namespace rung with
+`Plan::tmpfs` (T-1968, its Done paragraph of 2026-11-26 has the proof).

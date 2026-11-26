@@ -203,6 +203,7 @@ pub(crate) fn prepare(
         o.tmpfs.push("/tmp".to_string());
     }
     let tmp_cap = o.tmp_size.unwrap_or(crate::lifecycle::syscall::TMP_CAP);
+    let sized = super::tmpfs::take(verb, syscall, &mut o)?; // TODO/machine.md T-1968
     add_tmpfs(verb, store, &mut o)?; // TODO/cli.md T-1655
     let maps = crate::lifecycle::volume::maps(verb, &rootfs, &o.volumes)?;
     let mut env = Plan::env_for(&podvm_enter::NAMES, &cfg.config.env, &o.env);
@@ -354,6 +355,14 @@ pub(crate) fn prepare(
     );
     crate::initns::stays::check_rung(verb, &o, entered.word())?; // T-2002
     super::devices::check_rung(verb, &o, entered.word())?; // TODO/enter.md T-1939
+    let forced = ladder.map(|m| m.name()); // TODO/machine.md T-1968: only pod-enter's rung
+    let ul_ = userland.is_some();
+    if let Some(why) = super::tmpfs::wrong_entry(&sized, entered.word(), ul_, forced, o.init_image)
+    {
+        eprintln!("podvm {verb}: {why}");
+        return Err(podvm_image::error::EXIT_RUNTIME_ERROR);
+    }
+    super::tmpfs::push(&mut env, &sized, &mut banner);
     let (pid, net) = (opened.has(Part::Pid), opened.has(Part::Net));
     crate::initns::stays::check_init(verb, o.init, pid, entered.word())?; // T-2087
     crate::initns::stays::check_net(verb, o.net_host, net, entered.word())?; // T-2087

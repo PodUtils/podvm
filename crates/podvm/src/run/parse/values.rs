@@ -141,10 +141,10 @@ pub(super) fn cap_drop(verb: &str, a: &str) -> Result<bool, i32> {
 }
 
 /// One `--tmpfs PATH[:OPTIONS]`. TODO/cli.md T-1655. PATH is an absolute
-/// guest path; `rw`, `ro`, `nosuid`, `nodev`, `exec`, `noexec`, `size=`
-/// and `mode=` are read (`ro` makes it read-only; the others have nothing
-/// to act on, because the directory is not a mount); each other option is
-/// refused by name.
+/// guest path; `size=N` makes it a tmpfs with a limit (TODO/machine.md
+/// T-1968, `run::tmpfs`); `ro` makes it read-only; `rw`, `nosuid`, `nodev`,
+/// `exec`, `noexec` and `mode=` are read and change nothing; each other
+/// option is refused by name.
 pub(super) fn tmpfs(verb: &str, spec: &str, o: &mut Opts) -> Result<(), i32> {
     let (path, opts) = spec.split_once(':').unwrap_or((spec, ""));
     let refuse = |why: String| {
@@ -157,14 +157,9 @@ pub(super) fn tmpfs(verb: &str, spec: &str, o: &mut Opts) -> Result<(), i32> {
     let path = path.trim_end_matches('/').to_string();
     for opt in opts.split(',').filter(|x| !x.is_empty()) {
         match opt.split_once('=').map_or(opt, |(k, _)| k) {
-            "size" if path == "/tmp" => match opt
-                .split_once('=')
-                .and_then(|(_, v)| crate::tier::parse_mem(v))
-            {
-                Some(n) => o.tmp_size = Some(n),
-                None => return Err(refuse(format!("{opt:?} is not a size"))),
-            },
-            "rw" | "nosuid" | "nodev" | "exec" | "noexec" | "size" | "mode" => {}
+            "size" => super::super::tmpfs::sized(&path, opt.split_once('=').map_or("", |x| x.1), o)
+                .map_err(refuse)?, // TODO/machine.md T-1968: a mount with a limit
+            "rw" | "nosuid" | "nodev" | "exec" | "noexec" | "mode" => {}
             "ro" => o.ro_volumes.push(path.clone()),
             other => return Err(refuse(format!("the option {other:?} is not taken"))),
         }
