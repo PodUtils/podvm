@@ -33,6 +33,7 @@ usage: podvm <command> [options]
   create       write a container record, and start nothing
   start        start a created container, and return when its payload is running
   update       change resource limits of a running Incus container
+  volume rm    remove a volume's host directory and what Incus instances wrote in it
   ps           list containers, from podvm's own table and never from /proc
   logs         a container's captured output
   stop         SIGTERM, then SIGKILL after a bounded grace

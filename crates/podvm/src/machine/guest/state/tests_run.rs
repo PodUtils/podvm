@@ -21,6 +21,7 @@ fn request() -> Request<'static> {
         qemu_args: Vec::new(),
         copies: Vec::new(),
         volumes: Vec::new(),
+        mapped: Vec::new(),
         stdin: None,
         tty: false,
         net_none: true,

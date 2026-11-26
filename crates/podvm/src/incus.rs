@@ -23,6 +23,8 @@ pub(crate) mod target; // TODO/machine.md T-2078
 pub(crate) mod update; // TODO/machine.md T-2093
 pub(crate) mod usage; // TODO/machine.md T-2076
 pub(crate) mod verbs;
+pub(crate) mod volmap; // TODO/machine.md T-2103
+pub(crate) mod volume; // TODO/machine.md T-2103
 pub(crate) mod waitkill; // TODO/cli.md T-2087
 pub(crate) mod walk; // TODO/cli.md T-2079
 pub(crate) mod xattrs; // TODO/machine.md T-1999, T-1994

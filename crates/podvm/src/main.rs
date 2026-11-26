@@ -121,6 +121,7 @@ fn main() -> std::process::ExitCode {
         Some("port") => exit(windows::machine::port(rest)), // T-1869
         Some("start") => exit(lifecycle::start(rest)),
         Some("update") => exit(incus::update::dispatch(rest)),
+        Some("volume") => exit(incus::volume::group(rest)), // TODO/machine.md T-2103
         Some("create") => exit(lifecycle::create(rest)),
         Some("container") => exit(lifecycle::container_group(rest)), // T-1848
         Some("probe") => exit(probe(rest)),
@@ -138,6 +139,7 @@ fn main() -> std::process::ExitCode {
         Some("guest-hold") => exit(incus::hold(rest)),              // an incus init, T-1718
         Some(incus::guest_exec::VERB) => exit(incus::guest_exec::main(rest)), // T-2080
         Some(incus::waitkill::GUEST_KILL) => exit(incus::waitkill::guest_kill(rest)), // T-2087
+        Some(incus::volume::GUEST_VERB) => exit(incus::volume::guest_main(rest)), // T-2103
         Some(initns::VERB) => exit(initns::main(rest)),             // an init of the image, T-2002
         Some("guest-9p") => exit(machine::guest::vol::main(rest)),  // in a guest, T-1723
         Some("guest-disk") => exit(machine::guest::disk::guest_main(rest)), // in a guest, T-1968

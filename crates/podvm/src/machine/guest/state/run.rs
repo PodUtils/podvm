@@ -143,6 +143,7 @@ pub(super) fn line(r: &Request, accel: Accel, mem: u64, kernel: &Path, p: &Paths
                 tag: format!("podvm{i}"),
                 guest: String::new(),
                 ro: *ro,
+                mapped: false,
             },
         ));
     }
@@ -221,6 +222,7 @@ pub fn run(r: &Request, c: &Ctx) -> Outcome {
             .iter()
             .map(|(_, g, ro)| (g.clone(), *ro))
             .collect::<Vec<_>>(),
+        &r.mapped,
     );
     let frame = match job(r, &nonce, &vols) {
         Ok(f) => f,

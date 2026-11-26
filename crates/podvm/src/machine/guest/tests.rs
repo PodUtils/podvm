@@ -299,7 +299,7 @@ fn a_hard_link_of_the_tree_carries_its_data_once() {
 /// 125 before the command.
 #[test]
 fn each_volume_is_a_9p_tag_mounted_before_the_working_directory() {
-    let vols = super::vol::vols(&[("/data".into(), false), ("/cfg dir".into(), true)]);
+    let vols = super::vol::vols(&[("/data".into(), false), ("/cfg dir".into(), true)], &[]);
     assert_eq!(vols[0].tag, "podvm0");
     assert_eq!(
         super::vol::virtfs(std::path::Path::new("/h/d"), &vols[0]),
@@ -411,6 +411,7 @@ fn banner_quiet_hides_the_machine_notice() {
         qemu_args: Vec::new(),
         copies: Vec::new(),
         volumes: Vec::new(),
+        mapped: Vec::new(),
         stdin: None,
         tty: false,
         net_none: false,

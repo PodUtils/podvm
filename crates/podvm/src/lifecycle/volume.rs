@@ -34,7 +34,9 @@ use crate::lifecycle::Userland;
 /// `rw` is the default; `ro` makes the volume read-only through the layer
 /// of the interposer (TODO/cli.md T-1655); `overlay` gives HOST as the
 /// read-only lower layer of an overlay on the namespace rung (T-2101), and
-/// takes a directory and neither `ro` nor `rw`; `z` and `Z` do nothing
+/// takes a directory and neither `ro` nor `rw`; `mapped` (with `ro` or
+/// `rw`) is a 9p share of a directory with `security_model=mapped-xattr` on
+/// the machine tier (TODO/machine.md T-2103); `z` and `Z` do nothing
 /// (T-2061); each other option is refused by name. The table checks of
 /// the pair run in `pod-enter`'s `Maps::new` (with `podvm_enter::NAMES`)
 /// and its table builders.
@@ -79,10 +81,15 @@ pub fn parse(spec: &str) -> Result<(Volume, Mode), String> {
     let Some(host) = canon.to_str() else {
         return Err(format!("the host path {canon:?} is not UTF-8"));
     };
-    if mode == Mode::Overlay && !canon.is_dir() {
+    if mode.dir_only() && !canon.is_dir() {
         return Err(format!(
-            "the host path {host:?} is not a directory, and an overlay takes a directory as \
-             its lower layer (TODO/enter.md T-2101)"
+            "the host path {host:?} is not a directory, and {} (TODO/enter.md T-2101, \
+             TODO/machine.md T-2103)",
+            if mode == Mode::Overlay {
+                "an overlay takes a directory as its lower layer"
+            } else {
+                "a mapped volume is a 9p share of a directory"
+            }
         ));
     }
     let guest = guest.to_string();
@@ -95,47 +102,8 @@ pub fn parse(spec: &str) -> Result<(Volume, Mode), String> {
     ))
 }
 
-/// The mode of a volume (`-v HOST:GUEST[:OPTIONS]`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Mode {
-    Rw,
-    Ro,
-    /// HOST is the read-only lower layer of an overlay (TODO/enter.md T-2101).
-    Overlay,
-}
-
-/// The mode of the options of `-v`. `ro` wins over `rw`, as before;
-/// `overlay` with `ro` or `rw` is a pair that conflicts.
-pub fn mode_of(opts: &str) -> Result<Mode, String> {
-    let (mut ro, mut rw, mut overlay) = (false, false, false);
-    for o in opts.split(',') {
-        match o {
-            "" => {}
-            "rw" => rw = true,
-            // TODO/cli.md T-2061: `z` and `Z` label a source for SELinux.
-            // podvm labels nothing, and docker too does nothing on a host
-            // with no SELinux, so the option is accepted as a no-op.
-            "z" | "Z" => {}
-            "ro" => ro = true,
-            "overlay" => overlay = true,
-            other => {
-                return Err(format!(
-                    "the option {other:?} has nothing to act on: podvm takes rw, ro, overlay, \
-                     z and Z (TODO/cli.md T-1655, T-2061, TODO/enter.md T-2101)"
-                ))
-            }
-        }
-    }
-    match (overlay, ro || rw) {
-        (true, true) => Err(format!(
-            "the options {opts:?} conflict: overlay keeps HOST read-only and makes GUEST \
-             writable, so it takes neither ro nor rw (TODO/enter.md T-2101)"
-        )),
-        (true, false) => Ok(Mode::Overlay),
-        _ if ro => Ok(Mode::Ro),
-        _ => Ok(Mode::Rw),
-    }
-}
+mod mode; // TODO/machine.md T-2103
+pub use mode::{mode_of, Mode};
 
 /// Refuse the volumes on each entry that cannot serve them: only the
 /// loader family reads the table. `forced` is the `PODVM_MODE` rung,

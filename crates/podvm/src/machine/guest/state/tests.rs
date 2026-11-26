@@ -82,6 +82,13 @@ fn a_state_serves_only_the_run_that_its_guest_can_hold() {
         ),
         (
             Asks {
+                mapped: true,
+                ..base.clone()
+            },
+            ":mapped",
+        ),
+        (
+            Asks {
                 tty: true,
                 ..base.clone()
             },
