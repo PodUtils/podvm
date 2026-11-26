@@ -8,6 +8,22 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: a signal during the save of a guest state, and three outside-pass findings, 2026-11-26
+
+Record: T-2048, T-2100 (OR-B41-03, OR-B41-05, OR-B41-16).
+Deployed: not deployed; for the next beta after 0.2.0-beta.40.
+
+- On the machine tier, a SIGTERM or another forwarded signal during the
+  save of a guest state ends the run at once with one line. Before, the
+  run waited for the end of the save (up to about 190 s, an estimate from
+  the bounds) and kept a partial state file (experiment 480).
+- `--format json` is refused by name. Before, it printed the word `json`
+  and exited 0.
+- `update --memory` with a value too large for a count of bytes says so,
+  not "at least 6m".
+- The usage of `system abi` says 125 for a file that podvm cannot read,
+  the code that the verb gives.
+
 ### Fixed: no store path in the argv of the spare-tree helper, 2026-11-26
 
 Record: T-2054 (item 5).

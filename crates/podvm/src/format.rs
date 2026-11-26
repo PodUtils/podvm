@@ -26,7 +26,7 @@ impl std::fmt::Display for Bad {
                 f,
                 "{what:?} is not something podvm's --format understands. It \
                  takes `{{{{.Field}}}}` placeholders and literal text, and \
-                 nothing else: no pipelines, no functions, no `table` prefix"
+                 nothing else: no pipelines, no functions, no `table` prefix, no `json` keyword"
             ),
             Bad::UnknownField { got, known } => write!(
                 f,
@@ -57,6 +57,11 @@ fn walk(
     // `--format 'table {{.Tag}}'`, which printed `table latest` and exited 0.
     if template == "table" || template.starts_with("table ") || template.starts_with("table\t") {
         return Err(Bad::Unsupported("table".to_string()));
+    }
+    // ⛔ OR-B41-05: docker's `--format json` prints each row as JSON. As
+    // literal text it printed the word `json` and exited 0.
+    if template.trim() == "json" {
+        return Err(Bad::Unsupported("json".to_string()));
     }
     let mut rest = template.as_str();
     loop {

@@ -689,7 +689,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2045](enter.md) | P1 | M | none | enter | done | On the userland rung, a link to the host path of the rootfs with `..` reads host files |
 | [T-2046](cli.md) | P1 | S | none | cli | done | `logs` loads the whole log into memory and has no bound of bytes |
 | [T-2047](machine.md) | P2 | M | none | machine | done | The memory that a guest of the machine tier needs for an initrd of N bytes, as a curve |
-| [T-2048](machine.md) | P1 | M | none | machine | partial | The save of the state of a guest hangs the run with no line when the monitor of the emulator answers late |
+| [T-2048](machine.md) | P1 | M | none | machine | done | The save of the state of a guest hangs the run with no line when the monitor of the emulator answers late |
 | [T-2050](deps.md) | P2 | L | none | deps | done | Take podcrates `v0.80.0`: the write table, `pod-beneath`, the loader rule, five `#!` levels, the signals, the saved state of a line, the static QEMU 11.0.0 |
 | [T-2051](machine.md) | P2 | M | none | machine | done | The save and the load of the Linux guest of the machine tier keep their own code beside `pod_guest::warm::line` |
 | [T-2052](cli.md) | P2 | S | none | cli | done | `run -it`: the interrupt key does not stop the foreground child of the payload |
@@ -736,10 +736,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2097](deps.md) | P2 | M | none | deps | done | Take podcrates `v0.85.0` and keep the causes of failures |
 | [T-2098](image.md) | P1 | S | none | image | done | An OCI archive can name the same verified layer more than once |
 | [T-2099](machine.md) | P2 | L | none | machine | partial | The bytes that a payload reads through each volume, in `--report` |
+| [T-2100](cli.md) | P2 | M | none | cli | partial | The faults of the tenth outside pass (2026-11-26, the gate of the beta after 0.2.0-beta.40) |
 
 ## Counts
 
-670 entries: 22 open, 40 partial, 6 blocked, 602 done.
+671 entries: 22 open, 40 partial, 6 blocked, 603 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -749,10 +750,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 20 | 0 | 273 | 296 |
-| P2 | 14 | 15 | 5 | 209 | 243 |
+| P1 | 3 | 19 | 0 | 274 | 296 |
+| P2 | 14 | 16 | 5 | 209 | 244 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 22 | 40 | 6 | 602 | 670 |
+| **All** | 22 | 40 | 6 | 603 | 671 |
 
 ## Work order
 

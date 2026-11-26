@@ -7312,3 +7312,70 @@ As uid 1000, `podvm probe --json` gives the words of the fix, the refusal of the
   namespace. Repro on 2026-11-25 as uid 1000 with the release `podvm`: the
   probe field and the refusal (exit 125) give these words, and `run
   --verbose` gives `namespaces: user+pid+uts+mount` and `pids: private`.
+
+# T-2100: The faults of the tenth outside pass (2026-11-26, the gate of the beta after 0.2.0-beta.40)
+
+**Source:** the tenth outside pass (2026-11-26): an agent with the release binary of `7c2b161` (`--version` 0.2.0-beta.40) and `podvm man` only; the native surface as uid 1000, the incus tier as root against a private incusd 6.0.0, the machine tier under TCG ([the report](../docs/history/outside-pass-2026-11-26.md))
+**Category:** cli
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+The pass found 17 findings, OR-B41-01 to OR-B41-17: no P0, no P1, eight
+P2 and nine P3. The rule of the gate: no P0 or P1 finding stays open
+(`docs/maintenance.md`, "Releases", step 4), so the beta can go out with
+each finding as a line of "Known gaps". Four findings are faults of the
+ninth pass that stay open (OR-B40-07, OR-B40-08, OR-B40-10, OR-B40-16),
+and one is the class of #473 (T-1939). The changes of the candidate held:
+`update` on the incus tier, `load` of an archive that names one layer more
+than once, and the machine tier under TCG.
+
+## Premise
+
+The lead did not reproduce the findings before the record; each has the
+command and the count of the tester. The pass is not blind by a tool: the
+tester ran as root on the host of the checkout (the report says what it
+saw).
+
+## Approach
+
+Keep each finding in the table below, as a line of "Known gaps" of the
+beta. Fix the P2 findings by their class after the beta, each with a test
+of the class.
+
+## Decision
+
+-
+
+## Prove
+
+`sh scripts/dev/checks.sh` passes with a test of the class of each fixed
+finding; the reproducer of each fixed finding on a release binary as uid
+1000 gives the documented result.
+
+## Done
+
+The state of each finding (2026-11-26):
+
+| Finding | Sev | Triage | Entry | State |
+| --- | --- | --- | --- | --- |
+| OR-B41-01, `doctor` refuses the machine tier where podvm fetched its QEMU | P2 | known | [T-2087](cli.md), OR-B40-07 | open |
+| OR-B41-02, the fetched QEMU and the records of a detached guest go under `$HOME`, not `PODVM_STORE` | P2 | gap | - | open |
+| OR-B41-03, `system abi` exits 125 for a file that cannot be read; the manual says 2 | P2 | fix | [T-2100](cli.md) | done: the usage says 125, the code of the published table for a file that podvm cannot read (#521) |
+| OR-B41-04, `cp` refuses a path through an absolute link in the container | P2 | known | [T-2087](cli.md), OR-B40-16 | open |
+| OR-B41-05, `--format json` prints `json` and exits 0 | P2 | fix | [T-2100](cli.md) | done: `format::walk` refuses `json` by name, as `table`; a row of the test of the image fields |
+| OR-B41-06, a foreground `run --rm` that SIGPIPE ends keeps a `Created` record | P2 | gap | - | open |
+| OR-B41-07, incus: a `--rm` run that the OOM killer ends can keep its instance | P2 | gap | - | open |
+| OR-B41-08, `--device HOST:GUEST` with another guest path is visible only in part | P2 | known | [T-1939](enter.md) | open |
+| OR-B41-09, a repeated layer counts in `.Size` each time; a manifest with more layers than `diff_ids` loads | P3 | gap | - | open |
+| OR-B41-10, a name conflict exits 1 from `create` and 125 from `run` | P3 | known | [T-2087](cli.md), OR-B40-10 | open |
+| OR-B41-11, no bound of the length of a reference | P3 | gap | - | open |
+| OR-B41-12, `login` checks no password | P3 | known | [T-2087](cli.md), OR-B40-08 | open |
+| OR-B41-13, a missing argument exits 1 or 125 by verb | P3 | gap | - | open |
+| OR-B41-14, `system df` counts an extraction that failed | P3 | gap | - | open |
+| OR-B41-15, the machine tier with too little memory names no minimum | P3 | gap | - | open |
+| OR-B41-16, `update --memory` of a value too large says "at least 6m" | P3 | fix | [T-2100](cli.md) | done: an overflow says "larger than 16 EiB"; a row of the update test |
+| OR-B41-17, words and looks (the list of the report) | P3 | gap | - | open |

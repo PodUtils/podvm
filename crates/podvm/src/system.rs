@@ -32,7 +32,8 @@ usage: podvm system abi <object> <libc>
 
 May <object> be preloaded into a payload served by <libc>? Answered by
 reading both, never by loading one (TODO/interpose.md T-0709). Exit 0 it
-may, 1 it may not and the reason is on stderr, 2 a file could not be read.
+may, 1 it may not and the reason is on stderr, 125 a file could not be
+read.
 ";
 
 pub const SYSTEM_USAGE: &str = "\

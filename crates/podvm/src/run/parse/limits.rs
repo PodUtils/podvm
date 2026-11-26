@@ -31,8 +31,13 @@ pub(crate) fn incus_limit(verb: &str, flag: &str, v: &str) -> Result<(&'static s
             let n: u64 = num
                 .parse()
                 .map_err(|_| bad("takes bytes with b, k, m or g"))?;
-            let bytes = n.checked_mul(mult).filter(|b| *b >= 6 << 20);
-            let bytes = bytes.ok_or_else(|| bad("takes at least 6m, as docker does"))?;
+            // OR-B41-16: a product past u64 is too large, not too small.
+            let bytes = n.checked_mul(mult).ok_or_else(|| {
+                bad("is larger than 16 EiB, the most that a count of bytes holds")
+            })?;
+            if bytes < 6 << 20 {
+                return Err(bad("takes at least 6m, as docker does"));
+            }
             Ok(("limits.memory", format!("{bytes}B")))
         }
         "--cpus" => {

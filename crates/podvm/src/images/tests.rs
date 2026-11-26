@@ -164,6 +164,7 @@ fn a_template_naming_a_field_no_verb_has_is_refused_without_any_record() {
     assert!(format::check("{{.Nope}}", IMAGE_FIELDS).is_err());
     assert!(format::check("{{.Tag", IMAGE_FIELDS).is_err());
     assert!(format::check("table {{.Tag}}", IMAGE_FIELDS).is_err());
+    assert!(format::check("json", IMAGE_FIELDS).is_err(), "OR-B41-05");
     assert!(format::check("{{.Digest}}", IMAGE_FIELDS).is_ok());
     // ⚠ The two verbs do not have the same fields, and each is checked
     // against its own list.

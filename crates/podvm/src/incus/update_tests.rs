@@ -51,6 +51,7 @@ fn update_maps_only_the_live_limit_flags_as_run_does() {
         &["--podvm-tier=incus", "worker", "--cpus"],
         &["--podvm-tier=incus", "worker", "--pids-limit=0"],
         &["--podvm-tier=incus", "worker", "--memory=1k"],
+        &["--podvm-tier=incus", "worker", "--memory=1000000000000g"],
         &["--podvm-tier=incus", "worker", "--storage-opt=size=1G"],
         &["--podvm-tier=incus", "worker", "other", "--memory=256m"],
         &["--podvm-tier=incus", "bad/name", "--memory=256m"],

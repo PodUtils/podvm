@@ -6065,7 +6065,7 @@ The experiment's run on `kvm.yml` gives the smallest memory for each size; `mem.
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -6088,6 +6088,21 @@ Reproduce under TCG as a user with no root, with an emulator that answers late: 
 The unit test `a_save_leaves_a_whole_state_or_nothing` with the row `Peer::Late` (a stand-in of the monitor as QEMU: one client at a time, a queue of one connection, the late answer on the same connection) and the row `Peer::Hangs` (no answer, no new client, a full queue): the save ends within its bound in each row. Under TCG with QEMU stopped for 8 s at the start of the migration, the run gives 7 and saves the state. A run of `kvm.yml` job `init`: experiment 465 clause 2 gives 7 and saves a state, clause 9 passes on the machine tier, and the rows `mach-sav` and `mach-lod` of experiment 468 have their bench lines.
 
 ## Done
+
+**Done (2026-11-26).** Item (2): the drive runs `state::save` in a scoped
+thread and looks at the signalfd of the forward (`Forward::during` and `Forward::came`, T-2041)
+each 100 ms while the save runs. A signal of the set during the save
+ends the emulator with SIGKILL. The save then fails at once and removes its
+partial files. The drive reaps the emulator, and `Forward::poll` ends podvm
+with the signal after one line, as for each signal before the command
+starts. Experiment 480 (`experiments/480-machine-save-sigterm.py`, as root
+under TCG, the image of experiment 473) stops the emulator with SIGSTOP
+when the partial file of the state appears, then sends SIGTERM to podvm.
+With the fix, podvm ended on SIGTERM 0.1 s after the signal with one line,
+no emulator stayed, and no partial file or state stayed. With the binary
+of `7c2b161`, podvm had not ended 60 s after the signal and gave no line,
+and the partial file stayed
+([transcript](../experiments/results/machine-save-sigterm.txt)).
 
 Partial (2026-11-20). The cause, measured on the cloud host (4 CPUs, no `/dev/kvm`, QEMU 8.2.2, TCG, uid 30034 with a subordinate range and no delegated cgroup, `XDG_RUNTIME_DIR` with no user bus, the build of `86144d0`): two runs of clause 2 by hand gave 0 and 7 in 34 s and 31 s (the save: 1,268 MiB in 1.9 s, the longest answer of the monitor 208 ms), so TCG with a fast disk does not show the hang. With QEMU stopped for 8 s at the start of the migration, the run hung. After 420 s the SIGTERM of `timeout` did not end it: SIGTERM was pending for the process (`ShdPnd` 0x4000) and blocked in each of its three threads, as the drive blocks the signals of the run (T-2041) and reads them only between two lines of the console. The stack of the main thread was `unix_stream_connect` and `unix_wait_for_peer`. `ss -xl` gave the socket of the monitor with 2 connections in its queue and a backlog of 1, and QEMU held the first connection open with 1,280 bytes that podvm did not read (the late answers). A SIGKILL ended the run after 467 s, and no emulator stayed.
 

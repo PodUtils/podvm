@@ -126,6 +126,56 @@ impl Forward {
         up
     }
 
+    /// True where a signal of the set came within `wait`. It reads no
+    /// signal: [`Forward::poll`] reads and gives it.
+    pub fn came(&self, wait: std::time::Duration) -> bool {
+        let Some(sfd) = self.sfd else {
+            std::thread::sleep(wait);
+            return false;
+        };
+        let mut fds = [k::PollFd {
+            fd: sfd as i32,
+            events: k::POLLIN,
+            revents: 0,
+        }];
+        let ms = i64::try_from(wait.as_millis()).unwrap_or(i64::MAX);
+        matches!(k::ppoll(&mut fds, ms), Ok(n) if n > 0)
+    }
+
+    /// Run `work` in a thread of its own, while no command runs in the
+    /// guest, and look for a signal each `step` (TODO/machine.md T-2048
+    /// item 2). A signal ends the emulator `child` with SIGKILL, so `work`
+    /// on its monitor fails at once; then [`Forward::poll`] ends podvm with
+    /// the signal. `None` where the thread of `work` failed.
+    pub fn during<T: Send>(
+        &mut self,
+        step: std::time::Duration,
+        child: &mut std::process::Child,
+        stdin: &mut Option<std::process::ChildStdin>,
+        sent: &mut Option<std::thread::JoinHandle<std::process::ChildStdin>>,
+        work: impl FnOnce() -> T + Send,
+    ) -> Option<T> {
+        std::thread::scope(|scope| {
+            let job = scope.spawn(work);
+            let mut signalled = false;
+            while !job.is_finished() {
+                if self.came(step) {
+                    let _ = child.kill();
+                    signalled = true;
+                    break;
+                }
+            }
+            let end = job.join().ok();
+            if signalled {
+                // The poll reads the signal and ends podvm with it, after
+                // one line that says so.
+                let _ = child.wait();
+                self.poll(stdin, sent);
+            }
+            end
+        })
+    }
+
     /// Give each signal that came to the guest. `stdin` is the stdin of the
     /// emulator; `sent` the writer of the job, which gives it back.
     pub fn poll(
