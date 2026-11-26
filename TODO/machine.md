@@ -5721,6 +5721,12 @@ The ext4 `modules.dep` closure alone gave `Cannot load crc32c driver`.
 Load the pinned `crc32c_generic.ko` as well. The probe proved mount,
 copy-up and bounded writes through a separate overlay. A root switch
 still needs a proof.
+Experiment 481 (2026-11-26, T-1968) proved a root switch on the pinned
+amd64 kernel under TCG. `podvm guest-disk` moved `/dev`, `/proc` and `/sys`
+into an overlay with the initramfs as the lower layer and a virtio ext4
+upper layer, moved the overlay onto `/`, and changed the root. The image's
+`/bin/sh` then ran the rest of the init. The cached disk image of each
+digest, the init of the image as PID 1 and the exit status are still open.
 
 ## Prove
 
