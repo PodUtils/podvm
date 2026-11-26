@@ -116,6 +116,11 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   out of reach. In the PID namespace of a foreground run of a user with no
   root, podvm is no subreaper: PID 1 of the namespace reaps each orphan at
   once, and the end of the run kills each process of the namespace.
+- podvm waits for each process that it starts, except the processes that
+  outlive the verb by design: the launcher of `run -d` and `start`, the
+  fill of a spare tree, and PID 1 of the namespace of a foreground run
+  while that fill runs. The init or the subreaper of the caller reaps
+  them; an init that reaps late shows them as zombies until then.
 - A denied terminal operation produces a named refusal.
 - Host CA completion changes payload trust data and can be disabled.
 - `--network broker` (T-1665) holds a payload to an egress broker of the

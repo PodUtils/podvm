@@ -45,6 +45,42 @@ pub(super) extern "C" fn sweep_at_exit() {
         // SAFETY: kill takes two integers; the pids are of this namespace.
         unsafe { kill(pid as i32, 9) };
     }
+    // TODO/cli.md T-2087: wait until each process that got SIGKILL has
+    // ended and pid 1 reaped it, so that pid 1 sees the prefill alone, or
+    // nothing and ends with the run. A process that stays past the bound
+    // keeps pid 1 as its reaper, as before.
+    let bound = std::time::Duration::from_millis(podvm_supervise::tree::TREE_KILL_MS);
+    let deadline = std::time::Instant::now() + bound;
+    while std::time::Instant::now() < deadline {
+        let mut st = 0;
+        // SAFETY: st lives for the call; WNOHANG (1) does not wait.
+        while unsafe { waitpid(-1, &mut st, 1) } > 0 {}
+        if others_but(keep) == Some(0) {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+}
+
+/// In pid 1 after the end of pid 2: reap each ended child, and true where
+/// no child is left (ECHILD): pid 1 then has no process to wait for.
+pub(super) fn none_left() -> bool {
+    const WNOHANG: i32 = 1;
+    const ECHILD: i32 = 10;
+    loop {
+        let mut st = 0;
+        // SAFETY: st lives for the call; WNOHANG does not wait.
+        let r = unsafe { waitpid(-1, &mut st, WNOHANG) };
+        if r > 0 {
+            continue;
+        }
+        // SAFETY: errno of this thread.
+        let e = unsafe { *__errno_location() };
+        if r < 0 && e == EINTR {
+            continue;
+        }
+        return r < 0 && e == ECHILD;
+    }
 }
 
 /// TODO/cli.md T-2087 (OR-B40-05): in pid 2, SIGKILL to each process of
@@ -99,12 +135,17 @@ pub fn end_tree(bound: std::time::Duration) -> Option<podvm_supervise::Residual>
 /// from the `/proc` of the namespace (`own_proc`); None where it cannot be
 /// read.
 fn others() -> Option<u64> {
+    others_but(None)
+}
+
+/// [`others`], also without `keep`.
+fn others_but(keep: Option<u32>) -> Option<u64> {
     let me = std::process::id();
     let rd = std::fs::read_dir("/proc").ok()?;
     let n = rd
         .flatten()
         .filter_map(|e| e.file_name().to_str().and_then(|n| n.parse::<u32>().ok()))
-        .filter(|p| *p != 1 && *p != me)
+        .filter(|p| *p != 1 && *p != me && Some(*p) != keep)
         .count();
     Some(n as u64)
 }

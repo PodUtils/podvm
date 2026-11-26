@@ -8,6 +8,18 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: a foreground run of a user with no root leaves no zombie, 2026-11-26
+
+Record: T-2087 (OR-B40-05, the follow-up of experiment 485).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- After a foreground `run`, `system info` or `probe` of a user with no
+  root, PID 1 of podvm's namespace ended after podvm and stayed a zombie
+  until the init of the host reaped it. podvm now reaps it, except while
+  the fill of a spare tree runs (`PODVM_SPARE_TREE=0` turns it off). The
+  launcher of `run -d` outlives the verb by design, as the shim of docker
+  does, and the init or the subreaper of the caller reaps it.
+
 ### Added: `-v HOST:GUEST:overlay`, a read-only host directory with a writable layer, 2026-11-26
 
 Record: T-2101 (PodUtils/podrunner#368).

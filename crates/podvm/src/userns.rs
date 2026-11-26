@@ -461,6 +461,11 @@ pub fn enter_if(argv: &[String]) {
             } else {
                 128 + (st & 0x7f)
             };
+            // With no process of the namespace left, pid 1 ends here and
+            // the outer process reaps it at the end of the pipe (T-2087).
+            if sweep::none_left() {
+                std::process::exit(code);
+            }
             let b = [code as u8];
             sigrelay::die_with_outer(false); // T-2006: the reaper stays
                                              // SAFETY: one byte of b; the outer process exits on it.
