@@ -8,6 +8,15 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: `run -u` names the access that the payload keeps, 2026-11-26
+
+Record: T-2087 (OR-B40-17).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `run -u` and `create -u` say one line where the payload keeps the
+  caller's access to the tree (a user namespace that maps one id, with no
+  subordinate range), as `exec -u` says it.
+
 ### Fixed: `--init` on the namespace rung, and the note of `top`, 2026-11-26
 
 Record: T-2087 (OR-B40-06).
