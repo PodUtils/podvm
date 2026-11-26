@@ -571,6 +571,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #675 | COORD-256: pod-hostprobe: the machine legs take the path of the emulator, for a QEMU copy that is not on PATH (to podcrates) | open | T-2100 |
 | #676 | COORD-257: podvm 0.2.0-beta.41: live Incus limits (podrunner#354), saved states with channels and process limits (podrunner#355), repeated OCI layers (#671) (to podrunner) | open | T-2093, T-2094, T-2098 |
 | #677 | COORD-258: pod-oci: the config gives rootfs.diff_ids, and a check of their count against the layers of the manifest (to podcrates) | open | T-2100 |
+| #678 | COORD-259: pod-oci: bounds of a reference (name 255, tag 128) and pod-enter: the refusal of a missing working directory of exec (to podcrates) | open | T-2100 |
 
 ## Messages whose title does not start with COORD-NNN
 
