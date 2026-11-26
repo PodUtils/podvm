@@ -7362,7 +7362,7 @@ The state of each finding (2026-11-26):
 
 | Finding | Sev | Triage | Entry | State |
 | --- | --- | --- | --- | --- |
-| OR-B41-01, `doctor` refuses the machine tier where podvm fetched its QEMU | P2 | known | [T-2087](cli.md), OR-B40-07 | open |
+| OR-B41-01, `doctor` refuses the machine tier where podvm fetched its QEMU | P2 | known | [T-2087](cli.md), OR-B40-07 | open: the legs of `pod-hostprobe` run `qemu-system-x86_64` from PATH only; COORD-256 (#675) asks podcrates for a path of the emulator |
 | OR-B41-02, the fetched QEMU and the records of a detached guest go under `$HOME`, not `PODVM_STORE` | P2 | fix | [T-2100](cli.md) | partial: `podvm_windows::tools::root_of` puts the copy of QEMU in `PODVM_STORE/tools/qemu-VERSION` where `PODVM_STORE` is set (`PODVM_TOOLS_DIR` first); the table test `the_copy_of_qemu_goes_where_the_variables_say`; as uid 1000 with a home of mode 555 and a private store, `run --rm --podvm-tier=machine` fetched QEMU into the store and printed `hi`, exit 0. Open: the machine directory of a detached Linux guest stays under the Windows catalog (`PODVM_MACHINES_DIR`) |
 | OR-B41-03, `system abi` exits 125 for a file that cannot be read; the manual says 2 | P2 | fix | [T-2100](cli.md) | done: the usage says 125, the code of the published table for a file that podvm cannot read (#521) |
 | OR-B41-04, `cp` refuses a path through an absolute link in the container | P2 | known | [T-2087](cli.md), OR-B40-16 | open |
