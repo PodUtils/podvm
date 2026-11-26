@@ -232,6 +232,45 @@ fn lifecycle_usage_strings_are_plain_ascii() {
     assert_eq!(bad, 0, "lifecycle usage carries {bad} non-ASCII bytes");
 }
 
+/// TODO/cli.md T-2100 (OR-B41-17): a usage that offers `--podvm-tier
+/// incus` names each other flag of its synopsis that the incus tier
+/// refuses, or says which one it takes. `stop -t` was offered and refused.
+#[test]
+fn a_usage_with_the_incus_tier_names_the_flags_it_refuses() {
+    let served = crate::incus::verbs::served;
+    // `logs` of the incus tier refuses --tail only (`incus::logs`).
+    let logs: &[&str] = &["-f", "--follow", "--limit-bytes"];
+    let cases: [(&str, &str, &[&str]); 4] = [
+        ("ps", PS_USAGE, served("ps")),
+        ("rm", RM_USAGE, served("rm")),
+        ("stop", STOP_USAGE, served("stop")),
+        ("logs", LOGS_USAGE, logs),
+    ];
+    for (verb, usage, takes) in cases {
+        let synopsis: Vec<&str> = usage
+            .lines()
+            .take_while(|l| !l.trim().is_empty())
+            .filter(|l| l.starts_with("usage:") || l.starts_with("       "))
+            .flat_map(|l| l.split(|c: char| c.is_whitespace() || "[]|=".contains(c)))
+            .filter(|w| w.starts_with('-') && *w != "--podvm-tier")
+            .collect();
+        assert!(!synopsis.is_empty(), "{verb}: no flag read");
+        let at = usage
+            .find("\n  --podvm-tier incus")
+            .unwrap_or_else(|| panic!("{verb}: no line of the incus tier"));
+        let rest = &usage[at + 3..];
+        let para = rest.find("\n  -").map_or(rest, |n| &rest[..n]);
+        let only = takes.first().map(|f| format!("it takes {f} only"));
+        let squeezed = para.split_whitespace().collect::<Vec<_>>().join(" ");
+        for f in synopsis.iter().filter(|f| !takes.contains(f)) {
+            assert!(
+                para.contains(f) || only.as_ref().is_some_and(|o| squeezed.contains(o)),
+                "{verb}: {f} is in the usage and the incus tier refuses it: {para:?}"
+            );
+        }
+    }
+}
+
 #[test]
 fn a_container_path_is_split_from_a_plain_one() {
     assert_eq!(

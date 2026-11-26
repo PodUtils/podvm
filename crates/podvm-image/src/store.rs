@@ -289,13 +289,13 @@ impl Store {
 
     pub fn open(root: impl Into<PathBuf>) -> Result<Store> {
         let root = root.into();
-        create_private_root(&root)?;
+        files::create_private_root(&root)?;
         for d in [
             root.join(BLOBS).join(crate::digest::SHA256),
             root.join(LOCKS),
             root.join(STAGING),
         ] {
-            std::fs::create_dir_all(&d).map_err(|e| Error::io(d.display().to_string(), e))?;
+            std::fs::create_dir_all(&d).map_err(|e| files::root_error(&root, &d, e))?;
         }
         let store = Store { root };
         // ⛔ Refuse a store a later podvm wrote, rather than reading its fields
@@ -458,27 +458,6 @@ mod records;
 mod strays;
 pub use files::*;
 pub use strays::Strays;
-
-/// Create the store root with mode 0700 where it does not exist yet; its
-/// parents get the default modes. ⛔ TODO/supervise.md T-1715: the
-/// container table and the logs live under the root, and the table keeps
-/// each `-e` value, so only the owner may reach them. A root that exists
-/// keeps its mode ([`Store::exposed_mode`] reports it).
-fn create_private_root(root: &Path) -> Result<()> {
-    use std::os::unix::fs::DirBuilderExt;
-    if root.is_dir() {
-        return Ok(());
-    }
-    if let Some(parent) = root.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| Error::io(parent.display().to_string(), e))?;
-    }
-    match std::fs::DirBuilder::new().mode(0o700).create(root) {
-        Ok(()) => Ok(()),
-        // Another podvm made it between the check and the create.
-        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists && root.is_dir() => Ok(()),
-        Err(e) => Err(Error::io(root.display().to_string(), e)),
-    }
-}
 
 #[cfg(test)]
 mod tests;

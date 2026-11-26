@@ -45,26 +45,39 @@ fn a_failed_record_of_a_foreground_run_names_its_cause() {
         &["run", "--name", "dup", IMAGE, "sh", "-c", "exit 0"],
     );
     assert!(first.status.success(), "{}", text(&first.stderr));
-    // (the flags, what the line must name, why)
+    // TODO/cli.md T-2100 (OR-B41-10): one code for a name in use, from each
+    // verb that makes a record: 1, a refusal after the parse.
+    for verb in [&["create"][..], &["run", "-d"], &["run"]] {
+        let mut a = verb.to_vec();
+        a.extend_from_slice(&["--name", "dup", IMAGE, "sh", "-c", "exit 0"]);
+        let r = podvm(&store, &a);
+        let err = text(&r.stderr);
+        assert_eq!(r.status.code(), Some(1), "{verb:?}: {err}");
+        assert!(err.contains("is already used"), "{verb:?}: {err}");
+    }
+    // (the flags, the table, what the line must name, the exit code). A
+    // name in use is the caller's refusal, 1 as from `create` (T-2100,
+    // OR-B41-10); a table that does not parse is podvm's, 125.
     let table = store.join("containers.json");
-    let cases: &[(&[&str], &[u8], &str)] = &[
-        (&["--name", "dup"], b"", "is already used"),
-        (&[], b"not json", "move it aside"),
-        (&[], b"", "does not parse"),
+    let cases: &[(&[&str], &[u8], &str, i32)] = &[
+        (&["--name", "dup"], b"", "is already used", 1),
+        (&[], b"not json", "move it aside", 125),
+        (&[], b"", "does not parse", 125),
         (
             &["--name", "x"],
             b"{\"podvm_containers\":1,",
             "move it aside",
+            125,
         ),
     ];
     let mut failures = Vec::new();
-    for (flags, bytes, want) in cases {
+    for (flags, bytes, want, code) in cases {
         if !bytes.is_empty() || *want == "does not parse" {
             std::fs::write(&table, bytes).unwrap();
         }
         let r = run(flags);
         let err = text(&r.stderr);
-        if r.status.code() != Some(125)
+        if r.status.code() != Some(*code)
             || !err.contains(want)
             || err.contains("is owned by uid")
             || err.lines().count() != 1

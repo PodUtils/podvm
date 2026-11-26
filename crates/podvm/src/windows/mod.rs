@@ -339,7 +339,7 @@ pub fn windows(args: &[String]) -> i32 {
             if a.guest == Some(args::Guest::Dos) {
                 if a.image.is_some() {
                     eprintln!(
-                        "podvm windows: the DOS flavor boots its base cache, not a disk                          you hand it; --image belongs to the windows flavor\n{USAGE}"
+                        "podvm windows: the DOS flavor boots its base cache, not a disk you hand it; --image belongs to the windows flavor\n{USAGE}"
                     );
                     return podvm_image::error::EXIT_FLAG_ERROR;
                 }

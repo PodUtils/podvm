@@ -33,9 +33,7 @@ pub(super) fn enter(
 ) -> i32 {
     use podvm_supervise::table::State;
     if state == State::Created {
-        eprintln!(
-            "podvm exec: {target} has been created and never started, so its rootfs              is there and nothing is running in it. note: podvm will enter it anyway,              because a fresh chroot shares only the filesystem and needs nothing to              be running (TODO/enter.md T-0505)"
-        );
+        eprintln!("{}", super::ns::created_note(target));
     }
     // ⭐ T-0505's record, read once: the memo below, the device spec, the
     // container's own image name for the workdir refusal, and the image

@@ -41,6 +41,9 @@ usage: podvm ps [-a|--all] [-q|--quiet] [--format T] [--no-trunc] [--podvm-tier 
   prefix), and label=<key>[=<value>], matched against the labels of the
   run (TODO/cli.md T-1695). Repeatable; every filter must match.
 
+  --podvm-tier incus  the instances of incus; of the other flags it takes
+                   -a only (TODO/machine.md T-1722)
+
   refused: .Ports is always empty and is not an oversight: the payload shares this
     machine's network namespace, so there is nothing to publish.
 ";
@@ -59,6 +62,14 @@ fn store() -> Result<podvm_image::Store, i32> {
 /// and podvm's own table); each other failure is podvm's (125).
 fn fail(verb: &str, e: podvm_supervise::Error) -> i32 {
     eprintln!("podvm {verb}: {e}");
+    code_of(&e)
+}
+
+/// The exit code of a failure of the container table: 1 for the
+/// caller's (a name in use included), 125 for podvm's. One rule for
+/// `create`, `run -d` and a foreground `run` (TODO/cli.md T-2100,
+/// OR-B41-10: `run` gave 125 for the name in use that `create` gave 1 for).
+pub(crate) fn code_of(e: &podvm_supervise::Error) -> i32 {
     if e.is_callers() {
         EXIT_CLI_ERROR
     } else {

@@ -41,24 +41,21 @@ pub(super) fn ps_fields(c: &Container, no_trunc: bool) -> Vec<(&'static str, Str
     ]
 }
 
+/// The usage of `stop`. TODO/cli.md T-2100 (OR-B41-17): it names `-t` as
+/// refused with `--podvm-tier incus`, as the tier refuses it.
+pub(crate) const STOP_USAGE: &str =
+    "usage: podvm stop [-t seconds] [--podvm-tier incus] <container> [container...]
+  --podvm-tier incus  an instance of incus; -t is refused";
+
 /// `podvm stop [-t N] <container>...`
 pub fn stop(args: &[String]) -> i32 {
     // ⭐ TODO/cli.md T-1330: `stop -t5` reads as `-t 5` before admission.
-    let expanded =
-        match crate::parity::expand("stop", args) {
-            Ok(a) => a,
-            Err(member) => return crate::parity::refuse_member(
-                "stop",
-                &member,
-                "usage: podvm stop [-t seconds] [--podvm-tier incus] <container> [container...]",
-            ),
-        };
+    let expanded = match crate::parity::expand("stop", args) {
+        Ok(a) => a,
+        Err(member) => return crate::parity::refuse_member("stop", &member, STOP_USAGE),
+    };
     let args: &[String] = &expanded;
-    if let Some(c) = crate::parity::admit_all(
-        "stop",
-        args,
-        "usage: podvm stop [-t seconds] [--podvm-tier incus] <container> [container...]",
-    ) {
+    if let Some(c) = crate::parity::admit_all("stop", args, STOP_USAGE) {
         return c;
     }
     let mut grace = STOP_GRACE_MS;
@@ -67,7 +64,7 @@ pub fn stop(args: &[String]) -> i32 {
     while let Some(a) = it.next() {
         match a.as_str() {
             "-h" | "--help" => {
-                println!("usage: podvm stop [-t seconds] [--podvm-tier incus] <container> [container...]");
+                println!("{STOP_USAGE}");
                 return 0;
             }
             "-t" | "--time" | "--timeout" => match it.next().and_then(|v| grace_ms(v)) {
@@ -78,11 +75,7 @@ pub fn stop(args: &[String]) -> i32 {
                 }
             },
             other if other.starts_with('-') => {
-                if let Err(c) = crate::parity::admit(
-                    "stop",
-                    other,
-                    "usage: podvm stop [-t seconds] [--podvm-tier incus] <container> [container...]",
-                ) {
+                if let Err(c) = crate::parity::admit("stop", other, STOP_USAGE) {
                     return c;
                 }
                 return crate::parity::no_arm("stop", other);
@@ -91,7 +84,7 @@ pub fn stop(args: &[String]) -> i32 {
         }
     }
     if names.is_empty() {
-        eprintln!("usage: podvm stop [-t seconds] [--podvm-tier incus] <container> [container...]");
+        eprintln!("{STOP_USAGE}");
         return EXIT_CLI_ERROR;
     }
     let s = match store() {

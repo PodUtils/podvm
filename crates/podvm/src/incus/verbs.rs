@@ -246,6 +246,15 @@ pub(super) async fn detached(c: &Client, job: &Job<'_>, image: &str, d: &Detach)
     0
 }
 
+/// The flags of `verb` that the incus tier serves (TODO/cli.md T-2100).
+pub(crate) fn served(verb: &str) -> &'static [&'static str] {
+    match verb {
+        "ps" => &["-a", "--all"],
+        "rm" => &["-f", "--force"],
+        _ => &[],
+    }
+}
+
 /// `ps`, `start`, `stop` and `rm` with `--podvm-tier=incus`; `logs` is
 /// [`super::logs`].
 pub fn dispatch(verb: &str, args: &[String]) -> i32 {
@@ -259,11 +268,7 @@ pub fn dispatch(verb: &str, args: &[String]) -> i32 {
         .filter(|a| !a.starts_with('-'))
         .cloned()
         .collect();
-    let known: &[&str] = match verb {
-        "ps" => &["-a", "--all"],
-        "rm" => &["-f", "--force"],
-        _ => &[],
-    };
+    let known = served(verb);
     if let Some(f) = flags.iter().find(|f| !known.contains(f)) {
         eprintln!(
             "podvm {verb}: {f} is not served with --podvm-tier=incus (TODO/machine.md T-1722)"

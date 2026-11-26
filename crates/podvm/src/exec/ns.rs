@@ -72,6 +72,27 @@ pub(super) fn not_running(name: &str, state: podvm_supervise::table::State) -> O
     })
 }
 
+/// The note of `exec` into a container that was created and never
+/// started (T-0505): the entry goes on.
+pub(super) fn created_note(name: &str) -> String {
+    format!(
+        "podvm exec: {name} was created and never started, so its rootfs is \
+         there and nothing runs in it. podvm enters it all the same: a fresh \
+         chroot shares only the filesystem and needs nothing to run \
+         (TODO/enter.md T-0505)"
+    )
+}
+
+/// The refusal of `exec` of a name that is no container and no image of
+/// the store (T-1805: exit 1). `exec` takes a container first, so the
+/// line names both.
+pub(super) fn not_in_store(name: &str) -> String {
+    format!(
+        "podvm exec: no such container or image: {name}. `podvm exec` never \
+         pulls: `podvm run -d --name NAME IMAGE ...` makes a container"
+    )
+}
+
 /// `pod_enter::spawn_joined` of the payload of `pidfd`. TODO/enter.md
 /// T-2054 (OQ-08): the relay that pod-enter leaves in the PID namespace of
 /// the run is a fork of this process; it sets `Plan::relay_title` and an

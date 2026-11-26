@@ -178,3 +178,46 @@ pub fn record_of(
         pulled_at: clock::now(),
     })
 }
+
+/// Create the store root with mode 0700 where it does not exist yet; its
+/// parents get the default modes. ⛔ TODO/supervise.md T-1715: the
+/// container table and the logs live under the root, and the table keeps
+/// each `-e` value, so only the owner may reach them. A root that exists
+/// keeps its mode ([`Store::exposed_mode`] reports it).
+pub(super) fn create_private_root(root: &Path) -> Result<()> {
+    use std::os::unix::fs::DirBuilderExt;
+    if root.is_dir() {
+        return Ok(());
+    }
+    if let Some(parent) = root.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| root_error(root, parent, e))?;
+    }
+    match std::fs::DirBuilder::new().mode(0o700).create(root) {
+        Ok(()) => Ok(()),
+        // Another podvm made it between the check and the create.
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists && root.is_dir() => Ok(()),
+        Err(e) => Err(root_error(root, root, e)),
+    }
+}
+
+/// The error of a directory `at` of the store root `root` that podvm
+/// cannot make. TODO/cli.md T-2100 (OR-B41-17): it names the store, and a
+/// file on the path by name, where a bare `File exists` named neither.
+pub(super) fn root_error(root: &Path, at: &Path, e: std::io::Error) -> Error {
+    let file = at
+        .ancestors()
+        .find(|a| a.symlink_metadata().is_ok_and(|m| !m.is_dir()) && !a.is_dir());
+    match file {
+        Some(f) => Error::Store(format!(
+            "{} cannot be the store root: {} is a file, not a directory \
+             (PODVM_STORE sets the root)",
+            root.display(),
+            f.display()
+        )),
+        None => Error::Store(format!(
+            "{} cannot be the store root: {}: {e}",
+            root.display(),
+            at.display()
+        )),
+    }
+}

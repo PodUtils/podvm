@@ -392,5 +392,22 @@ pub(super) fn continue_run(
         },
     );
 
+    // TODO/cli.md T-2100: a continuation line that lost its backslash.
+    plant.case_plant(
+        "27g a string literal with the indentation of a lost continuation",
+        "the pattern joined_literal",
+        scratch,
+        &|| {
+            let file = "crates/podvm/src/machine/guest/init.rs";
+            let text = read_file(root, file);
+            let planted = concat!(
+                "const PLANTED: &str = \"one two three four,",
+                "              five\";"
+            );
+            write_file(root, file, &format!("{planted}\n{text}"));
+            true
+        },
+    );
+
     finish_run(plant, root, scratch)
 }

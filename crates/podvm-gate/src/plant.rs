@@ -92,7 +92,7 @@ const FILES: &[&str] = &[
     "crates/podvm-supervise/src/lib.rs",
     "crates/podvm/src/parity.rs",
     "crates/podvm/src/run.rs",
-    "crates/podvm/src/machine/guest/init.rs", // case 27f (T-1855)
+    "crates/podvm/src/machine/guest/init.rs", // cases 27f (T-1855), 27g (T-2100)
     // TODO/machine.md T-1879: case 27d plants a retired sentence here.
     "crates/podvm/src/windows/dos.rs",
     "scripts/build-interpose.sh",

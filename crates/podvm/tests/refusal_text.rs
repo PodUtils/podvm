@@ -81,6 +81,15 @@ fn refusal_text_names_the_cause() {
     assert_eq!(rc, Some(125), "{err}");
     assert!(err.contains("the rules part with `;`"), "{err}");
 
+    // 8. TODO/cli.md T-2100: `load` of an empty stdin names stdin, not the
+    // spool of the store that took it.
+    let (rc, err) = podvm(&["load"], &d);
+    assert_eq!(rc, Some(1), "{err}");
+    assert!(
+        err.contains("the archive on stdin has no index.json") && !err.contains("staging"),
+        "{err}"
+    );
+
     // 5. a confine path that the image lacks: the guest path, no host path.
     let tar = d.join("r.tar");
     write_ustar(

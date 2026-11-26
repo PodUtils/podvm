@@ -236,11 +236,15 @@ pub fn save(verb: &str, args: &[String]) -> i32 {
             }
         }
     } else {
-        let mut out = std::io::stdout().lock();
+        let mut out = super::archive_exit::Watched::new(std::io::stdout().lock());
         match podvm_image::layout::save_for(&store, &o.want, platform.as_ref(), &mut out) {
             Ok(done) => {
                 eprintln!("{}", saved_line(&o.want, &done));
                 0
+            }
+            // TODO/cli.md T-2100: one line for a write that failed.
+            Err(e) if out.failed => {
+                crate::names::stdout::failed_line(&format!("podvm save: stdout: {e}"))
             }
             Err(e) => {
                 eprintln!("podvm save: {e}");
@@ -292,7 +296,10 @@ pub fn load(verb: &str, args: &[String]) -> i32 {
             path
         }
     };
-    let code = match podvm_image::layout::load(&store, &src) {
+    let shown = file_arg
+        .clone()
+        .unwrap_or_else(|| super::archive_exit::STDIN_ARCHIVE.into());
+    let code = match podvm_image::layout::load(&store, &src, &shown) {
         Ok(record) => {
             println!("Loaded image: {}", loaded_name(&record));
             0
