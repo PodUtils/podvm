@@ -114,7 +114,8 @@ interposer is the cost.
 Two runs of one store import an image once: the second waits for the lock
 of the import (`locks/incus-ALIAS.key.lock` of the store), and a race with
 another store on the same incusd ends in the image that is there (T-2081).
-The first answer of incusd has a bound of 30 s (T-2080).
+Each silence of incusd in an answer ends after 30 s with one line that names the
+socket, for each call (T-2080, T-2089).
 
 [Experiment 434](../experiments/434-incus-tier.sh) proves each clause of
 this page against the incusd of route A ([its run](../experiments/results/incus-tier.txt)).

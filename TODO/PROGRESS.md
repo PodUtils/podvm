@@ -12,11 +12,11 @@ start.
 * The newest release is `v0.2.0-beta.41` (2026-11-26). [CHANGELOG](../CHANGELOG.md)
   holds what each release ships, with its known gaps.
 * Open first: the asks of podrunner (`docs/HANDOFF.md`, "Next steps").
-* Experiment 473 proved the saved-state channel and process limits under
-  TCG. The answer to PodUtils/podrunner#355 waits for the beta.
-* Hosted experiment 479 proved live memory, CPU and process updates
-  without restarting the Incus instance. PodUtils/podrunner#354 waits
-  for the beta, and #664 is closed.
+* `v0.2.0-beta.41` carries the saved-state channel and process limits
+  (T-2094, experiment 473 under TCG; PodUtils/podrunner#355) and the live
+  memory, CPU and process update of an incus instance (T-2093,
+  experiment 479 on a hosted runner; PodUtils/podrunner#354). COORD-257
+  (#676) asks podrunner to take the beta.
 * podvm takes the crates of PodUtils/podcrates at `v0.85.0`. A change of
   moved code goes to podcrates as a COORD issue.
 * KVM is free (the owner, 2026-11-09). Probe `/dev/kvm` on the current host.

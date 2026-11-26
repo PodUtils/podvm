@@ -23,6 +23,9 @@ The other rules of git (the branch, the identity, the remote) are in
 
 A release starts from `.github/workflows/release.yml`; dispatch
 `nightly.yml` with `trial=true` on `main` first ([handoff](HANDOFF.md)).
+Where the session cannot dispatch a workflow, it opens the issue
+`[gh action] requested` (`AGENTS.md`, section 9); the beta.41 gate runs went
+through it (#674).
 
 The gate of a beta (T-1949, [Quality](methodology/quality.md), rules 1
 and 5). Do each step on the commit that the release takes:
@@ -38,6 +41,9 @@ and 5). Do each step on the commit that the release takes:
    failure has a cause in the record that is a fault of the host.
 4. Run [blind QA](methodology/quality.md#blind-qa) on the release candidate.
    Its findings and dispositions must be in the record before publication.
+   Run the tester as uid 1000 on a host that holds no checkout. The tenth
+   pass (`0.2.0-beta.41`) ran as root on the host of the checkout, so a tool
+   did not keep it blind ([report](history/outside-pass-2026-11-26.md)).
 5. Dispatch `nightly.yml` with `trial=true` and `arm.yml` on `main`; both
    pass.
 6. The section of the version in `CHANGELOG.md` has a part "Known gaps":
