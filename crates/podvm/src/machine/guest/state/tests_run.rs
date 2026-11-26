@@ -5,6 +5,7 @@ fn request() -> Request<'static> {
         verb: "run",
         keeper: None,
         pids: None,
+        disk: None,
         arch: arch::Arch::Amd64,
         loud: false,
         store_root: Path::new("/store"),

@@ -106,6 +106,9 @@ pub struct Asks {
     pub engine: bool,
     pub broker: bool,
     pub copies: bool,
+    /// `--storage-opt size=`: the root of the guest on a disk of the run
+    /// (T-1968), which the saved guest does not have.
+    pub disk: bool,
     pub volumes: usize,
     pub stdin: usize,
     /// An x86_64 guest on an x86_64 host.
@@ -124,6 +127,7 @@ impl Asks {
             engine: r.engine,
             broker: r.broker.is_some(),
             copies: !r.copies.is_empty(),
+            disk: r.disk.is_some(),
             volumes: r.volumes.len(),
             stdin: r.stdin.as_ref().map_or(0, Vec::len),
             native: r.arch == arch::Arch::Amd64 && arch::Arch::host() == arch::Arch::Amd64,
@@ -163,6 +167,9 @@ pub fn refusal(a: &Asks) -> Option<String> {
     }
     if a.copies {
         return no("a copy into the guest");
+    }
+    if a.disk {
+        return no("--storage-opt size= (TODO/machine.md T-1968)");
     }
     if a.volumes > SLOTS {
         return Some(format!(

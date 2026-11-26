@@ -630,7 +630,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1965](machine.md) | P1 | M | none | machine | done | The incus tier gives no CPU time and no peak memory of an instance |
 | [T-1966](machine.md) | P2 | M | none | machine | done | The incus tier cannot run a container engine in an instance |
 | [T-1967](machine.md) | P1 | S | none | machine | done | The machine tier has no limit of processes in a guest |
-| [T-1968](machine.md) | P2 | L | none | machine | blocked | No tier gives a sized writable disk to a unit |
+| [T-1968](machine.md) | P2 | L | none | machine | partial | No tier gives a sized writable disk to a unit |
 | [T-1969](supervise.md) | P1 | M | none | supervise | done | The run report holds no OOM fact of a unit |
 | [T-1970](cli.md) | P1 | M | none | cli | partial | The outside pass of 2026-11-18: three P1 and seven P2 faults on the path of a unit |
 | [T-1971](cli.md) | P1 | S | none | cli | done | `--env-file` cannot hold a value with a newline |
@@ -740,7 +740,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-671 entries: 22 open, 40 partial, 6 blocked, 603 done.
+671 entries: 22 open, 41 partial, 5 blocked, 603 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -751,9 +751,9 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
 | P1 | 3 | 19 | 0 | 274 | 296 |
-| P2 | 14 | 16 | 5 | 209 | 244 |
+| P2 | 14 | 17 | 4 | 209 | 244 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 22 | 40 | 6 | 603 | 671 |
+| **All** | 22 | 41 | 5 | 603 | 671 |
 
 ## Work order
 

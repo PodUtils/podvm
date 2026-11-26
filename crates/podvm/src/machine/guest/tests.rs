@@ -390,6 +390,7 @@ fn banner_quiet_hides_the_machine_notice() {
         verb: "run",
         keeper: None,
         pids: None,
+        disk: None,
         arch: super::arch::Arch::Amd64,
         loud: false,
         store_root: p,

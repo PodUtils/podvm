@@ -133,6 +133,7 @@ fn main() -> std::process::ExitCode {
         Some(incus::guest_exec::VERB) => exit(incus::guest_exec::main(rest)), // T-2080
         Some(initns::VERB) => exit(initns::main(rest)),             // an init of the image, T-2002
         Some("guest-9p") => exit(machine::guest::vol::main(rest)),  // in a guest, T-1723
+        Some("guest-disk") => exit(machine::guest::disk::guest_main(rest)), // in a guest, T-1968
         Some("guest-job") => exit(machine::guest::job::guest_main(rest)), // in a guest, T-2008
         Some("guest-tty") => exit(machine::guest::tty::guest_main(rest)), // in a guest, T-1723
         Some("guest-signals") => exit(machine::guest::signals::guest_main(rest)), // T-2041

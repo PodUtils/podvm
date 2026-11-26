@@ -172,6 +172,20 @@ pub(super) fn machine_tier(
         );
         return EXIT_FLAG_ERROR;
     }
+    // TODO/machine.md T-1968 (PodUtils/podrunner#296 ask 5): the sized
+    // disk of the guest, or its refusal before the pull and the boot.
+    let size = o
+        .limits
+        .iter()
+        .find(|l| l.1 == super::parse::limits::ROOT_SIZE);
+    let amd64 = platform.arch == "amd64";
+    let disk = match crate::machine::guest::disk::of_value(size.map(|l| l.2.as_str()), amd64) {
+        Ok(d) => d,
+        Err(why) => {
+            eprintln!("podvm {verb}: machine tier refused: {why}");
+            return EXIT_FLAG_ERROR;
+        }
+    };
     // TODO/machine.md T-1750: `run -d` starts a keeper of the guest; the
     // keeper is this same run, in the foreground.
     let keeper = crate::machine::detach::keeper();
@@ -302,6 +316,7 @@ pub(super) fn machine_tier(
             .iter()
             .find(|(_, k, _)| *k == "limits.processes")
             .map(|(_, _, v)| v.clone()),
+        disk,
     });
     if let Some(d) = probe {
         let _ = std::fs::remove_dir_all(d);
