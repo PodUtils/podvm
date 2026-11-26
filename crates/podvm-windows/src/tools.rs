@@ -248,12 +248,25 @@ pub fn novnc_root() -> PathBuf {
 }
 
 /// The directory of the store copy: `PODVM_TOOLS_DIR` where it is set,
+/// else `tools/qemu-VERSION` in `PODVM_STORE` where that is set (T-2100,
+/// OR-B41-02: a store on a writable disk with a home that is read-only),
 /// else `tools/qemu-VERSION` beside the Windows catalog.
 pub fn root() -> PathBuf {
-    if let Some(p) = std::env::var_os("PODVM_TOOLS_DIR")
-        && !p.is_empty()
-    {
+    root_of(
+        std::env::var_os("PODVM_TOOLS_DIR"),
+        std::env::var_os("PODVM_STORE"),
+    )
+}
+
+/// [`root`] from the values of `PODVM_TOOLS_DIR` and `PODVM_STORE`.
+pub fn root_of(tools: Option<std::ffi::OsString>, store: Option<std::ffi::OsString>) -> PathBuf {
+    if let Some(p) = tools.filter(|p| !p.is_empty()) {
         return PathBuf::from(p);
+    }
+    if let Some(s) = store.filter(|s| !s.is_empty()) {
+        return PathBuf::from(s)
+            .join("tools")
+            .join(format!("qemu-{QEMU_VERSION}"));
     }
     let base = crate::base_cache();
     let windows = base.parent().unwrap_or(Path::new("."));
@@ -310,6 +323,23 @@ pub fn total_bytes() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// T-2100 (OR-B41-02): the order of the three sources of the directory.
+    #[test]
+    fn the_copy_of_qemu_goes_where_the_variables_say() {
+        let v = |s: &str| Some(std::ffi::OsString::from(s));
+        let q = format!("qemu-{QEMU_VERSION}");
+        assert_eq!(root_of(v("/t"), v("/s")), PathBuf::from("/t"));
+        assert_eq!(root_of(v(""), v("/s")), PathBuf::from("/s/tools").join(&q));
+        assert_eq!(root_of(None, v("/s")), PathBuf::from("/s/tools").join(&q));
+        let beside = root_of(None, None);
+        assert!(
+            beside.ends_with(PathBuf::from("tools").join(&q)),
+            "{}",
+            beside.display()
+        );
+        assert_eq!(root_of(None, v("")), beside);
+    }
 
     fn hex64(h: &str) -> bool {
         h.len() == 64

@@ -242,7 +242,8 @@ pub const USER: &[Group] = &[
             v(
                 "PODVM_TOOLS_DIR",
                 "a directory",
-                "Names the directory of the copy of the emulator in the store.",
+                "Names the directory of the copy of the emulator in the store. With no value, it \
+                 is tools/qemu-VERSION in PODVM_STORE where that is set, else beside the catalog.",
             ),
             v(
                 "PODVM_WINDOWS_KEEP",

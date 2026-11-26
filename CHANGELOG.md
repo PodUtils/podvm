@@ -8,14 +8,16 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
-### Fixed: an incus `--rm` run that the OOM killer ends, 2026-11-26
+### Fixed: an incus `--rm` run that the OOM killer ends, and the QEMU copy in the store, 2026-11-26
 
-Record: T-2100 (OR-B41-07).
+Record: T-2100 (OR-B41-02, OR-B41-07).
 Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 
 - The incus tier stops and deletes the instance again where incusd says
   that it still runs, up to four times, so a `--rm` run that the OOM
   killer ends no longer keeps its instance.
+- Where `PODVM_STORE` is set and `PODVM_TOOLS_DIR` is not, the machine
+  tier keeps its copy of QEMU in `PODVM_STORE/tools`, not under `$HOME`.
 
 ## 0.2.0-beta.41 (2026-11-26)
 
