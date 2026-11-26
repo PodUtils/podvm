@@ -163,11 +163,10 @@ pub fn make(dir: &Path, bytes: u64) -> Result<PathBuf, String> {
 /// The UUID of a file system and the seed of its directory hashes.
 fn random() -> std::io::Result<([u8; 16], [u8; 16])> {
     use std::io::Read;
-    let mut b = [0u8; 32];
-    std::fs::File::open("/dev/urandom")?.read_exact(&mut b)?;
     let (mut uuid, mut seed) = ([0u8; 16], [0u8; 16]);
-    uuid.copy_from_slice(&b[..16]);
-    seed.copy_from_slice(&b[16..]);
+    let mut urandom = std::fs::File::open("/dev/urandom")?;
+    urandom.read_exact(&mut uuid)?;
+    urandom.read_exact(&mut seed)?;
     uuid[6] = (uuid[6] & 0x0f) | 0x40; // version 4
     uuid[8] = (uuid[8] & 0x3f) | 0x80;
     Ok((uuid, seed))
