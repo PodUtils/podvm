@@ -7223,6 +7223,38 @@ with exit 0; `wait` exits 125 with "it is Created". An instance of an
 older podvm has no `guest-kill`: `kill` exits 125 with the line of podvm in
 the instance.
 
+The follow-up of OR-B40-05 (2026-11-26), from experiment 485: after a verb,
+processes of podvm in state `Z` had the init of the host as parent. On the
+cloud host that init (`process_api`) reaps an orphan about 2 s after it
+ends, so a count 0.5 s after a verb finds it. The cause is older than the
+fix of OR-B40-05: the binary of `afc4404` (before the merge of that fix)
+and the binary of `74c3b46` gave the same counts. In a foreground run of a
+user with no root, and in `system info` and `probe`, which take the same
+entry, the outer process exited on the code of pid 2, and pid 1 of the
+namespace then exec'd the reaper and ended after its parent. Now the
+sweep at the exit of pid 2 waits until each process that it killed has
+ended, and pid 1 ends at once where no process of the namespace is left;
+the outer process gets no code on its pipe and reaps pid 1. Only a helper
+that outlives the verb by design keeps pid 1 as its reaper. The session's
+call: podvm waits for each process that it starts, except the processes
+that outlive the verb by design (the launcher of `run -d` and `start`, the
+fill of the spare tree of T-1781, and pid 1 while that fill runs). The
+subreaper or the init of the caller reaps these, as with the shim of
+docker; a podvm that waits for them would hold the verb until they end.
+Measured as uid 1000 with `mirror.gcr.io/library/alpine:3.20`, three runs
+of each verb, the zombies of the binary 0.5 s after the verb. Before
+(`74c3b46`), with `PODVM_SPARE_TREE=0`: `run` 3, `run --rm` 3, `system
+info` 3, `run -d` 0, `exec` 0, `rm -f` 1. After: 0, 0, 0, 0, 0 and 1 (the
+launcher). With the spare tree on, `run` and `run -d` still give one each
+(the fill) before and after. Experiment 485 passes its 9 clauses with both
+binaries; at its end 2 zombies of podvm before and 1 after (the launcher
+of its last `rm -f`). The test `crates/podvm/tests/podvm_zombies.rs` makes
+itself the child subreaper, so that it sees each orphan of podvm at once,
+and counts the zombies of podvm after `system info`, a foreground run,
+`run -d`, `exec` and `rm -f`; with the binary before it fails as uid 1000
+(one zombie after `system info` and one after the run), and it passes as
+root and as uid 1000 after.
+
 
 # T-2088: The faults of the external QA of `0.2.0-beta.31` that stay open on `0.2.0-beta.40`
 
