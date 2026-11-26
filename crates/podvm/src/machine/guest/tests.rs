@@ -413,9 +413,9 @@ fn banner_quiet_hides_the_machine_notice() {
         sealed: None,
         engine: false,
     };
-    assert_eq!(notice(&r, Accel::Kvm, true), None);
+    assert_eq!(notice(&r, Accel::Kvm, "root disk from the cache"), None);
     r.loud = true;
-    let line = notice(&r, Accel::Tcg, false).unwrap();
+    let line = notice(&r, Accel::Tcg, "root disk built now").unwrap();
     assert!(line.contains("TCG") && line.contains("built now"), "{line}");
 }
 

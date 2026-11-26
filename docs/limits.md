@@ -271,7 +271,25 @@ The guest kernel is the pinned `vmlinuz-virt` of Alpine 3.22.6, which
 podvm fetches into the store. The guest is x86_64 (linux/amd64), or
 arm64 as the paragraph below says; an image of each other architecture
 is refused by name with exit 125 before the boot (T-1889). The image
-needs `/bin/sh`. With no
+needs `/bin/sh`.
+The root of an x86_64 guest with the pinned kernel is a read-only ext4
+disk of the image (T-1994). podvm writes the disk once for each image
+digest into `store/machine/root-DIGEST-v1.img`, with no tool of the
+host. The disk keeps the owners and the modes of the image, hard links,
+symbolic links, FIFOs, `security.capability`, `user.*` attributes and
+POSIX ACLs. A run waits for the build of another run under a lock. A run
+uses a disk only where its trailer, its size and its superblock agree and
+where the file is the one of the last check (its inode, size and times),
+else podvm hashes the disk; a disk whose SHA-256 is not the one of its
+trailer is built again. The root of the guest is an overlay of podvm's
+files, the disk and an upper layer on a tmpfs, so a write goes to the
+memory of the guest and never to the disk. The initramfs holds only
+podvm and its modules, so the memory of the guest does not grow with the
+image. `PODVM_MACHINE_ROOT=initramfs` selects the root of earlier
+releases, the image in the initramfs; `--podvm-engine` keeps that root
+by default, because the overlay2 driver of an engine refuses a directory
+on overlayfs. A guest whose root disk does not mount ends the run with
+125 and the reason before the command. With no
 `--podvm-net none` and no `--podvm-sealed`, the guest has QEMU's
 user-mode network: it reaches the host's loopback at
 10.0.2.2. `-v HOST:GUEST[:ro]` is a 9p mount of the host directory (T-1723): a write
@@ -329,8 +347,8 @@ states:
   a sparse file in the directory of the run, with no tool of the host,
   and refuses the run where the host has less than N bytes free. The
   guest loads the ext4, virtio disk and overlay modules of the pinned
-  modloop, and its root becomes an overlay with the initramfs as the
-  lower layer and the disk as the upper layer. A write to the root or to
+  modloop, and the disk is the upper layer of the overlay of its root,
+  in place of the tmpfs (T-1994). A write to the root or to
   the working directory past the size gets ENOSPC. A `-v` volume is a 9p
   mount of a host directory, and the disk does not bound it. A guest
   that cannot mount its disk ends the run with 125 before the command.
@@ -482,8 +500,9 @@ C26). Experiment 465 measures each line below as uid 1000.
   the run takes the machine tier
   and names the part on stderr. The init is then PID 1 of a PID
   namespace of the guest, with real root and each controller of cgroup2.
-  The guest has the limits of "Guests" above: the root is an initramfs
-  (T-1994 keeps the root on a disk), a volume is a 9p mount, and the
+  The guest has the limits of "Guests" above: the root is the root disk
+  of the image (T-1994), and the saved state of T-2008 keeps its root in
+  the initramfs; a volume is a 9p mount, and the
   network is QEMU's user-mode network. Under TCG on the cloud host a run
   of `true` takes 24 s to 27 s with four vCPUs, and QEMU holds 2.6 GB of
   memory for an image of 584 MB; the namespace rung takes 3 s.

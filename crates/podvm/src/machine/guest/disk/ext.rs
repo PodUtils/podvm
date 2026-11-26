@@ -17,12 +17,12 @@
 use std::os::unix::fs::FileExt;
 
 pub const BLOCK: u64 = 4096;
-const BLOCKS_PER_GROUP: u64 = 8 * BLOCK;
-const INODE_SIZE: u64 = 256;
+pub const BLOCKS_PER_GROUP: u64 = 8 * BLOCK;
+pub const INODE_SIZE: u64 = 256;
 const BYTES_PER_INODE: u64 = 16 << 10;
 const DESC_SIZE: u64 = 32;
-const FIRST_INO: u32 = 11;
-const ROOT_INO: u32 = 2;
+pub const FIRST_INO: u32 = 11;
+pub const ROOT_INO: u32 = 2;
 const LOST_FOUND_INO: u32 = 11;
 /// The fewest data blocks that a last group keeps; a smaller rest of the
 /// size is left out of the file system, as `mke2fs` does.
@@ -99,11 +99,45 @@ impl Layout {
         }
     }
 
-    fn group_start(&self, g: u64) -> u64 {
+    /// TODO/machine.md T-1994: the smallest layout whose groups hold
+    /// `data` blocks beside their metadata and `inodes` inodes (the
+    /// reserved ones and the root included), for a disk that is written
+    /// whole once and then only read: no free block and few free inodes.
+    pub fn fit(data: u64, inodes: u64) -> Result<Layout, String> {
+        let per_block = BLOCK / INODE_SIZE;
+        let max_ipg = 8 * BLOCK;
+        let mut groups = inodes.div_ceil(max_ipg).max(1);
+        loop {
+            if groups * BLOCKS_PER_GROUP > u64::from(u32::MAX) {
+                return Err(format!(
+                    "{data} blocks of data and {inodes} inodes are more than an ext4 file \
+                     system of 32-bit block numbers holds (16 TiB)"
+                ));
+            }
+            let ipg = inodes.div_ceil(groups).div_ceil(per_block).max(1) * per_block;
+            let mut l = Layout {
+                blocks: groups * BLOCKS_PER_GROUP,
+                groups,
+                inodes_per_group: ipg,
+                gdt_blocks: (groups * DESC_SIZE).div_ceil(BLOCK),
+                itable_blocks: ipg * INODE_SIZE / BLOCK,
+            };
+            let need = (0..groups).map(|g| l.overhead(g)).sum::<u64>() + data;
+            if need > l.blocks {
+                groups = (groups + 1).max(need.div_ceil(BLOCKS_PER_GROUP));
+                continue;
+            }
+            let last = groups - 1;
+            l.blocks = need.max(l.group_start(last) + l.overhead(last) + 1);
+            return Ok(l);
+        }
+    }
+
+    pub fn group_start(&self, g: u64) -> u64 {
         g * BLOCKS_PER_GROUP
     }
 
-    fn group_blocks(&self, g: u64) -> u64 {
+    pub fn group_blocks(&self, g: u64) -> u64 {
         (self.blocks - self.group_start(g)).min(BLOCKS_PER_GROUP)
     }
 
@@ -117,15 +151,15 @@ impl Layout {
     }
 
     /// The metadata blocks of group `g`.
-    fn overhead(&self, g: u64) -> u64 {
+    pub fn overhead(&self, g: u64) -> u64 {
         self.super_blocks(g) + 2 + self.itable_blocks
     }
 
-    fn block_bitmap(&self, g: u64) -> u64 {
+    pub fn block_bitmap(&self, g: u64) -> u64 {
         self.group_start(g) + self.super_blocks(g)
     }
 
-    fn inode_table(&self, g: u64) -> u64 {
+    pub fn inode_table(&self, g: u64) -> u64 {
         self.block_bitmap(g) + 2
     }
 
@@ -149,6 +183,7 @@ impl Layout {
         }
     }
 
+    #[cfg(test)]
     pub fn free_blocks(&self) -> u64 {
         (0..self.groups)
             .map(|g| self.group_blocks(g) - self.used_blocks(g))
@@ -160,21 +195,33 @@ impl Layout {
     }
 }
 
-fn put16(b: &mut [u8], at: usize, v: u64) {
+pub fn put16(b: &mut [u8], at: usize, v: u64) {
     b[at..at + 2].copy_from_slice(&(v as u16).to_le_bytes());
 }
 
-fn put32(b: &mut [u8], at: usize, v: u64) {
+pub fn put32(b: &mut [u8], at: usize, v: u64) {
     b[at..at + 4].copy_from_slice(&(v as u32).to_le_bytes());
 }
 
-/// The superblock of the copy in group `g` (1024 bytes).
-fn superblock(l: &Layout, g: u64, uuid: &[u8; 16], seed: &[u8; 16], now: u64) -> Vec<u8> {
+/// The counts of one group: free blocks, free inodes and directories.
+pub type Counts = (u64, u64, u64);
+
+/// The names of one file system: its UUID, the seed of its directory
+/// hashes and its label (at most 16 bytes).
+pub struct Names<'a> {
+    pub uuid: [u8; 16],
+    pub seed: [u8; 16],
+    pub label: &'a [u8],
+}
+
+/// The superblock of the copy in group `g` (1024 bytes), with the counts
+/// of each group.
+fn superblock(l: &Layout, g: u64, n: &Names, counts: &[Counts], now: u64) -> Vec<u8> {
     let mut s = vec![0u8; 1024];
     put32(&mut s, 0, l.inodes());
     put32(&mut s, 4, l.blocks);
-    put32(&mut s, 12, l.free_blocks());
-    put32(&mut s, 16, l.inodes() - u64::from(FIRST_INO));
+    put32(&mut s, 12, counts.iter().map(|c| c.0).sum());
+    put32(&mut s, 16, counts.iter().map(|c| c.1).sum());
     put32(&mut s, 24, 2); // 1024 << 2
     put32(&mut s, 28, 2);
     put32(&mut s, 32, BLOCKS_PER_GROUP);
@@ -201,9 +248,10 @@ fn superblock(l: &Layout, g: u64, uuid: &[u8; 16], seed: &[u8; 16], now: u64) ->
             | RO_COMPAT_EXTRA_ISIZE)
             .into(),
     );
-    s[104..120].copy_from_slice(uuid);
-    s[120..120 + 10].copy_from_slice(b"podvm-disk");
-    s[236..252].copy_from_slice(seed);
+    s[104..120].copy_from_slice(&n.uuid);
+    let label = &n.label[..n.label.len().min(16)];
+    s[120..120 + label.len()].copy_from_slice(label);
+    s[236..252].copy_from_slice(&n.seed);
     s[252] = 1; // half MD4, the hash of an indexed directory
     put32(&mut s, 264, now);
     put16(&mut s, 348, 32);
@@ -213,24 +261,45 @@ fn superblock(l: &Layout, g: u64, uuid: &[u8; 16], seed: &[u8; 16], now: u64) ->
 }
 
 /// The group descriptor table (the first copy and each backup).
-fn descriptors(l: &Layout) -> Vec<u8> {
+fn descriptors(l: &Layout, counts: &[Counts]) -> Vec<u8> {
     let mut d = vec![0u8; (l.gdt_blocks * BLOCK) as usize];
-    for g in 0..l.groups {
+    for (g, c) in (0..l.groups).zip(counts) {
         let at = (g * DESC_SIZE) as usize;
         let e = &mut d[at..at + DESC_SIZE as usize];
         put32(e, 0, l.block_bitmap(g));
         put32(e, 4, l.block_bitmap(g) + 1);
         put32(e, 8, l.inode_table(g));
-        put16(e, 12, l.group_blocks(g) - l.used_blocks(g));
-        put16(e, 14, l.inodes_per_group - l.used_inodes(g));
-        put16(e, 16, if g == 0 { 2 } else { 0 });
+        put16(e, 12, c.0);
+        put16(e, 14, c.1);
+        put16(e, 16, c.2);
     }
     d
 }
 
+/// Write the superblock copies and the descriptor tables of `l` with the
+/// counts of each group into `f`.
+pub fn write_heads(
+    f: &std::fs::File,
+    l: &Layout,
+    n: &Names,
+    counts: &[Counts],
+    now: u64,
+) -> std::io::Result<()> {
+    let gdt = descriptors(l, counts);
+    for g in (0..l.groups).filter(|g| has_super(*g)) {
+        let start = l.group_start(g);
+        let sb = superblock(l, g, n, counts, now);
+        // Group 0 keeps its superblock 1024 bytes into the disk; each
+        // copy starts its group's first block.
+        f.write_all_at(&sb, if g == 0 { 1024 } else { start * BLOCK })?;
+        f.write_all_at(&gdt, (start + 1) * BLOCK)?;
+    }
+    Ok(())
+}
+
 /// A bitmap block with the first `used` bits set, and each bit from
 /// `valid` to the end of the block set as padding.
-fn bitmap(used: u64, valid: u64) -> Vec<u8> {
+pub fn bitmap(used: u64, valid: u64) -> Vec<u8> {
     let mut b = vec![0u8; BLOCK as usize];
     for bit in (0..used).chain(valid..8 * BLOCK) {
         b[(bit / 8) as usize] |= 1 << (bit % 8);
@@ -255,6 +324,13 @@ fn dir_inode(mode: u64, links: u64, block: u64, now: u64) -> Vec<u8> {
 
 /// A directory block of `entries` (inode, name); the last entry takes the
 /// rest of the block.
+/// The seconds of the clock since the epoch (0 before it).
+pub fn now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
+}
+
 fn dir_block(entries: &[(u32, &str)]) -> Vec<u8> {
     let mut b = vec![0u8; BLOCK as usize];
     let mut at = 0usize;
@@ -278,20 +354,24 @@ fn dir_block(entries: &[(u32, &str)]) -> Vec<u8> {
 /// Write an empty ext4 file system of `l` into `f`, a file of at least
 /// `l.blocks` blocks whose bytes are zero (a new sparse file).
 pub fn write(f: &std::fs::File, l: &Layout, uuid: [u8; 16], seed: [u8; 16]) -> std::io::Result<()> {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs());
+    let now = now();
     let at = |block: u64| block * BLOCK;
-    let gdt = descriptors(l);
+    let counts: Vec<Counts> = (0..l.groups)
+        .map(|g| {
+            (
+                l.group_blocks(g) - l.used_blocks(g),
+                l.inodes_per_group - l.used_inodes(g),
+                if g == 0 { 2 } else { 0 },
+            )
+        })
+        .collect();
+    let names = Names {
+        uuid,
+        seed,
+        label: b"podvm-disk",
+    };
+    write_heads(f, l, &names, &counts, now)?;
     for g in 0..l.groups {
-        let start = l.group_start(g);
-        if has_super(g) {
-            let sb = superblock(l, g, &uuid, &seed, now);
-            // Group 0 keeps its superblock 1024 bytes into the disk; each
-            // copy starts its group's first block.
-            f.write_all_at(&sb, if g == 0 { 1024 } else { at(start) })?;
-            f.write_all_at(&gdt, at(start + 1))?;
-        }
         let blocks = l.group_blocks(g);
         f.write_all_at(&bitmap(l.used_blocks(g), blocks), at(l.block_bitmap(g)))?;
         f.write_all_at(

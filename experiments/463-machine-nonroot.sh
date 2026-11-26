@@ -143,8 +143,10 @@ if command -v docker >/dev/null 2>&1 && docker pull -q alpine:3.20 >/dev/null 2>
 		flag="--podvm-mem $mem"
 		[ "$mem" = default ] && flag=""
 		start=$(date +%s)
+		# The memory of the initramfs root (T-1922), which T-1994 keeps
+		# behind PODVM_MACHINE_ROOT=initramfs.
 		# shellcheck disable=SC2086
-		timeout 900 "$P" run --verbose --rm --podvm-tier=machine $flag huge:463 true \
+		PODVM_MACHINE_ROOT=initramfs timeout 900 "$P" run --verbose --rm --podvm-tier=machine $flag huge:463 true \
 			>/dev/null 2>"$OUT.7.err"
 		rc=$?
 		say "clause 6  rc $rc in $(($(date +%s) - start)) s (a root of 1400 MiB, --podvm-mem $mem)"

@@ -47,8 +47,10 @@ use std::time::Duration;
 use podvm_image::error::EXIT_RUNTIME_ERROR;
 use podvm_windows::plan::Accel;
 
-pub use archive::run_archive;
+#[cfg(test)]
+use archive::base_path;
 use archive::tools;
+pub use archive::{base_archive, run_archive};
 use drive::drive;
 pub use input::{read_stdin, MAX_STDIN};
 pub use line::notice;
@@ -115,47 +117,6 @@ pub struct Request<'a> {
     /// `--storage-opt size=N`: the bytes of the sized disk that holds the
     /// root and the working directory of the guest ([`disk`], T-1968).
     pub disk: Option<u64>,
-}
-
-/// The cache file of the base archive of `digest`.
-pub fn base_path(store_root: &Path, digest: &str) -> PathBuf {
-    let hex = digest.trim_start_matches("sha256:");
-    store_root
-        .join("machine")
-        .join(format!("base-{hex}-v{BASE_FORMAT}.cpio"))
-}
-
-/// The base archive of the rootfs, from the cache or built now. `true`
-/// where the cache answered.
-pub fn base_archive(
-    store_root: &Path,
-    digest: &str,
-    rootfs: &Path,
-) -> Result<(PathBuf, bool), String> {
-    let path = base_path(store_root, digest);
-    if path.is_file() {
-        return Ok((path, true));
-    }
-    let dir = path.parent().expect("a file under machine/");
-    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    let tmp = path.with_extension(format!("partial-{}", std::process::id()));
-    let file = std::fs::File::create(&tmp).map_err(|e| format!("{}: {e}", tmp.display()))?;
-    let mut w = cpio::Newc::new(std::io::BufWriter::new(file));
-    // TODO/machine.md T-1776: the owners of the image, from the sidecar
-    // beside the rootfs; with no sidecar each file stays root's.
-    if let Some(dir) = rootfs.parent() {
-        let _ = w.owners_from(&dir.join(".meta.jsonl"));
-    }
-    let built = w
-        .tree(rootfs)
-        .and_then(|()| w.finish())
-        .and_then(|mut b| b.flush());
-    if let Err(e) = built {
-        let _ = std::fs::remove_file(&tmp);
-        return Err(format!("the base archive of {}: {e}", rootfs.display()));
-    }
-    std::fs::rename(&tmp, &path).map_err(|e| format!("{}: {e}", path.display()))?;
-    Ok((path, false))
 }
 
 /// The accelerator: `Err` where KVM was asked for and does not open.
@@ -285,7 +246,12 @@ pub fn boot(r: &Request) -> i32 {
             Err(e) => return fail(e),
         }
     }
-    let disk_load = match disk::add_modules(r, !assets.modules.is_empty(), &mut modules) {
+    // TODO/machine.md T-1994: the root on the disk of the image.
+    let on_disk = match disk::root_wanted(r, !assets.modules.is_empty()) {
+        Ok(b) => b,
+        Err(e) => return fail(e),
+    };
+    let disk_load = match disk::add_modules(r, on_disk, !assets.modules.is_empty(), &mut modules) {
         Ok(names) => names, // TODO/machine.md T-1968
         Err(e) => return fail(e),
     };
@@ -294,9 +260,20 @@ pub fn boot(r: &Request) -> i32 {
         Err(e) => return fail(e),
     };
     let kernel = assets.kernel;
-    let (base, cached) = match base_archive(r.store_root, r.digest, r.rootfs) {
+    let init_image = r.env.iter().any(|e| e == crate::initns::MARK);
+    // The base archive where the root is in the initramfs, and for the
+    // saved state of T-2008, whose guest keeps its root there.
+    let base = match (!on_disk || init_image)
+        .then(|| base_archive(r.store_root, r.digest, r.rootfs))
+        .transpose()
+    {
         Ok(b) => b,
         Err(e) => return fail(e),
+    };
+    let root = match on_disk.then(|| disk::root_of(r)) {
+        None => None,
+        Some(Ok(d)) => Some(d),
+        Some(Err(e)) => return fail(e),
     };
     if r.sealed.is_some() && tools.is_none() {
         return fail(
@@ -305,7 +282,6 @@ pub fn boot(r: &Request) -> i32 {
                 .to_string(),
         );
     }
-    let init_image = r.env.iter().any(|e| e == crate::initns::MARK);
     if init_image && tools.is_none() {
         return fail(
             "--podvm-init=image needs podvm in the guest, and the kernel of \
@@ -322,7 +298,7 @@ pub fn boot(r: &Request) -> i32 {
     }
     // TODO/machine.md T-2008: the run from a saved state of the guest, or
     // with the save of one; else the boot below.
-    if init_image {
+    if let (true, Some((base, _))) = (init_image, &base) {
         let pinned = !assets.volume_modules.is_empty() && !assets.modules.is_empty();
         let all: Vec<(String, PathBuf)> = assets
             .modules
@@ -334,7 +310,7 @@ pub fn boot(r: &Request) -> i32 {
             accel,
             qemu: &qemu,
             kernel: &kernel,
-            base: &base,
+            base,
             modules: &all,
             pinned_kernel: pinned,
         };
@@ -356,8 +332,11 @@ pub fn boot(r: &Request) -> i32 {
             .join(format!("run-{}-{}", std::process::id(), &nonce[..8]));
     let initrd = dir.join("initrd.cpio");
     let made = std::fs::create_dir_all(&dir)
-        .and_then(|()| std::fs::copy(&base, &initrd))
-        .and_then(|_| {
+        .and_then(|()| match (&root, &base) {
+            (None, Some((b, _))) => std::fs::copy(b, &initrd).map(drop),
+            _ => std::fs::write(&initrd, b""), // T-1994: podvm's files only
+        })
+        .and_then(|()| {
             let script = init::script(
                 &nonce,
                 &r.argv,
@@ -374,7 +353,10 @@ pub fn boot(r: &Request) -> i32 {
             let script = init::with_pids(script, r.pids.as_deref(), &nonce);
             let script = init::with_image_init(script, init_image); // T-2002
             let script = exec::with_server_if(script, r.keeper.is_some());
-            let (script, more) = disk::init(script, &disk_load, &nonce)?; // T-1968
+            let (script, more) = match &root {
+                Some(_) => (script, Vec::new()), // `guest-root` mounts the disk
+                None => disk::init(script, &disk_load, &nonce)?, // T-1968
+            };
             let mut a = run_archive(&script, tools.as_ref(), &copies, r.stdin.as_deref())?;
             a.extend(more);
             Ok(a)
@@ -394,7 +376,7 @@ pub fn boot(r: &Request) -> i32 {
             return fail(e);
         }
     };
-    if let Some(line) = notice(r, accel, cached) {
+    if let Some(line) = notice(r, accel, &disk::root::source(&root, &base)) {
         eprintln!("{line}");
     }
     vol::notices(r.verb, &r.volumes, nine, r.disk.is_some());
@@ -428,6 +410,7 @@ pub fn boot(r: &Request) -> i32 {
         extra.push(vol::virtfs(host, v));
     }
     extra.extend(disk_file.iter().flat_map(|d| disk::argv(d)));
+    extra.extend(root.iter().flat_map(|(p, _)| disk::root::argv(p))); // T-1994
     extra.extend(r.qemu_args.iter().cloned());
     let mut argv = qemu_argv(
         accel,
@@ -437,6 +420,9 @@ pub fn boot(r: &Request) -> i32 {
         &extra,
     );
     arch::adapt(&mut argv, r.arch);
+    if root.is_some() {
+        disk::root::with_init(&mut argv, &disk_load, r.disk.is_some(), &nonce);
+    }
     argv.extend(r.keeper.iter().flat_map(exec::keeper_args));
     arch::err_port(&mut argv, r.arch);
     if r.net_none {

@@ -8,6 +8,27 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Changed: the root of a machine guest is a disk of its image, 2026-11-26
+
+Record: T-1994 (PodUtils/podrunner#313 ask 2, PodUtils/podrunner#316
+ask 2), T-1999.
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `run --podvm-tier=machine` of an x86_64 image boots from a read-only
+  ext4 disk of the image, which podvm writes once for each image digest
+  into the store. A second run of the digest uses the same disk. The
+  initramfs holds only podvm and its modules, so the memory of the guest
+  does not grow with the size of the image.
+- The disk keeps owners, modes, hard links, `security.capability`,
+  `user.*` attributes and POSIX ACLs: a file with `cap_net_raw+ep` in the
+  image has that capability in the guest.
+- A write to the root goes to a tmpfs, or to the disk of `--storage-opt
+  size=`, and never to the cached disk. A damaged disk is found and built
+  again.
+- `PODVM_MACHINE_ROOT=initramfs` selects the root of earlier releases.
+  `--podvm-engine` and the saved state of `--podvm-init=image` keep that
+  root. [Limits](docs/limits.md) has the rules.
+
 ### Added: a sized writable disk for a guest of the machine tier, 2026-11-26
 
 Record: T-1968 (PodUtils/podrunner#296 ask 5).

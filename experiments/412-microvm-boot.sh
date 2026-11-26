@@ -5,13 +5,14 @@
 #
 # TODO/machine.md T-1656. The guest kernel is the pinned vmlinuz-virt of the
 # Alpine netboot archive 3.22.6 (podvm fetches it into the store); the
-# initrd is the cached base archive of the image plus a run archive with
-# /podvm-init. The pinned input is the alpine digest of experiment 356.
+# root is the cached root disk of the image (T-1994), and the initrd is a
+# run archive with /podvm-init. The pinned input is the alpine digest of
+# experiment 356.
 #
 # Clauses:
 #   1. `sh -c 'uname -r; exit 7'` prints a kernel release and exits 7; the
 #      banner names the accelerator.
-#   2. a second run says that the base archive came from the cache.
+#   2. a second run says that the root disk came from the cache.
 #   3. PODVM_412_BOOTS runs in a row (20 by default) each reach the command
 #      and give its code.
 #   4. PODVM_MACHINE_ACCEL=kvm where /dev/kvm does not open exits 125 by
@@ -91,7 +92,7 @@ timeout 900 "$PB" run --verbose --podvm-tier=machine "$ALPINE" true >/dev/null 2
 rc=$?
 { echo ""; echo "== 2. the cache"; echo "exit              $rc"; sed 's/^/  /' "$WORK/c2.err"; } >>"$REPORT"
 [ "$rc" -eq 0 ] || { note "2: wanted exit 0, got $rc"; fail=1; }
-grep -q "base archive from the cache" "$WORK/c2.err" || { note "2: the base archive was not reused"; fail=1; }
+grep -q "root disk from the cache" "$WORK/c2.err" || { note "2: the root disk was not reused"; fail=1; }
 
 # Clause 3.
 ok=0; i=0; start=$(date +%s)

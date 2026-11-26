@@ -75,9 +75,11 @@ pub fn disk_fail(nonce: &str) -> String {
 /// The first lines of each init: the mounts of the guest and its modules.
 fn setup() -> String {
     let mut s = String::new();
-    s.push_str("mount -t proc proc /proc 2>/dev/null\n");
-    s.push_str("mount -t sysfs sysfs /sys 2>/dev/null\n");
-    s.push_str("mount -t devtmpfs devtmpfs /dev 2>/dev/null\n");
+    // TODO/machine.md T-1994: `podvm guest-root` mounts them before the
+    // root moves to the disk of the image; a second mount would stack.
+    s.push_str("[ -e /proc/self ] || mount -t proc proc /proc 2>/dev/null\n");
+    s.push_str("[ -d /sys/kernel ] || mount -t sysfs sysfs /sys 2>/dev/null\n");
+    s.push_str("[ -c /dev/null ] || mount -t devtmpfs devtmpfs /dev 2>/dev/null\n");
     // TODO/machine.md T-1780: cgroup2 where an engine or a payload looks
     // for it; `lo` up in each guest that carries podvm, and the modules of
     // `--podvm-engine` where the archive names them.

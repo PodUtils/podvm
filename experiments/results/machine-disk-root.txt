@@ -1,0 +1,72 @@
+Run: python3 -I experiments/482-machine-disk-root.py as uid 1000 (setpriv), PODVM_482_BIN = the release build of this commit's tree. WORK names the owned scratch directory.
+Is the root of a machine guest the disk of its image, made once?
+2026-11-26T11:04:20Z Linux 6.18.44-fc-v880, uid 1000, TCG, no /dev/kvm: True
+podvm SHA-256 381f9ba71d2e9d40be88ce517c8863ac2844c475e0d759b79bde8d696b48ec03
+image ghcr.io/linuxcontainers/alpine:latest@sha256:28a33e0390da2b341d05e53803c6766977039baedfc8a82a4910d5acc4755b66 with a layer of 220 MiB
+$ podvm pull -q ghcr.io/linuxcontainers/alpine:latest@sha256:28a33e0390da2b341d05e53803c6766977039baedfc8a82a4910d5acc4755b66
+  | exit 0 in 2.1 s, first output after -
+$ podvm save -o WORK/alp.tar ghcr.io/linuxcontainers/alpine:latest@sha256:28a33e0390da2b341d05e53803c6766977039baedfc8a82a4910d5acc4755b66
+  | exit 0 in 0.0 s, first output after -
+  | podvm save: saved ghcr.io/linuxcontainers/alpine:latest@sha256:28a33e0390da2b341d05e53803c6766977039baedfc8a82a4910d5acc4755b66 as 4 blobs (3.5 MiB), digest sha256:d22cb65d578ea325347d7a6e5645998c3e7310f57504368df2a1a8f4337d1ed6
+$ podvm load -i WORK/cap.tar
+  | exit 0 in 0.7 s, first output after 0.7 s
+  | Loaded image: localhost/cap482:1
+big.bin SHA-256 0d00283c0b0cb9f45d286ca7c2a3a9241fd61fbacab799da6791f6b9a93c886f
+$ podvm run --rm --verbose --podvm-tier=machine --podvm-net none localhost/cap482:1 sh -c PAYLOAD
+  | exit 7 in 21.2 s, first output after 13.6 s
+  | overlay / overlay rw,relatime,lowerdir=/:/podvm-lower,upperdir=/podvm-upper/upper,workdir=/podvm-upper/work,uuid=on 0 0
+  | CAP=CapEff: 0000000000002000
+  | PLAIN=CapEff: 0000000000000000
+  | MEM=MemTotal: 480668 kB
+  | BIG=0d00283c0b0cb9f45d286ca7c2a3a9241fd61fbacab799da6791f6b9a93c886f /opt/big.bin
+  | WRITE-OK
+  | 0a9a5dfd008f: Extracted (517 entries, 0 whiteouts)
+  | 6df4f565d867: Extracted (9 entries, 0 whiteouts)
+  | 119e5de0699f: Extracted (6 entries, 0 whiteouts); 0 extended attributes set, 1 not set (the first: security.capability of opt/cap/cat, EPERM; the sidecar names each)
+  | podvm run: this host has no QEMU; podvm fetches the static QEMU 11.1.3 and its firmware (25 MiB) into WORK/store/tools/qemu-11.1.3 (TODO/machine.md T-1875)
+  | podvm: 8 MiB of 17 MiB
+  | podvm: 16 MiB of 17 MiB
+  | podvm run: the store copy of QEMU 11.1.3 is in WORK/store/tools/qemu-11.1.3
+  | podvm run: machine tier: a guest under TCG (the emulator process is the boundary, not hardware isolation), root disk built now (TODO/machine.md T-1656)
+PASS 1: the first run exited 7
+PASS 2: the notice of the first run and 1 root disk(s) in the store
+PASS 3: CapEff of /opt/cap/cat 0000000000002000, of /opt/plain/cat 0000000000000000
+PASS 4: the root is an overlay of the disk with a tmpfs upper layer
+root disk root-57cb264284cd9f473e8c282bf516b10f505ae9423b849c2963b472ee22fc4167-v1.img: 240959488 bytes, SHA-256 e64dd58c5eda62b14b7edfd05ecd226316dcddebe9c42cd64f623324878b9855
+$ podvm run --rm --verbose --podvm-tier=machine --podvm-net none localhost/cap482:1 sh -c PAYLOAD
+  | exit 7 in 12.2 s, first output after 4.0 s
+  | overlay / overlay rw,relatime,lowerdir=/:/podvm-lower,upperdir=/podvm-upper/upper,workdir=/podvm-upper/work,uuid=on 0 0
+  | CAP=CapEff: 0000000000002000
+  | PLAIN=CapEff: 0000000000000000
+  | MEM=MemTotal: 480668 kB
+  | BIG=0d00283c0b0cb9f45d286ca7c2a3a9241fd61fbacab799da6791f6b9a93c886f /opt/big.bin
+  | WRITE-OK
+  | podvm run: machine tier: a guest under TCG (the emulator process is the boundary, not hardware isolation), root disk from the cache (TODO/machine.md T-1656)
+PASS 5: the second run exited 7; the disk is the same file with the same bytes: True; first output after 13.6 s, then 4.0 s
+$ PODVM_MACHINE_ROOT=initramfs podvm run --rm --verbose --podvm-tier=machine --podvm-net none localhost/cap482:1 sh -c PAYLOAD
+  | exit 7 in 15.0 s, first output after 9.6 s
+  | rootfs / rootfs rw,size=631576k,nr_inodes=157894,inode64 0 0
+  | CAP=CapEff: 0000000000000000
+  | PLAIN=CapEff: 0000000000000000
+  | MEM=MemTotal: 1510568 kB
+  | BIG=0d00283c0b0cb9f45d286ca7c2a3a9241fd61fbacab799da6791f6b9a93c886f /opt/big.bin
+  | WRITE-OK
+  | podvm run: machine tier: a guest under TCG (the emulator process is the boundary, not hardware isolation), base archive built now (TODO/machine.md T-1656)
+PASS 6: MemTotal 469 MiB on the root disk, 1475 MiB with the initramfs (control, exit 7); the guest SHA-256 of big.bin is the host's: True and True
+$ podvm run --rm --verbose --podvm-tier=machine --podvm-net none localhost/cap482:1 sh -c PAYLOAD
+  | exit 7 in 13.0 s, first output after 5.9 s
+  | overlay / overlay rw,relatime,lowerdir=/:/podvm-lower,upperdir=/podvm-upper/upper,workdir=/podvm-upper/work,uuid=on 0 0
+  | CAP=CapEff: 0000000000002000
+  | PLAIN=CapEff: 0000000000000000
+  | MEM=MemTotal: 480668 kB
+  | BIG=0d00283c0b0cb9f45d286ca7c2a3a9241fd61fbacab799da6791f6b9a93c886f /opt/big.bin
+  | WRITE-OK
+  | podvm run: machine tier: the root disk WORK/store/machine/root-57cb264284cd9f473e8c282bf516b10f505ae9423b849c2963b472ee22fc4167-v1.img of the cache was damaged (its SHA-256 is ff8732e607e7f403b1c9a4e7c7aa34339da4d17336d61759df0b2a815473a8c2, and its trailer names 1985d483e64cb78f8c2b370528ce1b248899cc1c8d49f9c1fc7f9c591d857b3d); podvm built it again (TODO/machine.md T-1994)
+  | podvm run: machine tier: a guest under TCG (the emulator process is the boundary, not hardware isolation), root disk built now (TODO/machine.md T-1656)
+PASS 7: the run after a changed byte exited 7 and built the disk again with the bytes of the first build
+$ PODVM_MACHINE_ROOT=ram podvm run --rm --verbose --podvm-tier=machine --podvm-net none localhost/cap482:1 true
+  | exit 125 in 0.0 s, first output after -
+  | podvm run: machine tier: PODVM_MACHINE_ROOT=ram: the values are disk and initramfs (TODO/machine.md T-1994)
+PASS 8: PODVM_MACHINE_ROOT=ram exited 125
+PASS 9: 0 emulator(s), and run directories or partial files []
+THE ROOT OF A MACHINE GUEST IS THE DISK OF ITS IMAGE, MADE ONCE

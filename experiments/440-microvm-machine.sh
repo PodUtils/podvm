@@ -29,6 +29,8 @@ PB="${PODVM_BIN:-$REPO/target/x86_64-unknown-linux-musl/release/podvm}"
 BOOTS=${PODVM_440_BOOTS:-20}
 IMG="${PODVM_440_IMAGE:-mirror.gcr.io/library/alpine:3.20}"
 export PODVM_STORE="$WORK/store"
+# The boots below take the base archive of the initramfs root (T-1994).
+export PODVM_MACHINE_ROOT=initramfs
 : >"$OUT"
 note() { echo "$*" | tee -a "$OUT"; }
 fail=0

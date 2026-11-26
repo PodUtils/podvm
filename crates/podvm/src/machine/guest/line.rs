@@ -31,12 +31,12 @@ pub(super) fn with_cpus(argv: &mut [String], cpus: Option<u32>) {
 
 /// The notice of the machine tier, or `None` where the banner is off
 /// (TODO/cli.md T-1824: `-q`, and the default, keep stderr silent).
-pub fn notice(r: &Request, accel: Accel, cached: bool) -> Option<String> {
+pub fn notice(r: &Request, accel: Accel, source: &str) -> Option<String> {
     if !r.loud {
         return None;
     }
     Some(format!(
-        "podvm {}: machine tier: a guest under {} ({}), base archive {} (TODO/machine.md T-1656)",
+        "podvm {}: machine tier: a guest under {} ({}), {} (TODO/machine.md T-1656)",
         r.verb,
         match accel {
             Accel::Kvm => "KVM",
@@ -46,10 +46,6 @@ pub fn notice(r: &Request, accel: Accel, cached: bool) -> Option<String> {
             Accel::Kvm => "hardware virtualization",
             Accel::Tcg => "the emulator process is the boundary, not hardware isolation",
         },
-        if cached {
-            "from the cache"
-        } else {
-            "built now"
-        }
+        source
     ))
 }
