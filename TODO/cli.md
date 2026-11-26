@@ -7055,15 +7055,15 @@ experiment 434 with clauses 28 to 30; each other finding is a line in
 | OR-B39-06, incus: a foreground `run` gives its output at the end, stderr after stdout | P2 | gap | [T-2080](machine.md) | done |
 | OR-B39-07, incus: `run -d --rm` keeps the stopped instance; a foreground `--name` is ignored | P2 | fix if cheap | [T-2080](machine.md) | done (a foreground run still keeps no record: the instance goes at its end, as under `--rm`) |
 | OR-B39-08, incus: the import expands hard links (busybox: 2.1 MiB stored, 420 MiB for each instance) | P2 | gap | - | open |
-| OR-B39-09, incus: `run -w /nonexistent` runs in `/` with exit 0 | P2 | fix if cheap | [T-2080](machine.md) | done for `run` (docker makes the directory); `exec -w` to a missing directory still runs in `/` (incusd) |
+| OR-B39-09, incus: `run -w /nonexistent` runs in `/` with exit 0 | P2 | fix | [T-2079](cli.md) | done: a foreground `run` (T-2080), `run -d` and `create` make the directory, as docker does; `exec -w` refuses a directory that is not there, or a file, with exit 126, as docker's `exec` (podvm reads the kind of the path by the files API and follows each link); the test `a_path_is_found_after_its_links_and_each_refusal_names_it` |
 | OR-B39-10, incus: a daemon that takes the connection and never answers holds podvm with no bound | P2 | fix if cheap | [T-2080](machine.md) | done for the first call of each verb (30 s); a bound of each call is asked of podcrates |
-| OR-B39-11, incus: `rm -rf /.podvm` in the payload deletes its log; `logs` gives a raw 404 | P2 | gap | - | open |
+| OR-B39-11, incus: `rm -rf /.podvm` in the payload deletes its log; `logs` gives a raw 404 | P2 | fix | [T-2079](cli.md) | done: `logs` says that the payload removed the log (or `/.podvm`), with exit 1 and the command that gives the exit code; the init makes `/.podvm` again for the exit code, so `wait` and `inspect` give it; the log itself stays lost |
 | OR-B39-12, incus: after a failed create, "the instance stays" although the delete answered 404; `incus tier;` | P2 | fix | [T-2080](machine.md) | done |
 | OR-B39-13, incus: no check of the pool for an image that incus has; the line of the check names a host path | P2 | T-2078 | [T-2078](machine.md) | done: the import records the need of the tree in the store, and a run of an image that incus has checks the pool with it (T-2078); the path of the pool stays in the line |
 | OR-B39-14, native: `cp HOST ctr:/nonexistdir/f` makes the directory | P2 | known (OR-B38-14) | - | done: a missing parent of DEST refuses the copy (exit 1) in each direction, as docker; the same rule as OR-B39-04 |
 | OR-B39-15, native: the edits of a payload to `/etc/hosts` are lost at the next `exec` | P2 | gap | - | open |
 | OR-B39-16, incus: `--platform linux/arm64` on amd64 gives "Command not executable" with no word of the architecture | P2 | with OR-B39-01 | [T-2080](machine.md) | done for a foreground `run`; `run -d` writes the error of the start to the log |
-| OR-B39-17, incus: `--podvm-init=image` of an image with no init: a raw error of forkstart, the instance stays RUNNING | P3 | gap | - | open |
+| OR-B39-17, incus: `--podvm-init=image` of an image with no init: a raw error of forkstart, the instance stays RUNNING | P3 | fix | [T-2079](cli.md) | done: before the start, podvm reads `/sbin/init` of the new instance (after its links); where the image has none, one line names it, exit 125, and podvm removes the instance. On this host (cgroup v1) the binary before the fix also removed the instance; a RUNNING instance after a failed start is the case of T-2100 (OR-B41-07) |
 | OR-B39-18, `container ls --podvm-tier incus` gives "a bug in podvm (T-0801)" | P3 | fix | [T-2080](machine.md) | done |
 | OR-B39-19, many small items (the list of the findings file) | P3 | gap | - | open |
 
@@ -7096,6 +7096,24 @@ new `/nonexistdir/f` with exit 0; the new binary gives
 `/opt/exist/{dir,old}`, `/opt/dir`, `dst/srcd/{inner,y}`, and "the parent
 directory of /nonexistdir/f does not exist" with exit 1.
 Left: the findings of the table that are open.
+
+Proof of OR-B39-09, OR-B39-11 and OR-B39-17 (2026-11-26): a private
+incusd 6.0.0 as root on the cloud host (cgroup v1, no AppArmor), the image
+`mirror.gcr.io/library/alpine:3.20`, the release binary of beta.41 before
+and the release binary of the fix after. OR-B39-09: before, `exec -w
+/nonexistent` printed `/` with exit 0, and `run -d -w /newdir ... pwd`
+logged "podvm guest-hold: pwd: No such file or directory" with exit 127;
+after, `exec -w` gives exit 126 with the line for `/nonexistent`, a file
+and a dangling link, runs in a link to a directory and in a directory of
+a `-v` volume, and refuses a missing directory in the volume; `run -d -w
+/newdir` logs `/newdir` with exit 0. OR-B39-11: before, `logs` after `rm
+-rf /.podvm` gave the raw 404 of incusd; after, it says that the payload
+removed the log, with exit 1, and `wait` and `inspect` give the exit code 3.
+OR-B39-17: with `busybox:1.36` (no `/sbin/init`), before, the raw error of
+`forkstart` with exit 125; after, "the image has no /sbin/init ...; podvm
+removed the instance" with exit 125, and `incus list` has no instance.
+The tests are in `crates/podvm/src/incus/waitkill_tests.rs`. A host with
+cgroup v2 or AppArmor is not measured here.
 
 # T-2087: The faults of the ninth outside pass (2026-11-24, the gate of 0.2.0-beta.40)
 
@@ -7147,7 +7165,7 @@ gaps" of the release.
 | OR-B40-01, `rmi` of a second tag of an image that a running container uses is refused with exit 125 | P1 | fix | [T-2087](cli.md) | done: the name goes as docker untags it, where another record keeps the image; the last name is refused with exit 1, the `cli-error` of the exit table |
 | OR-B40-02, `inspect` gives `.Exec.Mode join` and pid sharing for a created container, where `exec` is a fresh chroot | P1 | fix | [T-2087](cli.md) | done: `.Exec.Mode` and `.Exec.Shares` say `join` only for a running run (`lifecycle::exec_opened`) |
 | OR-B40-03, `PODVM_MODE=tmpfs`, `rundir` and `cache` fail for uid 1000 with a copy error of `dev/random` | P1 | fix | [T-2087](cli.md) | done: the binds of the devices go off the source tree before the copy and are made again on the staged root |
-| OR-B40-04, incus: `wait` and `kill` have no path of the tier | P2 | gap | - | open |
+| OR-B40-04, incus: `wait` and `kill` have no path of the tier | P2 | fix | [T-2087](cli.md) | done: `wait --podvm-tier incus` prints the exit code of the command when the instance stops, also for `run -d --rm`; `kill [-s SIG] --podvm-tier incus` signals the command by podvm in the instance (`guest-kill`, the pid file of the init); `tier = incus` routes both; after "no such container" a second line names an instance of podvm in incus of that name (`wait`, `kill`, `rm`, `logs`); the tests `wait_gives_the_exit_code_of_each_end_or_says_why_there_is_none` and `kill_signals_the_command_by_podvm_in_the_instance` |
 | OR-B40-05, a foreground run on the namespace rung does not reap orphans until it ends | P2 | gap | - | open |
 | OR-B40-06, `--init` and `top` are refused with a reason that is false on the namespace rung | P2 | gap | - | open |
 | OR-B40-07, `doctor` and `probe` say the machine tier is refused where `run` fetches its own QEMU | P2 | gap | - | open |
@@ -7161,7 +7179,7 @@ gaps" of the release.
 | OR-B40-15, `--format '{{json .}}'`, `table` and `index` are refused | P2 | gap | - | open |
 | OR-B40-16, `cp` refuses a container path with `..` or an absolute link that docker resolves in the root | P2 | gap | - | open |
 | OR-B40-17, `run -u` does not drop privileges and says nothing (`exec -u` says it) | P2 | gap | - | open |
-| OR-B40-18, incus: a created instance reads `Stopped`, and `inspect --verbose` gives a false reason for the dashes | P2 | gap | - | open |
+| OR-B40-18, incus: a created instance reads `Stopped`, and `inspect --verbose` gives a false reason for the dashes | P2 | fix | [T-2087](cli.md) | done: an instance whose `last_used_at` is the zero time of incusd reads `Created` in `ps`, `inspect` and `kill`; `--verbose` says that it never started; `logs` prints nothing and `wait` refuses with exit 125, as for a created container of the other tiers; the test `an_instance_that_never_started_is_created` |
 | OR-B40-19 to OR-B40-28, ten P3 items (the list of the findings file) | P3 | gap | - | open |
 
 Proof of the P1 fixes (2026-11-24): OR-B40-01: `Store::delete` lets a
@@ -7187,6 +7205,23 @@ removal of one of two names of an image removed the lock that a container
 held, and the image then read as not in use. The files now stay where a
 surviving record names the same image. `cargo test --workspace
 --no-fail-fast`: 97 test binaries, each passed.
+
+Proof of OR-B40-04 and OR-B40-18 (2026-11-26), on the private incusd of
+the proof of T-2079 (cgroup v1, no AppArmor): before, `wait` and `kill`
+with `--podvm-tier=incus` gave "unknown option" with exit 125, and a
+created instance gave `Stopped -` with the false reason of an older podvm.
+After: `run -d ... sh -c 'sleep 2; exit 7'`, then `wait` prints 7 after
+2.7 s; `kill` of `sleep 300` prints the name, and `wait` prints 137; `kill
+-s SIGTERM` of a shell with a trap of TERM prints the name, `wait` prints
+42, and the log holds "got TERM"; `kill` of a stopped instance exits 1;
+three `run -d --rm` with exit 5, each followed by `wait`, print 5; `kill`
+and `wait` with `tier = incus` in the configuration and no flag work;
+`wait i1` with no flag adds the line that `i1` is an instance of podvm in
+incus. A created instance gives `Created created -` and "the instance is
+Created and never started"; `ps -a` gives `Created`; `logs` prints nothing
+with exit 0; `wait` exits 125 with "it is Created". An instance of an
+older podvm has no `guest-kill`: `kill` exits 125 with the line of podvm in
+the instance.
 
 
 # T-2088: The faults of the external QA of `0.2.0-beta.31` that stay open on `0.2.0-beta.40`

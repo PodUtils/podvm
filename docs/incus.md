@@ -138,8 +138,8 @@ read-only to it.
 label `user.podvm=1`, podvm's init `guest-hold --run`, and the command in
 `/.podvm/cmd`; the init writes the command's output to `/.podvm/log` and
 its exit code to `/.podvm/exit`, and the instance stops when the command
-ends. `ps`, `start`, `stop`, `rm`, `logs` and `exec` with the tier call the
-API on the instance of that name. incusd keeps the state: a record of
+ends. `ps`, `start`, `stop`, `rm`, `logs`, `exec`, `wait` and `kill` with
+the tier call the API on the instance of that name. incusd keeps the state: a record of
 podvm's container table belongs to a launcher, and its reconcile calls a
 running record with no launcher dead. Clause 12 of experiment 434 runs each
 verb against the incusd of route A. `logs -f` follows `/.podvm/log` until
@@ -149,6 +149,41 @@ offset that podvm wrote last, which pod-incus copies in pieces of 64 KiB
 to stdout (`Client::get_file_to`), so a log of any size is read. `inspect` gives the state of an instance as JSON
 or through `--format` (`.Name`, `.Status`, `.ExitCode`, `.EnteredRung`,
 `.CpuSeconds`, `.PeakMemoryBytes`, `.OomKills`).
+
+`wait` and `kill` (T-2087, OR-B40-04 of the ninth outside pass):
+
+* `wait NAME` reads the state of the instance each 250 ms until it stops,
+  then prints the exit code that the init wrote to `/.podvm/exit`. For an
+  instance of `run -d --rm`, incusd removes the instance and the file when
+  it stops; podvm then reads the file each 100 ms while the instance runs,
+  and a line says so where the instance went before the read. The bound is
+  the bound of `wait` of the other tiers (1 hour).
+* `kill [-s SIG] NAME` runs `/.podvm/podvm guest-kill SIG` in the instance
+  by the exec API: incusd has no call that signals a process of an
+  instance. The init writes the pid of the command to `/.podvm/pid` while
+  the command runs, and podvm in the instance signals that pid (SIGKILL
+  where `-s` gives none, as docker). An instance that does not run is
+  refused with exit 1. Limit: between the end of the command and the
+  removal of the pid file, another process of the instance can take the
+  same pid.
+
+incusd says `Stopped` for an instance that never started, and for one
+whose command ended. incusd 6.0 gives `last_used_at` the time
+`1970-01-01T00:00:00Z` to an instance that never started (a push of a file
+does not change it), so `ps`, `inspect` and `wait` say `Created` there, as
+docker does; `logs` of it prints nothing, and `inspect --verbose` says why
+a value is a dash (T-2087, OR-B40-18).
+
+The payload runs as root of the instance, so it can remove `/.podvm`.
+`logs` then says that the log is not there, with no raw 404 of incusd; the
+init makes `/.podvm` again for the exit code at the end, so `wait` and
+`inspect` still give it (T-2079, OR-B39-11).
+
+`exec -w DIR` refuses a directory that is not there (or a file) with exit
+126, as docker's `exec`: incusd ran the command in `/` with no word. podvm
+reads the kind of the path by the files API and follows each link of it.
+`run -d -w DIR` and `create -w DIR` make the directory, as docker does
+(T-2079, OR-B39-09).
 
 The usage of a stopped instance (T-2076, PodUtils/podrunner#345): incusd
 gives the CPU time and the memory only while an instance runs, and the
@@ -208,8 +243,8 @@ selects the incus tier with no flag:
 * `run` and `create` take it where the socket of the incusd is there; where
   it is not, they say so and the ladder selects the rung;
 * `system info --format '{{.EnteredRung}}'` names `incus`;
-* `exec`, `start`, `stop`, `rm`, `logs` and `inspect` take it for a name
-  that is an instance of podvm in incus;
+* `exec`, `start`, `stop`, `rm`, `logs`, `inspect`, `wait` and `kill` take
+  it for a name that is an instance of podvm in incus;
 * an explicit `--podvm-tier` wins, and another value of `tier` is refused by
   name.
 
@@ -255,7 +290,10 @@ Clause 15 of experiment 434 holds the tier.
 
 `run -d --podvm-tier=incus --podvm-init=image IMAGE CMD` (also `create`)
 starts the instance with no `lxc.init.cmd`, so `/sbin/init` of the image
-(systemd) is PID 1 of the instance. A foreground run takes another route
+(systemd) is PID 1 of the instance. Before the start, podvm reads `/sbin/init` of the
+new instance by the files API: where the image has none, the run ends with
+one line that names it and exit 125, and podvm removes the instance (T-2079,
+OR-B39-17). A foreground run takes another route
 (call C26 of [the decisions](decisions.md)); the flag with the incus tier
 and no `-d` is a flag error, exit 125. The code is
 `crates/podvm/src/incus/systemd.rs`. A run does this:

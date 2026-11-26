@@ -65,6 +65,12 @@ pub fn exec(
             _ => None,
         };
         let (env, cwd) = exec_env(run.as_ref(), env, cwd);
+        // TODO/cli.md T-2079 (OR-B39-09): incusd runs the command in `/`
+        // where the working directory is not there; docker's exec fails.
+        if let Some(line) = workdir_refusal(name, &cwd, super::walk::find(&c, name, &cwd).await) {
+            eprintln!("podvm exec: {line}");
+            return podvm_image::error::EXIT_CANNOT_INVOKE;
+        }
         let mut x = Exec::new(argv.to_vec());
         x.environment = env;
         x.cwd = cwd;
@@ -104,6 +110,27 @@ pub fn exec_env(
         (None, None) => String::new(),
     };
     (m, cwd)
+}
+
+/// The refusal of the working directory `cwd` of an `exec` in the
+/// instance `name`, as [`super::walk::find`] found it; `None` where the
+/// command can run there, or where podvm cannot tell (incusd decides, as
+/// before).
+pub fn workdir_refusal(name: &str, cwd: &str, found: super::walk::Found) -> Option<String> {
+    use super::walk::Found;
+    if cwd.is_empty() {
+        return None;
+    }
+    let what = match found {
+        Found::Missing => "is not there",
+        Found::Kind(pod_incus::FileKind::File) => "is a file, not a directory",
+        Found::Kind(_) | Found::Unknown(_) => return None,
+    };
+    Some(format!(
+        "{name}: the working directory {cwd:?} {what} in the instance: exec makes no \
+         directory, and docker's exec fails there too (exit 126); run -w makes it \
+         (TODO/cli.md T-2079)"
+    ))
 }
 
 /// The line after an `exec` that ended with 126 or 127 and wrote nothing:

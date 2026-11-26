@@ -151,7 +151,7 @@ fn incus_verbs_discard_and_rm_name_what_stays() {
         .unwrap_err();
     assert!(e.contains("Error") && !e.contains("runs"), "{e}");
     // ps lists the labelled instance, and not the one of another user.
-    let rows = rt.block_on(super::verbs::rows(&c, true)).unwrap();
+    let rows = rt.block_on(super::ps::rows(&c, true)).unwrap();
     assert_eq!(rows.len(), 1, "{rows:?}");
     assert_eq!(rows[0][0], "inc1");
     assert_eq!(rows[0][4], "Up");

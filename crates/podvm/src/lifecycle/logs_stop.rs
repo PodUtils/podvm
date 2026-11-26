@@ -223,7 +223,7 @@ pub fn kill(args: &[String]) -> i32 {
             return crate::parity::refuse_member(
                 "kill",
                 &member,
-                "usage: podvm kill [-s SIGNAL] <container> [container...]",
+                "usage: podvm kill [-s SIGNAL] [--podvm-tier incus] <container> [container...]",
             )
         }
     };
@@ -231,7 +231,7 @@ pub fn kill(args: &[String]) -> i32 {
     if let Some(c) = crate::parity::admit_all(
         "kill",
         args,
-        "usage: podvm kill [-s SIGNAL] <container> [container...]",
+        "usage: podvm kill [-s SIGNAL] [--podvm-tier incus] <container> [container...]",
     ) {
         return c;
     }
@@ -241,7 +241,9 @@ pub fn kill(args: &[String]) -> i32 {
     while let Some(a) = it.next() {
         match a.as_str() {
             "-h" | "--help" => {
-                println!("usage: podvm kill [-s SIGNAL] <container> [container...]");
+                println!(
+                    "usage: podvm kill [-s SIGNAL] [--podvm-tier incus] <container> [container...]"
+                );
                 return 0;
             }
             "-s" | "--signal" => match it.next() {
@@ -261,7 +263,7 @@ pub fn kill(args: &[String]) -> i32 {
                 if let Err(c) = crate::parity::admit(
                     "kill",
                     other,
-                    "usage: podvm kill [-s SIGNAL] <container> [container...]",
+                    "usage: podvm kill [-s SIGNAL] [--podvm-tier incus] <container> [container...]",
                 ) {
                     return c;
                 }
@@ -271,7 +273,7 @@ pub fn kill(args: &[String]) -> i32 {
         }
     }
     if names.is_empty() {
-        eprintln!("usage: podvm kill [-s SIGNAL] <container> [container...]");
+        eprintln!("usage: podvm kill [-s SIGNAL] [--podvm-tier incus] <container> [container...]");
         return EXIT_CLI_ERROR;
     }
     let s = match store() {
@@ -290,7 +292,7 @@ pub fn kill(args: &[String]) -> i32 {
         }
         match podvm_supervise::kill(&s, want, sig) {
             Ok(c) => println!("{}", c.name),
-            Err(e) => code = fail("kill", e),
+            Err(e) => code = fail_named("kill", want, e),
         }
     }
     code

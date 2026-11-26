@@ -15,6 +15,7 @@ pub(crate) mod inspect;
 pub(crate) mod logs; // TODO/cli.md T-2046
 pub(crate) mod net;
 pub(crate) mod oom; // TODO/machine.md T-2077
+pub(crate) mod ps; // TODO/cli.md T-2087
 pub(crate) mod run;
 pub(crate) mod space; // TODO/machine.md T-2078
 pub(crate) mod systemd;
@@ -22,6 +23,8 @@ pub(crate) mod target; // TODO/machine.md T-2078
 pub(crate) mod update; // TODO/machine.md T-2093
 pub(crate) mod usage; // TODO/machine.md T-2076
 pub(crate) mod verbs;
+pub(crate) mod waitkill; // TODO/cli.md T-2087
+pub(crate) mod walk; // TODO/cli.md T-2079
 mod xattrs; // TODO/machine.md T-1999
 
 #[cfg(test)]
@@ -44,14 +47,18 @@ mod tests;
 mod usage_tests;
 #[cfg(test)]
 mod verbs_tests; // TODO/machine.md T-1846 // TODO/machine.md T-2076
+#[cfg(test)]
+mod waitkill_tests; // TODO/cli.md T-2079, T-2087
 
 /// The verbs that `--podvm-tier=incus` serves on an instance that stays
 /// (TODO/machine.md T-1722): their exit, or `None` for another verb.
 pub fn intercept(verb: Option<&str>, rest: &[String]) -> Option<i32> {
     // TODO/cli.md T-1811: another tier on these verbs is a usage error by
     // name; it reached the parser, whose "a bug in podvm" text was wrong.
-    if let (Some(v @ ("ps" | "start" | "stop" | "rm" | "logs" | "inspect")), Some(t)) =
-        (verb, other_tier(rest))
+    if let (
+        Some(v @ ("ps" | "start" | "stop" | "rm" | "logs" | "inspect" | "wait" | "kill")),
+        Some(t),
+    ) = (verb, other_tier(rest))
     {
         eprintln!(
             "podvm {v}: --podvm-tier={t}: {v} takes --podvm-tier=incus only, for an \
@@ -65,6 +72,9 @@ pub fn intercept(verb: Option<&str>, rest: &[String]) -> Option<i32> {
         v @ ("ps" | "start" | "stop" | "rm") => Some(verbs::dispatch(v, &a)),
         "logs" => Some(logs::logs(&a)),
         "inspect" => Some(inspect::inspect(&a)),
+        // TODO/cli.md T-2087 (OR-B40-04).
+        "wait" => Some(waitkill::wait(&a)),
+        "kill" => Some(waitkill::kill(&a)),
         _ => None,
     }
 }
@@ -133,6 +143,11 @@ pub const LOG: &str = "/.podvm/log";
 pub const EXIT: &str = "/.podvm/exit";
 /// The stdin of the command, mode 0600, where the run had one (T-1777).
 pub const STDIN: &str = "/.podvm/stdin";
+/// TODO/cli.md T-2087 (OR-B40-04): the pid of the command while it runs,
+/// for `kill` ([`waitkill::guest_kill`]).
+pub const PID: &str = "/.podvm/pid";
+/// The directory of the files of podvm in the instance.
+pub const DIR: &str = "/.podvm";
 
 /// The exit code of a wait status.
 fn code_of(status: i32) -> i32 {
@@ -240,7 +255,11 @@ pub fn hold(args: &[String]) -> i32 {
             guard = Some(g);
         }
         match start_cmd(guard) {
-            Ok(pid) => CHILD.store(pid, std::sync::atomic::Ordering::Relaxed),
+            Ok(pid) => {
+                CHILD.store(pid, std::sync::atomic::Ordering::Relaxed);
+                // T-2087 (OR-B40-04): `kill` signals the command by this pid.
+                let _ = std::fs::write(PID, format!("{pid}\n"));
+            }
             Err(e) => {
                 let _ = std::fs::write(LOG, format!("podvm guest-hold: {e}\n"));
                 match end_of.as_mut() {
@@ -266,12 +285,13 @@ pub fn hold(args: &[String]) -> i32 {
                 continue;
             }
             if pid == CHILD.load(std::sync::atomic::Ordering::Relaxed) {
+                let _ = std::fs::remove_file(PID);
                 let code = code_of(status);
                 if let Some((anchor, meter)) = end_of.as_mut() {
                     finish(code, anchor.as_ref(), meter);
                     return code;
                 }
-                let _ = std::fs::write(EXIT, format!("{code}\n"));
+                write_exit(code);
                 // TODO/machine.md T-1993: where the init of the image is
                 // PID 1, the instance stops when its command ends, as with
                 // podvm's own init: SIGRTMIN+4 asks systemd to power off.
@@ -306,7 +326,7 @@ fn finish(code: i32, anchor: Option<&usage::Anchor>, meter: &mut usage::Meter) {
         None => Err("the init could not open its root at the start".to_string()),
     };
     if usage::seal(EXIT, format!("{code}\n").as_bytes()).is_err() {
-        let _ = std::fs::write(EXIT, format!("{code}\n"));
+        write_exit(code);
     }
     match root {
         // The root of the instance: the measure is the one that a reader
@@ -320,6 +340,18 @@ fn finish(code: i32, anchor: Option<&usage::Anchor>, meter: &mut usage::Meter) {
             let _ = std::fs::remove_file(usage::USAGE);
         }
     }
+}
+
+/// Write the exit code to [`EXIT`]. TODO/cli.md T-2079 (OR-B39-11): where
+/// the command removed [`DIR`], the directory comes back first, so that
+/// `wait` and `inspect` still read the code.
+fn write_exit(code: i32) {
+    if std::fs::write(EXIT, format!("{code}\n")).is_ok() {
+        return;
+    }
+    use std::os::unix::fs::DirBuilderExt;
+    let _ = std::fs::DirBuilder::new().mode(0o755).create(DIR);
+    let _ = std::fs::write(EXIT, format!("{code}\n"));
 }
 
 /// Start the command of [`CMD`]; its pid. With `guard`, the command gets
@@ -341,6 +373,10 @@ fn start_cmd(guard: Option<oom::Guard>) -> Result<i32, String> {
         Ok(f) => std::process::Stdio::from(f),
         Err(_) => std::process::Stdio::null(),
     };
+    // TODO/cli.md T-2079 (OR-B39-09): docker makes the working directory
+    // of `run -d` and `create`; a spawn in a missing one named the program.
+    let cwd = if cmd.cwd.is_empty() { "/" } else { &cmd.cwd };
+    std::fs::create_dir_all(cwd).map_err(|e| format!("the working directory {cwd}: {e}"))?;
     let mut command = std::process::Command::new(prog);
     if let Some(g) = guard {
         let (text, must) = (g.child_text(), g.must_set());
@@ -355,7 +391,7 @@ fn start_cmd(guard: Option<oom::Guard>) -> Result<i32, String> {
         .args(rest)
         .env_clear()
         .envs(cmd.env.iter().filter_map(|e| e.split_once('=')))
-        .current_dir(if cmd.cwd.is_empty() { "/" } else { &cmd.cwd })
+        .current_dir(cwd)
         .stdin(stdin)
         .stdout(log)
         .stderr(err)

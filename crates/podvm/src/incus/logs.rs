@@ -80,6 +80,11 @@ pub(crate) async fn copy(
             "not an instance of podvm (no user.podvm label)".into(),
         ));
     }
+    // T-2087 (OR-B40-18): docker gives an empty log for a created
+    // container; an instance that never started has no log file.
+    if super::ps::never_started(&i) {
+        return Ok(());
+    }
     let mut seen = 0u64;
     let mut left = limit;
     loop {
@@ -120,7 +125,10 @@ pub(crate) async fn copy(
                 // The file can be missing before the command writes its
                 // first line, while the instance runs.
                 if !running {
-                    return Err(incus(e));
+                    return Err(match super::verbs::gone(&e) {
+                        true => Fault::Incus(missing_log(c, name).await),
+                        false => incus(e),
+                    });
                 }
             }
         }
@@ -130,6 +138,27 @@ pub(crate) async fn copy(
         // The follow is the only task of this current-thread runtime.
         std::thread::sleep(pause);
     }
+}
+
+/// TODO/cli.md T-2079 (OR-B39-11): the line where incusd has no log file
+/// of the instance `name`: the payload runs as root of the instance and
+/// can remove the files of podvm. The exit code stays (the init writes it
+/// again at the end).
+pub(crate) async fn missing_log(c: &Client, name: &str) -> String {
+    let dir = match super::walk::find(c, name, super::DIR).await {
+        super::walk::Found::Missing => format!("the directory {} is not there", super::DIR),
+        _ => format!("{} is not there", super::LOG),
+    };
+    let running = c.instance(name).await.is_ok_and(|i| i.status == "Running");
+    let who = match running {
+        true => "Its command has not started yet, or the payload removed it",
+        false => "The payload removed it",
+    };
+    format!(
+        "the instance has no log: {dir}. {who} (the payload runs as root of the \
+         instance), so no output stays to show; `podvm inspect --podvm-tier incus --format \
+         '{{{{.ExitCode}}}}' {name}` gives the exit code"
+    )
 }
 
 #[cfg(test)]

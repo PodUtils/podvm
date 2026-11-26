@@ -27,8 +27,7 @@ use pod_hostprobe::usage;
 
 /// The usage of the instance at the end of its command, written by its init.
 pub const USAGE: &str = "/.podvm/usage";
-/// The directory of podvm's files in the instance.
-const DIR: &str = "/.podvm";
+use super::DIR;
 /// The mount point of the cgroup file systems while the init opens them.
 const MOUNT: &str = "/.podvm/.meter";
 /// The most bytes of [`USAGE`] that a reader takes.

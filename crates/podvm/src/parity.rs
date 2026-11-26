@@ -451,6 +451,7 @@ pub const TABLE: &[Row] = &[
     Row { verb: "stop", flag: Some("-h, --help"), status: Native, note: "prints this verb's usage and exits 0" },
     Row { verb: "kill", flag: Some("-s, --signal"), status: Native, note: "by name or number. refused: An unknown one is refused rather than defaulted: sending the wrong signal is not something a caller can notice" },
     Row { verb: "kill", flag: Some("-h, --help"), status: Native, note: "prints this verb's usage and exits 0" },
+    Row { verb: "kill", flag: Some("--podvm-tier"), status: Native, note: "podvm's own: incus sends the signal (SIGKILL where -s gives none) to the command of an instance of podvm in incus by podvm in the instance, and prints the name; an instance that does not run is refused with exit 1. With no flag, tier = incus in $store/config routes a name that is an instance of podvm in incus (TODO/cli.md T-2087)" },
     Row { verb: "rm", flag: Some("-f, --force"), status: Native, note: "kill a running container before removing it" },
     Row { verb: "rm", flag: Some("-v, --volumes"), status: Stub, note: "accepted for parity: podvm has no named or anonymous volumes, so there are none to remove; a -v HOST:GUEST source is the host's own directory, which docker's rm -v keeps too (TODO/enter.md T-1653)" },
     Row { verb: "rm", flag: Some("--podvm-tier"), status: Native, note: "podvm's own: incus acts on the instances of podvm in incus (the label user.podvm), never on another instance. With no flag, tier = incus in $store/config routes a name that is an instance of podvm in incus (TODO/machine.md T-1722)" },
@@ -461,6 +462,7 @@ pub const TABLE: &[Row] = &[
     Row { verb: "logs", flag: Some("--tail"), status: Native, note: "prints the last N lines of the captured file (`--tail N` or `--tail=N`, 0 prints nothing), then follows where `-f` is given instead of replaying the whole file (TODO/cli.md T-1337). `--tail all` is the whole log, as in docker (T-2061)" },
     Row { verb: "logs", flag: Some("--limit-bytes"), status: Native, note: "writes the first N bytes of the log and exits 0 (N from 1 to 9223372036854775807; 0, a sign, a letter or a larger N is refused). The log streams through one buffer of 64 KiB. With --tail, the first N bytes of the tail; with -f, the follow ends at N bytes. On --podvm-tier=incus podvm reads the file in pieces of 64 KiB, with no bound of its size (TODO/cli.md T-2046)" },
     Row { verb: "wait", flag: Some("-h, --help"), status: Native, note: "prints this verb's usage and exits 0" },
+    Row { verb: "wait", flag: Some("--podvm-tier"), status: Native, note: "podvm's own: incus waits until an instance of podvm in incus stops and prints the exit code of its command; an instance that never started has no exit code (exit 125), as a created container. With no flag, tier = incus in $store/config routes a name that is an instance of podvm in incus (TODO/cli.md T-2087)" },
     Row { verb: "start", flag: Some("-a, --attach"), status: NoneStatus, note: "known difference from docker: `start -a` is not implemented. `podvm start NAME`, then `podvm logs -f NAME` and `podvm wait NAME` give the same output and the exit code (TODO/cli.md T-2061)" },
     Row { verb: "start", flag: Some("--podvm-tier"), status: Native, note: "podvm's own: incus acts on the instances of podvm in incus (the label user.podvm), never on another instance. With no flag, tier = incus in $store/config routes a name that is an instance of podvm in incus (TODO/machine.md T-1722)" },
     Row { verb: "start", flag: Some("-h, --help"), status: Native, note: "prints this verb's usage and exits 0" },
@@ -490,7 +492,6 @@ pub const TABLE: &[Row] = &[
 
 mod lookup;
 pub use lookup::*;
-
 #[cfg(test)]
 mod api_tests;
 #[cfg(test)]
