@@ -311,6 +311,8 @@ fn main() {
                 if got == want.as_slice() { "ok" } else { "bad" }
             );
         }
+        // T-1991 (PodUtils/podrunner#308): the steps of `brk_steps`.
+        "brk" => println!("brk {}", brk_steps()),
         _ => {
             eprintln!("podvm-dispatch-probe: no verb {verb:?}");
             std::process::exit(2);
@@ -406,4 +408,49 @@ fn sig_in_call() {
         if on > 0 { "on-alt" } else { "none" },
         OFF.load(Ordering::SeqCst)
     );
+}
+
+/// TODO/enter.md T-1991 (PodUtils/podrunner#308): `cc1` spun for ever in a
+/// hash table that `calloc` took from a break that grew again after a
+/// shrink: glibc does not clear memory that `sbrk` gives, and the kernel
+/// gives zeros. Each step of the break, as offsets from the first break,
+/// and the bytes that are not zero where the kernel keeps them (the page of
+/// the shrunk break) and where it gives new pages. Raw calls with no
+/// allocation between them: the allocator of the probe can move the break.
+fn brk_steps() -> String {
+    const P: i64 = 4096;
+    const BRK: i64 = if cfg!(target_arch = "aarch64") {
+        214
+    } else {
+        12
+    };
+    // SAFETY: brk takes an address and reads no memory.
+    let brk = |to: i64| unsafe { syscall(BRK, to) };
+    let b0 = brk(0);
+    let off = |b: i64| b - b0;
+    let grow = brk(b0 + 3 * P + 100);
+    if grow != b0 + 3 * P + 100 {
+        return format!("grow failed: {}", off(grow));
+    }
+    // SAFETY: the break gave the range [b0, grow).
+    unsafe { core::ptr::write_bytes(b0 as *mut u8, 0xAA, off(grow) as usize) };
+    let shrink = brk(b0 + P + 10);
+    let regrow = brk(b0 + 3 * P + 100);
+    let count = |from: i64, to: i64| {
+        // SAFETY: the break gave the range again.
+        let s = unsafe { core::slice::from_raw_parts(from as *const u8, (to - from) as usize) };
+        s.iter().filter(|&&b| b != 0).count()
+    };
+    let kept = count(b0 + P + 10, b0 + 2 * P);
+    let fresh = count(b0 + 2 * P, regrow);
+    let below = brk(b0 - (1 << 40));
+    let above = brk(b0 + (1 << 46));
+    format!(
+        "grow={} shrink={} regrow={} kept={kept} fresh={fresh} below={} above={}",
+        off(grow),
+        off(shrink),
+        off(regrow),
+        off(below),
+        off(above)
+    )
 }

@@ -429,3 +429,26 @@ fn the_strings_of_argv_lie_in_rising_order_below_the_environment() {
     let Some(r) = root("layout") else { return };
     assert_eq!(probe(&r, &["layout", "a", "bb", "ccc"]).0, "layout ok");
 }
+
+/// PodUtils/podrunner#308 (TODO/enter.md T-1991): `cargo doc` of ripgrep
+/// hung on the syscall tier: `cc1` of the vendored PCRE2 spun in a hash
+/// table that `calloc` took from a break that grew again after a shrink.
+/// The handler's break gives what the kernel gives: each step of the
+/// probe's table (grow, shrink, grow again, the bytes of the kept page and
+/// of the new pages, a break below the base and one past the end) prints
+/// the same line on the handler, with and without the tier, as on the
+/// kernel.
+#[test]
+fn the_break_of_the_handler_answers_as_the_kernel_does() {
+    let Some(r) = root("brk") else { return };
+    let kernel = Command::new(env!("CARGO_BIN_EXE_podvm-dispatch-probe"))
+        .args(["brk"])
+        .output()
+        .unwrap();
+    let kernel = String::from_utf8_lossy(&kernel.stdout)
+        .trim_end()
+        .to_string();
+    assert!(kernel.contains("fresh=0"), "the kernel: {kernel}");
+    assert_eq!(probe(&r, &["brk"]), (kernel.clone(), 0));
+    assert_eq!(probe_with(&r, &["brk"], Some("1048576")), (kernel, 0));
+}

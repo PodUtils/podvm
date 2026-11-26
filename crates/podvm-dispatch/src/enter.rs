@@ -346,17 +346,25 @@ fn try_enter(
     }
     sys::close(pfd);
     // The break: a reserved range after the program, opened as it grows.
-    // SAFETY: an anonymous map with no access.
-    let brk = unsafe {
+    // T-1991: where a map lies there (a static PIE that the loader put
+    // below another map), the range goes where the kernel puts it, as a
+    // randomized break of the kernel does; with no range, `brk` fails.
+    // SAFETY: an anonymous map with no access, at a hint or fixed with no
+    // replace.
+    let reserve = |at: i64, fixed: i64| unsafe {
         sc6(
             nr::MMAP,
-            img.end as i64,
+            at,
             BRK_RESERVE as i64,
             0,
-            0x22 | 0x4000 | 0x10_0000,
+            0x22 | 0x4000 | fixed,
             -1,
             0,
         )
+    };
+    let brk = match reserve(img.end as i64, 0x10_0000) {
+        b if b < 0 => reserve(img.end as i64, 0),
+        b => b,
     };
     if brk >= 0 {
         state::BRK_BASE.store(brk as usize, Ordering::Relaxed);
