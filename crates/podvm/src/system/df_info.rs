@@ -134,7 +134,10 @@ pub fn df(verb: &str, args: &[String]) -> i32 {
         }
         let (rootfs, _) = podvm_extract::paths(&store, &r.manifest_digest);
         let rootfs_bytes = podvm_image::space::dir_bytes(&rootfs);
-        let extracted = rootfs.is_dir();
+        // T-2100 (OR-B41-14): the check of `inspect .Extracted` (the
+        // marker of a whole extraction), not a directory that a failed
+        // extraction can leave.
+        let extracted = podvm_extract::is_extracted(&store, &r.manifest_digest);
         rows.push((
             r.display_repository(),
             df_tag(r, twice(r)),

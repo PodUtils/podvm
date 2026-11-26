@@ -10,7 +10,7 @@ They describe their recorded revision, not the current build.
 
 ### Fixed: an incus `--rm` run that the OOM killer ends, and the QEMU copy in the store, 2026-11-26
 
-Record: T-2100 (OR-B41-02, OR-B41-07, OR-B41-13).
+Record: T-2100 (OR-B41-02, OR-B41-07, OR-B41-13, OR-B41-14).
 Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 
 - The incus tier stops and deletes the instance again where incusd says
@@ -19,6 +19,7 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 - Where `PODVM_STORE` is set and `PODVM_TOOLS_DIR` is not, the machine
   tier keeps its copy of QEMU in `PODVM_STORE/tools`, not under `$HOME`.
 - `notebook` with no notebook exits 1, the code of a missing argument.
+- `system df` counts only whole extractions, as `inspect .Extracted` does.
 
 ## 0.2.0-beta.41 (2026-11-26)
 
