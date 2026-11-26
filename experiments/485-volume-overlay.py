@@ -70,7 +70,8 @@ def digest(d):
 
 
 def podvm_procs():
-    """The pids of each process whose command line names podvm, of uid 1000."""
+    """The pids of each live process (not a zombie that init has yet to
+    reap) of uid 1000 whose command line names podvm."""
     found = []
     for entry in Path("/proc").iterdir():
         if not entry.name.isdigit() or int(entry.name) == os.getpid():
@@ -79,7 +80,10 @@ def podvm_procs():
             if entry.stat().st_uid != 1000:
                 continue
             cmd = (entry / "cmdline").read_bytes()
+            stat = (entry / "stat").read_text()
         except OSError:
+            continue
+        if stat[stat.rfind(")") + 2:].startswith("Z"):
             continue
         if b"podvm" in cmd:
             found.append(int(entry.name))

@@ -1,8 +1,8 @@
 Does -v HOST:GUEST:overlay keep HOST as it was and give GUEST a layer?
-2026-11-26T15:33:42Z Linux 6.18.44-fc-v880, uid 0
-podvm SHA-256 fe1fa72aa53b1ce1dfcc8711d06a534be2eee64134c8ff393ac68d4d3816a3f5
+2026-11-26T16:45:53Z Linux 6.18.44-fc-v880, uid 0
+podvm SHA-256 4d2f79e1c8b9acf38429636af6d095161d62159413c25c0bac437d52e3c6e36e
 image mirror.gcr.io/library/alpine:3.20
-  | run -d: exit 0: 94003ee50042 
+  | run -d: exit 0: fecd03e63998 
 PASS 1: run -d exit 0; the payload made each change
 PASS 2: exec sees 'changed\nnew\nbeta\nhello from H\n600\nend\n'
 PASS 3: 1 upper layer(s) in the trees of the store, with a whiteout of sub/c
