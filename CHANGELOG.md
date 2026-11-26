@@ -8,6 +8,16 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: `--env-file`, `run -d`, `--tmpfs` mode, `cp` and `exec` faults of the outside passes, 2026-11-26
+
+Record: T-2070 (OR-B38-11), T-2087 (OR-B40-12).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `--env-file` takes a line with a name and no `=` as docker does: the
+  value of the name in the environment of the caller, and nothing where the
+  caller has none. A UTF-8 byte order mark on line 1 is no part of the
+  first name. White space in a bare name is refused with its line number.
+
 ### Fixed: a foreground run of a user with no root leaves no zombie, 2026-11-26
 
 Record: T-2087 (OR-B40-05, the follow-up of experiment 485).

@@ -455,10 +455,12 @@ fn parse_flags_with(
     Ok(o)
 }
 
-pub(super) mod values;
+pub(crate) mod envfile;
+pub(super) mod values; // TODO/cli.md T-2070
+pub(crate) use envfile::{read_env_file, read_env_file0};
+pub(crate) use values::env_arg;
 pub use values::usage;
 use values::*;
-pub(crate) use values::{env_arg, read_env_file, read_env_file0};
 
 pub(super) mod access;
 pub(super) mod bound;

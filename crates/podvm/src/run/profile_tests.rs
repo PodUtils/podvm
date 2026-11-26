@@ -66,9 +66,14 @@ fn env_file_loads_and_stubs_parse() {
         o.env,
         v(&["A=1", "B= two words", "C=\"quoted\"", "D='single'"])
     );
-    // A line without `=` is refused naming the file, never skipped.
+    // A name with no `=` takes the host value, and gives nothing where the
+    // host has none (T-2070, OR-B38-11); white space in the name is refused.
+    let bare = dir.join("bare.env");
+    std::fs::write(&bare, "A=1\nPODVM_TEST_NO_SUCH_VARIABLE\n").unwrap();
+    let o = parse("run", &v(&["--env-file", bare.to_str().unwrap(), "img"])).unwrap();
+    assert_eq!(o.env, v(&["A=1"]));
     let bad = dir.join("bad.env");
-    std::fs::write(&bad, "A=1\nNOEQUALS\n").unwrap();
+    std::fs::write(&bad, "A=1\nTWO WORDS\n").unwrap();
     assert_eq!(
         parse("run", &v(&["--env-file", bad.to_str().unwrap(), "img"])).unwrap_err(),
         EXIT_FLAG_ERROR

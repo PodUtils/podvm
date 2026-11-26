@@ -6817,7 +6817,7 @@ Fix the two P1 findings and the P2 findings that the lead marked "fix"; give OR-
 | OR-B38-08, `login` prints "Login Succeeded" for a registry that it did not contact | P2 | known gap | - | open |
 | OR-B38-09, `run -h hx IMAGE CMD` prints the usage (docker's `-h` is `--hostname`) | P3 | by design: the manual says that each verb takes `-h` as help | - | open |
 | OR-B38-10, `probe` says mount only, no user or PID isolation and no `/proc`, where `run` enters user+pid+uts+mount with `/proc` | P2 | known gap | - | open |
-| OR-B38-11, `--env-file`: a line with no `=` refuses the run (docker passes the host value); a UTF-8 BOM on line 1 stays | P3 | known gap | - | open |
+| OR-B38-11, `--env-file`: a line with no `=` refuses the run (docker passes the host value); a UTF-8 BOM on line 1 stays | P3 | fix | [T-2070](cli.md) | done: a line with a name and no `=` takes the value of the name from the environment of the caller, and gives nothing where the caller has none, as docker and `-e NAME` do; a UTF-8 byte order mark on line 1 is not part of the first name; white space in a bare name is refused with its line number. Proof: the unit test `an_env_file_is_read_as_docker_reads_it`, and `run --env-file` as uid 1000 |
 | OR-B38-12, `run -d IMAGE /nonexistent` exits 125, a foreground run 127 (docker: 127) | P3 | known gap | - | open |
 | OR-B38-13, `run` with no `-i` passes stdin; `run -it` with a stdin that is no terminal is accepted with no line (docker refuses) | P3 | known gap | - | open |
 | OR-B38-14, `cp` prints paths of the store; `cp FILE CTR:/missing/dir/file` makes the parents (docker: an error) | P3 | known gap | - | open |
@@ -7173,7 +7173,7 @@ gaps" of the release.
 | OR-B40-09, a payload argument that is not UTF-8 is refused | P2 | gap | - | open |
 | OR-B40-10, a name conflict exits 1 from `create` and 125 from `run` | P2 | fix | [T-2100](cli.md) | done: OR-B41-10 of T-2100; each verb that makes a record exits 1, the cli-error of the published table |
 | OR-B40-11, `run --rm` keeps the extracted tree of the image (the store keeps trees by design) | P2 | gap | - | open |
-| OR-B40-12, `--env-file` refuses a bare NAME (known: OR-B38) | P2 | known | - | open |
+| OR-B40-12, `--env-file` refuses a bare NAME (known: OR-B38) | P2 | fix | [T-2087](cli.md) | done: as OR-B38-11 |
 | OR-B40-13, `run -it` and `exec -it`: the pty is not the controlling terminal (known: OR-B38-17) | P2 | known | - | open |
 | OR-B40-14, `--network host` is refused, though the payload shares the host network | P2 | fix | [T-2087](cli.md) | done (2026-11-26): `--network` takes `host` or `broker`, one of them (the table test `network_takes_host_or_broker_one_of_them`); `host` holds where the entry opens no network namespace, each rootfs rung and the runsc tier (`--network=host` of runsc); the machine and incus tiers refuse it by name, and a rung that opens a network namespace would refuse it (`initns::stays::check_net`, the table test `network_host_holds_where_no_network_namespace_opens`). As uid 1000 the binary before the fix (`main`, 0.2.0-beta.41) refused `run --rm --network host alpine:3.20 true` with 125; the fix ran it on the namespace rung and the userland rung with the network namespace of the host (`net:[4026531833]` inside and outside), exit 0, and in `run -d` |
 | OR-B40-15, `--format '{{json .}}'`, `table` and `index` are refused | P2 | gap | - | open |
