@@ -124,6 +124,13 @@ fn a_state_serves_only_the_run_that_its_guest_can_hold() {
         ),
         (
             Asks {
+                disk: true,
+                ..base.clone()
+            },
+            "--storage-opt size=",
+        ),
+        (
+            Asks {
                 volumes: SLOTS + 1,
                 ..base.clone()
             },

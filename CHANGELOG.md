@@ -8,6 +8,18 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Added: a sized writable disk for a guest of the machine tier, 2026-11-26
+
+Record: T-1968 (PodUtils/podrunner#296 ask 5).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `run --podvm-tier=machine --storage-opt size=N` (64m to 16T) gives the
+  guest a disposable ext4 disk of N bytes. The root and the working
+  directory of the guest are on it, and a write past it gets ENOSPC.
+  podvm writes the file system itself; the host needs no `mke2fs`.
+- The disk does not bound a `-v` volume. The refusals and the failure
+  of the mount in the guest are in [Limits](docs/limits.md).
+
 ### Fixed: an incus `--rm` run that the OOM killer ends, and the QEMU copy in the store, 2026-11-26
 
 Record: T-2100 (OR-B41-02, OR-B41-07, OR-B41-13, OR-B41-14).

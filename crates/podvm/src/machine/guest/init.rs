@@ -44,12 +44,32 @@ pub fn script(
     tty: Option<&str>,
     channel: Option<Chan>,
 ) -> String {
-    let mut s = String::from("#!/bin/sh\n");
-    s.push_str(&setup());
+    let mut s = head();
     s.push_str(&body(
         nonce, argv, env, workdir, net, vols, tty, channel, false,
     ));
     s
+}
+
+/// The first lines of the init of a run: the mounts and the modules, which
+/// come before the root moves to a sized disk (TODO/machine.md T-1968).
+pub fn head() -> String {
+    format!("#!/bin/sh\n{}", setup())
+}
+
+/// TODO/machine.md T-1968: the init where the root did not reach its
+/// sized disk: the reason of `podvm guest-disk` on the second port, then
+/// the exit marker with 125, as [`early_exit`] does; the command does not
+/// run on the RAM of the guest in place of its disk.
+pub fn disk_fail(nonce: &str) -> String {
+    let err = super::disk::ERR;
+    format!(
+        "#!/bin/sh\n{{ echo PODVM-READY-{nonce}; {ERR_PORT}; \
+         l=\"podvm: machine tier: --storage-opt size=: the root of the guest is not on its \
+         disk: $(cat {err} 2>/dev/null) (TODO/machine.md T-1968)\"; \
+         if [ -c \"$E\" ]; then echo \"$l\" >\"$E\"; else echo \"$l\" >&2; fi; echo; \
+         echo PODVM-EXIT-{nonce} 125; sync; reboot -f; echo b > /proc/sysrq-trigger; }}\n"
+    )
 }
 
 /// The first lines of each init: the mounts of the guest and its modules.

@@ -98,10 +98,10 @@ pub fn closure(dep: &str, top: &[&str]) -> Result<Vec<(String, String)>, String>
     Ok(out)
 }
 
-/// The list file and the module files of the engine in `dir`.
-fn list_path(dir: &Path) -> PathBuf {
+/// The list file of the module set `label` in `dir`, and the module files.
+fn list_path(dir: &Path, label: &str) -> PathBuf {
     dir.join(format!(
-        "engine-{}.list",
+        "{label}-{}.list",
         &super::kernel::modloop_sha256()[..16]
     ))
 }
@@ -116,16 +116,31 @@ fn module_path(dir: &Path, name: &str) -> PathBuf {
 /// The modules of the engine in `store_root/machine/`, in their order,
 /// taken out of the pinned modloop where they are not there yet.
 pub fn ensure(store_root: &Path) -> Result<Vec<(String, PathBuf)>, String> {
+    set(
+        store_root,
+        "engine",
+        TOP,
+        "--podvm-engine needs the modules of the pinned kernel, and PODVM_MACHINE_KERNEL \
+         names another kernel (TODO/machine.md T-1780)",
+    )
+}
+
+/// The modules of `top` and their closure in `store_root/machine/`, in
+/// their order, under the list `label`; taken out of the pinned modloop
+/// where they are not there yet. `refusal` is the error where
+/// `PODVM_MACHINE_KERNEL` names another kernel than the pin.
+pub fn set(
+    store_root: &Path,
+    label: &str,
+    top: &[&str],
+    refusal: &str,
+) -> Result<Vec<(String, PathBuf)>, String> {
     if std::env::var_os("PODVM_MACHINE_KERNEL").is_some() {
-        return Err(
-            "--podvm-engine needs the modules of the pinned kernel, and PODVM_MACHINE_KERNEL \
-             names another kernel (TODO/machine.md T-1780)"
-                .to_string(),
-        );
+        return Err(refusal.to_string());
     }
     let dir = store_root.join("machine");
     let listed = |dir: &Path| -> Option<Vec<(String, PathBuf)>> {
-        let text = std::fs::read_to_string(list_path(dir)).ok()?;
+        let text = std::fs::read_to_string(list_path(dir, label)).ok()?;
         let v: Vec<_> = text
             .lines()
             .filter(|l| !l.is_empty())
@@ -143,7 +158,7 @@ pub fn ensure(store_root: &Path) -> Result<Vec<(String, PathBuf)>, String> {
     let dep = img
         .read(&format!("modules/{kver}/modules.dep"))
         .map_err(|e| format!("the modloop: {e}"))?;
-    let mods = closure(&String::from_utf8_lossy(&dep), TOP)?;
+    let mods = closure(&String::from_utf8_lossy(&dep), top)?;
     for (n, path) in &mods {
         let bytes = img
             .read(&format!("modules/{kver}/{path}"))
@@ -155,8 +170,9 @@ pub fn ensure(store_root: &Path) -> Result<Vec<(String, PathBuf)>, String> {
             .map_err(|e| format!("{}: {e}", p.display()))?;
     }
     let names: Vec<&str> = mods.iter().map(|(n, _)| n.as_str()).collect();
-    std::fs::write(list_path(&dir), names.join("\n") + "\n")
-        .map_err(|e| format!("{}: {e}", list_path(&dir).display()))?;
+    let list = list_path(&dir, label);
+    std::fs::write(&list, names.join("\n") + "\n")
+        .map_err(|e| format!("{}: {e}", list.display()))?;
     listed(&dir).ok_or_else(|| format!("{}: the modules did not stay", dir.display()))
 }
 

@@ -121,25 +121,29 @@ pub(super) fn limits(
     if limits.is_empty() {
         return Ok(());
     }
-    // TODO/machine.md T-1964: the size of a root disk is a device of an
-    // incus instance; no other tier has one to size.
-    if limits
-        .iter()
-        .any(|(_, k, _)| *k == super::parse::limits::ROOT_SIZE)
+    // TODO/machine.md T-1964, T-1968: the size of a root disk is a device
+    // of an incus instance or the sized disk of a machine guest; no other
+    // tier has one to size.
+    if tier != Tier::Machine
+        && limits
+            .iter()
+            .any(|(_, k, _)| *k == super::parse::limits::ROOT_SIZE)
     {
         eprintln!(
             "podvm {verb}: --storage-opt size= sizes the root disk of an instance of the \
-             incus tier (--podvm-tier=incus); this tier has no root disk to size \
+             incus tier (--podvm-tier=incus) or the disk of a guest of the machine tier \
+             (--podvm-tier=machine); this tier has no root disk to size \
              (TODO/machine.md T-1964, T-1968)"
         );
         return Err(EXIT_FLAG_ERROR);
     }
     // PodUtils/podrunner#296 ask 4 (TODO/machine.md T-1967): the init of a
-    // machine guest holds `--pids-limit` in a cgroup of the guest.
+    // machine guest holds `--pids-limit` in a cgroup of the guest, and asks
+    // 5 (T-1968): the guest has a disk of `--storage-opt size=`.
     if tier == Tier::Machine {
         let rest: Vec<_> = limits
             .iter()
-            .filter(|(_, k, _)| *k != "limits.processes")
+            .filter(|(_, k, _)| *k != "limits.processes" && *k != super::parse::limits::ROOT_SIZE)
             .cloned()
             .collect();
         return super::parse::limits::refuse_off_incus(verb, &rest);
@@ -328,5 +332,37 @@ mod tests {
             files(&[l("--cpus", "1.5")]),
             [("cpu.max", "150000 100000".to_string())]
         );
+    }
+
+    /// TODO/machine.md T-1968: the machine tier takes `--storage-opt
+    /// size=` and `--pids-limit` into its guest; a native tier and the
+    /// runsc tier refuse the size by name, and the machine tier refuses
+    /// `--memory`.
+    #[test]
+    fn the_machine_tier_takes_the_size_of_its_disk() {
+        use crate::tier::Tier;
+        let l = |f: &str, v: &str| {
+            let (k, val) = crate::run::parse::limits::incus_limit("run", f, v).unwrap();
+            (f.to_string(), k, val)
+        };
+        let size = l("--storage-opt", "size=64m");
+        let pids = l("--pids-limit", "8");
+        for (tier, limits, ok) in [
+            (Tier::Machine, vec![size.clone()], true),
+            (Tier::Machine, vec![size.clone(), pids.clone()], true),
+            (
+                Tier::Machine,
+                vec![size.clone(), l("--memory", "64m")],
+                false,
+            ),
+            (Tier::Runsc, vec![size.clone()], false),
+            (Tier::Syscall, vec![size.clone()], false),
+        ] {
+            assert_eq!(limits_ok(tier, &limits), ok, "{tier:?} {limits:?}");
+        }
+    }
+
+    fn limits_ok(tier: crate::tier::Tier, l: &[(String, &'static str, String)]) -> bool {
+        limits("run", tier, l).is_ok()
     }
 }

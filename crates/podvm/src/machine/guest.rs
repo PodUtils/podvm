@@ -19,6 +19,7 @@ pub(crate) mod arch; // TODO/machine.md T-1890
 pub(crate) mod archive;
 pub(crate) mod channel;
 pub(crate) mod cpio;
+pub(crate) mod disk; // TODO/machine.md T-1968
 mod drive;
 pub(crate) mod engine;
 pub(crate) mod exec; // TODO/machine.md T-1750
@@ -111,6 +112,9 @@ pub struct Request<'a> {
     /// `--pids-limit`: the `pids.max` of the cgroup of the payload in the
     /// guest ([`init::with_pids`], TODO/machine.md T-1967).
     pub pids: Option<String>,
+    /// `--storage-opt size=N`: the bytes of the sized disk that holds the
+    /// root and the working directory of the guest ([`disk`], T-1968).
+    pub disk: Option<u64>,
 }
 
 /// The cache file of the base archive of `digest`.
@@ -281,6 +285,10 @@ pub fn boot(r: &Request) -> i32 {
             Err(e) => return fail(e),
         }
     }
+    let disk_load = match disk::add_modules(r, !assets.modules.is_empty(), &mut modules) {
+        Ok(names) => names, // TODO/machine.md T-1968
+        Err(e) => return fail(e),
+    };
     let tools = match tools(&modules, engine_names) {
         Ok(t) => t,
         Err(e) => return fail(e),
@@ -366,7 +374,10 @@ pub fn boot(r: &Request) -> i32 {
             let script = init::with_pids(script, r.pids.as_deref(), &nonce);
             let script = init::with_image_init(script, init_image); // T-2002
             let script = exec::with_server_if(script, r.keeper.is_some());
-            run_archive(&script, tools.as_ref(), &copies, r.stdin.as_deref())
+            let (script, more) = disk::init(script, &disk_load, &nonce)?; // T-1968
+            let mut a = run_archive(&script, tools.as_ref(), &copies, r.stdin.as_deref())?;
+            a.extend(more);
+            Ok(a)
         })
         .and_then(|extra| {
             let mut f = std::fs::OpenOptions::new().append(true).open(&initrd)?;
@@ -376,35 +387,17 @@ pub fn boot(r: &Request) -> i32 {
         let _ = std::fs::remove_dir_all(&dir);
         return fail(format!("the initrd of the run: {e}"));
     }
+    let disk_file = match r.disk.map(|b| disk::make(&dir, b)).transpose() {
+        Ok(d) => d,
+        Err(e) => {
+            let _ = std::fs::remove_dir_all(&dir);
+            return fail(e);
+        }
+    };
     if let Some(line) = notice(r, accel, cached) {
         eprintln!("{line}");
     }
-    for (host, guest, ro) in &r.volumes {
-        if nine && *ro {
-            eprintln!(
-                "podvm {}: machine tier: -v {}:{guest}:ro is a read-only 9p mount of the \
-                 host directory (TODO/machine.md T-1723)",
-                r.verb,
-                host.display()
-            );
-        } else if nine {
-            eprintln!(
-                "podvm {}: machine tier: -v {}:{guest} is a 9p mount of the host directory: \
-                 a write in the guest lands there, with the host user's ownership \
-                 (TODO/machine.md T-1723)",
-                r.verb,
-                host.display()
-            );
-        } else {
-            eprintln!(
-                "podvm {}: machine tier: -v {}:{guest} is a copy into the guest: the kernel \
-                 of PODVM_MACHINE_KERNEL has no 9p module, so writes in the guest do not \
-                 return to the host (TODO/machine.md T-1723)",
-                r.verb,
-                host.display()
-            );
-        }
-    }
+    vol::notices(r.verb, &r.volumes, nine, r.disk.is_some());
     let sock = stderr::socket_path(&nonce);
     let _ = std::fs::remove_file(&sock);
     let mut extra = stderr::argv(&sock);
@@ -434,6 +427,7 @@ pub fn boot(r: &Request) -> i32 {
         extra.push("-virtfs".to_string());
         extra.push(vol::virtfs(host, v));
     }
+    extra.extend(disk_file.iter().flat_map(|d| disk::argv(d)));
     extra.extend(r.qemu_args.iter().cloned());
     let mut argv = qemu_argv(
         accel,
@@ -480,6 +474,9 @@ pub fn boot(r: &Request) -> i32 {
                 );
                 let _ = std::fs::remove_file(&sock);
                 let _ = std::fs::remove_file(tty::socket_path(&sock));
+                if let Some(Err(e)) = r.disk.map(|b| disk::make(&dir, b)) {
+                    break fail(e); // a new disk, T-1968
+                }
             }
             // Only the guest of a state ends Cold, and this guest is none.
             state::Driven::Cold(why) | state::Driven::Again(why) => break fail(why),

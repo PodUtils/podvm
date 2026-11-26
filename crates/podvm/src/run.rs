@@ -153,8 +153,13 @@ pub const RUN_OPTIONS: &str = "\
                    the incus tier: the size of the root disk of the
                    instance (a copy of the root device of the default
                    profile); a pool that holds no size (the driver dir)
-                   refuses the run. Each other tier refuses it by name
-                   (TODO/machine.md T-1964)
+                   refuses the run (TODO/machine.md T-1964). The machine
+                   tier: a disposable ext4 disk of N bytes (64m to 16T)
+                   holds the root and the working directory of the guest,
+                   and a write past it gets ENOSPC; it does not bound a -v
+                   volume, which is a 9p mount of the host. A guest that
+                   cannot mount it ends the run with 125 (T-1968). Each
+                   other tier refuses it by name
   --network broker, --allow HOST, --ports P
                    an egress broker that allows HOST on the ports P (443 by
                    default); it needs --podvm-tier=syscall or machine

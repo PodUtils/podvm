@@ -108,6 +108,8 @@ mod tests {
 
     /// T-1964: each spelling of a size names the same bytes; a size below
     /// 64m, an unknown unit and an option other than size= are refusals.
+    /// T-1968: the machine tier takes each kept size up to 16 TiB as the
+    /// bytes of the disk of its guest, and refuses a larger one by name.
     #[test]
     fn storage_opt_takes_each_spelling_of_a_size() {
         for (v, want) in [
@@ -125,7 +127,20 @@ mod tests {
         ] {
             let got = incus_limit("run", "--storage-opt", v).ok();
             assert_eq!(got, want.map(|b| (ROOT_SIZE, format!("{b}B"))), "{v}");
+            let disk =
+                got.map(|(_, kept)| crate::machine::guest::disk::of_value(Some(&kept), true));
+            match want {
+                Some(b) if b <= 16 << 40 => assert_eq!(disk, Some(Ok(Some(b))), "{v}"),
+                Some(_) => panic!("{v}: a row of more than 16 TiB belongs below"),
+                None => assert_eq!(disk, None, "{v}"),
+            }
         }
+        let (_, kept) = incus_limit("run", "--storage-opt", "size=17T").unwrap();
+        let e = crate::machine::guest::disk::of_value(Some(&kept), true).unwrap_err();
+        assert!(
+            e.starts_with("--storage-opt size=") && e.contains("16 TiB"),
+            "{e}"
+        );
     }
 
     #[test]

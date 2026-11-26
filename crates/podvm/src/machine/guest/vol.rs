@@ -177,3 +177,36 @@ pub fn main(args: &[String]) -> i32 {
     }
     i32::from(!failed.is_empty())
 }
+
+/// The line of each `-v` of a run on stderr: a 9p mount where `nine`, else
+/// a copy into the guest. TODO/machine.md T-1968: a sized disk (`disk`)
+/// holds the root and not a 9p mount, so the line says that the disk does
+/// not bound the volume.
+pub fn notices(verb: &str, volumes: &[(std::path::PathBuf, String, bool)], nine: bool, disk: bool) {
+    let unbounded = if disk {
+        "; --storage-opt size= does not bound it"
+    } else {
+        ""
+    };
+    for (host, guest, ro) in volumes {
+        let host = host.display();
+        if nine && *ro {
+            eprintln!(
+                "podvm {verb}: machine tier: -v {host}:{guest}:ro is a read-only 9p mount of the \
+                 host directory (TODO/machine.md T-1723)"
+            );
+        } else if nine {
+            eprintln!(
+                "podvm {verb}: machine tier: -v {host}:{guest} is a 9p mount of the host \
+                 directory: a write in the guest lands there, with the host user's ownership\
+                 {unbounded} (TODO/machine.md T-1723)"
+            );
+        } else {
+            eprintln!(
+                "podvm {verb}: machine tier: -v {host}:{guest} is a copy into the guest: the \
+                 kernel of PODVM_MACHINE_KERNEL has no 9p module, so writes in the guest do not \
+                 return to the host (TODO/machine.md T-1723)"
+            );
+        }
+    }
+}

@@ -5545,7 +5545,7 @@ As uid 1000, under KVM or TCG: `run --podvm-tier=machine --pids-limit 16 public.
 **Milestone:** none
 **Priority:** P2
 **Effort:** L
-**Status:** blocked
+**Status:** partial
 
 ## Problem
 
@@ -5564,33 +5564,80 @@ Machine tier: a flag that sizes the writable disk of the guest. Namespace rung: 
 
 ## Decision
 
--
+Decision (2026-11-26): the machine tier takes docker's `--storage-opt
+size=N` and adds no `--podvm-*` flag. Docker gives that option the size of
+the writable layer of the container, and the guest disk holds that layer.
+The incus tier already reads the same option as the size of the root disk
+(T-1964), so one parser and one table serve both tiers. The size is 64m to
+16 TiB: ext4 with 32-bit block numbers holds no more.
+
+podvm writes the empty ext4 file system itself (`machine/guest/disk/ext.rs`).
+The host needs no `mke2fs`, and the guest needs no tool of the image. The
+podcrates `v0.85.0` search for an ext4 or a file system writer found only
+`pod-guest::fat16` and `pod_guest::squashfs`. The writer is a candidate
+for podcrates, beside `fat16`.
+
+The guest root is an overlay with the initramfs as the lower layer and the
+disk as the upper layer. `podvm guest-disk` moves `/dev`, `/proc` and
+`/sys` into it, moves it onto `/` and changes the root, as `switch_root`
+does. It does not delete the initramfs, because the initramfs is the lower
+layer. A run with the size boots and does not use a saved state
+(`state::refusal`, T-2008).
 
 ## Prove
 
-`kvm.yml`: a machine guest with a 1 GiB writable disk gives `No space left on device` to a write of 2 GiB; as uid 1000, `run -d --tmpfs /w:size=64m` gives the same to a write of 100 MiB in `/w`.
+Machine tier: `python3 -I experiments/481-machine-sized-disk.py` as a user
+that is not root, under TCG: a guest with a 64 MiB disk writes 16 MiB in
+`/work`, a write of 96 MiB gets `No space left on device`, the run gives the
+exit code of the payload, and no disk file and no emulator stay. Namespace
+rung: as uid 1000, `run -d --tmpfs /w:size=64m` gives the same to a write of
+100 MiB in `/w`.
 
-## Blocker
+## Done
 
-The OCI machine guest currently uses a RAM-backed initrd and optional
-host-backed 9p volumes. T-1968 needs a block-backed writable layer and
-guest bootstrap. That part of T-1994 can use the RAM-backed lower layer
-while the immutable disk image is in development. Podrunner mounts its
-host unit work directory at `/podrunner-work` over 9p. A limit on the
-guest root cannot bound writes to that bind. The namespace work directory
-needs a required size-limited mount in pod-enter, requested in #667
-(COORD-250). On this host `unshare -Ur -m` could start and the tmpfs
-mount returned `Permission denied`. The namespace proof needs a hosted
-lane that can mount tmpfs in its user and mount namespaces.
+**Partial (2026-11-26).** The machine tier holds `--storage-opt size=N`.
+podvm makes a sparse file of N bytes in the run directory. It writes an
+empty ext4 file system into the file. podvm gives the file to the guest as
+a virtio disk with the serial `podvm-disk`, `cache=unsafe` and
+`werror=report`. The run directory goes at the end of the run. A second
+boot of T-2016 gets a new disk. The init execs `podvm guest-disk` after its
+first mounts. That command loads the closure of `crc32c_generic`,
+`virtio_blk`, `ext4` and `overlay` from the pinned modloop, mounts the disk
+and makes the overlay the root. Then it execs the rest of the init. A
+failure writes its reason, and the guest ends the run with 125 before the
+command starts. The first guest run showed this path with one true line:
+the closure was not loaded in order, and `finit_module` of `ext4.ko` gave
+ENOENT. podvm refuses these cases by name with 125 before the pull: a size
+over 16 TiB, an arm64 guest and `PODVM_MACHINE_KERNEL`. podvm refuses the run
+before the boot when the store has fewer free bytes than N. A run with the
+size and `--podvm-init=image` boots, and podvm names the refusal of the
+saved state.
 
-An amd64 TCG probe mounted a disposable 64 MiB virtio disk as ext4.
-A 4 MiB control file remained readable after poweroff. A 96 MiB write
-stopped at 52,985,856 bytes with `No space left on device` and exit 1.
-The same kernel and QEMU 11.1.3 mounted an overlay with an initramfs
-lower and ext4 upper and work. Copy-up kept the lower bytes, and a 96
-MiB write through the overlay stopped at 52,969,472 bytes with the same
-error. The product still needs to put the writable layer and the work
-directory on the capped storage path. See
+A `-v` volume, such as podrunner's `/podrunner-work`, is a 9p mount of a
+host directory over the new root. The disk does not bound it. The line of
+each volume, the help and `docs/limits.md` say so. A write of 80 MiB to a
+9p volume of a run with a 64 MiB disk succeeded on the host.
+
+Proof: experiment 481 on the cloud host as uid 1000 under TCG (no
+`/dev/kvm`), QEMU 11.1.3 of the store, passed nine of nine clauses. The
+16 MiB write succeeded, and the 96 MiB write stopped at 47,898,624 bytes
+with `No space left on device`. The root was `overlay` with
+`upperdir=/podvm-disk/upper`, and the run gave exit 7. No disk file, run
+directory or emulator stayed. The control with no disk wrote 96 MiB into
+the RAM root. `size=17T` and the size on the syscall tier each gave 125.
+The unit tests `the_size_of_a_disk_holds_or_refuses_by_name`,
+`storage_opt_takes_each_spelling_of_a_size` and
+`the_machine_tier_takes_the_size_of_its_disk` pin the parser and the
+refusals. `e2fsck_finds_no_fault_in_the_disk` runs `e2fsck -f -n` of
+e2fsprogs on a 64 MiB disk and on a 9-group disk. It found the planted wrong
+count of free blocks.
+[Transcript](../experiments/results/machine-sized-disk.txt)
+
+Remaining: the namespace rung. Its work directory needs a required
+size-limited mount in pod-enter, requested in #667 (COORD-250). On this host
+`unshare -Ur -m` started, and the tmpfs mount gave `Permission denied`. The
+proof needs a lane that can mount tmpfs in its user and mount namespaces.
+The earlier TCG probe of the virtio ext4 disk is in
 [the virtio ext4 transcript](../experiments/results/machine-virtio-ext4.txt).
 
 # T-1993: On the incus tier, the init of the image (systemd) runs as PID 1

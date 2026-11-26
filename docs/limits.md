@@ -322,6 +322,19 @@ states:
   bridge network (experiment 447). The modules load only with the flag,
   because they add time to each boot. podvm adds no `iptables`: the
   image of the engine brings it.
+- `--storage-opt size=N` (64m to 16T) gives the guest a disposable
+  ext4 disk of N bytes (T-1968). podvm writes the empty file system into
+  a sparse file in the directory of the run, with no tool of the host,
+  and refuses the run where the host has less than N bytes free. The
+  guest loads the ext4, virtio disk and overlay modules of the pinned
+  modloop, and its root becomes an overlay with the initramfs as the
+  lower layer and the disk as the upper layer. A write to the root or to
+  the working directory past the size gets ENOSPC. A `-v` volume is a 9p
+  mount of a host directory, and the disk does not bound it. A guest
+  that cannot mount its disk ends the run with 125 before the command.
+  The run boots and does not use a saved state, and the disk goes at the
+  end of the run. An arm64 guest and the kernel of `PODVM_MACHINE_KERNEL`
+  refuse the flag.
 
 The guest does not honour `--podvm-confine`, `--user`, `--hostname`, `--add-host`,
 `--read-only`, `--tmpfs`, `--ulimit`, `--security-opt`, `--cap-drop` or
