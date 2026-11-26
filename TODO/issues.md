@@ -582,6 +582,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #686 | [gh action] requested | closed (gate 45843797814 passed on `f9ffcaa`) | the gate after the fix of the syscall tier's `brk` (T-1991) and the native-tier fixes |
 | #687 | COORD-263: the answer to PodUtils/podcrates#273: podvm's copy of ext.rs records 65535 past group 65535 (846e733); podvm takes pod_guest::ext4 at the next tag (to podcrates) | open | T-1968, T-1994 |
 | #688 | [gh action] requested | open | the gate and the `init` job of `kvm.yml` after T-1994 steps 2 and 3 and T-2054 item 1 |
+| #689 | COORD-264: pod-enter: an overlay kind of volume in Plan::volumes (to podcrates) | open | T-2101 |
 
 ## Messages whose title does not start with COORD-NNN
 
