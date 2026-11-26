@@ -5806,6 +5806,20 @@ Amended (2026-11-24, [T-2084](deps.md)). Item 4 is done: podcrates `v0.82.1` ans
 
 Amended (2026-11-25). `run::spare::spawn_prefill` clears the helper's environment. With an extracted Alpine 3.20 image in a private store, `env -i podvm tree-prefill STORE DIGEST` created a spare with an executable `bin/busybox`, and `env -i podvm tree-prefill STORE` exited 0 on the trash-only path. Item 5 still tracks the store path in argv.
 
+Amended (2026-11-26). Item 5 is done. `run::spare::spawn_prefill` gives the
+store and the digest to the helper on a pipe (the store, a NUL, the digest;
+at most 8,192 bytes), so the argv of the helper is the path of podvm and
+`tree-prefill` only. The helper refuses an argument, a terminal on standard
+input, a store that is not absolute, a digest that is not UTF-8 and a job
+that is too long, each with one line and exit 125. Measured as uid 1000 on
+the cloud host with a private store and `mirror.gcr.io/library/alpine:3.20`:
+after `run --rm`, `pgrep -af tree-prefill` gave `/var/tmp/t2054/podvm
+tree-prefill`, and the spare tree was there; at the same time a helper of
+the binary of `7c2b161` gave `.../podvm tree-prefill /var/tmp/qa-b41/work/store`.
+The table test `a_job_goes_on_the_pipe_and_back_or_is_refused_by_name` and
+`a_store_path_that_is_not_utf8_goes_on_the_pipe_and_back` hold the rule.
+Items 1, 2 and 3 stay, so the entry stays partial.
+
 # T-2055: `--podvm-volume-base` on the loader family: a link under DIR resolves into the image, not to ELOOP
 
 **Source:** the sixth outside pass ([T-2044](cli.md)), OQ-11 (P2)

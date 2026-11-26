@@ -55,8 +55,10 @@ median() { tr ' ' '\n' | grep . | sort -n | awk '{a[NR]=$1} END {print (NR ? a[i
 digest_of() { "$PB" image inspect --format '{{.Id}}' "$1" 2>/dev/null | sed 's/:/_/'; }
 spare_of() { echo "$PODVM_STORE/rootfs/$(digest_of "$1")/spare"; }
 ready() { # image: wait until its spare is there and no prefill runs (300 s)
+	# The helper takes its store on a pipe (T-2054 item 5): its argv is only
+	# the verb, so this waits for each helper of the host.
 	_w=0
-	while { [ ! -d "$(spare_of "$1")" ] || pgrep -f "tree-prefill $PODVM_STORE" >/dev/null; } && [ $_w -lt 300 ]; do
+	while { [ ! -d "$(spare_of "$1")" ] || pgrep -f " tree-prefill$" >/dev/null; } && [ $_w -lt 300 ]; do
 		sleep 1; _w=$((_w + 1))
 	done
 }
@@ -100,7 +102,7 @@ mkdir -p "$S3" && chmod 700 "$S3"
 PODVM_STORE="$S3" "$PB" pull -q "$A" >/dev/null 2>&1 && PODVM_STORE="$S3" "$PB" run --rm "$A" true >/dev/null 2>&1
 i=0; while [ -z "$(ls -d "$S3"/rootfs/*/spare 2>/dev/null)" ] && [ $i -lt 120 ]; do sleep 1; i=$((i + 1)); done
 before=$(ls -d "$S3"/rootfs/*/spare 2>/dev/null | wc -l)
-while pgrep -f "tree-prefill $S3" >/dev/null; do sleep 1; done
+while pgrep -f " tree-prefill$" >/dev/null; do sleep 1; done
 PODVM_STORE="$S3" "$PB" tag "$A" other448:1 >/dev/null 2>&1
 PODVM_STORE="$S3" "$PB" rmi other448:1 >/dev/null 2>&1
 shared=$(ls -d "$S3"/rootfs/*/rootfs "$S3"/rootfs/*/spare 2>/dev/null | wc -l)

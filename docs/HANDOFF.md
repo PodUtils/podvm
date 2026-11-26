@@ -56,9 +56,8 @@ contains the commit that changes this file. A fresh session reads
   init PID stayed the same. The stream, usage and Btrfs root-cap checks
   also passed. Gate 45735495585 passed on the same revision. #664 is closed.
   [Live-limits transcript](../experiments/results/incus-live-limits.txt)
-* T-2054's spare-tree helper now clears its environment. Both
-  `tree-prefill` paths worked with an empty environment in a private
-  Alpine store. T-2054 still tracks the helper's store path in argv.
+* T-2054 item 5 is done: the spare-tree helper takes its store and
+  digest on a pipe, with an empty environment. Items 1, 2 and 3 stay.
 * T-2050 and T-2066 are done. A machine-tier Alpine run fetched the pinned
   static QEMU 11.1.3 into an empty tools store and returned the payload
   exit 7 under TCG. Hosted run 45153867720 already proves experiments 465

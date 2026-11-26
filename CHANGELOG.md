@@ -8,6 +8,14 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: no store path in the argv of the spare-tree helper, 2026-11-26
+
+Record: T-2054 (item 5).
+Deployed: not deployed; for the next beta after 0.2.0-beta.40.
+
+- The detached `podvm tree-prefill` gets its store and digest on a pipe,
+  so `ps` of another user shows no path of the store.
+
 ### Fixed: repeated OCI layer descriptors, 2026-11-26
 
 Record: T-2098.

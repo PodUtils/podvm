@@ -136,7 +136,7 @@ fn main() -> std::process::ExitCode {
         Some("guest-job") => exit(machine::guest::job::guest_main(rest)), // in a guest, T-2008
         Some("guest-tty") => exit(machine::guest::tty::guest_main(rest)), // in a guest, T-1723
         Some("guest-signals") => exit(machine::guest::signals::guest_main(rest)), // T-2041
-        Some("tree-prefill") => exit(run::spare::main(rest)),       // TODO/image.md T-1781
+        Some(run::spare::VERB) => exit(run::spare::main(rest)),     // TODO/image.md T-1781
         Some("windows") => exit(windows::windows(rest)),
         Some("man") => exit(man::man(rest)),
         Some("profile") => exit(profile::main(rest)), // TODO/cli.md T-1654
