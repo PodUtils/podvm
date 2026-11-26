@@ -397,3 +397,22 @@ fn a_wait_status_gives_the_code_or_128_and_the_signal() {
         assert_eq!(boot::code_of(status), want, "{status}");
     }
 }
+
+/// TODO/cli.md T-2087 (OR-B40-06): `--init` holds where the run has a PID
+/// namespace and is refused elsewhere; a run with no `--init` passes on
+/// each rung.
+#[test]
+fn init_holds_where_the_run_has_a_pid_namespace() {
+    // (--init, a PID namespace, rung, refused)
+    let rows = [
+        (true, true, "namespace", false),
+        (true, false, "userland", true),
+        (true, false, "chroot", true),
+        (false, false, "userland", false),
+        (false, true, "namespace", false),
+    ];
+    for (init, pid, rung, refused) in rows {
+        let got = stays::check_init("run", init, pid, rung).is_err();
+        assert_eq!(got, refused, "{init} {pid} {rung}");
+    }
+}

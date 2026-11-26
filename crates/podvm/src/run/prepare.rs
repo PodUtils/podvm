@@ -353,6 +353,8 @@ pub(crate) fn prepare(
     );
     crate::initns::stays::check_rung(verb, &o, entered.word())?; // T-2002
     super::devices::check_rung(verb, &o, entered.word())?; // TODO/enter.md T-1939
+    let pid = opened.has(podvm_probe::isolation::Part::Pid);
+    crate::initns::stays::check_init(verb, o.init, pid, entered.word())?; // T-2087
     banner.push_str(&store_note(store));
     banner.push_str(&tree.fill.line());
     // ⭐ M5. The completion layer runs HERE: after the rootfs exists and the

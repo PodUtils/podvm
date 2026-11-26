@@ -8,6 +8,17 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: `--init` on the namespace rung, and the note of `top`, 2026-11-26
+
+Record: T-2087 (OR-B40-06).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `run --init` and `create --init` hold where the run has a PID
+  namespace: its PID 1 is podvm's init already. A rung with no PID
+  namespace and each guest tier refuse `--init` by name.
+- The refusal of `top` names each rung truly and names
+  `podvm exec NAME ps` for the namespace rung.
+
 ### Fixed: `--device` with another guest path, 2026-11-26
 
 Record: T-1939 (#473), T-2100 (OR-B41-08).
