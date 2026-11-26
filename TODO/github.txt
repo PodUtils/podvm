@@ -575,5 +575,5 @@
 683 issue open
 684 issue open
 685 issue closed
-686 issue open
+686 issue closed
 687 issue open
