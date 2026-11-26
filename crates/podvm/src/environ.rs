@@ -162,6 +162,15 @@ pub const USER: &[Group] = &[
                  a service made at its start (call C27).",
             ),
             v(
+                "PODVM_MACHINE_ROOT",
+                "disk, initramfs",
+                "Selects the root of a guest (T-1994). With no value, an x86_64 guest with the \
+                 pinned kernel boots from a read-only disk of its image, which podvm builds once \
+                 for each image digest in the store, and each other guest and --podvm-engine \
+                 keep the image in the initramfs. initramfs keeps the image in the initramfs. \
+                 disk refuses a guest that cannot have the disk. Another value exits 125.",
+            ),
+            v(
                 "PODVM_MACHINE_KERNEL",
                 "a file",
                 "Names a kernel for the guest in place of the pinned kernel. The first use is \

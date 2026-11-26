@@ -47,6 +47,8 @@ fi
 WORK=$(mktemp -d "${TMPDIR:-/var/tmp}/podvm-470.XXXXXX") || exit 2
 trap 'rm -rf "$WORK"' EXIT
 export PODVM_STORE="$WORK/store"
+# The memory of the initramfs root, which T-1994 keeps behind a variable.
+export PODVM_MACHINE_ROOT=initramfs
 P=$BIN
 fail=0
 mkdir -p "$(dirname "$OUT")"

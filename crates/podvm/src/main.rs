@@ -63,6 +63,12 @@ mod usage_text; // PodUtils/podvm#520
 use usage_text::{PROBE_USAGE, USAGE};
 
 fn main() -> std::process::ExitCode {
+    // TODO/machine.md T-1994: the first process of a guest whose root is
+    // the disk of its image, with no /proc yet: before each other step.
+    if std::env::args_os().nth(1).as_deref() == Some(machine::guest::disk::ROOT_VERB.as_ref()) {
+        let args: Vec<String> = std::env::args().skip(2).collect();
+        return exit(machine::guest::disk::guest_root_main(&args));
+    }
     names::start(); // T-1652 (the native-static rung) and SIGPIPE (T-1769)
     let argv: Vec<String> = names::store::take(names::argv()); // T-1913, #505
     userns::enter_if(&argv); // T-1909: before any thread

@@ -5680,7 +5680,7 @@ Experiment 434 (incus 6.0.0, route A), a new clause: `run -d --podvm-tier=incus 
 **Milestone:** none
 **Priority:** P1
 **Effort:** L
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -5728,9 +5728,79 @@ upper layer, moved the overlay onto `/`, and changed the root. The image's
 `/bin/sh` then ran the rest of the init. The cached disk image of each
 digest, the init of the image as PID 1 and the exit status are still open.
 
+Decision (2026-11-26, step 1): the root disk is ext4, and podvm writes it.
+The pinned amd64 kernel has ext4 and overlay, and T-1968 loads them
+already. ext4 keeps POSIX ACLs, so no image is refused for an ACL, as
+SquashFS would need (experiment 477). The pinned kernels have no EROFS
+(experiment 478). The podcrates `v0.85.0` search (`codegraph.py similar`
+for an ext4, SquashFS or file system writer) found only readers
+(`pod_guest::squashfs`) and `pod-guest::fat16`. podvm extends its own
+empty ext4 writer of T-1968, which COORD-260 (#680) offers to podcrates.
+The root disk is the default of an x86_64 guest with the pinned kernel,
+because experiment 482 proves it and the old root stays one variable
+away: `PODVM_MACHINE_ROOT=initramfs` selects the root in the initramfs.
+The default keeps the initramfs for `--podvm-engine`, because the
+overlay2 driver of an engine refuses a directory on overlayfs. The saved
+state of T-2008 keeps its root in the initramfs: its guest holds the base
+archive, and a run that cannot use a state boots on the root disk.
+
 ## Prove
 
 `kvm.yml`: `run --podvm-tier=machine --podvm-init=image` of an image with systemd boots from its disk image; `systemctl is-system-running` gives `running` or `degraded`; the exit code of the payload unit is the exit code of the run; a second run of the same digest reuses the disk image.
+
+Step 1: `python3 -I experiments/482-machine-disk-root.py` as uid 1000
+under TCG.
+
+## Done
+
+**Partial (2026-11-26), step 1.** `run --podvm-tier=machine` of an
+x86_64 image with the pinned kernel boots from a read-only ext4 disk of
+the image. `machine/guest/disk/tree.rs` walks the extracted rootfs with
+the owners and the modes of the sidecar, the hard links, the links, the
+FIFOs and the devices. It takes `security.capability` (v2), `user.*` and
+the POSIX ACLs of the tree, and the attributes of the sidecar that the
+extraction did not set. `disk/image.rs` and `disk/inode.rs` fit a layout
+with no spare block and write the extents, the linear directories, the
+attributes in the inode or in a block of their own, and the ACLs in the
+form of ext4. A block of zeros stays a hole, and the same tree gives the
+same bytes. `disk/root.rs` keeps the disk at
+`store/machine/root-DIGEST-v1.img`. One run builds it under a lock into a
+name with a random part, syncs it, adds a trailer with the SHA-256 of the
+file system, and renames it. A run uses the disk only where the trailer,
+the size and the superblock agree and the file is the one of the `.ok`
+record (device, inode, size, change time, modification time). Else the
+run hashes the disk, and a disk with another hash is built again, with
+one line that names it. The kernel runs `podvm guest-root` from an
+initramfs of podvm and its modules only. It mounts the disk read-only
+and makes the root an overlay of the initramfs (on top), the disk, and an
+upper layer on a tmpfs or on the sized disk of T-1968. Then it execs the
+image's `/bin/sh /podvm-init`. A failure gives the reason and exit 125.
+
+Proof: experiment 482 as uid 1000 under TCG (QEMU 11.1.3 of the store),
+nine of nine clauses PASS. The payload's code 7 passed through. The first
+run built the disk, and the second run took it from the cache, with the
+same inode, size, time and SHA-256; its first output came after 4.0 s
+against 13.6 s. As nobody, the copy of busybox with `cap_net_raw+ep` had
+CapEff `0000000000002000`, and the copy with no capability had none. The
+root was `lowerdir=/:/podvm-lower,upperdir=/podvm-upper/upper`. With a
+file of 220 MiB in the image, the guest had MemTotal 469 MiB, against
+1475 MiB with `PODVM_MACHINE_ROOT=initramfs`, and the guest read the file
+with the SHA-256 of the host. After a changed byte, the next run named
+the damaged disk and built it again with the bytes of the first build.
+`PODVM_MACHINE_ROOT=ram` gave 125. No emulator, run directory or partial
+file stayed. The unit tests `the_root_disk_keeps_each_kind_of_file_and_each_attribute`
+(debugfs and `e2fsck -f -n` of e2fsprogs as the reader),
+`the_plan_refuses_what_the_disk_cannot_hold`,
+`the_extents_of_each_count_of_runs`,
+`the_cache_of_the_root_disk_takes_only_a_whole_disk` and
+`the_root_of_the_guest_is_the_disk_where_it_can_be` pin the writer and
+the cache. [Transcript](../experiments/results/machine-disk-root.txt)
+
+Remaining: step 1 under KVM on `kvm.yml`; a disk of the image in the
+saved state of T-2008; the removal of a root disk with its image (`rmi`
+and `system prune` leave `root-*.img`, as they leave `base-*.cpio`); an
+arm64 guest. Steps 2 and 3 (the init of the image as PID 1 of the guest,
+and its exit status) are open.
 
 # T-1996: On the incus tier, an instance of the hosted snapshot has 231,072 ids, `/dev/fuse` and a machine-id of its own
 
@@ -5877,6 +5947,15 @@ With only guest loopback up, `getcap` must show the file capability.
 As uid 1000, `ping -4 -n -e 0 -c 1 -W 1 127.0.0.1` must get a reply.
 The `-e 0` check requires a raw socket. An identical `0755` copy without
 the file capability must fail under the same credentials.
+
+Amended (2026-11-26). The root disk of the machine tier (T-1994) keeps
+`security.capability` of the tree and of the sidecar. In experiment 482
+under TCG, as the user nobody in the guest, a copy of busybox with
+`cap_net_raw+ep` in a PAX record had CapEff `0000000000002000`, and an
+identical copy with no capability had none. The control with the root in
+the initramfs had CapEff 0 for both, as the `newc` archive keeps no
+attribute. Remaining: the hosted-core slice on `kvm.yml` with `getcap` and
+`ping` as above.
 
 # T-2008: The machine tier boots systemd at each run: a saved state of the guest for each digest
 

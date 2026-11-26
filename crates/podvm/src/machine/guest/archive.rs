@@ -2,7 +2,7 @@
 //! copies of `-v` where no 9p module serves them, and podvm itself with the
 //! modules that the guest loads (TODO/machine.md T-1656, T-1723).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use super::cpio;
 
@@ -85,4 +85,46 @@ pub(super) fn tools(
         modules: m,
         engine,
     }))
+}
+
+/// The cache file of the base archive of `digest`.
+pub fn base_path(store_root: &Path, digest: &str) -> PathBuf {
+    let hex = digest.trim_start_matches("sha256:");
+    store_root
+        .join("machine")
+        .join(format!("base-{hex}-v{}.cpio", super::BASE_FORMAT))
+}
+
+/// The base archive of the rootfs, from the cache or built now. `true`
+/// where the cache answered.
+pub fn base_archive(
+    store_root: &Path,
+    digest: &str,
+    rootfs: &Path,
+) -> Result<(PathBuf, bool), String> {
+    let path = base_path(store_root, digest);
+    if path.is_file() {
+        return Ok((path, true));
+    }
+    let dir = path.parent().expect("a file under machine/");
+    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    // A name of its own: a pid is not unique across PID namespaces.
+    let tmp = path.with_extension(format!("partial-{}", super::init::nonce()?));
+    let file = std::fs::File::create(&tmp).map_err(|e| format!("{}: {e}", tmp.display()))?;
+    let mut w = cpio::Newc::new(std::io::BufWriter::new(file));
+    // TODO/machine.md T-1776: the owners of the image, from the sidecar
+    // beside the rootfs; with no sidecar each file stays root's.
+    if let Some(dir) = rootfs.parent() {
+        let _ = w.owners_from(&dir.join(".meta.jsonl"));
+    }
+    let built = w
+        .tree(rootfs)
+        .and_then(|()| w.finish())
+        .and_then(|mut b| std::io::Write::flush(&mut b));
+    if let Err(e) = built {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(format!("the base archive of {}: {e}", rootfs.display()));
+    }
+    std::fs::rename(&tmp, &path).map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok((path, false))
 }

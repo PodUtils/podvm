@@ -25,7 +25,7 @@ pub(crate) mod usage; // TODO/machine.md T-2076
 pub(crate) mod verbs;
 pub(crate) mod waitkill; // TODO/cli.md T-2087
 pub(crate) mod walk; // TODO/cli.md T-2079
-mod xattrs; // TODO/machine.md T-1999
+pub(crate) mod xattrs; // TODO/machine.md T-1999, T-1994
 
 #[cfg(test)]
 mod attach_tests; // TODO/machine.md T-2080

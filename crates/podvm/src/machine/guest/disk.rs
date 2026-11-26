@@ -14,13 +14,24 @@
 //!
 //! A `-v` volume is a 9p mount of a host directory over that root: the
 //! disk does not bound it. The disk goes with the directory of the run.
+//!
+//! TODO/machine.md T-1994: the root disk of an image ([`root`]) is a
+//! read-only ext4 of the image's tree ([`tree`], [`image`], [`inode`]),
+//! built once for each digest. A guest of it boots `podvm guest-root`
+//! from an initramfs of podvm's files only, with the same modules; the
+//! upper layer of its root is the sized disk where the run has one.
 
 mod ext;
 mod guest;
+mod image;
+mod inode;
+pub mod root;
+mod tree;
 
 use std::path::{Path, PathBuf};
 
 pub use guest::main as guest_main;
+pub use guest::root_main as guest_root_main;
 
 /// The modules of the disk, out of the pinned modloop, with each module
 /// that `modules.dep` names for them. `crc32c_generic` comes first: ext4
@@ -29,6 +40,13 @@ pub use guest::main as guest_main;
 pub const MODULES: [&str; 4] = ["crc32c_generic", "virtio_blk", "ext4", "overlay"];
 /// The serial of the virtio disk, by which the guest finds it.
 pub const SERIAL: &str = "podvm-disk";
+/// The subcommand that the kernel of a guest of the root disk runs first.
+pub const ROOT_VERB: &str = "guest-root";
+/// The serial of the root disk of the image (T-1994).
+pub const ROOT_SERIAL: &str = "podvm-root";
+/// `PODVM_MACHINE_ROOT`: `disk` (the default where the guest can have
+/// it) or `initramfs`, the root of the guest before T-1994.
+pub const ROOT_VAR: &str = "PODVM_MACHINE_ROOT";
 /// The rest of the init after the root moved to the disk, the init of a
 /// failure, and the reason of the failure.
 pub const NEXT: &str = "/podvm/init-run";
@@ -90,21 +108,86 @@ pub fn modules(store_root: &Path) -> Result<Vec<(String, PathBuf)>, String> {
     )
 }
 
-/// TODO/machine.md T-1968: where the run asks for a disk, the refusal of
-/// a guest that cannot have it, or the modules of the disk added to
-/// `modules` (each name once). `pinned`: the kernel has the module set of
-/// the pin. The names of the disk's modules come back in the order of
-/// their load; none where the run has no disk.
+/// TODO/machine.md T-1994: whether the root of the guest is the disk of
+/// its image, for the value of [`ROOT_VAR`]. The default takes it where
+/// the guest is x86_64 with the module set of the pinned kernel, and keeps
+/// the initramfs elsewhere; `disk` refuses such a guest by name. The
+/// default keeps the initramfs for `--podvm-engine` (`engine`) too: the
+/// overlay2 driver of an engine refuses a directory on overlayfs.
+pub fn root_choice(
+    var: Option<&str>,
+    amd64: bool,
+    pinned: bool,
+    engine: bool,
+) -> Result<bool, String> {
+    let can = amd64 && pinned;
+    match var {
+        None | Some("") => Ok(can && !engine),
+        Some("initramfs") => Ok(false),
+        Some("disk") if can => Ok(true),
+        Some("disk") => Err(format!(
+            "{ROOT_VAR}=disk: the root disk needs podvm and the ext4, virtio disk and overlay \
+             modules of the pinned x86_64 kernel in the guest, and this guest is {} \
+             (TODO/machine.md T-1994)",
+            if amd64 {
+                "of PODVM_MACHINE_KERNEL"
+            } else {
+                "linux/arm64"
+            }
+        )),
+        Some(other) => Err(format!(
+            "{ROOT_VAR}={other}: the values are disk and initramfs (TODO/machine.md T-1994)"
+        )),
+    }
+}
+
+/// [`root_choice`] for the run `r`; `modules`: the kernel has the module
+/// set of the pin.
+pub fn root_wanted(r: &super::Request, modules: bool) -> Result<bool, String> {
+    let pinned = modules && std::env::var_os("PODVM_MACHINE_KERNEL").is_none();
+    let var = std::env::var(ROOT_VAR).ok();
+    root_choice(
+        var.as_deref(),
+        r.arch == super::arch::Arch::Amd64,
+        pinned,
+        r.engine,
+    )
+}
+
+/// The root disk of the run `r`, from the cache or built now; a damaged
+/// disk of the cache is named on stderr before its build.
+pub fn root_of(r: &super::Request) -> Result<(PathBuf, root::Got), String> {
+    let got = root::ensure(r.store_root, r.digest, r.rootfs)?;
+    if let root::Got::Built(Some(why)) = &got.1 {
+        eprintln!(
+            "podvm {}: machine tier: the root disk {} of the cache was damaged ({why}); podvm \
+             built it again (TODO/machine.md T-1994)",
+            r.verb,
+            got.0.display()
+        );
+    }
+    Ok(got)
+}
+
+/// TODO/machine.md T-1968, T-1994: where the run asks for a disk or its
+/// root is the disk of its image (`root`), the refusal of a guest that
+/// cannot have a disk, or the modules of the disk added to `modules`
+/// (each name once). `pinned`: the kernel has the module set of the pin.
+/// The names of the disk's modules come back in the order of their load;
+/// none where the run has neither.
 pub fn add_modules(
     r: &super::Request,
+    root: bool,
     pinned: bool,
     modules: &mut Vec<(String, PathBuf)>,
 ) -> Result<Vec<String>, String> {
-    let Some(bytes) = r.disk else {
-        return Ok(Vec::new());
-    };
-    if let Some(why) = refusal(r.arch == super::arch::Arch::Amd64, pinned, bytes) {
+    if let Some(bytes) = r.disk
+        && let Some(why) = refusal(r.arch == super::arch::Arch::Amd64, pinned, bytes)
+    {
         return Err(why);
+    }
+    if r.disk.is_none() && !root {
+        return Ok(Vec::new());
     }
     let mut names = Vec::new();
     for (n, p) in self::modules(r.store_root)? {
@@ -224,5 +307,7 @@ pub fn archive(next: &str, fail: &str) -> std::io::Result<Vec<u8>> {
     w.finish()
 }
 
+#[cfg(test)]
+mod image_tests;
 #[cfg(test)]
 mod tests;

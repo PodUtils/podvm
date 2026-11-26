@@ -9,6 +9,16 @@
 //! initramfs stays: it is the lower layer), and execs `/bin/sh NEXT`.
 //! Each failure writes its reason to [`super::ERR`] and execs
 //! `/bin/sh FAIL`, which ends the run with 125 before the command.
+//!
+//! `podvm guest-root --load M1,M2,... [--disk] NONCE` (TODO/machine.md
+//! T-1994) is the first process of a guest whose root is the disk of its
+//! image: the kernel runs it (`rdinit=/podvm/podvm -- guest-root ...`),
+//! and the initramfs holds no shell. It mounts `/proc`, `/sys` and `/dev`,
+//! loads the modules, mounts the root disk read-only, and makes the root an
+//! overlay of the initramfs (podvm's files, on top) and the disk, with the
+//! upper layer on the sized disk (`--disk`) or on a tmpfs. Then it execs
+//! the image's `/bin/sh /podvm-init`. A failure ends the run with 125 and
+//! its reason itself, with the markers of `NONCE`.
 
 use std::ffi::CString;
 use std::path::Path;
@@ -23,12 +33,18 @@ unsafe extern "C" {
         data: *const u8,
     ) -> i32;
     fn chroot(path: *const std::ffi::c_char) -> i32;
+    fn reboot(cmd: i32) -> i32;
+    fn sync();
 }
 
+const MS_RDONLY: u64 = 1;
 const MS_MOVE: u64 = 8192;
-/// Where the disk and the new root are mounted, in the initramfs.
+/// Where the disks, the tmpfs of the upper layer and the new root are
+/// mounted, in the initramfs.
 const DISK: &str = "/podvm-disk";
 const ROOT: &str = "/podvm-root";
+const LOWER: &str = "/podvm-lower";
+const UPPER: &str = "/podvm-upper";
 /// The bound of the wait for the disk device after its driver loads.
 const DEVICE_BOUND: Duration = Duration::from_secs(10);
 
@@ -64,8 +80,8 @@ fn mount_at(src: &str, target: &str, fs: &str, flags: u64, data: &str) -> Result
     Ok(())
 }
 
-/// The device node of the virtio disk whose serial is [`super::SERIAL`].
-fn device() -> Result<String, String> {
+/// The device node of the virtio disk whose serial is `want`.
+fn device(want: &str) -> Result<String, String> {
     let start = Instant::now();
     loop {
         if let Ok(rd) = std::fs::read_dir("/sys/block") {
@@ -73,15 +89,14 @@ fn device() -> Result<String, String> {
                 let name = e.file_name().to_string_lossy().into_owned();
                 let serial = std::fs::read_to_string(e.path().join("serial")).unwrap_or_default();
                 let node = format!("/dev/{name}");
-                if serial.trim() == super::SERIAL && Path::new(&node).exists() {
+                if serial.trim() == want && Path::new(&node).exists() {
                     return Ok(node);
                 }
             }
         }
         if start.elapsed() > DEVICE_BOUND {
             return Err(format!(
-                "no virtio disk with the serial {} came within {} s",
-                super::SERIAL,
+                "no virtio disk with the serial {want} came within {} s",
                 DEVICE_BOUND.as_secs()
             ));
         }
@@ -93,15 +108,35 @@ fn mkdir(p: &str) -> Result<(), String> {
     std::fs::create_dir_all(p).map_err(|e| format!("mkdir {p}: {e}"))
 }
 
-/// Each step up to the new root; the process is then in it.
-fn up(modules: &[&str]) -> Result<(), String> {
+/// Where the upper layer of the root goes.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Upper {
+    /// The sized disk of `--storage-opt size=` (T-1968).
+    Disk,
+    /// A tmpfs in the memory of the guest.
+    Tmpfs,
+}
+
+/// Each step up to the new root, an overlay of `lowerdir` with its upper
+/// layer on `upper`; the process is then in it.
+fn up(modules: &[&str], lowerdir: &str, upper: Upper) -> Result<(), String> {
     for m in modules {
         crate::machine::guest::net::load(m)?;
     }
-    let dev = device()?;
-    mkdir(DISK)?;
-    mount_at(&dev, DISK, "ext4", 0, "")?;
-    let (upper, work) = (format!("{DISK}/upper"), format!("{DISK}/work"));
+    let base = match upper {
+        Upper::Disk => {
+            let dev = device(super::SERIAL)?;
+            mkdir(DISK)?;
+            mount_at(&dev, DISK, "ext4", 0, "")?;
+            DISK
+        }
+        Upper::Tmpfs => {
+            mkdir(UPPER)?;
+            mount_at("tmpfs", UPPER, "tmpfs", 0, "mode=0755")?;
+            UPPER
+        }
+    };
+    let (upper, work) = (format!("{base}/upper"), format!("{base}/work"));
     mkdir(&upper)?;
     mkdir(&work)?;
     mkdir(ROOT)?;
@@ -110,7 +145,7 @@ fn up(modules: &[&str]) -> Result<(), String> {
         ROOT,
         "overlay",
         0,
-        &format!("lowerdir=/,upperdir={upper},workdir={work}"),
+        &format!("lowerdir={lowerdir},upperdir={upper},workdir={work}"),
     )?;
     for m in ["/dev", "/proc", "/sys"] {
         let to = format!("{ROOT}{m}");
@@ -146,7 +181,7 @@ pub fn main(args: &[String]) -> i32 {
         }
     };
     let modules: Vec<&str> = load.split(',').filter(|m| !m.is_empty()).collect();
-    let why = match up(&modules) {
+    let why = match up(&modules, "/", Upper::Disk) {
         Ok(()) => format!("the rest of the init: {}", exec_sh(next)),
         Err(e) => e,
     };
@@ -156,4 +191,94 @@ pub fn main(args: &[String]) -> i32 {
     let e = exec_sh(fail);
     eprintln!("podvm guest-disk: {why}; {fail}: {e}");
     125
+}
+
+/// The first mounts of a guest with no shell: `/proc`, `/sys` and
+/// `/dev`, each where a file of it is not there yet (the kernel can mount
+/// `devtmpfs` itself).
+fn first_mounts() -> Result<(), String> {
+    for (fs, at, mark) in [
+        ("proc", "/proc", "/proc/self"),
+        ("sysfs", "/sys", "/sys/kernel"),
+        ("devtmpfs", "/dev", "/dev/null"),
+    ] {
+        if !Path::new(mark).exists() {
+            mkdir(at)?;
+            mount_at(fs, at, fs, 0, "")?;
+        }
+    }
+    Ok(())
+}
+
+/// The root on the disk of the image (see the module note).
+fn root_up(modules: &[&str], upper: Upper) -> Result<(), String> {
+    first_mounts()?;
+    for m in modules {
+        crate::machine::guest::net::load(m)?;
+    }
+    let dev = device(super::ROOT_SERIAL)?;
+    mkdir(LOWER)?;
+    mount_at(&dev, LOWER, "ext4", MS_RDONLY, "")?;
+    // The initramfs on top: podvm, its modules, `/podvm-init` and the
+    // copies of the run win over a name of the image, as a later archive
+    // of an initrd does.
+    up(&[], &format!("/:{LOWER}"), upper)
+}
+
+/// The end of a guest whose root did not come: the markers of `nonce`
+/// with 125, and the reason on the second port (stderr where it is not
+/// there), then a reset, which ends the emulator (`-no-reboot`).
+fn root_fail(nonce: &str, why: &str) -> ! {
+    use std::io::Write;
+    let line = format!(
+        "podvm: machine tier: the root of the guest is not on the disk of its image: {why} \
+         (TODO/machine.md T-1994)\n"
+    );
+    let say = |text: &str| {
+        let mut out = std::io::stdout();
+        out.write_all(text.as_bytes())
+            .and_then(|()| out.flush())
+            .is_ok()
+    };
+    say(&format!("PODVM-READY-{nonce}\n"));
+    let to_port = std::fs::OpenOptions::new()
+        .write(true)
+        .open("/dev/ttyS1")
+        .and_then(|mut f| f.write_all(line.as_bytes()));
+    if to_port.is_err() {
+        eprint!("{line}");
+    }
+    say(&format!("\nPODVM-EXIT-{nonce} 125\n"));
+    const RB_AUTOBOOT: i32 = 0x0123_4567;
+    // SAFETY: sync(2) and reboot(2) take no pointer.
+    unsafe {
+        sync();
+        reboot(RB_AUTOBOOT);
+    }
+    loop {
+        std::thread::sleep(Duration::from_secs(3600));
+    }
+}
+
+/// `podvm guest-root`. It does not return.
+pub fn root_main(args: &[String]) -> i32 {
+    let (load, disk, nonce) = match args {
+        [flag, load, nonce] if flag == "--load" => (load, false, nonce),
+        [flag, load, d, nonce] if flag == "--load" && d == "--disk" => (load, true, nonce),
+        _ => {
+            eprintln!("podvm guest-root: the arguments are --load M1,M2,... [--disk] NONCE");
+            return 125;
+        }
+    };
+    if !nonce.bytes().all(|b| b.is_ascii_hexdigit()) {
+        eprintln!("podvm guest-root: {nonce:?} is not the nonce of a run");
+        return 125;
+    }
+    let modules: Vec<&str> = load.split(',').filter(|m| !m.is_empty()).collect();
+    let upper = if disk { Upper::Disk } else { Upper::Tmpfs };
+    let why = match root_up(&modules, upper) {
+        Ok(()) => format!("the init of the run: {}", exec_sh("/podvm-init")),
+        Err(e) => e,
+    };
+    root_fail(nonce, &why)
 }

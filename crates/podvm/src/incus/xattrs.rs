@@ -80,6 +80,12 @@ unsafe extern "C" {
 /// The attributes of the image on the tree at `path`, with no follow of a
 /// link. A file system with no attributes gives none.
 pub fn on_disk(path: &Path) -> Vec<Attr> {
+    on_disk_where(path, of_image)
+}
+
+/// [`on_disk`] with the names that `keep` takes (the root disk of the
+/// machine tier also takes the POSIX ACLs, TODO/machine.md T-1994).
+pub fn on_disk_where(path: &Path, keep: fn(&str) -> bool) -> Vec<Attr> {
     use std::os::unix::ffi::OsStrExt;
     let Ok(c) = std::ffi::CString::new(path.as_os_str().as_bytes()) else {
         return Vec::new();
@@ -98,7 +104,7 @@ pub fn on_disk(path: &Path) -> Vec<Attr> {
         let Ok(name) = std::str::from_utf8(name) else {
             continue;
         };
-        if !of_image(name) {
+        if !keep(name) {
             continue;
         }
         let Ok(cn) = std::ffi::CString::new(name) else {
