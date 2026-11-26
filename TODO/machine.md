@@ -7589,7 +7589,7 @@ the route and field of podrunner, the counter, the proof.
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -7623,7 +7623,40 @@ named by a verb. Name the version of each in the answer.
 
 ## Decision
 
--
+Machine tier: a mode of `-v`, beside `ro` and `overlay` (T-2101):
+`-v HOST:GUEST:mapped` and `-v HOST:GUEST:mapped,ro`. A variable would set
+the model of each volume of a run; the parity table and the help already
+give each mode of a volume as an option of `-v`. The share is an `-fsdev
+local,...,security_model=mapped-xattr,fmode=0644,dmode=0755[,readonly=on]`
+with a `virtio-9p-pci` device: QEMU's `-virtfs` does not pass `fmode` and
+`dmode` to its file system device (QEMU 11.1.3 made the files 0600 and
+0700). The guest mounts the tag with `access=client` (the 9p2000.L
+default, now explicit): the guest kernel checks each access against the
+owner and the mode of the `user.virtfs.*` attributes, so a user of the
+image acts as its own uid, and the host user owns each file. podvm refuses
+the mode by name where the file system of HOST takes no user attribute (a
+probe write of `user.podvm.probe`, removed again; for `ro` a read that
+gives `ENOTSUP`), where the kernel has no 9p module, on a saved state, on
+each other tier and rung, with `overlay`, and for a host file.
+
+Incus tier: a removal through incusd, `podvm volume rm --podvm-tier=incus
+HOST...`, with the map kept and no id of the caller in a map (podrunner's
+preference over `raw.idmap`). Each run of the incus tier with a writable
+volume records incusd's `volatile.idmap.next` of its instance (one range
+for the uids and the same for the gids) in
+`<store>/incus/volumes/HASH.map` (version `v1`). `volume rm` reads the
+records of HOST, of a directory under it and of one above it, and for each
+map creates an instance with no image (`source: none`),
+`security.idmap.isolated=true` with that `security.idmap.base` and
+`security.idmap.size` (incusd takes a set base as it is), no NIC, HOST as
+a disk device and podvm pushed as its one file. `podvm guest-volume-rm`
+there removes each entry that the root of the map can remove (with
+`pod-extract`'s `remove_at`: no link followed), and the instance goes. Then
+podvm, as the caller, removes HOST and the rest. HOST must be a directory
+of the caller, not a link, not `/`, not the home directory or above it,
+with no mount point at or under it. A host directory that no run of the
+store recorded is removed by the caller alone, and a failure names the
+missing record. No call of pod-incus was missing.
 
 ## Prove
 
@@ -7631,3 +7664,7 @@ A `run -d` with a writable volume where the image's user (a uid other than
 the host's) writes a file; the host user then removes the directory with no
 root; on the machine tier the next guest reads the file with its owner and
 mode.
+
+## Done
+
+**Done (2026-11-26).** Machine tier: `lifecycle::volume::mode` (`Mode::Mapped`), `run::overlay::refuse_mapped`, `machine::guest::vol` (`argv`, `check_mapped`, `probe_xattrs`, `MAPPED_OPTIONS`, the `:mapped` word of `guest-9p`), the refusal of a saved state, the help of `-v` and the parity row. Incus tier: `incus::volmap` (the record and `note` after each create of `run`, `run -d` and `create`), `incus::volume` (`volume rm` and `guest-volume-rm`), the parity rows of `volume` and `volume rm`, and the line of `podvm --help`. The tests: `the_options_of_a_volume_give_one_mode` (mapped with rw, ro, z; with overlay a conflict; a host file refused), `a_mapped_volume_keeps_the_owners_in_attributes`, `the_probe_of_a_mapped_volume_leaves_no_attribute`, the saved-state table, `the_removal_stays_in_the_callers_own_directory`, `a_mount_under_the_directory_refuses_the_removal`, `the_map_of_an_instance_is_one_range_from_id_0`, `the_record_of_the_maps_reads_back` and `the_guest_pass_removes_each_entry_and_follows_no_link`. Experiment 486 as root, each podvm as uid 1000 with a private store, the machine tier under TCG and a private incusd 6.0.0 (`experiments/results/volume-removal.txt`): 12 clauses in 12 pass. A guest user of uid 1001 writes a file of 0640 and a directory of 0700 in `-v H:/data:mapped`; on the host they belong to uid 1000 with 0644 and 0755 and `user.virtfs.uid` 1001; a second guest with `mapped,ro` sees uid 1001 and the modes, uid 1002 cannot list the directory, and a write fails with EROFS; uid 1000 removes them with `rm -rf`. On the incus tier, with `security.idmap.isolated=true` in the default profile, two `run -d` instances write as host uids 1066537 and 1132073; uid 1000 gets EACCES; the record holds the two maps; `volume rm` removes H2 in 1.9 s with two instances, and no instance and no record stay. `volume rm` refuses `/`, the home directory, a link, a file, a directory of root and a call with no tier at 125. The cleanup left no instance, image, incusd, dnsmasq or `incusbr0`.

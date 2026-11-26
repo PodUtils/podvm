@@ -1,36 +1,42 @@
 //! TODO/machine.md T-2103: the mapped volumes of the machine tier.
 
 /// TODO/machine.md T-2103: a `:mapped` volume, writable or read-only, is
-/// a share with `security_model=mapped-xattr`, mounted with
+/// an `-fsdev` with `security_model=mapped-xattr` (and a `,` of HOST
+/// doubled, as QEMU reads it), mounted with
 /// `access=client`; its argument goes to the guest and back whole. One
 /// table: the guest paths, the modes, and what the emulator and the
 /// subcommand get.
 #[test]
 fn a_mapped_volume_keeps_the_owners_in_attributes() {
-    use super::{arg, parse, virtfs, vols, Vol};
+    use super::{arg, argv, parse, vols, Vol};
     let g = |p: &str, ro| (p.to_string(), ro);
     let all = vols(
         &[g("/a", false), g("/b", true), g("/c", false), g("/d", true)],
         &["/a".to_string(), "/b".to_string()],
     );
+    let model = "security_model=mapped-xattr,fmode=0644,dmode=0755";
+    let fsdev = |t: &str, ro: &str| {
+        vec![
+            "-fsdev".to_string(),
+            format!("local,id={t},path=/h,,x,{model}{ro}"),
+            "-device".to_string(),
+            format!("virtio-9p-pci,fsdev={t},mount_tag={t}"),
+        ]
+    };
+    let virtfs = |t: &str, ro: &str| {
+        vec![
+            "-virtfs".to_string(),
+            format!("local,path=/h,,x,mount_tag={t},security_model=none{ro}"),
+        ]
+    };
     let cases = [
-        (
-            ",security_model=mapped-xattr,fmode=0644,dmode=0755",
-            "/a:mapped",
-        ),
-        (
-            ",security_model=mapped-xattr,fmode=0644,dmode=0755,readonly=on",
-            "/b:mapped:ro",
-        ),
-        (",security_model=none", "/c"),
-        (",security_model=none,readonly=on", "/d:ro"),
+        (fsdev("podvm0", ""), "/a:mapped"),
+        (fsdev("podvm1", ",readonly=on"), "/b:mapped:ro"),
+        (virtfs("podvm2", ""), "/c"),
+        (virtfs("podvm3", ",readonly=on"), "/d:ro"),
     ];
-    for (v, (model, word)) in all.iter().zip(cases) {
-        let h = std::path::Path::new("/h");
-        assert_eq!(
-            virtfs(h, v),
-            format!("local,path=/h,mount_tag={}{model}", v.tag)
-        );
+    for (v, (want, word)) in all.iter().zip(cases) {
+        assert_eq!(argv(std::path::Path::new("/h,x"), v), want, "{word}");
         assert_eq!(arg(v), format!("{}={word}", v.tag));
         assert_eq!(parse(&arg(v)).as_ref(), Some(v), "{word}");
     }

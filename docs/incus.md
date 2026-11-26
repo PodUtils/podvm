@@ -264,6 +264,40 @@ and reads the limits back. It prints the instance name on success or
 gives exit 125 with the reason. If the instance config changed during
 the update, inspect it before issuing another update.
 
+## Remove what an instance wrote in a volume (T-2103)
+
+```sh
+podvm volume rm --podvm-tier=incus HOST...
+```
+
+An instance writes in a writable volume (`-v HOST:GUEST`, a `disk`
+device) as the host ids of its id map: `BASE + uid` of the instance. The
+host user cannot remove a directory that a user of the image made with
+mode 0755 or 0700 there, and gets EACCES. `volume rm` keeps the map:
+
+1. Each run of the incus tier with a writable volume (`run`, `run -d`,
+   `create`) records incusd's `volatile.idmap.next` of its instance in
+   `<store>/incus/volumes/HASH.map`: the host path and each map
+   (`map BASE SIZE`). A map of another form than one range for the uids
+   and the same range for the gids is not recorded, and the run says so.
+2. `volume rm` reads the records of HOST, of each directory under it and
+   of each directory above it. For each map it creates an instance with no
+   image, `security.idmap.isolated=true` with that
+   `security.idmap.base` and `security.idmap.size`, no NIC, HOST as its
+   one disk device and podvm as its one file. podvm in the instance
+   (`guest-volume-rm`) removes each entry that the root of the map can
+   remove, and podvm deletes the instance.
+3. podvm then removes HOST and the rest as the caller, and the records of
+   HOST and under it.
+
+No id of the caller goes into a map (`raw.idmap`), and no instance is
+privileged. HOST must be a directory of the caller, not a link, not `/`,
+not the home directory or a directory above it, with no mount point at or
+under it. The walk follows no link. A directory that no run of the store
+recorded is removed by the caller alone; a failure there names the missing
+record. Experiment 486 removes what two instances of two isolated maps
+wrote in 1.9 s ([its run](../experiments/results/volume-removal.txt)).
+
 ## No network and one channel (T-1779)
 
 `run` with `--podvm-tier=incus` takes `--podvm-net none` and

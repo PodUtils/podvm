@@ -79,19 +79,41 @@ pub fn vols(guests: &[(String, bool)], mapped: &[String]) -> Vec<Vol> {
         .collect()
 }
 
-/// The emulator's argument of one volume.
+/// A value of an option of the emulator: a `,` of `s` doubles, as QEMU
+/// reads it.
+fn opt(s: &std::path::Path) -> String {
+    s.display().to_string().replace(',', ",,")
+}
+
+/// The emulator's argument of `-virtfs` for one volume that is not mapped.
 pub fn virtfs(host: &std::path::Path, v: &Vol) -> String {
     format!(
-        "local,path={},mount_tag={},{}{}",
-        host.display(),
+        "local,path={},mount_tag={},security_model=none{}",
+        opt(host),
         v.tag,
-        if v.mapped {
-            MAPPED_MODEL
-        } else {
-            "security_model=none"
-        },
         if v.ro { ",readonly=on" } else { "" }
     )
+}
+
+/// The emulator's arguments of one volume. TODO/machine.md T-2103: QEMU's
+/// `-virtfs` does not pass `fmode` and `dmode` to its file system device
+/// (measured with QEMU 11.1.3: the files came with 0600 and 0700), so a
+/// mapped volume is an `-fsdev` and a `virtio-9p-pci` device.
+pub fn argv(host: &std::path::Path, v: &Vol) -> Vec<String> {
+    if !v.mapped {
+        return vec!["-virtfs".to_string(), virtfs(host, v)];
+    }
+    vec![
+        "-fsdev".to_string(),
+        format!(
+            "local,id={},path={},{MAPPED_MODEL}{}",
+            v.tag,
+            opt(host),
+            if v.ro { ",readonly=on" } else { "" }
+        ),
+        "-device".to_string(),
+        format!("virtio-9p-pci,fsdev={},mount_tag={}", v.tag, v.tag),
+    ]
 }
 
 /// The argument of the subcommand for one volume:

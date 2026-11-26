@@ -416,8 +416,7 @@ pub fn boot(r: &Request) -> i32 {
         extra.extend(channel::argv(&ch));
     }
     for (v, (host, _, _)) in vols.iter().zip(&r.volumes) {
-        extra.push("-virtfs".to_string());
-        extra.push(vol::virtfs(host, v));
+        extra.extend(vol::argv(host, v));
     }
     extra.extend(disk_file.iter().flat_map(|d| disk::argv(d)));
     extra.extend(root.iter().flat_map(|(p, _)| disk::root::argv(p))); // T-1994
