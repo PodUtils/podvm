@@ -4733,3 +4733,53 @@ A table test: two writers with the same pid and sequence (a test seam) get two n
 ## Done
 
 **Done (2026-11-24).** (1) `podvm_image::store::staging_name` names each staging file of `Store::stage` and `Store::write_index` `HINT.PID.SEQ.TOKEN.held.partial`, where TOKEN is 64 random bits of `pod_core::entropy::OsEntropy` (the time in nanoseconds where the system gives no random bytes): two writers with one pid in two PID namespaces get two names. A clash is refused with one true line, "another process holds the staging file PATH: this write stops, and the store is as it was", no longer "a defect". (2) `Store::put_bytes` drops the lock of its staging file after the rename. (3) The sweep of `Store::open` (each command) removes a `.held.partial` that nobody holds once it is older than 10 s (`HELD_AGE`; its writer locks it right after the create); another `.partial` (the table of containers of pod-supervise, written with no lock) keeps the age of 600 s. Table tests `a_staging_name_is_unique_across_pid_namespaces`, `the_sweep_takes_a_held_name_that_nobody_holds_after_its_short_age`, `put_bytes_leaves_no_staging_file` and `a_clash_of_names_is_refused_with_a_true_line` (`crates/podvm-image/src/store/tests/staging_names.rs`). Measured with the release binary as uid 1000: a SIGKILL of `pull` of `golang:1.24-bookworm` left four `.held.partial` files (72 MiB); `images` at once kept them (younger than 10 s), and `images` 11 s later removed each one. `system df` does not count a staging file: with the sweep of each command, a file of a dead writer stays for at most 10 s, an estimate that holds where a command runs after it.
+
+# T-2098: An OCI archive can name the same verified layer more than once
+
+**Source:** PodUtils/podrunner Actions run 45731427540 on `724365bf`
+**Category:** image
+**Milestone:** none
+**Priority:** P1
+**Effort:** S
+**Status:** done
+
+## Problem
+
+Both runner-image builds stopped at `podvm load`. The importer expected
+`sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1`
+and reported that the tarball had no matching entry. This is the
+canonical empty layer. The producer added a conditional build step that
+can emit another empty layer.
+
+## Premise
+
+An OCI manifest may repeat a layer descriptor. The archive stores one
+blob per digest. The importer consumes a matched archive entry, then
+looks for another entry each time the manifest uses that digest.
+
+## Approach
+
+Allow a second reference to the same digest after the archive has
+supplied and verified its contents. Keep the manifest order and reject
+a missing, incorrect or unreferenced blob as before.
+
+## Decision
+
+Only reuse matches from the current archive. A cached blob by itself
+cannot satisfy a descriptor that the archive omitted.
+
+## Prove
+
+`cargo test --locked -p podvm-image layout::tests`. Load a manifest with
+two references to one empty layer and one archive entry for that layer.
+Check that the record keeps both references and the usual missing and
+incorrect digest refusals still hold.
+
+## Done
+
+**Done (2026-11-26).** The loader records which physical archive entries
+it verified and matched. Another reference can reuse a verified match.
+The source manifest still sets order and multiplicity. All nine release
+layout tests passed, including the repeated empty layer and the existing
+missing and incorrect digest tests. The failed two-architecture run did
+not retain its input archive. Podrunner's rerun needs the fixed beta.

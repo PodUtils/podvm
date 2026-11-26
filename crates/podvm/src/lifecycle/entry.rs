@@ -79,8 +79,12 @@ fn chroot_ok_for(verb: &str, findings: &podvm_probe::Findings) -> bool {
     }
 }
 
-pub(super) fn entry_possible(chroot_ok: bool, memfd_ok: bool, objects: bool) -> bool {
-    chroot_ok || memfd_ok || objects
+pub(super) fn entry_possible(
+    chroot_ok: bool,
+    memfd_ok: bool,
+    objects: impl FnOnce() -> bool,
+) -> bool {
+    chroot_ok || memfd_ok || objects()
 }
 
 /// TODO/enter.md T-1317. The pre-fetch tier of the entry gate: refuse only
@@ -92,27 +96,21 @@ pub(super) fn entry_possible(chroot_ok: bool, memfd_ok: bool, objects: bool) -> 
 /// object (the loader no-chroot family may run). Refusal names all three
 /// misses at 125, fetching nothing.
 ///
-/// ⭐ TODO/image.md T-1418. Past that tier, the store itself must execute
-/// what it creates: a default store on a `noexec` filesystem pulls and
-/// extracts fully, then dies at `execve` with raw `EACCES`. The probe runs
-/// here, before any byte is fetched, and refuses with the path and the
-/// `$PODVM_STORE` remedy. A probe that cannot run names its path and
-/// never reads as "no".
+/// TODO/image.md T-1418. Probe the store before fetching. A `noexec`
+/// store gives the path and `$PODVM_STORE` remedy. A probe that cannot
+/// run reports its own error.
 pub fn ensure_entry_possible(
     verb: &str,
     findings: &podvm_probe::Findings,
     store_root: &std::path::Path,
 ) -> Result<(), i32> {
-    // T-1688: the memfd leg is measured only where chroot is denied; where
-    // chroot holds the answer cannot change the result.
+    // T-1688: probe memfd only where chroot is unavailable.
     let chroot_ok = chroot_ok_for(verb, findings);
     let memfd = (!chroot_ok).then(podvm_enter::memfd::memfd_exec);
-    if entry_possible(
-        chroot_ok,
-        memfd.is_some_and(|m| m.runs()),
+    if entry_possible(chroot_ok, memfd.is_some_and(|m| m.runs()), || {
         crate::interpose::object(crate::interpose::Libc::Gnu).is_some()
-            || crate::interpose::object(crate::interpose::Libc::Musl).is_some(),
-    ) {
+            || crate::interpose::object(crate::interpose::Libc::Musl).is_some()
+    }) {
         return ensure_store_exec(verb, store_root);
     }
     let memfd_text = memfd

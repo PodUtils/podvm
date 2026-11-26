@@ -218,7 +218,7 @@ pub(crate) fn start_with(
             Duration::from_secs(24 * 3600),
             policy(allow, ports),
         ))
-        .map_err(|e| format!("the policy of --allow and --ports: {e}"))?;
+        .map_err(|e| format!("the policy of --allow and --ports: {}", e.chain()))?;
     let listener =
         std::net::TcpListener::bind("127.0.0.1:0").map_err(|e| format!("127.0.0.1: {e}"))?;
     let port = listener

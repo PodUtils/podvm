@@ -182,9 +182,8 @@ pub fn remove_plain(dir: &std::path::Path) -> std::io::Result<bool> {
             dir.display()
         )));
     }
-    crate::tree::open_dirs(dir).and_then(|()| {
-        pod_extract::remove_tree(dir).map_err(|e| std::io::Error::other(e.to_string()))
-    })
+    crate::tree::open_dirs(dir)
+        .and_then(|()| pod_extract::remove_tree(dir).map_err(|e| std::io::Error::other(e.chain())))
 }
 
 #[cfg(test)]

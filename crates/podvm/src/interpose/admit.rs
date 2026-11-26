@@ -15,14 +15,24 @@ pub(super) fn admit_slot(
     libc: Libc,
     slot: &Slot,
 ) -> Reach {
-    let Some(bytes) = slot.bytes else {
-        return Reach::Declined(format!(
-            "this podvm binary carries no {} interposer object, so the tier \
-             is declined; ./scripts/build-interpose.sh builds them",
-            libc.word()
-        ));
+    let (bytes, obj) = match slot {
+        Slot::Absent => {
+            return Reach::Declined(format!(
+                "this podvm binary carries no {} interposer object, so the tier \
+                 is declined; ./scripts/build-interpose.sh builds them",
+                libc.word()
+            ));
+        }
+        Slot::DecodeFailed => {
+            return Reach::Declined(format!(
+                "the embedded {} object could not be decoded, so podvm refuses to \
+                 preload what it cannot check",
+                libc.word()
+            ));
+        }
+        Slot::Present { bytes, elf } => (*bytes, elf),
     };
-    let Some(obj) = &slot.elf else {
+    let Some(obj) = obj else {
         return Reach::Declined(format!(
             "the embedded {} object does not parse, so podvm refuses to \
              preload what it cannot check",

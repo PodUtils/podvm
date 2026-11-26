@@ -88,8 +88,9 @@ pub const CLUSTER_VALUES: &[(&str, char)] = &[
     ("run", 'w'),
     ("run", 'u'),
     ("run", 'v'),
-    ("run", 'm'), // TODO/machine.md T-1897
-    ("run", 'p'), // TODO/machine.md T-1869
+    ("run", 'm'),    // TODO/machine.md T-1897
+    ("update", 'm'), // TODO/machine.md T-2093
+    ("run", 'p'),    // TODO/machine.md T-1869
     ("exec", 'e'),
     ("exec", 'w'),
     ("exec", 'u'),
@@ -189,7 +190,12 @@ pub const TABLE: &[Row] = &[
     Row { verb: "diff", flag: Option::None, status: NoneStatus, note: "podvm extracts into one directory and keeps no upper layer to difference against" },
     Row { verb: "port", flag: Option::None, status: Degraded, note: "the forwards of a detached Windows guest (run -d -p); a container publishes no ports, as its payload shares this machine's network namespace (TODO/machine.md T-1869)" },
     Row { verb: "rename", flag: Option::None, status: NoneStatus, note: "not implemented: `rm` and a fresh `create` under the other name is what podvm offers" },
-    Row { verb: "update", flag: Option::None, status: NoneStatus, note: "there are no resource limits to update" },
+    Row { verb: "update", flag: Option::None, status: Degraded, note: "changes resource limits of one running podvm container on the Incus tier (T-2093)" },
+    Row { verb: "update", flag: Some("--podvm-tier"), status: Native, note: "requires incus" },
+    Row { verb: "update", flag: Some("-m, --memory"), status: Native, note: "sets limits.memory as for run (T-1897)" },
+    Row { verb: "update", flag: Some("--cpus"), status: Native, note: "sets a CPU count or a scheduler share as for run (T-1897)" },
+    Row { verb: "update", flag: Some("--pids-limit"), status: Native, note: "sets limits.processes as for run (T-1897)" },
+    Row { verb: "update", flag: Some("-h, --help"), status: Native, note: "prints this verb's usage and exits 0" },
     // Building and moving images.
     Row { verb: "build", flag: Option::None, status: NoneStatus, note: "building runs a payload per layer and commits the result; podvm can run one but cannot commit one" },
     Row { verb: "commit", flag: Option::None, status: NoneStatus, note: "podvm cannot restore ownership, so a committed layer would misrepresent what it holds (TODO/extract.md T-0302)" },

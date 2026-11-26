@@ -120,6 +120,7 @@ struct StagedBlob {
 struct LoadedBlob {
     digest: Digest,
     entry: String,
+    referenced: bool,
 }
 
 /// `podvm load`: an OCI-layout tarball into the store. Every blob is
@@ -199,6 +200,7 @@ fn load_inner(
         loaded.push(LoadedBlob {
             digest,
             entry: name,
+            referenced: false,
         });
     }
     let Some(index_bytes) = &index_bytes else {
@@ -251,12 +253,13 @@ fn load_inner(
     for layer in &manifest.layers {
         take_loaded(&mut loaded, &layer.parsed_digest()?, src)?;
     }
-    if !loaded.is_empty() {
+    let extras = loaded.iter().filter(|blob| !blob.referenced).count();
+    if extras != 0 {
         return Err(Error::Oci(format!(
             "{} carries {} blob(s) the manifest does not name; refusing rather than \
              recording bytes no record points at. `podvm image prune` removes them",
             src.display(),
-            loaded.len()
+            extras
         )));
     }
     // TODO/image.md T-1839: with no name, the record has no tag and is
@@ -345,27 +348,34 @@ fn commit_entry(store: &Store, src: &Path, entry: &mut dyn Read) -> Result<Diges
     }
 }
 
-/// Take the committed blob whose computed digest is `want` off the list.
-/// A blob nobody names stays on it for the caller to refuse on.
-fn take_loaded(loaded: &mut Vec<LoadedBlob>, want: &Digest, src: &Path) -> Result<()> {
-    let Some(pos) = loaded.iter().position(|b| b.digest == *want) else {
-        // TODO/image.md T-1836: the entry of that name and its computed
-        // digest, or that no entry holds the blob.
-        let hex = want.to_string();
-        let hex = hex.trim_start_matches("sha256:");
-        let got = loaded
-            .iter()
-            .find(|b| b.entry.ends_with(hex))
-            .map(|b| format!("{} for the entry {}", b.digest, b.entry))
-            .unwrap_or_else(|| "no entry of the tarball".to_string());
-        return Err(Error::DigestMismatch {
-            what: format!("tarball {}", src.display()),
-            want: want.to_string(),
-            got,
-        });
-    };
-    loaded.remove(pos);
-    Ok(())
+/// Match one reference against verified bytes from this archive. Prefer a
+/// physical entry that has not been matched yet, since a tar can repeat it.
+fn take_loaded(loaded: &mut [LoadedBlob], want: &Digest, src: &Path) -> Result<()> {
+    if let Some(blob) = loaded
+        .iter_mut()
+        .find(|b| !b.referenced && b.digest == *want)
+    {
+        blob.referenced = true;
+        return Ok(());
+    }
+    // TODO/image.md T-1836: name a remaining entry with the expected name
+    // and wrong bytes even when an earlier reference matched this digest.
+    let hex = want.to_string();
+    let hex = hex.trim_start_matches("sha256:");
+    let mismatched = loaded
+        .iter()
+        .find(|b| !b.referenced && b.entry.ends_with(hex));
+    if mismatched.is_none() && loaded.iter().any(|b| b.referenced && b.digest == *want) {
+        return Ok(());
+    }
+    let got = mismatched
+        .map(|b| format!("{} for the entry {}", b.digest, b.entry))
+        .unwrap_or_else(|| "no entry of the tarball".to_string());
+    Err(Error::DigestMismatch {
+        what: format!("tarball {}", src.display()),
+        want: want.to_string(),
+        got,
+    })
 }
 
 /// The placeholder name of an index entry with no name (T-1839); the

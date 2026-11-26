@@ -217,11 +217,11 @@ fn the_record_carries_the_loader_drive_and_nothing_else() {
 /// decision it feeds.
 #[test]
 fn entry_is_possible_where_any_family_may_run() {
-    assert!(entry_possible(true, false, false));
-    assert!(entry_possible(false, true, false));
-    assert!(entry_possible(false, false, true));
-    assert!(entry_possible(true, true, true));
-    assert!(!entry_possible(false, false, false));
+    assert!(entry_possible(true, false, || unreachable!()));
+    assert!(entry_possible(false, true, || unreachable!()));
+    assert!(entry_possible(false, false, || true));
+    assert!(entry_possible(true, true, || unreachable!()));
+    assert!(!entry_possible(false, false, || false));
 }
 
 /// TODO/enter.md T-1317. The exact rung, decided pre-fixup: a usable

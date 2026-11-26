@@ -1,4 +1,4 @@
-//! Embed the two interposer objects, or embed nothing and say so.
+//! Pack the interposer objects for embedding.
 //!
 //! [`TODO/interpose.md`](../../TODO/interpose.md) T-0702. `podvm-interpose` is
 //! not a workspace member and its musl object needs `zig cc` as its linker, so
@@ -11,7 +11,7 @@
 //! (deleted 2026-10-01) measured that on 2026-09-12 and it completed in both
 //! shapes it tried, so the hazard did not fire here. ⚠ It is still refused: the deadlock is a property
 //! of whoever's machine runs it, the objects are ALREADY built outside cargo by
-//! `podvm-dev` and by the gate workflow, and a build step that only copies
+//! `podvm-dev` and by the gate workflow, and a build step that only packs existing objects
 //! cannot deadlock anywhere.
 //!
 //! ⛔ **A MISSING OBJECT IS NOT AN ERROR HERE.** A plain `cargo build` on a
@@ -23,8 +23,10 @@
 //! refusal is [`TODO/interpose.md`](../../TODO/interpose.md) T-0706's channel
 //! and it is the whole reason an empty object is allowed to exist.
 
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
+use flate2::{write::GzEncoder, Compression};
 use sha2::{Digest, Sha256};
 
 /// Hex sha256 of the embedded object bytes.
@@ -51,7 +53,7 @@ fn machine_of(bytes: &[u8]) -> String {
     }
 }
 
-/// The two objects, by the libc they are linked against.
+/// The objects, by the libc they are linked against.
 ///
 /// ⚠ The triples are the ones `scripts/build-interpose.sh` builds by default.
 /// A tree that overrides its `TARGETS` gets placeholders here, which is the
@@ -73,6 +75,14 @@ fn machine_for(arch: &str) -> Option<&'static str> {
         "aarch64" => Some("0xb7"),
         _ => None,
     }
+}
+
+/// Store one gzip member for a present object.
+fn pack_object(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let mut gzip = GzEncoder::new(std::fs::File::create(path)?, Compression::default());
+    gzip.write_all(bytes)?;
+    gzip.finish()?;
+    Ok(())
 }
 
 fn main() {
@@ -99,7 +109,7 @@ fn main() {
         // watched path APPEARS, which is what makes a later
         // `scripts/build-interpose.sh` reach a binary that was built without it.
         println!("cargo::rerun-if-changed={}", from.display());
-        let to = out.join(format!("interpose-{name}.so"));
+        let to = out.join(format!("interpose-{name}.so.gz"));
         // TODO/interpose.md T-1721: an object embeds only where its ELF
         // machine is the binary's; any other object is refused by name,
         // rather than one that each payload of this machine declines.
@@ -133,9 +143,14 @@ fn main() {
             }
         };
         if !bytes.is_empty() {
-            std::fs::write(&to, &bytes).expect("writing the embedded object");
+            pack_object(&to, &bytes).expect("packing the embedded object");
             embedded += 1;
         }
+        println!(
+            "cargo::rustc-env=PODVM_INTERPOSE_{}_SIZE={}",
+            name.to_ascii_uppercase(),
+            bytes.len()
+        );
         // The digest `version --verbose` reports (T-1004), or `absent`
         // where the placeholder went in. A digest of nothing would be a
         // value that looks measured and is not.

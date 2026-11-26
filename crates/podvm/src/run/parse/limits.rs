@@ -10,6 +10,8 @@ use podvm_image::error::EXIT_FLAG_ERROR;
 /// incus instance, a device and not a key of its configuration
 /// (PodUtils/podrunner#296 ask 1, TODO/machine.md T-1964).
 pub(crate) const ROOT_SIZE: &str = "podvm.root.size";
+pub(crate) const CPU: &str = "limits.cpu";
+pub(crate) const CPU_ALLOWANCE: &str = "limits.cpu.allowance";
 
 /// One flag and its value as the incus key and value.
 pub(crate) fn incus_limit(verb: &str, flag: &str, v: &str) -> Result<(&'static str, String), i32> {
@@ -40,12 +42,9 @@ pub(crate) fn incus_limit(verb: &str, flag: &str, v: &str) -> Result<(&'static s
             }
             // A whole number is a count of CPUs; a part is a share of time.
             if c.fract() == 0.0 {
-                Ok(("limits.cpu", format!("{}", c as u64)))
+                Ok((CPU, format!("{}", c as u64)))
             } else {
-                Ok((
-                    "limits.cpu.allowance",
-                    format!("{}%", (c * 100.0).round() as u64),
-                ))
+                Ok((CPU_ALLOWANCE, format!("{}%", (c * 100.0).round() as u64)))
             }
         }
         "--storage-opt" => {

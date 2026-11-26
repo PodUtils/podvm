@@ -114,6 +114,7 @@ fn main() -> std::process::ExitCode {
         Some("ps") => exit(lifecycle::ps(rest)),
         Some("port") => exit(windows::machine::port(rest)), // T-1869
         Some("start") => exit(lifecycle::start(rest)),
+        Some("update") => exit(incus::update::dispatch(rest)),
         Some("create") => exit(lifecycle::create(rest)),
         Some("container") => exit(lifecycle::container_group(rest)), // T-1848
         Some("probe") => exit(probe(rest)),

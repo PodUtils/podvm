@@ -8,6 +8,34 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: repeated OCI layer descriptors, 2026-11-26
+
+Record: T-2098.
+Deployed: not deployed; for the next beta after 0.2.0-beta.40.
+
+- `podvm load` accepts repeated references to a blob verified from the
+  same OCI archive and keeps the original layer order.
+
+### Added: live Incus resource updates, 2026-11-26
+
+Record: T-2093.
+Deployed: not deployed; for the next beta after 0.2.0-beta.40.
+
+- `podvm update --podvm-tier=incus` changes memory, CPU or process
+  limits on a running podvm container. It uses the instance ETag and
+  checks the limits before reporting success.
+
+### Changed: podcrates `v0.85.0`, 2026-11-26
+
+Record: T-2097.
+Deployed: not deployed; for the next beta after 0.2.0-beta.40.
+
+- Extraction and broker policy errors report the step and the underlying
+  cause with the new podcrates error format.
+- The binary packs the embedded interposers with gzip and decodes the
+  selected object when needed. The placed ELF and reported hash are the
+  original object's bytes and hash.
+
 ### Added: channels and process limits for saved Linux guests, 2026-11-25
 
 Record: T-2094.

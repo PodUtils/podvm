@@ -19,6 +19,7 @@ pub(crate) mod run;
 pub(crate) mod space; // TODO/machine.md T-2078
 pub(crate) mod systemd;
 pub(crate) mod target; // TODO/machine.md T-2078
+pub(crate) mod update; // TODO/machine.md T-2093
 pub(crate) mod usage; // TODO/machine.md T-2076
 pub(crate) mod verbs;
 mod xattrs; // TODO/machine.md T-1999

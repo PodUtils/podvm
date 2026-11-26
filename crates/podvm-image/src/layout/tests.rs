@@ -204,10 +204,7 @@ enum Order {
 /// An OCI-layout tarball of `n` layers (each a tar of one file), in
 /// `order`, at a new path; with the digest of the manifest.
 fn layered_layout(tag: &str, n: usize, order: Order) -> (std::path::PathBuf, Digest) {
-    let mut blobs: Vec<(Digest, Vec<u8>)> = Vec::new();
-    let mut layers = Vec::new();
-    let mut diff_ids = Vec::new();
-    for i in 0..n {
+    let contents = (0..n).map(|i| {
         let mut b = tar::Builder::new(Vec::new());
         let body = format!("layer {i}\n");
         let mut h = tar::Header::new_gnu();
@@ -216,13 +213,28 @@ fn layered_layout(tag: &str, n: usize, order: Order) -> (std::path::PathBuf, Dig
         h.set_cksum();
         b.append_data(&mut h, format!("t2068/layer-{i}"), body.as_bytes())
             .unwrap();
-        let bytes = b.into_inner().unwrap();
+        b.into_inner().unwrap()
+    });
+    layout_from_layers(tag, contents, order)
+}
+
+fn layout_from_layers(
+    tag: &str,
+    contents: impl IntoIterator<Item = Vec<u8>>,
+    order: Order,
+) -> (std::path::PathBuf, Digest) {
+    let mut blobs: Vec<(Digest, Vec<u8>)> = Vec::new();
+    let mut layers = Vec::new();
+    let mut diff_ids = Vec::new();
+    for bytes in contents {
         let d = Digest::of(&bytes);
         layers.push(serde_json::json!({
             "mediaType": MEDIA_UNTAR, "digest": d.to_string(), "size": bytes.len(),
         }));
         diff_ids.push(d.to_string());
-        blobs.push((d, bytes));
+        if !blobs.iter().any(|(digest, _)| digest == &d) {
+            blobs.push((d, bytes));
+        }
     }
     let host = crate::platform::Platform::host();
     let config = serde_json::to_vec(&serde_json::json!({
@@ -295,6 +307,25 @@ fn rand_bytes() -> [u8; 8] {
     let mut r = [0u8; 8];
     std::io::Read::read_exact(&mut std::fs::File::open("/dev/urandom").unwrap(), &mut r).unwrap();
     r
+}
+
+#[test]
+fn repeated_empty_layers_use_one_blob_from_the_archive() {
+    let base = rootfs_tar();
+    let empty = tar::Builder::new(Vec::new()).into_inner().unwrap();
+    let base_digest = Digest::of(&base).to_string();
+    let empty_digest = Digest::of(&empty).to_string();
+    let (tarball, manifest_digest) =
+        layout_from_layers("repeated", [empty.clone(), base, empty], Order::IndexFirst);
+    let store = scratch("repeated");
+    let record = load(&store, &tarball).unwrap();
+    assert_eq!(record.manifest_digest, manifest_digest.to_string());
+    assert_eq!(
+        record.layers,
+        [empty_digest.clone(), base_digest, empty_digest]
+    );
+    let _ = std::fs::remove_file(tarball);
+    let _ = std::fs::remove_dir_all(store.root());
 }
 
 /// TODO/image.md T-2068 (PodUtils/podrunner#344): a verb that walks the

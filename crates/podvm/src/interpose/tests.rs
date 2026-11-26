@@ -81,16 +81,8 @@ fn elf(interp: Option<&str>, sections: &[&str], machine: u16) -> Elf {
     }
 }
 
-fn no_objects() -> Parsed {
-    let empty = || Slot {
-        bytes: None,
-        elf: None,
-    };
-    Parsed {
-        gnu: empty(),
-        gnu234: empty(),
-        musl: empty(),
-    }
+fn no_objects(_: Object) -> Slot {
+    Slot::Absent
 }
 
 fn declined_name(r: Reach) -> String {
@@ -109,7 +101,7 @@ fn a_static_payload_is_declined_by_name() {
         "/podvm",
         &elf(None, &[], X86_64),
         "/rootfs",
-        &no_objects(),
+        |_| unreachable!("a static payload does not need an interposer"),
     ));
     assert!(why.contains("statically linked"), "{why}");
     assert!(why.contains("PT_INTERP"), "{why}");
@@ -130,7 +122,7 @@ fn go_markers_outrank_a_present_interpreter() {
             "/server",
             &elf(Some("/lib64/ld-linux-x86-64.so.2"), &[marker], X86_64),
             "/rootfs",
-            &no_objects(),
+            |_| unreachable!("a Go payload does not need an interposer"),
         ));
         assert!(why.contains("Go"), "{marker}: {why}");
     }
@@ -144,7 +136,7 @@ fn an_unknown_interpreter_is_declined() {
         "/p",
         &elf(Some("/opt/weird/loader"), &[], X86_64),
         "/rootfs",
-        &no_objects(),
+        |_| unreachable!("an unknown interpreter does not need an interposer"),
     ));
     assert!(why.contains("no libc"), "{why}");
 }
@@ -157,7 +149,7 @@ fn a_binary_without_objects_declines_naming_the_libc() {
         "/bin/sh",
         &elf(Some("/lib64/ld-linux-x86-64.so.2"), &[], X86_64),
         "/rootfs",
-        &no_objects(),
+        no_objects,
     ));
     assert!(why.contains("glibc"), "{why}");
     assert!(why.contains("build-interpose.sh"), "{why}");
@@ -167,25 +159,19 @@ fn a_binary_without_objects_declines_naming_the_libc() {
 /// loader cannot read.
 #[test]
 fn another_architecture_is_declined() {
-    let objs = Parsed {
-        gnu: Slot {
-            bytes: Some(b"present but unparsed"),
-            elf: Some(elf(None, &[], AARCH64)),
+    let slot = |object| match object {
+        Object::Gnu => Slot::Present {
+            bytes: b"present and parsed",
+            elf: Some(Box::new(elf(None, &[], AARCH64))),
         },
-        gnu234: Slot {
-            bytes: None,
-            elf: None,
-        },
-        musl: Slot {
-            bytes: None,
-            elf: None,
-        },
+        Object::Gnu234 => Slot::Absent,
+        Object::Musl => unreachable!("a glibc payload does not need musl"),
     };
     let why = declined_name(classify_elf(
         "/bin/sh",
         &elf(Some("/lib64/ld-linux-x86-64.so.2"), &[], X86_64),
         "/rootfs",
-        &objs,
+        slot,
     ));
     assert!(why.contains("0x"), "{why}");
 }
@@ -194,25 +180,19 @@ fn another_architecture_is_declined() {
 /// rather than preloaded unchecked or reported as absent.
 #[test]
 fn an_unparsable_object_is_refused_as_unparsable() {
-    let objs = Parsed {
-        gnu: Slot {
-            bytes: Some(b"present but unparsed"),
+    let slot = |object| match object {
+        Object::Gnu => Slot::Present {
+            bytes: b"present but unparsed",
             elf: None,
         },
-        gnu234: Slot {
-            bytes: None,
-            elf: None,
-        },
-        musl: Slot {
-            bytes: None,
-            elf: None,
-        },
+        Object::Gnu234 => Slot::Absent,
+        Object::Musl => unreachable!("a glibc payload does not need musl"),
     };
     let why = declined_name(classify_elf(
         "/bin/sh",
         &elf(Some("/lib64/ld-linux-x86-64.so.2"), &[], X86_64),
         "/rootfs",
-        &objs,
+        slot,
     ));
     assert!(why.contains("does not parse"), "{why}");
 }
@@ -446,9 +426,11 @@ fn debian_rootfs(tag: &str, with_loader: bool) -> Option<std::path::PathBuf> {
 }
 
 /// The embedded glibc object, or `None` where this binary carries none.
-fn gnu_objects() -> Option<Parsed> {
-    let p = parsed();
-    p.gnu.elf.is_some().then_some(p)
+fn parsed_gnu() -> Option<Elf> {
+    let Slot::Present { elf, .. } = Object::Gnu.slot() else {
+        return None;
+    };
+    elf.map(|value| *value)
 }
 
 /// T-1644: the embedded glibc object admits against the set read from a
@@ -457,11 +439,10 @@ fn gnu_objects() -> Option<Parsed> {
 /// `libdl.so.2` beside libc, and `libgcc_s.so.1`.
 #[test]
 fn the_glibc_object_admits_against_its_closure_read_inside_the_image() {
-    let (Some(objs), Some(root)) = (gnu_objects(), debian_rootfs("admit", true)) else {
+    let (Some(obj), Some(root)) = (parsed_gnu(), debian_rootfs("admit", true)) else {
         eprintln!("SKIP: no embedded glibc object, or no glibc under /lib/x86_64-linux-gnu");
         return;
     };
-    let obj = objs.gnu.elf.as_ref().unwrap();
     for name in ["__tls_get_addr", "dlsym", "_Unwind_Resume"] {
         assert!(
             obj.imported.iter().any(|i| i.name == name),
@@ -469,7 +450,12 @@ fn the_glibc_object_admits_against_its_closure_read_inside_the_image() {
         );
     }
     let payload = elf(Some("/lib64/ld-linux-x86-64.so.2"), &[], X86_64);
-    let reach = classify_elf("payload", &payload, &root.display().to_string(), &objs);
+    let reach = classify_elf(
+        "payload",
+        &payload,
+        &root.display().to_string(),
+        Object::slot,
+    );
     let _ = std::fs::remove_dir_all(&root);
     match reach {
         Reach::Preload { libc, .. } => assert_eq!(libc, Libc::Gnu),
@@ -483,7 +469,7 @@ fn the_glibc_object_admits_against_its_closure_read_inside_the_image() {
 /// the image, so the decline names the interpreter.
 #[test]
 fn a_loader_link_that_resolves_only_on_the_host_is_not_read() {
-    let (Some(objs), Some(root)) = (gnu_objects(), debian_rootfs("hostonly", false)) else {
+    let (Some(_), Some(root)) = (parsed_gnu(), debian_rootfs("hostonly", false)) else {
         eprintln!("SKIP: no embedded glibc object, or no glibc under /lib/x86_64-linux-gnu");
         return;
     };
@@ -492,7 +478,7 @@ fn a_loader_link_that_resolves_only_on_the_host_is_not_read() {
         "payload",
         &payload,
         &root.display().to_string(),
-        &objs,
+        Object::slot,
     ));
     let _ = std::fs::remove_dir_all(&root);
     assert!(why.contains("interpreter"), "{why}");

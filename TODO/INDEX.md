@@ -729,14 +729,16 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2090](gate.md) | P2 | S | none | gate | done | The external QA of `0.2.0-beta.31`: the reports that `0.2.0-beta.40` passes |
 | [T-2091](cli.md) | P2 | S | none | cli | done | `podvm-dev build` takes the error of a failed `build-state.py commit` as the commit |
 | [T-2092](cli.md) | P2 | S | none | cli | done | The documents, the probe field and the refusal of `--pid` say that the namespace rung opens no user, PID or UTS namespace |
-| [T-2093](machine.md) | P2 | M | none | machine | blocked | `podvm update --podvm-tier=incus NAME` changes the memory, CPU and process limits of a running instance |
+| [T-2093](machine.md) | P2 | M | none | machine | partial | `podvm update --podvm-tier=incus NAME` changes the memory, CPU and process limits of a running instance |
 | [T-2094](machine.md) | P2 | L | none | machine | done | The saved state of the machine tier serves a run with `--podvm-channel` and `--pids-limit` |
 | [T-2095](gate.md) | P1 | M | none | gate | done | Claude Code and Codex share hosted setup and blind QA |
 | [T-2096](deps.md) | P2 | M | none | deps | done | Take podcrates `v0.84.0` and its shared gzip writer |
+| [T-2097](deps.md) | P2 | M | none | deps | done | Take podcrates `v0.85.0` and keep the causes of failures |
+| [T-2098](image.md) | P1 | S | none | image | done | An OCI archive can name the same verified layer more than once |
 
 ## Counts
 
-667 entries: 22 open, 39 partial, 7 blocked, 599 done.
+669 entries: 22 open, 40 partial, 6 blocked, 601 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -746,10 +748,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 3 | 20 | 0 | 272 | 295 |
-| P2 | 14 | 14 | 6 | 207 | 241 |
+| P1 | 3 | 20 | 0 | 273 | 296 |
+| P2 | 14 | 15 | 5 | 208 | 242 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 22 | 39 | 7 | 599 | 667 |
+| **All** | 22 | 40 | 6 | 601 | 669 |
 
 ## Work order
 

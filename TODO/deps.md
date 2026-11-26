@@ -2605,3 +2605,50 @@ with podvm's selection of plain or compressed upload.
 The workspace check, 44 Incus tests and `sh scripts/dev/checks.sh`
 passed. PodUtils/podcrates#260 lists the take from #666. T-2085 owns the
 layer stream and its live proof.
+
+# T-2097: Take podcrates `v0.85.0` and keep the causes of failures
+
+**Source:** PodUtils/podcrates#262 (COORD-156), PodUtils/podvm#664 (COORD-248)
+**Category:** deps
+**Milestone:** none
+**Priority:** P2
+**Effort:** M
+**Status:** done
+
+## Problem
+
+The `v0.84.0` Incus client lacks a typed, ETag-conditional instance
+config update. T-2093 needs that API.
+
+## Premise
+
+Podcrates `v0.85.0` provides the typed update. The display of an I/O
+failure now gives its step. `Failure::chain()` includes its cause.
+
+## Approach
+
+Take the tag in the manifests, locks and issue sync. Preserve complete
+diagnostics for broker policy and extraction errors. T-2093 owns the
+live command and its hosted proof.
+
+## Decision
+
+The released tag points to `1d1c9fc`. `adoption/podvm` has no patch or
+run file for the release. Follow the podvm section of its notes.
+
+## Prove
+
+`cargo check --locked --workspace --all-targets` and
+`sh scripts/dev/checks.sh` pass.
+
+## Done
+
+**Done (2026-11-26).** Each podcrates manifest, lock and issue-sync pin
+takes `v0.85.0`. The broker and extraction paths retain the I/O cause
+with `Failure::chain()`. The workspace check and local gate passed.
+The podvm binary measured 9,488,600 bytes before the take and 9,509,080
+with the pin alone. Packing the existing interposer ELF files into gzip
+members reduced the integrated static candidate to 8,792,472 bytes.
+The decode tests checked exact size, end of stream and checksum. On
+pinned Alpine, the musl SHA-256 reported by `version --verbose` matched
+the file placed at `/.podvm/interpose.so` (T-0702).

@@ -32,6 +32,7 @@ usage: podvm <command> [options]
   verify       hash the store's blobs against their digests
   create       write a container record, and start nothing
   start        start a created container, and return when its payload is running
+  update       change resource limits of a running Incus container
   ps           list containers, from podvm's own table and never from /proc
   logs         a container's captured output
   stop         SIGTERM, then SIGKILL after a bounded grace

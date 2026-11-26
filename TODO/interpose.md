@@ -314,6 +314,12 @@ members: no new crate, no member row. No `Prove` line names the retired
 script and no workflow step runs it, so nothing repoints; the red-run
 plant is `experiments/results/libc-interpose-port-plant.txt`.
 
+The 2026-11-26 build packs each interposer ELF as a gzip member. The
+runtime decodes the selected object, checks its exact length and gzip
+checksum, and caches the original ELF bytes. `version --verbose` reports
+the raw-object SHA-256 and machine. Missing build objects keep the empty
+placeholder and the existing refusal path.
+
 # T-0703: Path virtualization: the entry-point set and `*at` resolution
 
 **Source:** `TOOL.md` section 6.7; `references/VHSgunzo__pathmap`

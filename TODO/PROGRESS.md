@@ -7,14 +7,14 @@ start.
 
 ## State
 
-667 entries: 22 open, 39 partial, 7 blocked, 599 done.
+669 entries: 22 open, 40 partial, 6 blocked, 601 done.
 
 * The newest release is `v0.2.0-beta.40` (2026-11-24). [CHANGELOG](../CHANGELOG.md)
   holds what each release ships, with its known gaps.
 * Open first: the asks of podrunner (`docs/HANDOFF.md`, "Next steps").
 * Experiment 473 proved the saved-state channel and process limits under
   TCG. The answer to PodUtils/podrunner#355 waits for the beta.
-* podvm takes the crates of PodUtils/podcrates at `v0.84.0`. A change of
+* podvm takes the crates of PodUtils/podcrates at `v0.85.0`. A change of
   moved code goes to podcrates as a COORD issue.
 * KVM is free (the owner, 2026-11-09). Probe `/dev/kvm` on the current host.
   `kvm.yml` (T-1682) gives a hosted runner with it, and `arm.yml` a hosted
@@ -39,8 +39,8 @@ status with `podvm-count` in the same commit as the work.
 1. Asks of peer sessions come first (the watcher of `AGENTS.md`, section
    9; the owner's ruling "podrunner first", 2026-11-18,
    `docs/decisions.md`): each new COORD issue `(to podvm)` of podrunner
-   (on 2026-11-25: PodUtils/podrunner#354, [T-2093](machine.md), blocked
-   on the pod-incus API requested in #664),
+   (PodUtils/podrunner#354, [T-2093](machine.md), uses the pod-incus API
+   delivered for #664),
    then PodUtils/podrunner#277, #216, #189, #168, #110, #296 (the
    sized writable disk in [T-1968](machine.md), which needs the
    disk-backed guest writable layer and the pod-enter mount in #667), and #313

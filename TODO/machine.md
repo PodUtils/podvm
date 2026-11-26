@@ -6467,6 +6467,14 @@ lower bound of the root is 0. The line after a failure with no tree in the
 store (incus had the image) gives the need as a dash. `space_tests` has
 the table of the loads with these cases.
 
+Podrunner's hosted run 45731449004 on `724365bf` used beta.40 with
+`full=slice` and `place=dir-small`. The 2 GiB ext4 directory pool had
+1.86 GiB free, and podvm estimated at least 7.21 GiB for the upload and
+instance root. `create` exited 125 before import, reported that incusd
+would fill the pool, and left no instance. This is the released `dir`
+pool control for #652. The same hosted lane still needs the next beta
+to check the newer import path.
+
 # T-2080: On the incus tier, an exit of 126 or 127 is a refusal of incusd, and a signal leaves the instance running
 
 **Source:** the eighth outside pass (T-2079): OR-B39-01, OR-B39-03, and the P2 findings OR-B39-05, 06, 07, 09, 10, 12, 16 and 18
@@ -7082,7 +7090,7 @@ two cases of the problem: `PeakMemoryBytes` near the truth, and
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** blocked
+**Status:** partial
 
 ## Problem
 
@@ -7118,25 +7126,30 @@ podrunner)` when it is in a beta.
 
 ## Decision
 
--
+Podcrates `v0.85.0` provides `Client::instance_with_etag`,
+`patch_instance_config` and a typed 412 error (#664, T-2097). The call
+sends `If-Match`, reports a conflict without resending the update,
+and reads back each requested key. Podrunner uses cold instances for
+offers with lower limits until podvm releases the update.
 
 ## Prove
 
 `cargo test -p podvm --bin podvm incus::` passes with a table test of the
 flags against the keys and a stand-in incusd that refuses one key. An
 experiment on the job `incus` of `kvm.yml` (cgroup v2): `run -d` with
-`--memory 512m`, `update --memory 256m`, then the limit in the cgroup of
-the instance and `inspect` give 256 MiB.
+`--memory 512m`, then `update --memory 256m`. Incus config and the
+guest cgroup show 256 MiB. The init PID and the running Incus tier
+reported by `podvm inspect` stay the same.
 
-## Blocker
+## Done
 
-COORD-248 (PodUtils/podvm#664) asks podcrates for a typed config PATCH and
-an instance ETag. The podcrates `v0.85.0` candidate at `1d1c9fc` has
-`Client::instance_with_etag`, `patch_instance_config` and a typed 412
-error. Main waits for the release tag. The call sends `If-Match`,
-diagnoses a conflict without retrying it blindly, and reads back each
-requested key. Podrunner uses cold instances for offers with lower
-limits until podvm releases this update.
+Partial (2026-11-26). `podvm update --podvm-tier=incus` uses the `run`
+limit parsers and refuses other tiers and flags. It sends one ETag-guarded
+PATCH for a running podvm container and verifies its identity and the
+requested limits on read-back. A conflicting ETag returns 125. The
+worker passed 47 Incus release tests, CLI contracts and CLI smoke cases.
+Experiment 479 checks the live cgroup values and confirms the same init
+PID. It awaits the hosted Incus run.
 
 # T-2094: The saved state of the machine tier serves a run with `--podvm-channel` and `--pids-limit`
 

@@ -6049,3 +6049,8 @@ Rust and Zig. The watcher logs record activity during the session.
 Use `gh run watch` while a turn waits for a result.
 [Podrunner startup](https://github.com/PodUtils/podrunner/commit/f18c7e114fff12dfb04b9da2118480c055fca36b)
 [PodSSH startup](https://github.com/PodUtils/podssh/commit/a13fef752a385565fd4ac721079663b06b539092)
+
+The 2026-11-26 take of PodUtils/podcrates#263 (`5e872816`) adds the
+shared four-role table and nine-item worker brief. The startup and
+watcher procedures still use the tested paths. The owner assigned
+GPT-6 Luna with medium reasoning to the CI monitor in this session.

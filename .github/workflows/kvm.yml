@@ -354,6 +354,9 @@ jobs:
           sh experiments/471-incus-usage-v2.sh || rc=$?
           exit "$rc"
 
+      - name: experiment 479 (live instance limits)
+        run: sh experiments/479-incus-live-limits.sh
+
       - name: experiment 474 (root disk quota)
         run: |
           set -eu
@@ -372,6 +375,7 @@ jobs:
           path: |
             experiments/results/incus-layer-stream.txt
             experiments/results/incus-usage-v2.txt
+            experiments/results/incus-live-limits.txt
             experiments/results/incus-root-quota.txt
           if-no-files-found: warn
 

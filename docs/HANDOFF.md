@@ -1,6 +1,6 @@
 # Handoff
 
-The state on 2026-11-25 after work resumed in Codex. The local checkout
+The state on 2026-11-26 after work resumed in Codex. The local checkout
 contains the commit that changes this file. A fresh session reads
 `AGENTS.md` first, then this file, `TODO/PROGRESS.md` and
 `docs/decisions.md`. The handoffs before this one are in git: `git show
@@ -32,12 +32,21 @@ contains the commit that changes this file. A fresh session reads
 * podcrates `v0.83.0` is taken on `main` after the tag (T-2089, `a39f4c4f`;
   #663, closed: PodUtils/podcrates#259 lists the take). podrunner pins
   beta.40 in its `4fc871c` (#662, closed).
-* `main` takes podcrates `v0.84.0` and its shared gzip writer (T-2096,
+* T-2096 took podcrates `v0.84.0` and its shared gzip writer (
   `04c8b7f4`, #666, PodUtils/podcrates#260). Hosted Incus run 45619039653
   on `6bb0ae96` passed experiment 475 for the fresh and cached layer
   streams. Hosted run 45621890257 on `7fb9e481` also passed the
   native-tree retention assertions of experiment 434 clause 31.
   T-2085 is done and the record closes #657.
+* Podcrates `v0.85.0` is released and main takes it (T-2097,
+  PodUtils/podcrates#262). The existing diagnostics keep the step and
+  cause of extraction and broker policy failures. The interposer
+  pack keeps raw ELF hashes and placement, and the static candidate
+  is 8,792,472 bytes. The local checks passed.
+* T-2098 fixes a load failure for repeated references to one verified
+  OCI layer. All nine release layout tests passed. The failure came
+  from Podrunner runner-image run 45731427540 on both architectures.
+  Podrunner needs a rerun after it takes a beta with the fix.
 * T-2054's spare-tree helper now clears its environment. Both
   `tree-prefill` paths worked with an empty environment in a private
   Alpine store. T-2054 still tracks the helper's store path in argv.
@@ -96,14 +105,17 @@ contains the commit that changes this file. A fresh session reads
    (COORD-132, `podvm update --podvm-tier=incus` of the memory, CPU and
    process limits of a running instance: T-2093) and PodUtils/podrunner#355
    (COORD-133, a saved state of the machine tier for `--podvm-channel` and
-   `--pids-limit`: T-2094). The podcrates `v0.85.0` candidate `1d1c9fc`
-   has the typed PATCH and ETag API of #664. T-2093 can be prepared
-   against that source and merged after the tag and its tests. T-2094
+   `--pids-limit`: T-2094). The podcrates `v0.85.0` tag at `1d1c9fc`
+   has the typed PATCH and ETag API of #664. The T-2093 update command
+   passed local tests. Hosted experiment 479 checks enforcement and keeps
+   the init PID across updates. T-2094
    passed experiment 473 under TCG. Answer each ask with a COORD issue
    `(to podrunner)` when its work is in a beta.
 2. T-2078 remaining 3: a run on the hosted runner of
-   PodUtils/podrunner#346 with the next beta (remaining 1 is done,
-   experiment 472).
+   PodUtils/podrunner#346 with the next beta. Hosted beta.40 run
+   45731449004 already proves the `dir-small` refusal on the same runner.
+   The pool had 1.86 GiB free for at least 7.21 GiB of estimated need.
+   Experiment 472 proves the pool-resource API on the earlier main.
 3. Sweep the current open issues at each session start (`AGENTS.md`, section 8
    item 7), and map each new issue to the entry of its own finding.
 4. podrunner: #583 (T-1968, a sized writable disk). The machine tier

@@ -214,6 +214,20 @@ selects the incus tier with no flag:
 
 Clause 13 of experiment 434 runs each of them.
 
+## Change live resource limits (T-2093)
+
+```sh
+podvm update --podvm-tier=incus NAME --memory 256m --cpus 2 --pids-limit 64
+```
+
+Give one running container that podvm created and at least one limit.
+The flags use the values of `run`. A fractional CPU value sets the
+Incus scheduler share. An update to the CPU setting replaces the old
+CPU count or share. Podvm checks the instance version during the write
+and reads the limits back. It prints the instance name on success or
+gives exit 125 with the reason. If the instance config changed during
+the update, inspect it before issuing another update.
+
 ## No network and one channel (T-1779)
 
 `run` with `--podvm-tier=incus` takes `--podvm-net none` and
