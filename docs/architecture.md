@@ -78,6 +78,8 @@ It supplies path, ownership, identity, device, and proc compatibility.
 It cannot cover every syscall or static payload.
 The pair targets x86_64 and aarch64. Each of those two binaries embeds the objects of its own machine (T-1721);
 a binary of another architecture embeds none and refuses a dynamic payload by name.
+The build packs each object with gzip, and the runtime decodes the selected object when it first needs it (T-2097).
+The placed ELF and its reported hash are the bytes and the hash of the original object.
 The runtime checks payload and object architecture before use.
 
 ## Machine execution

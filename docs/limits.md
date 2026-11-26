@@ -152,7 +152,8 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   run goes aside with one rename, and the same helper removes it after
   podvm's exit. golang 1.24, 811 MiB, on the cloud host (experiment
   448): a median `run --rm golang true` of 181 ms with the spare, 8.5 s
-  without. A spare uses the disk of one more tree for each image that
+  without. The helper gets the store and the digest of the image on a pipe,
+  so `ps` of another user shows no path of the store (T-2054, item 5). A spare uses the disk of one more tree for each image that
   ran; `rmi` and `image prune` remove it with the extraction.
   `PODVM_SPARE_TREE=0` turns the spare and the deferred removal off. podvm
   never writes the image's own tree after the extraction, so a spare
@@ -225,7 +226,8 @@ Forced FUSE mode enters through a rung-complete read-only server; its live
 entry arm and the permitted-tmpfs entry arm prove automatically where a
 host grants the device and the mount, and refuse naming them where it
 does not. The embedded-rootfs format is the `save` OCI-layout tarball,
-verified per blob on `load`.
+verified per blob on `load`. `load` accepts an OCI archive whose manifest
+repeats the descriptor of a layer, and keeps the order of the layers (T-2098).
 
 ⛔ **Live FUSE and tmpfs entry are a limit of the measured host, not pending work.**
 The prover exists: `experiments/358-ladder-rungs.sh` drives both entry arms
@@ -495,6 +497,9 @@ C26). Experiment 465 measures each line below as uid 1000.
   save: a secret that a service made at its start (a session key, the
   state of a random generator in its memory) is the same in each run.
   With `--verbose` the console of the boot is not shown for such a run.
+  A SIGTERM or another forwarded signal during the save of a state ends the
+  run at once with one line and leaves no partial state file (T-2048,
+  experiment 480).
   A state that does not load, or whose guest does not take the command,
   gives a boot with one line on stderr, and podvm removes that state.
   After three such failures in a row podvm tries no state of that shape
@@ -531,7 +536,7 @@ C26). Experiment 465 measures each line below as uid 1000.
 ## Network lab
 
 `podvm lab scenarios` lists 27 scenarios of `pod-netlab` (checked at
-podcrates `v0.82.1`); sand-net listed 39 (TODO/net.md T-1847). These 12 are absent,
+podcrates `v0.85.0`); sand-net listed 39 (TODO/net.md T-1847). These 12 are absent,
 as each needs a knob of issue 180 (`--vpn`, `--killswitch`, `--vpn-down`,
 `--uplink warp`, `--cfrs-pod`) and a WireGuard server, a live uplink or
 `podnet pod`, so none is an offline lab (podcrates@T-348): `vpn-full`,
@@ -584,6 +589,9 @@ run, writes `memory.max`, `cpu.max` and `pids.max`, and names an OOM kill
 ([cli](../TODO/cli.md) T-1747). Each other case (no delegation, a cgroup
 v1 host, `create`, the machine tier) refuses each of them with exit 125
 and a named reason, instead of an accepted flag that does nothing.
+`podvm update --podvm-tier=incus` changes the three limits of a running
+incus container (T-2093; [the incus tier](incus.md#change-live-resource-limits-t-2093));
+`update` has no other tier.
 `--ulimit nproc=` and `--ulimit as=` hold on each tier, also for
 `run -d`. The hazard is the engine underneath podvm, which
 accepts those limits silently; [RULES](../TODO/RULES.md) section 8 says an
