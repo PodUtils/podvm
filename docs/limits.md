@@ -175,8 +175,11 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   entry works, and the payload is uid 0 of that namespace. `run -d` and
   `create` enter the namespace rung through pod-enter's own user
   namespace (T-1912), with a PID namespace of pod-enter (T-1930) and a
-  UTS namespace only with `--hostname`. No entry of the rung makes a
-  network or an IPC namespace.
+  UTS namespace only with `--hostname`. A foreground `run` of uid 0, or
+  with `PODVM_USERNS=0`, also takes the PID namespace of pod-enter, with
+  `podvm-init` as PID 1 (T-2054); where pod-enter falls back to chroot,
+  the run has no PID namespace. No entry of the rung makes a network or an
+  IPC namespace.
   `exec` and `cp` join the namespaces of a running payload that differ
   from the caller's (T-1910). `-u UID` other than 0 is faked by the
   interposer view unless `PODVM_USERNS_RANGE=1` maps the subordinate

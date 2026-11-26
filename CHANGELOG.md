@@ -8,6 +8,22 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Changed: a foreground run of uid 0 has a PID namespace, 2026-11-26
+
+Record: T-2054 (item 1).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- On the namespace rung, a foreground `run` of uid 0, and a run with
+  `PODVM_USERNS=0`, now has a PID namespace with `podvm-init` as PID 1, as
+  `run -d` has. Before, the payload saw each process of the host and the
+  command line of podvm, and held a descriptor of the image lock. Now it
+  sees only the processes of its run, PID 1 reaps each orphan at once, and
+  podvm keeps the lock.
+- `--init` holds for such a run, and the banner, `inspect` and the manual
+  name the PID namespace.
+- Where the namespace rung falls back to chroot (an image with no `/tmp`),
+  the run has no PID namespace, as before.
+
 ### Fixed: a foreground run reaps an orphan of the payload at once, 2026-11-26
 
 Record: T-2087 (OR-B40-05).

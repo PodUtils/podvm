@@ -243,9 +243,11 @@ pub struct Facts {
     /// The caller is uid 0 of the initial user namespace: pod-enter makes
     /// no user namespace for it.
     pub host_root: bool,
-    /// `run -d` or `create`: the launcher enters with a PID namespace of
-    /// pod-enter (`Plan::pid_namespace`, T-1930).
-    pub detached: bool,
+    /// The entry takes the PID namespace of pod-enter, with its init as
+    /// PID 1 (`Plan::pid_namespace`): `run -d` and `create` (T-1930), and a
+    /// foreground run where podvm opened no PID namespace of its own (uid 0,
+    /// `PODVM_USERNS=0`; TODO/enter.md T-2054).
+    pub pid_init: bool,
     /// `--hostname`: a UTS namespace (T-1908).
     pub hostname: bool,
     /// The image has a `/proc` directory: pod-enter mounts a procfs there
@@ -262,7 +264,7 @@ pub fn of_entry(rung: Rung, f: Facts) -> Opened {
     if f.userns_active || !f.host_root {
         parts.push(Part::User);
     }
-    if f.userns_active || f.detached {
+    if f.userns_active || f.pid_init {
         parts.push(Part::Pid);
     }
     if f.userns_active || f.hostname {
@@ -281,7 +283,7 @@ pub const SHAPES: &[(&str, Facts)] = &[
         Facts {
             userns_active: true,
             host_root: false,
-            detached: false,
+            pid_init: false,
             hostname: false,
             proc_dir: true,
         },
@@ -291,7 +293,7 @@ pub const SHAPES: &[(&str, Facts)] = &[
         Facts {
             userns_active: false,
             host_root: false,
-            detached: false,
+            pid_init: true,
             hostname: false,
             proc_dir: true,
         },
@@ -301,7 +303,7 @@ pub const SHAPES: &[(&str, Facts)] = &[
         Facts {
             userns_active: false,
             host_root: true,
-            detached: false,
+            pid_init: true,
             hostname: false,
             proc_dir: true,
         },
@@ -311,7 +313,7 @@ pub const SHAPES: &[(&str, Facts)] = &[
         Facts {
             userns_active: false,
             host_root: false,
-            detached: true,
+            pid_init: true,
             hostname: false,
             proc_dir: true,
         },
@@ -321,7 +323,7 @@ pub const SHAPES: &[(&str, Facts)] = &[
         Facts {
             userns_active: false,
             host_root: true,
-            detached: true,
+            pid_init: true,
             hostname: false,
             proc_dir: true,
         },

@@ -64,12 +64,14 @@ pub(super) fn entry_banner(
 }
 
 /// TODO/cli.md T-2053 (OQ-07): the facts of the entry of `o`, for each
-/// statement of what it opens (`podvm_probe::isolation`).
-pub(super) fn facts(o: &Opts, detached: bool, rootfs: &str) -> podvm_probe::isolation::Facts {
+/// statement of what it opens (`podvm_probe::isolation`). `pid_init`: the
+/// entry takes pod-enter's PID namespace (`run -d`, `create`, and since
+/// TODO/enter.md T-2054 each foreground entry but a forced launch rung).
+pub(super) fn facts(o: &Opts, pid_init: bool, rootfs: &str) -> podvm_probe::isolation::Facts {
     podvm_probe::isolation::Facts {
         userns_active: crate::userns::active(),
         host_root: crate::userns::host_root(),
-        detached,
+        pid_init,
         hostname: o.hostname.is_some(),
         // pod-enter mounts a procfs on a directory of the image, not on a
         // link and not where the image has none.
