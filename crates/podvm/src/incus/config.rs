@@ -63,6 +63,7 @@ fn first_name(verb: &str, args: &[String]) -> Option<String> {
         ],
         "inspect" => &["-f", "--format"],
         "logs" => &["--tail", "--limit-bytes"],
+        "kill" => &["-s", "--signal"],
         _ => &[],
     };
     let mut it = args.iter();
@@ -83,7 +84,10 @@ fn first_name(verb: &str, args: &[String]) -> Option<String> {
 /// `Err(code)` where the configuration is refused.
 pub fn route(verb: &str, args: &[String]) -> Result<Option<Vec<String>>, i32> {
     let make = matches!(verb, "run" | "create");
-    let lifecycle = matches!(verb, "start" | "stop" | "rm" | "logs" | "inspect" | "exec");
+    let lifecycle = matches!(
+        verb,
+        "start" | "stop" | "rm" | "logs" | "inspect" | "exec" | "wait" | "kill"
+    );
     if !(make || lifecycle) || explicit(args) {
         return Ok(None);
     }

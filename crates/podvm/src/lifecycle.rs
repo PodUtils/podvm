@@ -29,7 +29,7 @@ const STOP_GRACE_MS: u64 = 10_000;
 /// ⛔ `podvm wait`'s bound. `TODO/RULES.md` section 8: a runtime whose audience
 /// is automated may not wait unbounded, so this is long rather than absent and
 /// reaching it is its own reported outcome.
-const WAIT_BOUND_MS: u64 = 3_600_000;
+pub(crate) const WAIT_BOUND_MS: u64 = 3_600_000;
 
 pub const PS_USAGE: &str = "\
 usage: podvm ps [-a|--all] [-q|--quiet] [--format T] [--no-trunc] [--podvm-tier incus]
@@ -75,6 +75,18 @@ pub(crate) fn code_of(e: &podvm_supervise::Error) -> i32 {
     } else {
         EXIT_RUNTIME_ERROR
     }
+}
+
+/// TODO/cli.md T-2087 (OR-B40-04): [`fail`]; where `want` names no
+/// container, a second line names an instance of podvm in incus of that
+/// name ([`crate::incus::ps::hint`]).
+fn fail_named(verb: &str, want: &str, e: podvm_supervise::Error) -> i32 {
+    let not_found = matches!(e.1, Some(pod_core::Class::NotFound));
+    let code = fail(verb, e);
+    if not_found {
+        crate::incus::ps::hint(verb, want);
+    }
+    code
 }
 
 /// `podvm create [options] <image> [command...]`, and the shared half of
@@ -362,7 +374,7 @@ pub fn ps(args: &[String]) -> i32 {
     // configuration selects the incus tier, with no filter (a filter reads
     // the fields of a container).
     let machines = if filters.is_empty() {
-        crate::incus::verbs::ps_rows(all)
+        crate::incus::ps::ps_rows(all)
     } else {
         Vec::new()
     };

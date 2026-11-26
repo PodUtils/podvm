@@ -145,7 +145,7 @@ pub fn logs(args: &[String]) -> i32 {
     };
     let opened = match podvm_supervise::open_log(&s, &o.want) {
         Ok(f) => f,
-        Err(e) => return fail("logs", e),
+        Err(e) => return fail_named("logs", &o.want, e),
     };
     // ⚠ The payload's own bytes, to stdout, unaltered. `logs` is the one
     // verb whose stdout is not podvm's, following or not.

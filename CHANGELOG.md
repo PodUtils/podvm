@@ -20,6 +20,32 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 - The disk does not bound a `-v` volume. The refusals and the failure
   of the mount in the guest are in [Limits](docs/limits.md).
 
+### Fixed: `wait`, `kill` and five other faults of the incus tier, 2026-11-26
+
+Record: T-2079 (OR-B39-09, OR-B39-11, OR-B39-17), T-2087 (OR-B40-04,
+OR-B40-18).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `wait --podvm-tier incus NAME` prints the exit code of the command when
+  the instance stops, also for `run -d --rm`. `kill [-s SIG] --podvm-tier
+  incus NAME` sends the signal (SIGKILL by default) to the command, and
+  `wait` then gives 128 + the signal. `tier = incus` in the configuration
+  routes both verbs. Where `wait`, `kill`, `rm` or `logs` finds no
+  container, a second line names an instance of podvm in incus of that
+  name.
+- An instance that was created and never started reads `Created` in `ps`
+  and `inspect`, not `Stopped`; `inspect --verbose` says that it never
+  started, and `logs` of it prints nothing.
+- `exec -w DIR` on the incus tier refuses a directory that is not there,
+  or a file, with exit 126, as docker's `exec`; it ran the command in `/`.
+  `run -d -w DIR` and `create -w DIR` make the directory, as docker does;
+  the command did not start, and its log named the program.
+- `--podvm-init=image` of an image with no `/sbin/init` ends with one line
+  that names it, and podvm removes the instance.
+- Where the payload removed `/.podvm`, `logs` says that the payload removed
+  the log, not a 404 of incusd; `wait` and `inspect` still give the exit
+  code.
+
 ### Fixed: an incus `--rm` run that the OOM killer ends, and the QEMU copy in the store, 2026-11-26
 
 Record: T-2100 (OR-B41-02, OR-B41-07, OR-B41-13, OR-B41-14).

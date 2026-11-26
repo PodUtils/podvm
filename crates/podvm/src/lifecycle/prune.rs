@@ -30,7 +30,7 @@ pub fn container_group(args: &[String]) -> i32 {
     let verb = match args.first().map(String::as_str) {
         Some("ls" | "list" | "ps") => Some("ps"),
         Some("rm" | "remove") => Some("rm"),
-        v @ Some("start" | "stop" | "logs" | "inspect") => v,
+        v @ Some("start" | "stop" | "logs" | "inspect" | "wait" | "kill") => v,
         _ => None,
     };
     if verb.is_some()

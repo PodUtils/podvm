@@ -184,14 +184,14 @@ pub fn inspect(args: &[String]) -> i32 {
                     continue;
                 }
             };
-            let exit = if i.status == "Running" {
+            // T-2087 (OR-B40-18): an instance that never started has no
+            // exit code and no usage.
+            let created = super::ps::never_started(&i);
+            let exit = if i.status == "Running" || created {
                 "-".to_string()
             } else {
-                match c.get_file(n, super::EXIT).await {
-                    Ok(f) => match f.content {
-                        FileContent::Bytes(b) => String::from_utf8_lossy(&b).trim().to_string(),
-                        _ => "-".to_string(),
-                    },
+                match super::waitkill::read_exit(&c, n).await {
+                    Ok(code) => code.to_string(),
                     Err(_) => "-".to_string(),
                 }
             };
@@ -206,6 +206,14 @@ pub fn inspect(args: &[String]) -> i32 {
             };
             let usage = if i.status == "Running" {
                 usage_of(&c, n).await
+            } else if created {
+                if verbose {
+                    eprintln!(
+                        "podvm inspect: {n}: a value is a dash: the instance is Created and \
+                         never started, so nothing ran in it (TODO/cli.md T-2087)"
+                    );
+                }
+                Usage::default()
             } else {
                 // T-2076: incusd gives no usage of a stopped instance; its
                 // init wrote it at the end.
@@ -249,16 +257,17 @@ pub fn fields(
         .get(IMAGE_KEY)
         .cloned()
         .unwrap_or_else(|| "-".into());
+    let status = super::ps::status(i);
     vec![
         ("Id", i.name.clone()),
         ("Name", i.name.clone()),
         ("Image", image),
-        ("State", i.status.to_lowercase()),
+        ("State", status.to_lowercase()),
         // TODO/cli.md T-2001 OP-06: docker's names of the same values.
-        ("State.Status", i.status.to_lowercase()),
+        ("State.Status", status.to_lowercase()),
         ("State.Running", (i.status == "Running").to_string()),
         ("State.ExitCode", exit.to_string()),
-        ("Status", i.status.clone()),
+        ("Status", status.to_string()),
         ("Running", (i.status == "Running").to_string()),
         ("ExitCode", exit.to_string()),
         ("Created", i.created_at.clone()),
@@ -278,7 +287,7 @@ pub fn json(i: &pod_incus::Instance, exit: &str, cmd: &[String], u: &Usage) -> s
         "Image": i.config.get(IMAGE_KEY),
         "Created": i.created_at,
         "State": {
-            "Status": i.status.to_lowercase(),
+            "Status": super::ps::status(i).to_lowercase(),
             "Running": i.status == "Running",
             "ExitCode": exit.parse::<i64>().ok(),
         },

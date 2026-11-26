@@ -11,10 +11,8 @@
 //!   ([`super::Cmd`]); `run -d` starts it. The command's output goes to
 //!   `/.podvm/log` and its exit code to `/.podvm/exit`; the instance stops
 //!   when the command ends.
-//! * `ps`, `start`, `stop`, `rm`, `logs` and `exec` with
+//! * `ps`, `start`, `stop`, `rm`, `logs`, `exec`, `wait` and `kill` with
 //!   `--podvm-tier=incus` call the API on the instance of that name.
-
-use std::io::Write;
 
 use pod_incus::{Client, FileWrite, NewInstance, Payload, Settings, Source};
 use podvm_image::error::EXIT_RUNTIME_ERROR;
@@ -90,7 +88,10 @@ pub(crate) async fn first_answer(
             "the socket {} took the connection and gave no answer to GET /1.0 within {} s: \
              incusd hangs, or another program holds the socket (TODO/machine.md T-2080)",
             sock.display(),
-            FIRST_ANSWER.as_secs()
+            c.settings()
+                .answer_timeout
+                .unwrap_or(FIRST_ANSWER)
+                .as_secs()
         )),
         Err(e) => Err(e.to_string()),
     }
@@ -98,6 +99,11 @@ pub(crate) async fn first_answer(
 
 /// A client of the incusd of [`socket_path`], checked.
 pub(crate) async fn connect() -> Result<(Client, String), String> {
+    connect_within(FIRST_ANSWER).await
+}
+
+/// [`connect`] with the bound `bound` of each silence of incusd.
+pub(crate) async fn connect_within(bound: std::time::Duration) -> Result<(Client, String), String> {
     let sock = socket_path();
     if !sock.exists() {
         return Err(format!(
@@ -110,7 +116,7 @@ pub(crate) async fn connect() -> Result<(Client, String), String> {
     settings.user_agent = format!("podvm/{}", env!("CARGO_PKG_VERSION"));
     // T-2080: each silence of incusd ends after this bound (podcrates
     // `v0.83.0`, #653).
-    settings.answer_timeout = Some(super::verbs::FIRST_ANSWER);
+    settings.answer_timeout = Some(bound);
     let c = Client::new(settings);
     let server = first_answer(&c, &sock).await?;
     server.check().map_err(|e| e.to_string())?;
@@ -212,6 +218,18 @@ pub(super) async fn detached(c: &Client, job: &Job<'_>, image: &str, d: &Detach)
         let _ = c.delete_instance(&name).await;
         return fail(e);
     }
+    // TODO/cli.md T-2079 (OR-B39-17): with no `lxc.init.cmd`, LXC starts
+    // /sbin/init of the image; where the image has none, incusd gave only
+    // the exit status of its forkstart.
+    if d.init_image
+        && let Some(line) = init_refusal(super::walk::find(c, &name, IMAGE_INIT).await)
+    {
+        let left = discard(c, &name).await;
+        return fail(match left.is_empty() {
+            true => format!("{line}; podvm removed the instance"),
+            false => with_left(line, &left),
+        });
+    }
     if d.start
         && let Err(e) = c.start(&name).await
     {
@@ -255,6 +273,25 @@ pub(crate) fn served(verb: &str) -> &'static [&'static str] {
     }
 }
 
+/// The init that LXC starts where an instance has no `lxc.init.cmd`.
+pub const IMAGE_INIT: &str = "/sbin/init";
+
+/// The refusal of `--podvm-init=image` where [`IMAGE_INIT`] of the image
+/// is not a file; `None` where it is one, or where podvm cannot tell.
+pub fn init_refusal(found: super::walk::Found) -> Option<String> {
+    use super::walk::Found;
+    let what = match found {
+        Found::Missing => "has no",
+        Found::Kind(pod_incus::FileKind::Directory) => "has a directory at",
+        Found::Kind(_) | Found::Unknown(_) => return None,
+    };
+    Some(format!(
+        "--podvm-init=image: the image {what} {IMAGE_INIT}, the init that incus starts as \
+         PID 1; use an image with an init (systemd), or leave out --podvm-init=image for \
+         podvm's own init (TODO/cli.md T-2079)"
+    ))
+}
+
 /// `ps`, `start`, `stop` and `rm` with `--podvm-tier=incus`; `logs` is
 /// [`super::logs`].
 pub fn dispatch(verb: &str, args: &[String]) -> i32 {
@@ -290,7 +327,7 @@ pub fn dispatch(verb: &str, args: &[String]) -> i32 {
             }
         };
         if verb == "ps" {
-            return ps(&c, all).await;
+            return super::ps::ps(&c, all).await;
         }
         let mut code = 0;
         for n in &names {
@@ -317,89 +354,6 @@ pub fn is_instance(name: &str) -> bool {
 /// Whether `inst` is an instance of podvm.
 pub(crate) fn ours(i: &pod_incus::Instance) -> bool {
     i.config.get(LABEL).is_some_and(|v| v == "1")
-}
-
-/// TODO/machine.md T-1846: the rows of `podvm ps` for the instances of
-/// podvm, in the columns of the containers: each one with `all`, else the
-/// running ones.
-pub(super) async fn rows(c: &Client, all: bool) -> Result<Vec<Vec<String>>, String> {
-    let list = c.instances().await.map_err(|e| e.to_string())?;
-    Ok(list
-        .iter()
-        .filter(|i| ours(i) && (all || i.status == "Running"))
-        .map(|i| {
-            let status = if i.status == "Running" {
-                "Up".to_string()
-            } else {
-                format!("Exited ({})", i.status)
-            };
-            vec![
-                i.name.clone(),
-                i.config
-                    .get(IMAGE_KEY)
-                    .cloned()
-                    .unwrap_or_else(|| "-".into()),
-                "(incus instance)".to_string(),
-                if i.created_at.is_empty() {
-                    "-".into()
-                } else {
-                    i.created_at.clone()
-                },
-                status,
-                i.name.clone(),
-            ]
-        })
-        .collect())
-}
-
-/// The rows of `podvm ps` for the instances of podvm where the
-/// configuration selects the incus tier and its incusd answers; none else.
-pub fn ps_rows(all: bool) -> Vec<Vec<String>> {
-    if !matches!(
-        super::config::configured(),
-        Ok(super::config::Configured::Incus { socket: true })
-    ) {
-        return Vec::new();
-    }
-    let out = std::sync::Mutex::new(Vec::new());
-    block_on("ps", async {
-        match connect().await {
-            Ok((c, _)) => match rows(&c, all).await {
-                Ok(r) => {
-                    *out.lock().unwrap_or_else(|e| e.into_inner()) = r;
-                    0
-                }
-                Err(e) => {
-                    eprintln!("podvm ps: incus tier: {e}");
-                    1
-                }
-            },
-            Err(e) => {
-                eprintln!("podvm ps: incus tier: {e}");
-                1
-            }
-        }
-    });
-    out.into_inner().unwrap_or_default()
-}
-
-async fn ps(c: &Client, all: bool) -> i32 {
-    let list = match c.instances().await {
-        Ok(l) => l,
-        Err(e) => {
-            eprintln!("podvm ps: incus tier: {e}");
-            return EXIT_RUNTIME_ERROR;
-        }
-    };
-    let mut out = std::io::stdout().lock();
-    let _ = writeln!(out, "{:<24} {:<10} IMAGE", "NAMES", "STATUS");
-    for i in list.iter().filter(|i| ours(i)) {
-        if all || i.status == "Running" {
-            let image = i.config.get(IMAGE_KEY).map(String::as_str).unwrap_or("-");
-            let _ = writeln!(out, "{:<24} {:<10} {image}", i.name, i.status);
-        }
-    }
-    0
 }
 
 pub(super) async fn one(c: &Client, verb: &str, name: &str, force: bool) -> Result<(), String> {

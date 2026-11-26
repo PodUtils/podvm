@@ -19,7 +19,7 @@ discard_write	crates/podvm/src/exec/command.rs	6
 discard_write	crates/podvm/src/exec/enter.rs	7
 discard_write	crates/podvm/src/images/login_extract.rs	1
 discard_write	crates/podvm/src/incus/run.rs	2
-discard_write	crates/podvm/src/incus/verbs.rs	6
+discard_write	crates/podvm/src/incus/verbs.rs	4
 discard_write	crates/podvm/src/lifecycle/native.rs	2
 discard_write	crates/podvm/src/lifecycle/userland.rs	6
 discard_write	crates/podvm/src/machine/guest/channel.rs	1

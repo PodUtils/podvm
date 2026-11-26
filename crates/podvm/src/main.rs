@@ -131,6 +131,7 @@ fn main() -> std::process::ExitCode {
         Some("guest-channel") => exit(machine::guest::channel::guest_main(rest)), // T-1751
         Some("guest-hold") => exit(incus::hold(rest)),              // an incus init, T-1718
         Some(incus::guest_exec::VERB) => exit(incus::guest_exec::main(rest)), // T-2080
+        Some(incus::waitkill::GUEST_KILL) => exit(incus::waitkill::guest_kill(rest)), // T-2087
         Some(initns::VERB) => exit(initns::main(rest)),             // an init of the image, T-2002
         Some("guest-9p") => exit(machine::guest::vol::main(rest)),  // in a guest, T-1723
         Some("guest-disk") => exit(machine::guest::disk::guest_main(rest)), // in a guest, T-1968

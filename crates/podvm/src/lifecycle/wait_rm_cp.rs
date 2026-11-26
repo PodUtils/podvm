@@ -2,7 +2,7 @@ use super::*;
 
 /// ⚠ By name or by number, and an unknown one is refused rather than defaulted:
 /// sending the wrong signal is not something a caller can notice.
-pub(super) fn signal_number(v: &str) -> Option<i32> {
+pub(crate) fn signal_number(v: &str) -> Option<i32> {
     if let Ok(n) = v.parse::<i32>() {
         return (n > 0 && n < 65).then_some(n);
     }
@@ -30,25 +30,29 @@ pub fn wait(args: &[String]) -> i32 {
             return crate::parity::refuse_member(
                 "wait",
                 &member,
-                "usage: podvm wait <container> [container...]",
+                "usage: podvm wait [--podvm-tier incus] <container> [container...]",
             )
         }
     };
     let args: &[String] = &expanded;
-    if let Some(c) =
-        crate::parity::admit_all("wait", args, "usage: podvm wait <container> [container...]")
-    {
+    if let Some(c) = crate::parity::admit_all(
+        "wait",
+        args,
+        "usage: podvm wait [--podvm-tier incus] <container> [container...]",
+    ) {
         return c;
     }
-    const WAIT_USAGE: &str = "usage: podvm wait <container> [container...]";
+    const WAIT_USAGE: &str = "usage: podvm wait [--podvm-tier incus] <container> [container...]";
     if args.is_empty() || args[0] == "-h" || args[0] == "--help" {
         return super::usage(args.is_empty(), WAIT_USAGE);
     }
     for want in args {
         if want.starts_with('-') {
-            if let Err(c) =
-                crate::parity::admit("wait", want, "usage: podvm wait <container> [container...]")
-            {
+            if let Err(c) = crate::parity::admit(
+                "wait",
+                want,
+                "usage: podvm wait [--podvm-tier incus] <container> [container...]",
+            ) {
                 return c;
             }
             return crate::parity::no_arm("wait", want);
@@ -82,7 +86,7 @@ pub fn wait(args: &[String]) -> i32 {
                 );
                 code = EXIT_RUNTIME_ERROR;
             }
-            Err(e) => code = fail("wait", e),
+            Err(e) => code = fail_named("wait", want, e),
         }
     }
     code
@@ -173,7 +177,7 @@ pub fn rm(args: &[String]) -> i32 {
         code = match remove_tree(&s, want, force) {
             Ok(None) => code,
             Ok(Some(c)) => c,
-            Err(e) => fail("rm", e),
+            Err(e) => fail_named("rm", want, e),
         };
     }
     code
