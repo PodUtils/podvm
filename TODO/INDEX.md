@@ -653,7 +653,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1988](enter.md) | P1 | S | none | enter | done | On the syscall tier, a volume whose guest path is not in the image cannot be stat-ed |
 | [T-1989](cli.md) | P2 | M | none | cli | open | The faults of the fourth outside pass (2026-11-18, the gate of beta.35) |
 | [T-1990](enter.md) | P1 | S | none | enter | partial | On the syscall tier, a dynamic program sometimes fails to start with "errno 11" |
-| [T-1991](enter.md) | P1 | M | none | enter | open | On the syscall tier, `cargo doc` of ripgrep prints "Compiling ripgrep" and then nothing for 45 min |
+| [T-1991](enter.md) | P1 | M | none | enter | done | On the syscall tier, `cargo doc` of ripgrep prints "Compiling ripgrep" and then nothing for 45 min |
 | [T-1992](cli.md) | P1 | M | none | cli | done | Each release publishes its binaries on ghcr.io |
 | [T-1993](machine.md) | P1 | M | none | machine | done | On the incus tier, the init of the image (systemd) runs as PID 1 |
 | [T-1994](machine.md) | P1 | L | none | machine | partial | On the machine tier, a root on a disk for each image and the init of the image |
@@ -740,7 +740,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-671 entries: 21 open, 42 partial, 5 blocked, 603 done.
+671 entries: 20 open, 42 partial, 5 blocked, 604 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -750,10 +750,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 2 | 20 | 0 | 274 | 296 |
+| P1 | 1 | 20 | 0 | 275 | 296 |
 | P2 | 14 | 17 | 4 | 209 | 244 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 21 | 42 | 5 | 603 | 671 |
+| **All** | 20 | 42 | 5 | 604 | 671 |
 
 ## Work order
 

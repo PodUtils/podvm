@@ -1,0 +1,43 @@
+# Experiment 484 (TODO/enter.md T-1991), on the cloud host, 2026-11-26.
+# Before: the binary of main at c98d590. After: the binary of wip/sys1991 with the fix of the break.
+# PODVM_484_HOME and PODVM_484_RG named a store with the image and a clone of ripgrep.
+
+## Before
+
+Does `cargo doc` of ripgrep end on the syscall tier as with no tier?
+2026-11-26T12:57:01Z Linux 6.18.44-fc-v880, uid 0, 4 CPUs
+podvm SHA-256 17e26f09ed47e99ac37ad267c0993ad6fb617826565e05ad6a634730e27a727f
+image mirror.gcr.io/library/rust:1@sha256:e84068000361bf3d4a5ba2b7647f62893528b1eb9f847d7a23b493f5ce8ea254
+ripgrep 178cc027e283fd965cb72d0a7395b219eada170c
+  | tier none: exit 0 in 19.4 s (bound 900 s)
+  |   Documenting grep-pcre2 v0.1.10 (/rg/crates/pcre2)
+  |   Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.44s
+  |   Generated /w/target-none/doc/globset/index.html and 9 other files
+PASS 1: with no tier, exit 0 in 19.4 s
+  | tier syscall: exit None in 137.1 s (bound 137 s)
+FAIL 2: on the tier, exit None in 137.1 s (bound 137 s)
+FAIL 3: 0 object(s) of pcre2_match.c on the tier
+PASS 4: 0 process(es) of the runs stayed
+exit=1
+
+## After
+
+Does `cargo doc` of ripgrep end on the syscall tier as with no tier?
+2026-11-26T12:59:45Z Linux 6.18.44-fc-v880, uid 0, 4 CPUs
+podvm SHA-256 5a9e1fca87f8cfe4ec8e210abb2de9578a15c2327e5d52275cce384bea4adba1
+image mirror.gcr.io/library/rust:1@sha256:e84068000361bf3d4a5ba2b7647f62893528b1eb9f847d7a23b493f5ce8ea254
+ripgrep 178cc027e283fd965cb72d0a7395b219eada170c
+  | tier none: exit 0 in 19.3 s (bound 900 s)
+  |   Documenting grep-pcre2 v0.1.10 (/rg/crates/pcre2)
+  |   Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.71s
+  |   Generated /w/target-none/doc/globset/index.html and 9 other files
+PASS 1: with no tier, exit 0 in 19.3 s
+  | tier syscall: exit 0 in 20.5 s (bound 137 s)
+  |   Documenting grep-pcre2 v0.1.10 (/rg/crates/pcre2)
+  |   Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.70s
+  |   Generated /w/target-syscall/doc/globset/index.html and 9 other files
+PASS 2: on the tier, exit 0 in 20.5 s (bound 137 s)
+PASS 3: 1 object(s) of pcre2_match.c on the tier
+PASS 4: 0 process(es) of the runs stayed
+CARGO DOC OF RIPGREP ENDS ON THE SYSCALL TIER
+exit=0
