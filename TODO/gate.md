@@ -6054,3 +6054,4 @@ The 2026-11-26 take of PodUtils/podcrates#263 (`5e872816`) adds the
 shared four-role table and nine-item worker brief. The startup and
 watcher procedures still use the tested paths. The owner assigned
 GPT-6 Luna with medium reasoning to the CI monitor in this session.
+PodUtils/podcrates#263 lists the take from #670.

@@ -557,13 +557,13 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #661 | COORD-245: the owner's rulings "Watchers" and "Work until done" of 2026-11-24, and a shared watcher of the Actions runs of a repository (to podcrates) | closed (podcrates v0.83.0 has runs.py, PodUtils/podcrates#259; taken in a39f4c4f, #663) | none: the rulings (docs/decisions.md, 2026-11-24) and an ask of a shared tool |
 | #662 | COORD-246: v0.2.0-beta.40 is out (to podrunner) | closed (podrunner pins v0.2.0-beta.40 in its 4fc871c, the state line of PodUtils/podrunner#350 and #345, 2026-11-25) | T-1949, T-2086, T-2087 |
 | #663 | COORD-247: podvm took podcrates v0.83.0 in a39f4c4f (the answer to PodUtils/podcrates#259) (to podcrates) | closed (PodUtils/podcrates#259 lists the take under "Takes": a39f4c4f, closed 2026-11-25) | T-2089 |
-| #664 | COORD-248: pod-incus config PATCH for live instance limits (to podcrates) | open | T-2093 |
+| #664 | COORD-248: pod-incus config PATCH for live instance limits (to podcrates) | closed (v0.85.0 taken and hosted run 45735495867 passed) | T-2093 |
 | #665 | [gh action] requested | closed (direct dispatch started run 45593099465 on `04c8b7f4`) | the dispatch of the `incus` job of `kvm.yml` (experiment 474, T-1964) |
 | #666 | COORD-249: podvm took podcrates v0.84.0 (to podcrates) | closed (PodUtils/podcrates#260 lists `04c8b7f4` under Takes) | T-2096 |
 | #667 | COORD-250: required size-limited tmpfs mounts in pod-enter (to podcrates) | open | T-1968 |
 | #668 | COORD-251: pinned static EROFS writer for a streamed OCI disk root (to podcrates) | open | T-1994 |
-| #669 | COORD-252: podvm took podcrates v0.85.0 (to podcrates) | open | T-2097 |
-| #670 | COORD-253: podvm took the shared hosted-session roles (to podcrates) | open | T-2095 |
+| #669 | COORD-252: podvm took podcrates v0.85.0 (to podcrates) | closed (PodUtils/podcrates#262 lists `9466c984`) | T-2097 |
+| #670 | COORD-253: podvm took the shared hosted-session roles (to podcrates) | closed (PodUtils/podcrates#263 lists `5e872816`) | T-2095 |
 | #671 | COORD-254: podvm load accepts repeated OCI layers in runner archives (to podrunner) | open | T-2098 |
 
 ## Messages whose title does not start with COORD-NNN

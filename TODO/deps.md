@@ -2652,3 +2652,4 @@ members reduced the integrated static candidate to 8,792,472 bytes.
 The decode tests checked exact size, end of stream and checksum. On
 pinned Alpine, the musl SHA-256 reported by `version --verbose` matched
 the file placed at `/.podvm/interpose.so` (T-0702).
+PodUtils/podcrates#262 lists the take from #669.

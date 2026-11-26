@@ -553,11 +553,11 @@
 661 issue closed
 662 issue closed
 663 issue closed
-664 issue open
+664 issue closed
 665 issue closed
 666 issue closed
 667 issue open
 668 issue open
-669 issue open
-670 issue open
+669 issue closed
+670 issue closed
 671 issue open

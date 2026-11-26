@@ -1,0 +1,26 @@
+question  can podvm lower the limits of a running Incus instance?
+date      2026-11-26T01:29:47Z
+host      Linux 7.0.0-1018-aws x86_64
+revision  9e49c275032d466bfff45481c98e00a65fc31531
+image     mirror.gcr.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+podvm 0.2.0-beta.40
+Client version: 6.0.0
+Server version: 6.0.0
+3.20: Pulling from library/alpine
+25f1d6b1951a: Pull complete
+Digest: sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+Status: Downloaded newer image for mirror.gcr.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+podvm: probed this machine rather than using the cache: /tmp/podvm-479.qSCTzUQL/store/probe.json does not exist yet
+podvm run: incus tier: incusd 6.0.0 at /var/lib/incus/unix.socket, image podvm-c64c687cbea93001-35e164280d06f197-v4 from incus (TODO/machine.md T-1718)
+live479-qsctzuql
+instance  live479-qsctzuql (host init PID 8738)
+initial config memory processes CPUs: 536870912B 128 2
+initial cgroup memory.max pids.max allowed-CPU count: 536870912 128 2
+live479-qsctzuql
+memory-update config memory processes CPUs: 268435456B 128 2
+memory-update cgroup memory.max pids.max allowed-CPU count: 268435456 128 2
+live479-qsctzuql
+process-update config memory processes CPUs: 268435456B 64 1
+process-update cgroup memory.max pids.max allowed-CPU count: 268435456 64 1
+live479-qsctzuql
+PASS: the live Incus limits changed without restarting the instance

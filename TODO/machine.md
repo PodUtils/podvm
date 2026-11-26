@@ -7090,7 +7090,7 @@ two cases of the problem: `PeakMemoryBytes` near the truth, and
 **Milestone:** none
 **Priority:** P2
 **Effort:** M
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -7143,13 +7143,21 @@ reported by `podvm inspect` stay the same.
 
 ## Done
 
-Partial (2026-11-26). `podvm update --podvm-tier=incus` uses the `run`
+**Done (2026-11-26).** Hosted Incus run 45735495867 on `9e49c275`
+passed experiment 479 with Incus 6.0.0 and cgroup v2. Memory changed from
+512 MiB to 256 MiB, `pids.max` from 128 to 64, and CPU affinity from two
+CPUs to one. Config and kernel values matched at each stage. The
+container stayed running with host init PID 8738. The experiment removed it
+at exit. The stream, usage and root quota checks also passed. See
+[the live-limits transcript](../experiments/results/incus-live-limits.txt).
+
+The command `podvm update --podvm-tier=incus` uses the `run`
 limit parsers and refuses other tiers and flags. It sends one ETag-guarded
 PATCH for a running podvm container and verifies its identity and the
 requested limits on read-back. A conflicting ETag returns 125. The
 worker passed 47 Incus release tests, CLI contracts and CLI smoke cases.
-Experiment 479 checks the live cgroup values and confirms the same init
-PID. It awaits the hosted Incus run.
+Run 45734572732 stopped before the update when the Incus `query` CLI
+refused the global `--project` flag. Run 45735495867 uses the query URL.
 
 # T-2094: The saved state of the machine tier serves a run with `--podvm-channel` and `--pids-limit`
 

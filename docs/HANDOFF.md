@@ -42,14 +42,20 @@ contains the commit that changes this file. A fresh session reads
   PodUtils/podcrates#262). The existing diagnostics keep the step and
   cause of extraction and broker policy failures. The interposer
   pack keeps raw ELF hashes and placement, and the static candidate
-  is 8,792,472 bytes. The local checks passed. The take is `9466c984`,
-  with acknowledgement #669. The shared role table and worker brief
-  are in `5e872816` and acknowledgement #670.
+  is 8,792,472 bytes. The local checks passed. PodUtils/podcrates#262
+  lists `9466c984` and acknowledges #669. Its #263 lists `5e872816` and
+  acknowledges #670 for the shared role table and worker brief.
 * T-2098 fixes a load failure for repeated references to one verified
   OCI layer. All nine release layout tests passed. Both jobs in
   Podrunner runner-image run 45731427540 reported a missing empty-layer
   blob. The run kept no archive. #671 asks for a rerun after podrunner
   takes a beta with the fix.
+* T-2093 is done. Hosted Incus run 45735495867 on `9e49c275` passed
+  experiment 479 with Incus 6.0.0 and cgroup v2. The observed limits
+  were 512 to 256 MiB, 128 to 64 processes and two to one CPUs. The
+  init PID stayed the same. The stream, usage and Btrfs root-cap checks
+  also passed. Gate 45735495585 passed on the same revision. #664 is closed.
+  [Live-limits transcript](../experiments/results/incus-live-limits.txt)
 * T-2054's spare-tree helper now clears its environment. Both
   `tree-prefill` paths worked with an empty environment in a private
   Alpine store. T-2054 still tracks the helper's store path in argv.
@@ -77,10 +83,10 @@ contains the commit that changes this file. A fresh session reads
   `a033f62`, experiment 472), what the namespace rung opens (T-2092, #546),
   the commit of `podvm-dev build` (T-2091, #531). Gate 45536609832 on
   `a033f62` and gate 45539122840 on `07416ff` are green.
-* The start sweep found 52 open issues in GitHub and in the record.
-  #664 (the pod-incus request) is open. Direct dispatch superseded #665.
-  Podcrates lists the take under Takes in PodUtils/podcrates#260.
-  The record closes #666 when it is pushed and issue-sync runs.
+* The finish sweep reconciled the open issue list with `TODO/github.txt`.
+  The record closes #664, #669 and #670 after the hosted proof and
+  sibling acknowledgements. #652 records the hosted beta.40 low-space
+  control and keeps the current candidate's hosted retest open.
 * The issue cleanup of 2026-11-24 is done: four agents checked each open
   issue against the code, the record and a run of the beta.40 binary. 87
   issues are closed with a comment of evidence; 56 stay open, each with a
@@ -104,18 +110,13 @@ contains the commit that changes this file. A fresh session reads
 
 ## Next steps, in order
 
-1. Two asks of podrunner (2026-11-25): PodUtils/podrunner#354
-   (COORD-132, `podvm update --podvm-tier=incus` of the memory, CPU and
-   process limits of a running instance: T-2093) and PodUtils/podrunner#355
-   (COORD-133, a saved state of the machine tier for `--podvm-channel` and
-   `--pids-limit`: T-2094). The podcrates `v0.85.0` tag at `1d1c9fc`
-   has the typed PATCH and ETag API of #664. The T-2093 update command
-   passed local tests. Hosted run 45734572732 on `9466c984` passed the
-   stream and usage checks. Experiment 479 needed the project in the
-   query URL because Incus `query` rejects the global `--project` flag.
-   Repeat the live proof with that harness fix. T-2094
-   passed experiment 473 under TCG. Answer each ask with a COORD issue
-   `(to podrunner)` when its work is in a beta.
+1. The next beta still needs the checks in
+   [the release checklist](maintenance.md#releases), including blind QA.
+   It carries T-2093 for PodUtils/podrunner#354 (live Incus limits) and
+   T-2094 for PodUtils/podrunner#355 (saved-state channels and process
+   limits). The T-2093 hosted proof and the T-2094 TCG proof passed.
+   Send a COORD for each after release, and name the released OCI layout
+   fix in #671 so podrunner can rerun its two-architecture image build.
 2. T-2078 remaining 3: a run on the hosted runner of
    PodUtils/podrunner#346 with the next beta. Hosted beta.40 run
    45731449004 already proves the `dir-small` refusal on the same runner.
