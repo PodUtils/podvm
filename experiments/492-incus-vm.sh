@@ -34,6 +34,8 @@ export INCUS_SOCKET=$PODVM_INCUS_SOCKET
 export LC_ALL=C
 
 incus_call() { timeout -k 5 60 incus --project default "$@" </dev/null; }
+# `incus query` refuses `--project`: the project goes in the path.
+incus_query() { timeout -k 5 60 incus query "$@" </dev/null; }
 podvm_call() {
     t=$1
     shift
@@ -55,7 +57,8 @@ for cmd in incus docker jq timeout; do
     command -v "$cmd" >/dev/null || skip "no $cmd"
 done
 [ -S "$PODVM_INCUS_SOCKET" ] || skip "no incus socket at $PODVM_INCUS_SOCKET"
-driver=$(incus_call query local:/1.0 | jq -r .environment.driver) || skip "incusd did not answer"
+driver=$(incus_query local:/1.0 | jq -r .environment.driver) || skip "incusd did not answer"
+[ -n "$driver" ] || skip "incusd gave no drivers"
 show "drivers   $driver"
 case "$driver" in
 *qemu*) ;;
@@ -121,7 +124,7 @@ run_vm vm492a sh -c 'while [ ! -e /run/podvm492.go ]; do sleep 1; done; exit 7' 
 }
 cat "$work/run1.err" >>"$out"
 show "clause 1  first run -d took $(($(date +%s) - start)) s"
-kind=$(incus_call query local:/1.0/instances/vm492a | jq -r .type)
+kind=$(incus_query "local:/1.0/instances/vm492a?project=default" | jq -r .type)
 [ "$kind" = virtual-machine ] || fail "clause 1: the instance is a $kind"
 grep -q "imported now" "$work/run1.err" || fail "clause 1: no import of the VM image"
 show "clause 1  PASS: a virtual-machine, image imported now"
@@ -150,7 +153,7 @@ code=$(podvm_call 300 wait --podvm-tier=incus vm492a 2>>"$out") || fail "clause 
 show "clause 4  wait: $code"
 [ "$code" = 7 ] || fail "clause 4: wait gives $code, not 7"
 i=0
-while [ "$(incus_call query local:/1.0/instances/vm492a | jq -r .status)" != Stopped ]; do
+while [ "$(incus_query "local:/1.0/instances/vm492a?project=default" | jq -r .status)" != Stopped ]; do
     i=$((i + 1))
     [ "$i" -lt 120 ] || fail "clause 4: the VM is not Stopped 120 s after wait"
     sleep 1
