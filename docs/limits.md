@@ -52,6 +52,17 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   option `mode=M` (octal, up to 7777) is the mode of that directory. A
   mount with `size=` has the mode 1777 of the kernel, and a `mode=` of it
   that is not 1777 is refused by name (OR-B38-16, T-2070).
+- With `-it`, the pty of `run` and `exec` is the controlling terminal of
+  the payload where podvm can leave the session of the caller: a user
+  with no root on the namespace rung, and `exec` into its `run -d`
+  (T-2070). A job-control shell then has `/dev/tty`, Ctrl-C goes to its
+  foreground job, and Ctrl-Z stops that job. podvm, the parent of the
+  payload, leads the session; in docker the payload leads it. As root
+  (podvm leads its process group) and with `-t` and no `-i`, the pty is
+  the controlling terminal of no process: an interactive shell turns job
+  control off, and podvm sends the signal of Ctrl-C and Ctrl-\ to the
+  processes of the payload itself. The session of the payload needs
+  podcrates@T-927 (COORD-188).
 - On the namespace rung a volume (`-v HOST:GUEST`) is a bind mount:
   `/proc/mounts` lists it, and `/proc/self/mountinfo` names the host path
   (T-1920). On the userland rung a volume, `--tmpfs` and `--read-only` are

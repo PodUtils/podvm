@@ -9,9 +9,17 @@
 //! raw for the run, so each key goes to the payload once and its echo comes
 //! from the pty.
 //!
-//! ⚠ The slave is not the controlling terminal of the payload: the entry of
-//! `pod-enter` makes no session. `isatty`, `ttyname` and the line discipline
-//! work; job control of an interactive shell does not.
+//! The slave is the controlling terminal of the payload where podvm relays
+//! stdin (`-i`) and can leave the caller's session: podvm makes it the
+//! terminal of its own new session, and the payload is a member of that
+//! session ([`leave_the_session`], TODO/cli.md T-2070). A job-control shell
+//! then has `/dev/tty`, takes a group of its own and makes it the
+//! foreground group.
+//! ⚠ `pod-enter` makes no session of the payload (COORD-188,
+//! podcrates@T-927): with `-t` and no `-i`, and where podvm leads its process group
+//! (root from a shell), the slave is the controlling terminal of no
+//! process. `isatty`, `ttyname` and the line discipline work; job control
+//! of an interactive shell does not.
 
 use std::ffi::{c_int, c_ulong};
 use std::io::{Read, Write};
@@ -42,6 +50,7 @@ const TIOCGPTN: c_ulong = 0x8004_5430;
 const TIOCSPTLCK: c_ulong = 0x4004_5431;
 const TIOCGWINSZ: c_ulong = 0x5413;
 const TIOCSWINSZ: c_ulong = 0x5414;
+const TIOCSCTTY: c_ulong = 0x540E;
 const O_NOCTTY: i32 = 0o400;
 
 /// The master and the slave of one pty.
@@ -128,7 +137,7 @@ impl Pty {
         // SIGINT of podvm, which the waiter forwards to the payload.
         let raw = stdin.then(Raw::new);
         if stdin {
-            leave_the_session();
+            leave_the_session(self.slave.as_raw_fd());
         }
         let (done, wait) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
@@ -188,20 +197,41 @@ impl Pty {
 /// the foreground group of the caller's terminal, and the relay, now in a
 /// background group, got no more input after the first chunk. This
 /// process leaves the session before the spawn (`setsid`), so its
-/// payload has no controlling terminal: `/dev/tty` is `ENXIO` and the
-/// shell turns job control off, as on each other rung.
+/// payload does not get the caller's terminal.
+/// TODO/cli.md T-2070 (OR-B38-17, OR-B40-13): the new session then takes
+/// the slave `slave` as its controlling terminal (`TIOCSCTTY`), so the
+/// payload, a member of the session, has the pty as its terminal: its
+/// `/dev/tty` is the pty, and a job-control shell makes its group the
+/// foreground group, as docker gives it. Before, the payload had no
+/// terminal, and the shell said "can't access tty; job control turned
+/// off". The leader of the session is podvm, the parent of the payload.
+/// In docker the payload leads its own session: that needs the fork of
+/// `pod-enter` (COORD-188, podcrates@T-927).
 /// ⚠ Only with `-i`: the caller's terminal is then raw and sends no
 /// signal. With `-t` and no `-i` it stays cooked, and its interrupt key
 /// must reach the process group of podvm and the payload (OR-03).
 /// ⚠ `setsid` fails (`EPERM`) where this process leads its process group
-/// (a foreground run of root from a shell); the session then stays, and
-/// no rung of such a run binds `/dev/tty`.
-fn leave_the_session() {
+/// (a foreground run of root from a shell); the session then stays, the
+/// pty is no controlling terminal, and no rung of such a run binds
+/// `/dev/tty`.
+fn leave_the_session(slave: c_int) {
     unsafe extern "C" {
         fn setsid() -> c_int;
     }
     // SAFETY: setsid takes no argument; a refusal changes nothing.
-    let _ = unsafe { setsid() };
+    if unsafe { setsid() } < 0 {
+        return;
+    }
+    // SAFETY: an open descriptor of the slave; the argument 0 takes no
+    // terminal of another session.
+    if unsafe { ioctl(slave, TIOCSCTTY, 0) } != 0 {
+        let e = std::io::Error::last_os_error();
+        // The caller's terminal is raw: a line ends with CR LF.
+        eprint!(
+            "podvm: -t: the pty is not the controlling terminal of the payload ({e}); \
+             a job-control shell turns job control off (TODO/cli.md T-2070)\r\n"
+        );
+    }
 }
 
 /// The payload of the run, for the interrupt key (0: none yet).

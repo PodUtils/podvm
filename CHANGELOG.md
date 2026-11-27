@@ -8,6 +8,22 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: the pty of `-it` is the controlling terminal of the payload of a user, 2026-11-27
+
+Record: T-2070 (OR-B38-17), T-2087 (OR-B40-13).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- As a user with no root on the namespace rung, `run -it IMAGE sh` and
+  `exec -it CTR sh` into a `run -d` give the shell the pty as its
+  controlling terminal. The shell no longer says "can't access tty; job
+  control turned off": its group is the foreground group of the pty,
+  Ctrl-C ends its foreground job and the shell goes on, and Ctrl-Z stops
+  the job. podvm leads the session of the pty, as the parent of the
+  payload.
+- Known gap: as root and with `-t` and no `-i`, the pty is still the
+  controlling terminal of no process. That needs the session of the
+  payload in podcrates (podcrates@T-927, COORD-188).
+
 ### Fixed: each number flag is refused outside its range with one true line, 2026-11-27
 
 Record: T-1947.
