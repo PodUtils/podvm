@@ -593,6 +593,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #697 | COORD-269: pod-guest: the module closure from the text of modules.dep and modules.builtin, with compressed modules (to podcrates) | open | T-1994 |
 | #698 | COORD-270: pod-core: one bounded parser of a number that a flag takes, with one refusal line (to podcrates) | open | T-1947 |
 | #699 | [gh action] requested | closed (gate 45958922063 failed on `ddbc820`: the `stop -t -1` row of `number_flags`; fixed in `71142da`) | the gate after T-1947 and T-2108 (`stop -t -1`) on `ddbc820` |
+| #700 | [gh action] requested | open | the gate after the fix of the `stop -t -1` row (`71142da`) on `cd952a3` |
 
 ## Messages whose title does not start with COORD-NNN
 
