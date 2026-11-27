@@ -6160,7 +6160,7 @@ Stream the unified tarball into the import of incusd (`POST /1.0/images` with th
 **Milestone:** none
 **Priority:** P1
 **Effort:** L
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -6183,10 +6183,27 @@ the links of the image, the choice by `PODVM_MACHINE_IMAGE_KERNEL`, the
 bzImage check and the refusal of a missing driver by name), so that the
 two tiers have one search. The mode itself is not started.
 
+Decision (2026-11-27, T-1998): the direct boot is `raw.qemu` `-kernel`,
+`-initrd` and `-append`, which incusd 6.0 serves (it starts the VM with no
+UEFI firmware), with `raw.apparmor` for the two files of the store. This
+needs no ESP, no GPT and no FAT writer; the ESP of `/boot/efi` is not used.
+The kernel line has `fstab=no`, because the disks of the fstab of the image
+are the host's. incusd reads the files of a VM only while it runs, so the
+VM stays up after its command, at most 120 s, until `wait` read the exit
+code.
+
 ## Prove
 
-`kvm.yml`, a new step with incus: `run -d --podvm-tier=incus --podvm-vm --podvm-init=image` of an image with a kernel boots it; `systemctl is-system-running` gives running or degraded; `losetup -f` prints a device; the exit code of the command is the exit code of the run; a second run of the same digest reuses the VM image.
+```sh
+cargo test -p podvm --bin podvm -- incus::vm run::tier_options
+gh workflow run kvm.yml -R PodUtils/podvm --ref main -f only=incusvm
+```
 
+The job `incusvm` of `kvm.yml` runs `experiments/492-incus-vm.sh`: `run -d --podvm-tier=incus --podvm-vm --podvm-init=image` of an image with a kernel boots it; `systemctl is-system-running` gives running or degraded; `losetup -f` prints a device; the exit code of the command is the exit code of the run; a second run of the same digest reuses the VM image.
+
+## Done
+
+Partial (2026-11-27): `--podvm-vm` is in the parser, the help and the table, and `incus/vm.rs` serves it. The image: an ext4 root disk of the tree with 8 GiB free (the writer of T-1994, `plan_with`), the label of `/` of the image's fstab, `/.podvm/podvm`, an empty `/etc/machine-id` and a udev rule and a unit that start `incus-agent` from the 9p drive `config`; written as qcow2 (`incus/vm/qcow2.rs`) and imported as a split VM image (pod-incus `ImageData::Split { vm: true }`) under `podvm-vm-HEX16-PODVM16-v1`. The kernel and the initrd come from the search of `kernel_image.rs` (`chosen`, `drivers`, `initrd_file`) and stay in the store; a second run of the digest takes the alias. The boot: `raw.qemu` with `-kernel`, `-initrd` and `-append`, `raw.apparmor` for the two files, `fstab=no`. podvm waits for systemd, pushes the command and starts `guest-hold --run --detach --linger 120`; `wait` reads the exit code of a running VM and writes `/.podvm/exit.read`, and the VM stops. Refusals with 125: an incusd with no `qemu` driver, an image with no kernel, initrd or driver, `--podvm-engine`, `--podvm-channel`, `--pids-limit`, `--storage-opt`, a CPU allowance, and `--podvm-vm` without `--podvm-tier=incus`, `--podvm-init=image` or `-d`/`create`. The unit tests `the_vm_mode_takes_or_refuses_each_ask` and `the_disk_of_a_vm_holds_the_image_the_agent_and_room` pass (the qcow2 file passes `qemu-img check` and `qemu-img compare`; the disk passes `e2fsck -fn` and mounts read-write). Remaining: the hosted proof (the job `incusvm` of `kvm.yml`, experiment 492).
 # T-1999: The `security.capability` xattrs of an image stay on the incus tier and the machine tier
 
 **Source:** PodUtils/podrunner#316 (COORD-106 of podrunner, the owner's ruling "The hosted snapshot" of podrunner)

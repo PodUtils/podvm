@@ -456,7 +456,8 @@ pub(super) fn incus_tier(
             .iter()
             .map(|(_, k, v)| (*k, v.clone()))
             .chain(crate::incus::run::engine_keys(o.engine))
-            .chain(crate::incus::run::snapshot_keys(o.init_image)) // T-1996
+            // T-1996; the keys of the ids are a container's (T-1998).
+            .chain(crate::incus::run::snapshot_keys(o.init_image && !o.vm))
             .collect(),
         // TODO/machine.md T-1722: create and run -d keep the instance.
         detach: (verb == "create" || o.detach).then(|| crate::incus::verbs::Detach {
@@ -475,6 +476,7 @@ pub(super) fn incus_tier(
         name: (verb == "run" && !o.detach)
             .then(|| o.name.clone())
             .flatten(),
+        vm: o.vm, // T-1998
         // TODO/machine.md T-1779: no NIC, and the channel as a proxy device.
         net_none: o.net_none,
         channel: o.channel.clone(),

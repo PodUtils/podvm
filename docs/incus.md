@@ -357,6 +357,45 @@ mode of the image, so an image with files of mode 0000 (`ubi-init`) imports
 starts `systemd-tmpfiles-clean.service` in it
 ([its run](../experiments/results/incus-tier.txt)).
 
+## An OCI image with a kernel as a VM (T-1998)
+
+`run -d --podvm-tier=incus --podvm-vm --podvm-init=image IMAGE CMD` (also
+`create`) runs the image as a virtual machine of incusd
+(PodUtils/podrunner#316). incus runs an OCI image only as a container
+(lxc/incus#1360), and the hosted snapshot needs its own kernel and a loop
+device. The code is `crates/podvm/src/incus/vm.rs`.
+
+1. The image: once for each digest and build of podvm, podvm writes an
+   ext4 root disk of the tree of the image with 8 GiB of free space (the
+   writer of the machine tier, T-1994), as qcow2, and imports it as a VM
+   image under the alias `podvm-vm-HEX16-PODVM16-vN`. The root has the
+   label of the line of `/` in the fstab of the image (`cloudimg-rootfs` on
+   the snapshot), else `podvm-root`. The disk holds `/.podvm/podvm`, an
+   empty `/etc/machine-id`, and a udev rule and a unit that start
+   `incus-agent` from the 9p drive `config` of incusd: the exec and the
+   file calls of incusd reach a VM through the agent only.
+2. The kernel: the search of the machine tier (`kernel_image.rs`,
+   `PODVM_MACHINE_IMAGE_KERNEL`), and the initrd of the same release
+   (`/boot/initrd.img-RELEASE`, `/boot/initramfs-RELEASE.img`). The kernel
+   must have the drivers of the root disk (virtio-scsi, ext4), of the agent
+   (virtio_console, vsock, 9p) and of the NIC. The two files stay in the
+   store under `incus-vm/ALIAS/`; a second run of the digest takes the
+   alias and the files.
+3. The boot: a direct boot. `raw.qemu` gives QEMU `-kernel`, `-initrd` and
+   `-append 'root=LABEL=L rw console=ttyS0 fsck.mode=skip fstab=no'`, and
+   `raw.apparmor` lets QEMU read the two files. `fstab=no`: the disks of the
+   fstab of the image (an ESP, a resource disk) are the host's.
+4. The run: podvm waits for systemd as step 1 of the section above, pushes
+   the command, and starts `guest-hold --run --detach --linger 120`. incusd
+   reads the files of a VM only while it runs, so the VM stays up after the
+   command, at most 120 s, until `wait` read the exit code; then it stops.
+
+An incusd with no VM driver (`environment.driver` with no `qemu`: no
+`/dev/kvm`, no `/dev/vsock` or no QEMU), an image with no kernel, no initrd
+or a missing driver, `--podvm-engine`, `--podvm-channel`, `--pids-limit`,
+`--storage-opt` and a CPU allowance end the run with one line and exit 125.
+`kvm.yml`, job `incusvm`, runs experiment 492.
+
 ## The hosted snapshot (T-1996, T-1997, T-1999)
 
 An image of a hosted runner is large and holds users, `fuse-overlayfs` and
@@ -485,7 +524,8 @@ it wrote, so after the failure the pool has its space again.
 
 * incus virtual machines and their speed: they need `/dev/kvm`; the runner
   of `kvm.yml` (T-1682) has it.
-* An OCI image with a kernel as an incus virtual machine (T-1998).
+* The hosted proof of the VM mode (T-1998, experiment 492), and the
+  exit code and the log of a VM after it stopped.
 * The network of an instance under route A.
 * A static `incusd`.
 * A push of podvm that each instance does not repeat (a shared file, or a

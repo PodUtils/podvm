@@ -33,7 +33,7 @@ mod files;
 #[cfg(test)]
 use files::read_module_within;
 use files::{check_bzimage, kernel_file, text};
-pub use files::{pick, read_module, releases};
+pub use files::{initrd_file, pick, read_module, releases};
 
 /// The variable of the choice.
 pub const VAR: &str = "PODVM_MACHINE_IMAGE_KERNEL";
@@ -300,11 +300,10 @@ pub struct Own {
     pub load: Vec<(String, PathBuf)>,
 }
 
-/// The kernel of `release` of the image at `rootfs`, for `groups`.
-pub fn own(rootfs: &Path, release: &str, groups: &[&Group]) -> Result<(PathBuf, Own), String> {
-    let kernel = kernel_file(rootfs, release)
-        .ok_or_else(|| format!("the image has no kernel file of {release}"))?;
-    check_bzimage(&kernel)?;
+/// The drivers of the kernel `release` of the image at `rootfs`, and the
+/// directory of its modules in the image. TODO/machine.md T-1998: the
+/// incus tier reads them too, so that the two tiers have one search.
+pub fn drivers(rootfs: &Path, release: &str) -> Result<(Drivers, String), String> {
     let dirs = [
         format!("/lib/modules/{release}"),
         format!("/usr/lib/modules/{release}"),
@@ -325,6 +324,31 @@ pub fn own(rootfs: &Path, release: &str, groups: &[&Group]) -> Result<(PathBuf, 
         &[format!("/boot/config-{release}"), format!("{dir}/config")],
     )?;
     let d = Drivers::parse(release, &dep, &builtin, config.as_deref());
+    Ok((d, dir.clone()))
+}
+
+/// TODO/machine.md T-1998: the kernel of the image that [`VAR`] chooses
+/// (the one kernel of the image where it is not set), its release, and
+/// its file after the bzImage check.
+pub fn chosen(rootfs: &Path) -> Result<(String, PathBuf), String> {
+    let var = match std::env::var_os(VAR) {
+        None => None,
+        Some(v) => Some(v.into_string().map_err(|_| format!("{VAR} is not UTF-8"))?),
+    };
+    let want = wanted(var.as_deref(), false)?.unwrap_or(Want::One);
+    let release = pick(&want, &releases(rootfs))?;
+    let kernel = kernel_file(rootfs, &release)
+        .ok_or_else(|| format!("the image has no kernel file of {release}"))?;
+    check_bzimage(&kernel)?;
+    Ok((release, kernel))
+}
+
+/// The kernel of `release` of the image at `rootfs`, for `groups`.
+pub fn own(rootfs: &Path, release: &str, groups: &[&Group]) -> Result<(PathBuf, Own), String> {
+    let kernel = kernel_file(rootfs, release)
+        .ok_or_else(|| format!("the image has no kernel file of {release}"))?;
+    check_bzimage(&kernel)?;
+    let (d, dir) = drivers(rootfs, release)?;
     if let Some(why) = d.base() {
         return Err(format!("the kernel {release} of the image: {why}"));
     }

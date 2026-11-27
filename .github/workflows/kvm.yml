@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       only:
-        description: "One job to run (guest, windows, cgroup, incus, nonroot, mem, init, arch or install); empty runs each"
+        description: "One job to run (guest, windows, cgroup, incus, incusvm, nonroot, mem, init, arch or install); empty runs each"
         required: false
         default: ""
       windows:
@@ -377,6 +377,81 @@ jobs:
             experiments/results/incus-usage-v2.txt
             experiments/results/incus-live-limits.txt
             experiments/results/incus-root-quota.txt
+          if-no-files-found: warn
+
+  # TODO/machine.md T-1998 (PodUtils/podrunner#316): `run -d
+  # --podvm-tier=incus --podvm-vm --podvm-init=image` of an image with a
+  # kernel boots it as a VM of incusd under KVM. incusd of apt with QEMU,
+  # OVMF and incus-agent; docker builds the fixture image.
+  incusvm:
+    if: inputs.only == '' || inputs.only == 'incusvm'
+    name: incus VM of an OCI image under KVM (experiment 492)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: give the job /dev/kvm
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules >/dev/null
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sudo udevadm settle || true
+          [ -e /dev/kvm ] && sudo chmod 0666 /dev/kvm
+          if [ -w /dev/kvm ] && [ -r /dev/kvm ]; then
+            ls -l /dev/kvm
+          else
+            echo "no usable /dev/kvm on this runner: COULD NOT RUN"
+            exit 2
+          fi
+
+      - name: incus of apt with its VM driver
+        run: |
+          set -eu
+          sudo apt-get -qq update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            incus incus-agent qemu-system-x86 ovmf >/dev/null
+          sudo modprobe vhost_vsock
+          # incusd checks its VM driver at its start: after QEMU and vsock.
+          sudo systemctl restart incus
+          sudo incus admin init --minimal
+          sudo chmod 0666 /var/lib/incus/unix.socket
+          incus version
+          incus query /1.0 | jq -r .environment.driver
+
+      - name: bootstrap
+        run: ./scripts/common/bootstrap-env.sh rust cc zig tools
+
+      - name: build podvm
+        run: |
+          cargo build --release -p podvm-gate --bin podvm-interpose-build
+          mkdir -p target/release
+          cp target/x86_64-unknown-linux-musl/release/podvm-interpose-build target/release/
+          ./target/release/podvm-interpose-build
+          cargo build --release -p podvm
+
+      - name: experiment 492 under KVM
+        run: |
+          mkdir -p .work
+          rc=0
+          timeout 50m sh experiments/492-incus-vm.sh || rc=$?
+          # Nothing of a guest may stay after the run.
+          incus list --format csv -c nt || true
+          if pgrep -a qemu-system; then
+            echo "an emulator stayed after the run"
+            incus list --format csv -c n | xargs -r -n1 incus delete --force || true
+            sudo pkill -9 qemu-system || true
+            rc=1
+          fi
+          exit "$rc"
+
+      - name: keep the transcript
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: incus-vm
+          path: experiments/results/incus-vm.txt
           if-no-files-found: warn
 
   # TODO/machine.md T-1922 (PodUtils/podrunner#195): the machine tier as a

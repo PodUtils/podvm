@@ -21,12 +21,12 @@
 //! from an initramfs of podvm's files only, with the same modules; the
 //! upper layer of its root is the sized disk where the run has one.
 
-mod ext;
+pub(crate) mod ext;
 mod guest;
-mod image;
+pub(crate) mod image;
 mod inode;
 pub mod root;
-mod tree;
+pub(crate) mod tree;
 
 use std::path::{Path, PathBuf};
 

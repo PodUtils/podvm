@@ -148,6 +148,7 @@ fn a_run_imports_creates_pushes_starts_execs_and_deletes() {
         tree: None,
         plan: std::sync::OnceLock::new(),
         name: None,
+        vm: false,
     });
     unsafe { std::env::remove_var("PODVM_INCUS_SOCKET") };
     assert_eq!(code, 7, "the exit code of the command");
@@ -303,6 +304,7 @@ fn an_upload_that_incusd_cuts_gives_a_line_not_a_sigpipe() {
         tree: None,
         plan: std::sync::OnceLock::new(),
         name: None,
+        vm: false,
     };
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()

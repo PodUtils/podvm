@@ -8,6 +8,21 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Added: an OCI image with a kernel runs as an incus VM, 2026-11-27
+
+Record: T-1998 (partial: the hosted proof remains).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `--podvm-vm` with `--podvm-tier=incus`, `--podvm-init=image` and
+  `run -d` or `create` makes the instance a VM (PodUtils/podrunner#316,
+  [incus](docs/incus.md)). podvm writes an ext4 root disk of the image
+  with 8 GiB free, as qcow2, and imports it once for each digest; the
+  kernel and the initrd of the image boot it directly (`raw.qemu`).
+  incus-agent starts from the drive of incusd, so `exec` and `wait` work.
+- An incusd with no VM driver, an image with no kernel, initrd or driver of
+  the VM, and a flag that a VM does not hold are refused by name with 125.
+- `kvm.yml` has the job `incusvm`, which runs experiment 492.
+
 ### Fixed: each number flag is refused outside its range with one true line, 2026-11-27
 
 Record: T-1947.

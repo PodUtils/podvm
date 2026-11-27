@@ -76,6 +76,13 @@ fn data_blocks(t: &Tree, n: usize, parent: usize) -> u64 {
 
 /// The plan of the disk of `t`, or why the disk cannot hold the tree.
 pub fn plan(t: &Tree) -> Result<Plan, String> {
+    plan_with(t, 0, 0)
+}
+
+/// [`plan`] with `spare_blocks` free blocks and `spare_inodes` free inodes
+/// past the tree: the writable root of an incus VM (TODO/machine.md
+/// T-1998).
+pub fn plan_with(t: &Tree, spare_blocks: u64, spare_inodes: u64) -> Result<Plan, String> {
     let n = t.nodes.len();
     if n == 0 || !matches!(t.nodes[0].kind, Kind::Dir(_)) {
         return Err("the tree has no root directory".to_string());
@@ -114,7 +121,10 @@ pub fn plan(t: &Tree) -> Result<Plan, String> {
         data += u64::from(matches!(placed, Placed::Block(_)));
         xattrs.push(placed);
     }
-    let layout = Layout::fit(data, u64::from(FIRST_INO) - 2 + n as u64)?;
+    let layout = Layout::fit(
+        data.saturating_add(spare_blocks),
+        (u64::from(FIRST_INO) - 2 + n as u64).saturating_add(spare_inodes),
+    )?;
     Ok(Plan {
         layout,
         paths,

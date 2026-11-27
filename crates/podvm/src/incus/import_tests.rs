@@ -7,9 +7,8 @@ use std::os::unix::net::UnixListener;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use serde_json::json;
-
 use pod_gzip::BLOCK;
+use serde_json::json;
 
 use super::image::Layers;
 use super::import::{ensure_image, ensure_image_with, Tree};
@@ -209,6 +208,7 @@ fn the_tree_is_made_for_an_import_only_and_goes_after_it() {
             tree: Some(&stub),
             plan: std::sync::OnceLock::new(),
             name: None,
+            vm: false,
         };
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -384,6 +384,7 @@ fn the_layers_supply_the_archive_and_the_space_check_with_no_tree() {
             tree: Some(&stub),
             plan: std::sync::OnceLock::new(),
             name: None,
+            vm: false,
         };
         let c = pod_incus::Client::new(pod_incus::Settings::new(&sock));
         let result = rt.block_on(ensure_image_with(&c, &job, "btrfs", embedded.to_vec()));

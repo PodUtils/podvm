@@ -56,6 +56,21 @@ pub(super) fn kernel_file(rootfs: &Path, release: &str) -> Option<PathBuf> {
     .find(|p| p.is_file())
 }
 
+/// TODO/machine.md T-1998: the initrd of `release` in the image, where
+/// one is a file: the name of Debian and Ubuntu, of Fedora and Arch, and
+/// of the module directory.
+pub fn initrd_file(rootfs: &Path, release: &str) -> Option<PathBuf> {
+    [
+        format!("/boot/initrd.img-{release}"),
+        format!("/boot/initramfs-{release}.img"),
+        format!("/usr/lib/modules/{release}/initrd"),
+        format!("/lib/modules/{release}/initrd"),
+    ]
+    .iter()
+    .filter_map(|p| resolve(rootfs, p))
+    .find(|p| p.is_file())
+}
+
 /// The release of `want` among `have`, or the refusal that names them.
 pub fn pick(want: &Want, have: &[String]) -> Result<String, String> {
     let list = if have.is_empty() {

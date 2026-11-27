@@ -56,6 +56,9 @@ pub struct Job<'a> {
     /// `--name` of a run in the foreground: the name of its instance
     /// (TODO/machine.md T-2080, OR-B39-07).
     pub name: Option<String>,
+    /// `--podvm-vm`: a virtual machine of the image (TODO/machine.md
+    /// T-1998).
+    pub vm: bool,
 }
 
 impl Job<'_> {
@@ -311,9 +314,18 @@ async fn run_async(job: &Job<'_>, sock: PathBuf) -> i32 {
             .await
             .map_err(|e| (e, None))?;
         server.check().map_err(|e| (e.to_string(), None))?;
+        // TODO/machine.md T-1998: a VM takes its own image.
+        if job.vm {
+            if let Some(why) = super::vm::no_vm_driver(&server.environment.driver) {
+                return Err((why, None));
+            }
+            let img = super::vm::build::ensure(&c, job).await?;
+            let (alias, cached) = (img.alias.clone(), img.cached);
+            return Ok((server.environment.server_version, alias, cached, Some(img)));
+        }
         let (image, cached) =
             super::import::ensure_image(&c, job, &server.environment.storage).await?;
-        Ok::<_, Fault>((server.environment.server_version, image, cached))
+        Ok::<_, Fault>((server.environment.server_version, image, cached, None))
     };
     let prepared = match sig.as_mut() {
         Some(sig) => tokio::select! {
@@ -322,7 +334,7 @@ async fn run_async(job: &Job<'_>, sock: PathBuf) -> i32 {
         },
         None => prepare.await,
     };
-    let (version, image, cached) = match prepared {
+    let (version, image, cached, vm) = match prepared {
         Ok(p) => p,
         Err(f) => return fail_twice(job.verb, f),
     };
@@ -333,9 +345,10 @@ async fn run_async(job: &Job<'_>, sock: PathBuf) -> i32 {
         if cached { "from incus" } else { "imported now" }
     );
     let Some(sig) = sig.as_mut() else {
-        return match &job.detach {
-            Some(d) => super::verbs::detached(&c, job, &image, d).await,
-            None => fail("no reader of the signals".to_string()),
+        return match (&job.detach, &vm) {
+            (Some(d), Some(img)) => super::vm::detached(&c, job, img, d).await,
+            (Some(d), None) => super::verbs::detached(&c, job, &image, d).await,
+            (None, _) => fail("no reader of the signals".to_string()),
         };
     };
     let inst = match &job.name {

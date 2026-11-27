@@ -17,7 +17,7 @@
 
 use std::time::{Duration, Instant};
 
-use pod_incus::{Client, Exec, FileContent};
+use pod_incus::{Client, Exec, FileContent, FileWrite, Payload};
 use podvm_image::error::{EXIT_CLI_ERROR, EXIT_FLAG_ERROR, EXIT_RUNTIME_ERROR};
 
 use super::verbs::{block_on, connect, gone, ours};
@@ -136,9 +136,21 @@ pub async fn wait_one(c: &Client, name: &str, pace: Pace) -> Result<i32, Refusal
             ));
         }
         let ended = matches!(i.status.as_str(), "Stopped" | "Error");
-        if ended || i.ephemeral {
+        // TODO/machine.md T-1998: incusd reads the files of a VM only while
+        // it runs; the VM waits for this read before it stops.
+        let vm = i.kind == "virtual-machine";
+        if vm && ended {
+            return Err((EXIT_RUNTIME_ERROR, vm_gone(&i.status)));
+        }
+        if ended || i.ephemeral || vm {
             match read_exit(c, name).await {
                 Ok(code) if ended => return Ok(code),
+                Ok(code) if vm => {
+                    let mut w = FileWrite::file(Payload::bytes(b"1\n".to_vec()));
+                    (w.uid, w.gid, w.mode) = (Some(0), Some(0), Some(0o600));
+                    let _ = c.put_file(name, super::EXIT_READ, w).await;
+                    return Ok(code);
+                }
                 Ok(code) => early = Some(code),
                 Err(e) if ended => {
                     let since = *stopped.get_or_insert_with(Instant::now);
@@ -175,6 +187,17 @@ pub async fn wait_one(c: &Client, name: &str, pace: Pace) -> Result<i32, Refusal
         };
         tokio::time::sleep(p).await;
     }
+}
+
+/// The line of a VM that stopped before `wait` read its exit code
+/// (TODO/machine.md T-1998).
+pub fn vm_gone(status: &str) -> String {
+    format!(
+        "the virtual machine is {status} and podvm read no exit code: incusd reads the files \
+         of a VM only while it runs, and the VM stays up for {} s after its command ends \
+         for this read (TODO/machine.md T-1998)",
+        super::vm::LINGER_S
+    )
 }
 
 /// Send the signal `sig` to the command of the instance `name`.

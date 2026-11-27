@@ -201,6 +201,7 @@ pub const BOOLEAN_LONGS: &[&str] = &[
     "--password-stdin",
     "--podvm-engine",
     "--podvm-sealed",
+    "--podvm-vm",
     "--quiet",
     "--read-only",
     "--recursive",

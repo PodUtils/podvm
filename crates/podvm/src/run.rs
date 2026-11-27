@@ -274,6 +274,11 @@ pub const RUN_OPTIONS: &str = "\
                    host with a missing part refuses by name (125). -t
                    gives the command a pty of the init. podvm, the
                    default, keeps podvm's init
+  --podvm-vm       podvm's own, incus tier with run -d or create and
+                   --podvm-init=image: the instance is a VM that boots
+                   the kernel and the initrd of the image on a root disk
+                   that podvm writes once for each digest; incusd without
+                   VM support refuses by name (TODO/machine.md T-1998)
   --podvm-sealed   podvm's own, machine tier only: the run comes as a tar
                    bundle on stdin (.podvm-run.json with argv, env and
                    workdir, and the files of the guest), and reaches the

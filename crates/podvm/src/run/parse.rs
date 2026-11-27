@@ -248,6 +248,7 @@ fn parse_flags_with(
             "--tls-verify" => o.tls_verify = Some(true),
             "--podvm-sealed" => o.sealed = true,
             "--podvm-engine" => o.engine = true,
+            "--podvm-vm" => o.vm = true, // T-1998
             "--podvm-init" => expecting = Some("--podvm-init"),
             x if x.starts_with("--podvm-init=") => opts::init_eq(verb, x, &mut o)?,
             "--add-host" => expecting = Some("--add-host"),
@@ -445,6 +446,7 @@ fn parse_flags_with(
     }
     volume_base::check(verb, &o)?; // PodUtils/podrunner#277
     opts::init_check(verb, &o)?; // T-1993
+    opts::vm_check(verb, &o)?; // T-1998
     if !matches!(o.pull.as_str(), "never" | "missing" | "always") {
         eprintln!(
             "podvm {verb}: --pull takes never, missing or always, not {:?}",

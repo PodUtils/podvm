@@ -279,6 +279,14 @@ async fn poll(c: &Client, name: &str, left: Duration) -> Answer {
 /// what happened: the state of systemd with each poll, or the bound, the
 /// polls and the name of PID 1.
 pub async fn boot_then_run(c: &Client, name: &str) -> Result<(), Down> {
+    wait_up(c, name).await?;
+    start_hold(c, name, &[]).await
+}
+
+/// Wait for the init of the image: systemd is running or degraded. A VM
+/// answers the exec calls once its incus-agent runs (TODO/machine.md
+/// T-1998); a refused exec of a running instance is asked again.
+pub async fn wait_up(c: &Client, name: &str) -> Result<(), Down> {
     let bound = boot_bound().map_err(|e| Down::gone(format!("--podvm-init=image: {e}")))?;
     let mut w = Waiter::new(Instant::now(), bound);
     loop {
@@ -321,7 +329,15 @@ pub async fn boot_then_run(c: &Client, name: &str) -> Result<(), Down> {
             }
         }
     }
-    let run = Exec::new(["/.podvm/podvm", "guest-hold", "--run", "--detach"]);
+    Ok(())
+}
+
+/// Start `guest-hold --run --detach` with `more` arguments: the command
+/// of `/.podvm/cmd` as one more process of the instance.
+pub async fn start_hold(c: &Client, name: &str, more: &[&str]) -> Result<(), Down> {
+    let mut argv = vec!["/.podvm/podvm", "guest-hold", "--run", "--detach"];
+    argv.extend_from_slice(more);
+    let run = Exec::new(argv);
     let r = c
         .exec_recorded(name, &run)
         .await

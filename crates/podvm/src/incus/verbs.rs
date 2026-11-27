@@ -142,21 +142,9 @@ pub(super) async fn detached(c: &Client, job: &Job<'_>, image: &str, d: &Detach)
         eprintln!("podvm {}: incus tier: {e}", job.verb);
         EXIT_RUNTIME_ERROR
     };
-    let name = match &d.name {
-        Some(n) if valid_name(n) => n.clone(),
-        Some(n) => {
-            eprintln!(
-                "podvm {}: --name {n:?}: incus takes a letter first, then letters, digits \
-                 and '-', at most 63 (TODO/machine.md T-1722)",
-                job.verb
-            );
-            return podvm_image::error::EXIT_FLAG_ERROR;
-        }
-        None => {
-            let nonce = crate::machine::guest::init::nonce()
-                .unwrap_or_else(|_| format!("{}", std::process::id()));
-            format!("podvm-{}", &nonce[..nonce.len().min(12)])
-        }
+    let name = match name_of(job.verb, d) {
+        Ok(n) => n,
+        Err(code) => return code,
     };
     let mut new = NewInstance::container(&name, Source::Alias(image.to_string()));
     new.devices = job_devices(job);
@@ -248,21 +236,50 @@ pub(super) async fn detached(c: &Client, job: &Job<'_>, image: &str, d: &Detach)
         && d.init_image
         && let Err(down) = super::systemd::boot_then_run(c, &name).await
     {
-        if down.keep {
-            // PodUtils/podrunner#349 ask 3 (TODO/machine.md T-2083): the
-            // instance stays, so that the fault is not lost with it.
-            return fail(format!(
-                "{}; the instance {name} stays for a look (`incus console {name} --show-log`, \
-                 `incus exec {name} -- systemctl status`): `podvm rm -f --podvm-tier incus \
-                 {name}` removes it",
-                down.line
-            ));
-        }
-        let left = discard(c, &name).await;
-        return fail(with_left(down.line, &left));
+        return self::down(job.verb, c, &name, down).await;
     }
     println!("{name}");
     0
+}
+
+/// The name of the instance of `d`: `--name` where incus takes it, else
+/// `podvm-` and a random part; the exit of a refusal.
+pub(super) fn name_of(verb: &str, d: &Detach) -> Result<String, i32> {
+    match &d.name {
+        Some(n) if valid_name(n) => Ok(n.clone()),
+        Some(n) => {
+            eprintln!(
+                "podvm {verb}: --name {n:?}: incus takes a letter first, then letters, digits \
+                 and '-', at most 63 (TODO/machine.md T-1722)"
+            );
+            Err(podvm_image::error::EXIT_FLAG_ERROR)
+        }
+        None => {
+            let nonce = crate::machine::guest::init::nonce()
+                .unwrap_or_else(|_| format!("{}", std::process::id()));
+            Ok(format!("podvm-{}", &nonce[..nonce.len().min(12)]))
+        }
+    }
+}
+
+/// The end of a run whose init of the image is not up: the line, and the
+/// instance stays for a look or goes.
+pub(super) async fn down(verb: &str, c: &Client, name: &str, down: super::systemd::Down) -> i32 {
+    let line = if down.keep {
+        // PodUtils/podrunner#349 ask 3 (TODO/machine.md T-2083): the
+        // instance stays, so that the fault is not lost with it.
+        format!(
+            "{}; the instance {name} stays for a look (`incus console {name} --show-log`, \
+             `incus exec {name} -- systemctl status`): `podvm rm -f --podvm-tier incus \
+             {name}` removes it",
+            down.line
+        )
+    } else {
+        let left = discard(c, name).await;
+        with_left(down.line, &left)
+    };
+    eprintln!("podvm {verb}: incus tier: {line}");
+    EXIT_RUNTIME_ERROR
 }
 
 /// The flags of `verb` that the incus tier serves (TODO/cli.md T-2100).

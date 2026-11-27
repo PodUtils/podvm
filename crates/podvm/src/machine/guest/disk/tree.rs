@@ -182,6 +182,100 @@ impl Tree {
     }
 }
 
+impl Tree {
+    /// TODO/machine.md T-1998: put `kind` at the absolute path `path` of
+    /// the tree, root's with `perm`, over the file of that name. Each
+    /// missing directory above it comes with mode 0755; a part above it
+    /// that is not a directory (a link included) is an error that names it,
+    /// and so is a directory at `path`. A node of one name takes the new
+    /// file in place; a hard link keeps its other names. The new nodes take
+    /// the newest time of the tree, so the same tree gives the same disk.
+    pub fn put(&mut self, path: &str, kind: Kind, perm: u32) -> Result<(), String> {
+        let parts: Vec<&str> = path.split('/').filter(|p| !p.is_empty()).collect();
+        let Some((last, above)) = parts.split_last() else {
+            return Err(format!("{path:?}: no name to put in the tree"));
+        };
+        if parts
+            .iter()
+            .any(|p| *p == "." || *p == ".." || p.len() > 255)
+        {
+            return Err(format!("{path:?}: not a plain path"));
+        }
+        let mtime = self.nodes.iter().map(|n| n.mtime).max().unwrap_or((0, 0));
+        let fresh = |kind: Kind, perm: u32| Node {
+            kind,
+            perm,
+            uid: 0,
+            gid: 0,
+            mtime,
+            xattrs: Vec::new(),
+            links: 1,
+        };
+        let mut dir = 0usize;
+        for part in above {
+            let found = self.child(dir, part);
+            dir = match found {
+                Some(n) if matches!(self.nodes[n].kind, Kind::Dir(_)) => n,
+                Some(_) => return Err(format!("{path}: {part} above it is not a directory")),
+                None => {
+                    let n = self.nodes.len();
+                    self.nodes.push(fresh(Kind::Dir(Vec::new()), 0o755));
+                    self.link(dir, part, n);
+                    n
+                }
+            };
+        }
+        match self.child(dir, last) {
+            Some(n) if matches!(self.nodes[n].kind, Kind::Dir(_)) => {
+                Err(format!("{path}: the image has a directory there"))
+            }
+            Some(n) if self.nodes[n].links == 1 => {
+                self.nodes[n] = fresh(kind, perm);
+                Ok(())
+            }
+            Some(n) => {
+                self.nodes[n].links -= 1;
+                let m = self.nodes.len();
+                self.nodes.push(fresh(kind, perm));
+                self.unlink(dir, last);
+                self.link(dir, last, m);
+                Ok(())
+            }
+            None => {
+                let m = self.nodes.len();
+                self.nodes.push(fresh(kind, perm));
+                self.link(dir, last, m);
+                Ok(())
+            }
+        }
+    }
+
+    /// The node of the name `name` in the directory `dir`.
+    fn child(&self, dir: usize, name: &str) -> Option<usize> {
+        match &self.nodes[dir].kind {
+            Kind::Dir(list) => list
+                .iter()
+                .find(|(n, _)| n.as_slice() == name.as_bytes())
+                .map(|(_, c)| *c),
+            _ => None,
+        }
+    }
+
+    /// Add the name `name` of the node `n` to `dir`, in the order of names.
+    fn link(&mut self, dir: usize, name: &str, n: usize) {
+        if let Kind::Dir(list) = &mut self.nodes[dir].kind {
+            let at = list.partition_point(|(k, _)| k.as_slice() < name.as_bytes());
+            list.insert(at, (name.as_bytes().to_vec(), n));
+        }
+    }
+
+    fn unlink(&mut self, dir: usize, name: &str) {
+        if let Kind::Dir(list) = &mut self.nodes[dir].kind {
+            list.retain(|(k, _)| k.as_slice() != name.as_bytes());
+        }
+    }
+}
+
 fn at(p: &Path, e: io::Error) -> String {
     format!("{}: {e}", p.display())
 }

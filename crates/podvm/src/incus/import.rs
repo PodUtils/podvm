@@ -29,7 +29,7 @@ pub const IMPORT_WAIT: std::time::Duration = std::time::Duration::from_secs(30 *
 /// TODO/machine.md T-2081 (OR-B39-02): the lock of the import of `alias`
 /// in the store of `job`, so that two runs of one store import an image
 /// once. `None` where the run has no store. A holder that ends frees it.
-async fn import_lock(
+pub(super) async fn import_lock(
     job: &Job<'_>,
     alias: &str,
 ) -> Result<Option<podvm_image::store::Lock>, Fault> {

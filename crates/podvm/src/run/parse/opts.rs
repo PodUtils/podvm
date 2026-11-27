@@ -54,6 +54,10 @@ pub(crate) struct Opts {
     /// `--podvm-init=image`: the init of the image is PID 1 of an incus
     /// instance (PodUtils/podrunner#313, TODO/machine.md T-1993).
     pub(crate) init_image: bool,
+    /// `--podvm-vm`: the incus instance is a virtual machine that boots
+    /// the kernel of the image (PodUtils/podrunner#316, TODO/machine.md
+    /// T-1998).
+    pub(crate) vm: bool,
     /// `--init` (TODO/cli.md T-2087, OR-B40-06): held where the run has a
     /// PID namespace, whose PID 1 is podvm's init; refused elsewhere.
     pub(crate) init: bool,
@@ -174,6 +178,7 @@ impl Opts {
             sealed: false,
             engine: false,
             init_image: false,
+            vm: false,
             init: false,
             volume_base: None,
             volume_given: Vec::new(),
@@ -335,6 +340,27 @@ pub(super) fn init_check(verb: &str, o: &Opts) -> Result<(), i32> {
          run -d or create (TODO/machine.md T-1993, T-1994, TODO/enter.md T-2002, T-2007)"
     );
     Err(podvm_image::error::EXIT_FLAG_ERROR)
+}
+
+/// `--podvm-vm` (TODO/machine.md T-1998): the pairs of flags that the VM
+/// mode of the incus tier refuses by name, before the pull.
+pub(super) fn vm_check(verb: &str, o: &Opts) -> Result<(), i32> {
+    let ask = crate::incus::vm::Ask {
+        vm: o.vm,
+        incus: matches!(o.tier, Some(crate::tier::Want::Incus)),
+        init_image: o.init_image,
+        stays: o.detach || verb == "create",
+        engine: o.engine,
+        channel: o.channel.is_some(),
+        limits: o.limits.iter().map(|(f, k, _)| (f.as_str(), *k)).collect(),
+    };
+    match crate::incus::vm::refusal(&ask) {
+        None => Ok(()),
+        Some(why) => {
+            eprintln!("podvm {verb}: {why}");
+            Err(podvm_image::error::EXIT_FLAG_ERROR)
+        }
+    }
 }
 
 /// `--podvm-mem VALUE`: a byte count with an optional K/M/G/T suffix

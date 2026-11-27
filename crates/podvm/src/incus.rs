@@ -23,6 +23,7 @@ pub(crate) mod target; // TODO/machine.md T-2078
 pub(crate) mod update; // TODO/machine.md T-2093
 pub(crate) mod usage; // TODO/machine.md T-2076
 pub(crate) mod verbs;
+pub(crate) mod vm; // TODO/machine.md T-1998
 pub(crate) mod volmap; // TODO/machine.md T-2103
 pub(crate) mod volume; // TODO/machine.md T-2103
 pub(crate) mod waitkill; // TODO/cli.md T-2087
@@ -240,6 +241,7 @@ pub fn hold(args: &[String]) -> i32 {
     let mut end_of = None;
     let mut guard = None;
     if args.iter().any(|a| a == "--run") {
+        let _ = std::fs::remove_file(EXIT_READ); // T-1998
         if pid1 {
             let _ = std::fs::remove_file(EXIT);
             let _ = std::fs::remove_file(usage::USAGE);
@@ -299,12 +301,40 @@ pub fn hold(args: &[String]) -> i32 {
                 // TODO/machine.md T-1993: where the init of the image is
                 // PID 1, the instance stops when its command ends, as with
                 // podvm's own init: SIGRTMIN+4 asks systemd to power off.
+                // A VM waits for the read of its exit code first (T-1998).
                 if std::process::id() != 1 {
+                    linger(linger_of(args));
                     kill(1, 34 + 4);
                 }
                 return code;
             }
         }
+    }
+}
+
+/// TODO/machine.md T-1998: the file that `wait` writes in a VM after it
+/// read [`EXIT`]. incusd reads the files of a VM through its agent, so
+/// only while the VM runs.
+pub const EXIT_READ: &str = "/.podvm/exit.read";
+/// The longest `--linger` of `guest-hold`.
+pub const LINGER_MAX: u64 = 3600;
+
+/// The seconds of `--linger SECS` in `args`, at most [`LINGER_MAX`];
+/// `None` where `args` have no such pair or the value is not a count.
+pub fn linger_of(args: &[String]) -> Option<u64> {
+    let i = args.iter().position(|a| a == "--linger")?;
+    let secs: u64 = args.get(i + 1)?.parse().ok()?;
+    Some(secs.min(LINGER_MAX))
+}
+
+/// Wait until [`EXIT_READ`] is there, at most `secs` seconds.
+fn linger(secs: Option<u64>) {
+    let Some(secs) = secs else {
+        return;
+    };
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(secs);
+    while std::time::Instant::now() < end && !std::path::Path::new(EXIT_READ).exists() {
+        std::thread::sleep(std::time::Duration::from_millis(200));
     }
 }
 

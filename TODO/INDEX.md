@@ -660,7 +660,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1995](enter.md) | P1 | S | none | enter | done | A Go program hangs on the userland rung at its first signal of preemption |
 | [T-1996](machine.md) | P1 | M | none | machine | partial | On the incus tier, an instance of the hosted snapshot has 231,072 ids, `/dev/fuse` and a machine-id of its own |
 | [T-1997](machine.md) | P1 | M | none | machine | done | On the incus tier, the import of a large image keeps no third copy |
-| [T-1998](machine.md) | P1 | L | none | machine | open | On the incus tier, an OCI image with a kernel runs as a virtual machine |
+| [T-1998](machine.md) | P1 | L | none | machine | partial | On the incus tier, an OCI image with a kernel runs as a virtual machine |
 | [T-1999](machine.md) | P1 | M | none | machine | partial | The `security.capability` xattrs of an image stay on the incus tier and the machine tier |
 | [T-2000](interpose.md) | P1 | S | none | interpose | done | `apt-get install` fails on the userland rung: dpkg's `tar` has no ownership memo |
 | [T-2001](cli.md) | P2 | M | none | cli | done | The faults of the fifth outside pass (2026-11-19, the gate of beta.36) |
@@ -748,7 +748,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-679 entries: 19 open, 41 partial, 6 blocked, 613 done.
+679 entries: 18 open, 42 partial, 6 blocked, 613 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -758,10 +758,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 1 | 20 | 1 | 277 | 299 |
+| P1 | 0 | 21 | 1 | 277 | 299 |
 | P2 | 13 | 16 | 4 | 216 | 249 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 19 | 41 | 6 | 613 | 679 |
+| **All** | 18 | 42 | 6 | 613 | 679 |
 
 ## Work order
 
