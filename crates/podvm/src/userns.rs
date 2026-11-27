@@ -78,6 +78,7 @@ unsafe extern "C" {
 
 mod host;
 mod join;
+pub mod lock; // TODO/enter.md T-2105
 pub mod owners;
 mod range;
 pub mod sigrelay;

@@ -6013,7 +6013,7 @@ info` names the rungs.
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** open
+**Status:** partial
 
 ## Problem
 
@@ -6031,12 +6031,42 @@ remount,bind,rw` returned 0 and left the mount read-only. The payload can
 also unmount the volume (`umount /x` returned 0). With
 `--podvm-confine`, Landlock refuses mount(2).
 
+A second way to the same host file, measured by the worker on
+2026-11-27 with the release binary of `6a8d7f7`: the namespace rung enters
+the tree with `chroot(2)`, not `pivot_root(2)`, so the root of the host
+stays in the mount namespace of the payload. A payload with
+`CAP_SYS_CHROOT` (uid 0 on each path of the rung) makes a directory,
+calls `chroot` on it, calls `chdir("..")` until the top, and calls
+`chroot(".")`: it then opens each host path with the rights of its ids
+(the caller's uid, or root for a caller of uid 0), the source of a `:ro`
+volume included. A nested user namespace does not stop it: `chroot`
+needs `CAP_SYS_CHROOT` in the user namespace of the caller only.
+
 ## Premise
 
 The same class is likely for each flag that podvm sets on a mount that
 the payload's user namespace owns: `--read-only` of the root, `nosuid` and
 `nodev`, the size of a `--tmpfs GUEST:size=N` (a remount with another
 size), the lower of an overlay volume. Not measured yet.
+
+**Measured (2026-11-27)**, with a static probe in `/tmp` of the run
+(experiment 489): each mount that the run makes in the user namespace of
+the payload is open to it. The payload remounts a `:ro` volume writable,
+clears `nosuid`, `nodev` and `noexec` of `/proc`, gives a `--tmpfs
+/w:size=8m` the size 64m, and unmounts a volume and a tmpfs; in a mount
+namespace of its own it does the same. Paths: a foreground `run` of
+uid 1000 (podvm's user namespace, C21) and `exec` into it; `run -d`,
+`create` and `start` of uid 1000 (pod-enter's user namespace) with
+`exec`; the same with an overlay volume (the launcher's own namespace);
+each verb of uid 0 of a user namespace of one id; and each verb of root,
+whose payload holds each capability of the initial user namespace. A
+fresh entry of `exec` that does not join the run makes its own mounts
+too. Not a path: `--read-only` of the root, and a volume of a foreground
+run of root or of uid 0 of a user namespace, are a path rewrite of the
+loader family (T-1655, T-1761), with no mount; a remount of `/` fails.
+Not measured: the init of the image (`--podvm-init=image`, T-2002),
+whose supervisor binds the volumes in its own user namespace and runs
+`/sbin/init` as uid 0 of it.
 
 ## Approach
 
@@ -6051,7 +6081,35 @@ podvm meanwhile.
 
 ## Decision
 
--
+podvm puts the payload in a nested user namespace wherever it can do so
+with no new code of a namespace: pod-enter opens one after its mounts and
+before the root change where the plan names ids and the caller is uid 0
+of a user namespace that is not the initial one (podcrates `v0.63.0`,
+`ns_user::nested_for`, the maps `<uid> 0 1`). `podvm_enter::lock`
+gives `Plan::userns_ids` the ids `0:0` where the plan names none and the
+map of the caller holds one id, uid 0 (`0 X 1`): pid 2 of a foreground
+run, the launcher of `run -d` with an overlay volume (after its own
+namespace), and each verb of uid 0 of a user namespace of one id. The maps
+`0 0 1` then take no id from the payload, which keeps uid 0 and each
+capability of the nested namespace and holds none over the mount
+namespace of the run: each mount, remount and unmount there fails with
+`EPERM`, and a mount namespace that the payload opens is a copy into a
+less privileged user namespace, with each flag and each mount under its
+root locked. A map of more ids (the subordinate range, T-1911) keeps the
+entry as before: the maps `0 0 1` would take the other ids. `exec` into
+such a run joins the user namespace that owns the mount namespace of the
+payload first (`userns::lock::mount_owner`, `NS_GET_USERNS`), and
+pod-enter then joins the payload's own and its mounts in one call
+(`setns(pidfd, CLONE_NEWUSER | CLONE_NEWNS)`); a fresh entry of `exec`
+takes the same ids. The other paths need pod-enter: its own user
+namespace (`run -d`, `create`, `start` of a caller that is not uid 0)
+and the initial user namespace of root are outside `nested_for`, and only
+the child of pod-enter, between its mounts and the exec, can enter a
+namespace under them. The way out of the chroot needs `pivot_root` in the
+same child. The ask to podcrates is in the report of the worker (the
+lead files it as a COORD issue `(to podcrates)`); podvm takes the
+release that has it and drops `podvm_enter::lock` where pod-enter nests
+by itself.
 
 ## Prove
 
@@ -6061,3 +6119,7 @@ and `create` with `start`: a remount of a `:ro` volume writable, of the
 root of `--read-only` writable, and of a `--tmpfs GUEST:size=N` to another
 size each fail with `EPERM`; an unmount of a volume fails; the host file
 stays the same byte for byte.
+
+## Done
+
+**Partial (2026-11-27).** `podvm_enter::lock` (the ids `0:0` for a caller whose map holds one id, with the table test `locked_ids_of_each_map` of podvm-enter), its use in the plans of a foreground run (`run::foreground`), of the launcher (`launcher.rs`, also after the namespace of an overlay volume) and of `exec` (`exec::enter`, `exec::command`), and the join of the owner of the mounts before the payload's own namespace (`userns::lock::mount_owner`, `userns::join`; the test `locked_owner_of_this_process_is_its_own_namespace`). Experiment 489 (`experiments/489-locked-mounts.py`, `experiments/results/locked-mounts.txt`), as root and as uid 1000 with private stores: locked (7 of 7 mount calls fail, the source of the `:ro` volume keeps its SHA-256): a foreground run of uid 1000, `exec` into it, `run -d` of uid 1000 with an overlay volume and `exec`, and a foreground run, `run -d` and `create`/`start` of uid 0 of a user namespace of one id; the binary of `6a8d7f7` shows the fault (the remount works and the host file changes); `--read-only` is no mount and a remount of `/` fails; no process and no tree stays. Cost: 20 runs of `run --rm alpine true`, median 140 ms before and 145 ms after as uid 1000 (125 ms and 123 ms as root, a path with no change), within the noise of the host (an estimate). The integration tests `pid_init_hidden`, `orphan_reap`, `podvm_zombies`, `user_ns_detached`, `hostname_detached`, `detached_rm`, `lifecycle_exit`, `tty_job_control`, `exec_hosts`, `tmpfs_exec`, `ro_native` and `volumes_default_rung` pass as root and as uid 1000 (`user_ns_detached` skips for root and `ro_native` skips one case for uid 1000, as on `6a8d7f7`). Remaining, each open in experiment 489: `run -d`, `create` and `start` of uid 1000 (pod-enter's own user namespace) and every verb of root (the initial user namespace) need the nested namespace in pod-enter; the way out of the chroot writes a host file on every path (11 of 11 rows) and needs `pivot_root` in pod-enter; a foreground run with the subordinate range (T-1911) needs maps of each id of the range, written from outside; `--podvm-init=image` (T-2002) is not measured. For uid 0 of a user namespace of one id, `exec` does not join a detached run (EPERM of `setns(pidfd, CLONE_NEWNS)`, as on `6a8d7f7`) and enters on its own, which now nests too.

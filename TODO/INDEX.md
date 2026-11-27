@@ -741,11 +741,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2102](deps.md) | P2 | M | none | deps | done | Take podcrates `v0.86.0` and the size-limited tmpfs of pod-enter |
 | [T-2103](machine.md) | P2 | M | none | machine | done | A writable host volume that the host user can remove, on the machine and incus tiers |
 | [T-2104](image.md) | P2 | S | none | image | done | `inspect` gives the unpacked bytes of an image before its first run |
-| [T-2105](enter.md) | P1 | M | none | enter | open | On the namespace rung, the payload can remount a `:ro` volume writable and write the host file |
+| [T-2105](enter.md) | P1 | M | none | enter | partial | On the namespace rung, the payload can remount a `:ro` volume writable and write the host file |
 
 ## Counts
 
-676 entries: 20 open, 40 partial, 5 blocked, 611 done.
+676 entries: 19 open, 41 partial, 5 blocked, 611 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -755,10 +755,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 2 | 19 | 0 | 276 | 297 |
+| P1 | 1 | 20 | 0 | 276 | 297 |
 | P2 | 13 | 16 | 4 | 215 | 248 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 20 | 40 | 5 | 611 | 676 |
+| **All** | 19 | 41 | 5 | 611 | 676 |
 
 ## Work order
 

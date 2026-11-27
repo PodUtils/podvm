@@ -430,7 +430,7 @@ pub(super) fn enter(
                 !h.starts_with(&tmpfs) || h.is_dir()
             })
             .collect(),
-        userns_ids: None,     // podcrates `v0.62.0`; T-1927 fills it for `run -d`
+        userns_ids: podvm_enter::lock::payload_ids(None), // T-2105: a fresh entry nests
         pid_namespace: false, // podcrates `v0.65.0`; T-1930 sets it for `run -d`
         // T-2054: the relay of a join of the run (PodUtils/podvm#646).
         relay_title: Some(podvm_enter::TITLE_EXEC.into()),

@@ -1,0 +1,63 @@
+Can the payload of the namespace rung change a mount of its run?
+2026-11-27T03:59:11Z Linux 6.18.44-fc-v880, uid 0
+podvm SHA-256 5ac5f0f67438085c1995c357c8d81ab18d3319bed8b7829fa688753b2c382e27
+before SHA-256 38983b17f5a813596a88e8593410adea9973b06a402cdc9b54a43dc3ef109b18
+image mirror.gcr.io/library/alpine:3.20
+  | uid 1000, foreground: exit 0; the volume is a mount: yes; the way out of the chroot: OK, the host file changed
+PASS 1: uid 1000, foreground: 7 of 7 mount calls fail; the volume source is the same
+  | uid 1000, exec into a foreground run: exit 0; the volume is a mount: yes; the way out of the chroot: OK, the host file changed
+PASS 2: uid 1000, exec into a foreground run: 7 of 7 mount calls fail; the volume source is the same
+  | uid 1000, run -d with an overlay volume, exec: exit 0; the volume is a mount: yes; the way out of the chroot: OK, the host file changed
+PASS 3: uid 1000, run -d with an overlay volume, exec: 7 of 7 mount calls fail; the volume source is the same
+  | uid 0 of one id, foreground (--tmpfs only): exit 0; the volume is a mount: no; the way out of the chroot: OK, the host file changed
+PASS 4: uid 0 of one id, foreground (--tmpfs only): 7 of 7 mount calls fail; the volume source is the same
+  | uid 0 of one id, run -d, exec: exit 0; the volume is a mount: no; the way out of the chroot: OK, the host file changed; exec did not join the run and entered on its own
+PASS 5: uid 0 of one id, run -d, exec: 7 of 7 mount calls fail; the volume source is the same
+  | uid 0 of one id, create, start, exec: exit 0; the volume is a mount: no; the way out of the chroot: OK, the host file changed; exec did not join the run and entered on its own
+PASS 6: uid 0 of one id, create, start, exec: 7 of 7 mount calls fail; the volume source is the same
+  | uid 1000, run -d, exec: exit 0; the volume is a mount: yes; the way out of the chroot: OK, the host file changed
+OPEN 7: uid 1000, run -d, exec: 0 of 7 mount calls fail (worked: remount-ro-volume, remount-proc-flags, remount-tmpfs-size, ns-remount-ro-volume, ns-unmount-volume, unmount-volume, unmount-tmpfs); the volume source CHANGED
+  | uid 1000, create, start, exec: exit 0; the volume is a mount: yes; the way out of the chroot: OK, the host file changed
+OPEN 8: uid 1000, create, start, exec: 0 of 7 mount calls fail (worked: remount-ro-volume, remount-proc-flags, remount-tmpfs-size, ns-remount-ro-volume, ns-unmount-volume, unmount-volume, unmount-tmpfs); the volume source CHANGED
+  | root, foreground (--tmpfs only): exit 0; the volume is a mount: no; the way out of the chroot: OK, the host file changed
+OPEN 9: root, foreground (--tmpfs only): 4 of 7 mount calls fail (worked: remount-proc-flags, remount-tmpfs-size, unmount-tmpfs); the volume source is the same
+  | root, run -d, exec: exit 0; the volume is a mount: yes; the way out of the chroot: OK, the host file changed
+OPEN 10: root, run -d, exec: 0 of 7 mount calls fail (worked: remount-ro-volume, remount-proc-flags, remount-tmpfs-size, ns-remount-ro-volume, ns-unmount-volume, unmount-volume, unmount-tmpfs); the volume source CHANGED
+  | root, create, start, exec: exit 0; the volume is a mount: yes; the way out of the chroot: OK, the host file changed
+OPEN 11: root, create, start, exec: 0 of 7 mount calls fail (worked: remount-ro-volume, remount-proc-flags, remount-tmpfs-size, ns-remount-ro-volume, ns-unmount-volume, unmount-volume, unmount-tmpfs); the volume source CHANGED
+PASS 12: --read-only: exit 0, remount of / Operation not permitted
+OPEN 13: the way out of the chroot wrote a host file in 11 of 11 rows
+PASS 14: before the fix: remount of the :ro volume OK, the host file changed
+PASS 15: 0 process(es) of podvm and 0 tree(s) stayed
+OPEN: rows [7, 8, 9, 10, 11, 13] wait for pod-enter (TODO/enter.md T-2105)
+EACH LOCKED ROW HOLDS
+Can the payload of the namespace rung change a mount of its run?
+2026-11-27T03:59:23Z Linux 6.18.44-fc-v880, uid 1000
+podvm SHA-256 5ac5f0f67438085c1995c357c8d81ab18d3319bed8b7829fa688753b2c382e27
+before SHA-256 38983b17f5a813596a88e8593410adea9973b06a402cdc9b54a43dc3ef109b18
+image mirror.gcr.io/library/alpine:3.20
+  | uid 1000, foreground: exit 0; the volume is a mount: yes; the way out of the chroot: OK, the host file changed
+PASS 1: uid 1000, foreground: 7 of 7 mount calls fail; the volume source is the same
+  | uid 1000, exec into a foreground run: exit 0; the volume is a mount: yes; the way out of the chroot: OK, the host file changed
+PASS 2: uid 1000, exec into a foreground run: 7 of 7 mount calls fail; the volume source is the same
+  | uid 1000, run -d with an overlay volume, exec: exit 0; the volume is a mount: yes; the way out of the chroot: OK, the host file changed
+PASS 3: uid 1000, run -d with an overlay volume, exec: 7 of 7 mount calls fail; the volume source is the same
+  | uid 0 of one id, foreground (--tmpfs only): exit 0; the volume is a mount: no; the way out of the chroot: OK, the host file changed
+PASS 4: uid 0 of one id, foreground (--tmpfs only): 7 of 7 mount calls fail; the volume source is the same
+  | uid 0 of one id, run -d, exec: exit 0; the volume is a mount: no; the way out of the chroot: OK, the host file changed; exec did not join the run and entered on its own
+PASS 5: uid 0 of one id, run -d, exec: 7 of 7 mount calls fail; the volume source is the same
+  | uid 0 of one id, create, start, exec: exit 0; the volume is a mount: no; the way out of the chroot: OK, the host file changed; exec did not join the run and entered on its own
+PASS 6: uid 0 of one id, create, start, exec: 7 of 7 mount calls fail; the volume source is the same
+  | uid 1000, run -d, exec: exit 0; the volume is a mount: yes; the way out of the chroot: OK, the host file changed
+OPEN 7: uid 1000, run -d, exec: 0 of 7 mount calls fail (worked: remount-ro-volume, remount-proc-flags, remount-tmpfs-size, ns-remount-ro-volume, ns-unmount-volume, unmount-volume, unmount-tmpfs); the volume source CHANGED
+  | uid 1000, create, start, exec: exit 0; the volume is a mount: yes; the way out of the chroot: OK, the host file changed
+OPEN 8: uid 1000, create, start, exec: 0 of 7 mount calls fail (worked: remount-ro-volume, remount-proc-flags, remount-tmpfs-size, ns-remount-ro-volume, ns-unmount-volume, unmount-volume, unmount-tmpfs); the volume source CHANGED
+PASS 9: SKIPPED: the rows of root need root
+PASS 10: SKIPPED: the rows of root need root
+PASS 11: SKIPPED: the rows of root need root
+PASS 12: --read-only: exit 0, remount of / Operation not permitted
+OPEN 13: the way out of the chroot wrote a host file in 8 of 8 rows
+PASS 14: before the fix: remount of the :ro volume OK, the host file changed
+PASS 15: 0 process(es) of podvm and 0 tree(s) stayed
+OPEN: rows [7, 8, 13] wait for pod-enter (TODO/enter.md T-2105)
+EACH LOCKED ROW HOLDS
