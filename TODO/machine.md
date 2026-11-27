@@ -5958,12 +5958,56 @@ a PID namespace. Experiment 483 clause 6 now expects systemd as PID 1 in
 the saved and the loaded guest, and passed nine of nine clauses again.
 [Transcript](../experiments/results/machine-disk-state.txt)
 
-Remaining: steps 1 to 3 and the state under KVM on `kvm.yml` (the step
-of experiment 469 now makes its base archive with
+**Partial (2026-11-26), the lifecycle with systemd as PID 1.** `run -d
+--podvm-tier=machine --podvm-init=image` now holds (`run/parse/opts.rs`
+refused it): the keeper boots systemd as PID 1 of the guest, and `ps`,
+`logs`, `exec` (`-e`, `-w`), `stop`, `inspect` and `rm` serve it. `create`
+of the machine tier with the init stays a refusal by name, and `exec -t`
+of a guest stays the refusal of T-2043. Two faults are fixed. (1) `stop`
+of a guest of `run -d` ended the emulator by QMP `quit` with no signal to
+the command and no exit code in the record; it now gives the keeper
+SIGTERM, which the keeper forwards to the command (T-2041), waits 10 s,
+and the exit code of the command ends the record; a command that runs on
+is killed with its guest, and the record says exit code 137
+(`windows/machine/life.rs::sigterm_keeper`). Where no keeper runs, no
+SIGTERM goes out, and the record says "with no keeper", not "after 10 s
+of SIGTERM" (`windows/machine.rs::stop_record`). (2) With systemd as PID 1 no
+signal reached the command, in `run -d` and in a foreground run: the
+unit of the run has no stdin, so the reader of signals in the guest read
+an empty input, and the host did not see its ready marker after the
+queries of systemd on the console. `guest-ready` now gives the init
+script `/dev/ttyS0` as stdin (`pid1::console_in`), and the host takes the
+marker at the end of a line (`signals::Forward::line`). The unit tests
+`where_the_init_of_the_image_holds`,
+`stop_gives_the_keeper_sigterm_and_waits_for_its_end` and
+`each_forwarded_signal_reaches_the_guest_and_nothing_else_does` pin the
+classes. Experiment 487 as uid 1000 under TCG, on the tree merged with
+`main` at `cd3a664`, eleven of eleven clauses PASS: `run -d` gave an id and Up; `logs` gave the first output; `exec`
+gave PID 1 systemd and PID 2 kthreadd, `running` and exit 3; `-e` and
+`-w` held; `exec -t` gave 125 by name; `stop` gave the command SIGTERM in
+0.9 s, its trap ran, and `ps`, `inspect` and `logs` gave exit code 5 and
+its line; `rm` removed it; a foreground `run -t` had `/dev/hvc0` and
+gave 6; a foreground run that got SIGTERM gave the trap's 5; `create`
+gave 125; nothing stayed.
+[Transcript](../experiments/results/machine-init-lifecycle.txt)
+A check by hand on the same binary, as uid 1000 under TCG, ran two
+guests of `run -d` with podvm's init: `stop` of a command with a trap of
+SIGTERM took 1 s and gave Exited (7) and the trap's line, and `stop` of a
+command that ignores SIGTERM took 11 s and gave Exited (137); no
+emulator stayed.
+
+Remaining: steps 1 to 3, the state and the lifecycle under KVM on
+`kvm.yml` (the step of experiment 469 makes its base archive with
 `PODVM_MACHINE_ROOT=initramfs`, as the routes of 468 keep the root on the
-disk); `run -d`, `exec` and `-t` with systemd as PID 1, which this proof
-did not run; an arm64 guest; the kernel and the initrd of the image
-itself (PodUtils/podrunner#316 ask 2).
+disk); an arm64 guest; `exec -t` of a guest (T-2043); the kernel and the
+initrd of the image itself (PodUtils/podrunner#316 ask 2), not started:
+a variable selects the kernel of the image (`/boot/vmlinuz-KVER`) with
+podvm's initramfs and the modules of `/usr/lib/modules/KVER` of the
+image (virtio_blk, ext4, overlay, 9p and their closure from its
+`modules.dep`, `modules.builtin` for each one built in, compressed
+modules through `finit_module` with `MODULE_INIT_COMPRESSED_FILE`), a
+refusal by name of each missing one, and a proof with an image that has
+a kernel (`uname -r`, systemd as PID 1, the exit code, a 9p volume).
 
 # T-1996: On the incus tier, an instance of the hosted snapshot has 231,072 ids, `/dev/fuse` and a machine-id of its own
 

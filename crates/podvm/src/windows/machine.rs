@@ -362,6 +362,13 @@ fn stop_record(root: &Path, name: &str) -> Option<String> {
     if r.flavor == "desktop" && agent::graceful(root, &r) {
         how = "guest-shutdown";
     }
+    // TODO/machine.md T-1994: a guest of `run -d` gets SIGTERM, as `docker
+    // stop` gives one: the keeper forwards it to the command in the guest
+    // (T-2041), and the exit code of the command ends the record.
+    let termed = r.flavor == "linux" && machines::alive(r.keeper_pid, r.keeper_start);
+    if termed && life::sigterm_keeper(&r, STOP_GRACE) {
+        return machines::read(root, name).map(|now| now.ended);
+    }
     let qmp = r
         .running()
         .then(|| podvm_windows::qmp::Monitor::connect(&sock, Duration::from_secs(2)));
@@ -394,7 +401,18 @@ fn stop_record(root: &Path, name: &str) -> Option<String> {
     {
         std::thread::sleep(Duration::from_millis(100));
     }
-    let end = format!("stopped by podvm stop ({how})");
+    let end = if termed {
+        // As `docker stop` after its grace: the exit code of a SIGKILL.
+        format!(
+            "stopped by podvm stop ({how}) after {} s of SIGTERM, exit code 137",
+            STOP_GRACE.as_secs()
+        )
+    } else if r.flavor == "linux" {
+        // No keeper got the SIGTERM: say so, with the code of a SIGKILL.
+        format!("stopped by podvm stop ({how}) with no keeper, exit code 137")
+    } else {
+        format!("stopped by podvm stop ({how})")
+    };
     if let Some(mut now) = machines::read(root, name) {
         now.ended = end.clone();
         let _ = machines::write(root, &now);

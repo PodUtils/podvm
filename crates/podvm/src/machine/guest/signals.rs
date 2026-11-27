@@ -121,7 +121,10 @@ impl Forward {
 
     /// True where `line` of the console is the marker of the reader.
     pub fn line(&mut self, line: &str) -> bool {
-        let up = line.trim() == up_marker(&self.nonce);
+        // TODO/machine.md T-1994: systemd as PID 1 writes its terminal
+        // queries on the line of the first output of the unit of the run,
+        // with no newline: the marker ends that line.
+        let up = line.trim_end().ends_with(&up_marker(&self.nonce));
         self.up |= up;
         up
     }
@@ -372,6 +375,21 @@ mod tests {
         };
         assert!(!f.line("PODVM-READY-0123abcd") && !f.up);
         assert!(f.line(&format!("{}\r", up_marker(nonce))) && f.up);
+        let mut g = Forward {
+            sfd: None,
+            up: false,
+            nonce: nonce.into(),
+            verb: "run".into(),
+        };
+        assert!(!g.line(&format!("{}x", up_marker(nonce))) && !g.up);
+        let junk = format!(
+            "\u{1b}[6n\u{1b}]3008;type=boot\u{1b}\\{}\r",
+            up_marker(nonce)
+        );
+        assert!(
+            g.line(&junk) && g.up,
+            "the marker after the queries of systemd"
+        );
         assert!(wrap("\"$@\"").ends_with("' /podvm-init \"$@\""));
         assert!(start(nonce).contains("guest-signals 0123abcd"));
     }
