@@ -129,6 +129,26 @@ pub fn enter_own_namespace() -> Result<(), String> {
     Ok(())
 }
 
+/// The launcher's whole entry for overlay volumes (TODO/enter.md T-2107):
+/// [`enter_own_namespace`], [`mount_all`], and, where the process is in a
+/// user namespace (`mknod` refused, so the tree holds regular files for the
+/// devices), the binds of the host's devices that `pod-enter` makes only in
+/// a user namespace of its own ([`crate::devices::bind`], with its list,
+/// `pod_enter::DEVICES`). The namespace rung copies them with the layers.
+/// Each line of the result is a path that stays as the image has it.
+pub fn prepare(
+    rootfs: &Path,
+    layers: &[Volume],
+    base: Option<&str>,
+) -> Result<Vec<String>, String> {
+    enter_own_namespace()?;
+    mount_all(rootfs, layers, base)?;
+    if !in_user_namespace() {
+        return Ok(Vec::new());
+    }
+    Ok(crate::devices::bind(rootfs, &pod_enter::DEVICES))
+}
+
 /// Mount each layer of `layers` on the tree `rootfs`, in order; the layer
 /// `n` takes the directory [`layer_dir`] `n`. `base` is the base of
 /// `--podvm-volume-base`: a HOST under it opens under it with no symbolic

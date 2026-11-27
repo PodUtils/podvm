@@ -27,3 +27,8 @@ pod-beneath = { git = "https://github.com/PodUtils/podcrates", tag = "v0.86.0" }
 [[test]]
 name = "overlay_layer"
 harness = false
+
+# TODO/enter.md T-2107: the devices of the launcher's namespace, the same way.
+[[test]]
+name = "overlay_devices"
+harness = false
