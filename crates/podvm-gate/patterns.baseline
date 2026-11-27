@@ -16,7 +16,7 @@ discard_write	crates/podvm/src/complete/step_output.rs	1
 discard_write	crates/podvm/src/complete/strict.rs	8
 discard_write	crates/podvm/src/diagnose.rs	4
 discard_write	crates/podvm/src/exec/command.rs	6
-discard_write	crates/podvm/src/exec/enter.rs	7
+discard_write	crates/podvm/src/exec/enter.rs	6
 discard_write	crates/podvm/src/images/login_extract.rs	1
 discard_write	crates/podvm/src/incus/run.rs	2
 discard_write	crates/podvm/src/incus/verbs.rs	4

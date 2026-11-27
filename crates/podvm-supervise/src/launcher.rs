@@ -182,7 +182,7 @@ fn enter_in_launcher(
     pass.extend(opened.pass.iter().copied());
     podvm_enter::device::push_serve(&mut env, &opened);
 
-    let root = RootDir::open(&container.rootfs).map_err(|e| e.to_string())?;
+    let mut root = RootDir::open(&container.rootfs).map_err(|e| e.to_string())?;
     // The stored environment already carries the constant descriptor number
     // from `create`; containers made before T-0710 do not, so ensure it here
     // rather than refusing a record that predates the rule.
@@ -193,6 +193,15 @@ fn enter_in_launcher(
     // namespace rung ride in `PODVM_BINDS`; the payload does not see it.
     let binds = binds_of(&env);
     let layers = overlays_of(&env); // TODO/enter.md T-2101
+    let ro_root = podvm_enter::read_only::take(&mut env); // TODO/cli.md T-2108
+    let ro_entry = container.rung == "namespace" && container.userland_exec.is_empty();
+    if ro_root && (!ro_entry || init_of_image(container)) {
+        return Err(format!(
+            "--read-only of the record is a mount of the namespace rung, and the record \
+             names {} (TODO/cli.md T-2108)",
+            container.rung
+        ));
+    }
     env.retain(|e| !e.starts_with("PODVM_BINDS=") && !e.starts_with("PODVM_BINDS_BASE="));
     // TODO/machine.md T-1968: the size-limited tmpfs mounts, as the volumes.
     let tmpfs = tmpfs::of(&env)?;
@@ -301,7 +310,7 @@ fn enter_in_launcher(
         })?;
         init = Some(started.keep);
         podvm_enter::Child::of(started.pid)
-    } else if container.userland_exec.is_empty() && !layers.is_empty() {
+    } else if container.userland_exec.is_empty() && (!layers.is_empty() || ro_root) {
         // TODO/enter.md T-2101: pod-enter mounts no overlay volume yet, so
         // this launcher takes a mount namespace of its own (and a user
         // namespace where it is not root), mounts each layer on the tree,
@@ -326,6 +335,13 @@ fn enter_in_launcher(
             .map_err(|e| format!("starting with an overlay volume: {e}"))?;
         // TODO/enter.md T-2105: the payload under the namespace of the layers.
         plan.userns_ids = podvm_enter::lock::payload_ids(plan.userns_ids);
+        if ro_root {
+            // TODO/cli.md T-2108: the read-only root, and the root of the entry on it.
+            let tree = std::path::Path::new(&container.rootfs);
+            podvm_enter::read_only::seal(tree, &plan.volumes, &plan.tmpfs)
+                .map_err(|e| format!("starting with --read-only: {e} (TODO/cli.md T-2108)"))?;
+            root = RootDir::open(&container.rootfs).map_err(|e| e.to_string())?;
+        }
         podvm_enter::spawn_namespace(&root, &plan, log).map_err(spawn_failure)?
     } else if container.userland_exec.is_empty() {
         let findings = podvm_probe::run();

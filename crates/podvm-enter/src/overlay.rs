@@ -76,7 +76,7 @@ pub fn check_guests(overlays: &[String], all: &[String]) -> Result<(), String> {
 }
 
 /// The line of an errno of a call.
-fn errno(what: &str, e: Errno) -> String {
+pub(crate) fn errno(what: &str, e: Errno) -> String {
     format!(
         "{what}: {} ({})",
         std::io::Error::from_raw_os_error(e.0),
@@ -85,7 +85,7 @@ fn errno(what: &str, e: Errno) -> String {
 }
 
 /// A descriptor that closes when it goes.
-struct Fd(i64);
+pub(crate) struct Fd(pub(crate) i64);
 
 impl Drop for Fd {
     fn drop(&mut self) {
@@ -93,7 +93,7 @@ impl Drop for Fd {
     }
 }
 
-fn cbuf(s: &str) -> Result<CBuf, String> {
+pub(crate) fn cbuf(s: &str) -> Result<CBuf, String> {
     CBuf::new(s).ok_or_else(|| format!("{s:?} holds a NUL byte"))
 }
 
@@ -194,7 +194,7 @@ fn layer_part(p: &Path, mode: u32) -> Result<(), String> {
 
 /// The mount point of `guest` in `rootfs`, one component at a time, with
 /// no link of the image on the way: the tree came from an archive.
-fn point(rootfs: &Path, guest: &str) -> Result<Fd, String> {
+pub(crate) fn point(rootfs: &Path, guest: &str) -> Result<Fd, String> {
     let dir_flags = sys::O_PATH | sys::O_DIRECTORY | sys::O_CLOEXEC;
     let root = cbuf(&rootfs.to_string_lossy())?;
     let mut at =

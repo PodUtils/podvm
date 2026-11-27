@@ -8,6 +8,31 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: `--read-only` keeps the namespace rung with a read-only root, 2026-11-27
+
+Record: T-2108 (OR-B42-02).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- Where the probe selects the namespace rung, `--read-only` no longer puts
+  a run on the userland rung. A foreground `run`, `run -d`, `create`,
+  `start` and `exec` keep the namespace rung, and the root of the payload
+  is a bind of the tree that podvm remounts read-only in a mount namespace
+  that it owns. A write to the root fails with `EROFS`, also by a raw
+  `syscall` instruction. `/tmp`, each `--tmpfs` (with `size=` too), each
+  volume with its own mode, and `/dev` stay writable. Before, a run of a
+  user with no root got the userland rung and the PID table of the host,
+  `--tmpfs P:size=N` was refused, and a raw `openat` of a dynamic payload
+  wrote a file in the host's `/tmp`.
+- For a user with no root and for uid 0 of a user namespace of one id, the
+  payload cannot remount `/` writable (`EPERM`, T-2105). Known gap: a
+  payload of root can, and can then write the tree of its container.
+- A run where podvm owns no mount namespace (`PODVM_USERNS=0` of a user
+  with no root, a forced launch rung, `--podvm-init=image`) keeps the
+  read-only layer of the interposer, as before. An `exec` that does not
+  join a running container with `--read-only` refuses by name.
+- The removal of a tree detaches a mount that another mount at the same
+  path hid, in more passes; before, one pass left it, and the tree stayed.
+
 ### Fixed: the payload no longer changes a mount of its run on most paths of the namespace rung, 2026-11-27
 
 Record: T-2105 (PodUtils/podrunner#378).

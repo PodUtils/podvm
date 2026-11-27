@@ -158,20 +158,38 @@ fn unescape(s: &str) -> String {
 /// deepest first. True where none stays. A volume of a run is a bind of a
 /// host directory into the tree: a removal that walked into it would remove
 /// the files of the host.
+///
+/// TODO/cli.md T-2108: a mount can hide another at the same path (the
+/// read-only bind of a root carries a copy of each mount under it), and an
+/// unmount by path reaches the top one only. The passes go on while each
+/// one detaches a mount, at most [`PASSES`] times.
 pub fn unmount_under(dir: &Path) -> bool {
     const MNT_DETACH: i32 = 2;
     const UMOUNT_NOFOLLOW: i32 = 8;
     let mut m = mounts_under(dir);
-    m.sort_by_key(|p| std::cmp::Reverse(p.as_os_str().len()));
-    for p in m {
-        let Ok(c) = std::ffi::CString::new(p.as_os_str().as_encoded_bytes()) else {
-            continue;
-        };
-        // SAFETY: a NUL-ended path.
-        unsafe { umount2(c.as_ptr(), MNT_DETACH | UMOUNT_NOFOLLOW) };
+    for _ in 0..PASSES {
+        if m.is_empty() {
+            return true;
+        }
+        m.sort_by_key(|p| std::cmp::Reverse(p.as_os_str().len()));
+        for p in &m {
+            let Ok(c) = std::ffi::CString::new(p.as_os_str().as_encoded_bytes()) else {
+                continue;
+            };
+            // SAFETY: a NUL-ended path.
+            unsafe { umount2(c.as_ptr(), MNT_DETACH | UMOUNT_NOFOLLOW) };
+        }
+        let left = mounts_under(dir);
+        if left.len() >= m.len() {
+            return left.is_empty();
+        }
+        m = left;
     }
-    mounts_under(dir).is_empty()
+    m.is_empty()
 }
+
+/// The most passes of [`unmount_under`].
+const PASSES: usize = 16;
 
 /// Remove the tree `dir`, the owner's bits added to each directory first.
 /// ⛔ Not while a mount stays under it (T-1920).

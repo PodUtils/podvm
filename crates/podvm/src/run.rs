@@ -193,10 +193,12 @@ pub const RUN_OPTIONS: &str = "\
                    (TODO/machine.md T-1968). With no size=: an empty
                    writable directory at P for a foreground run, removed at
                    its end, not a mount (TODO/cli.md T-1655)
-  --read-only      a write outside a writable volume fails with EROFS: through
-                   the interposer of the userland loader family, and on the
-                   namespace rung as a read-only root; elsewhere it is refused
-                   by name (TODO/cli.md T-1655, T-2064)
+  --read-only      a write outside a writable volume fails with EROFS: on the
+                   namespace rung a read-only bind of the root (/tmp, each
+                   --tmpfs, each volume and /dev stay writable; T-2108);
+                   else through the interposer of the userland loader
+                   family; elsewhere it is refused by name (TODO/cli.md
+                   T-1655, T-2064)
   --cap-drop ALL   the same bit; a named capability is refused
                    (TODO/cli.md T-1655)
   --timeout S      podman's: at S seconds the payload and its tree are
@@ -413,6 +415,7 @@ pub(crate) mod cgroup; // TODO/cli.md T-1747
 mod devices; // TODO/enter.md T-1939
 mod fallback; // TODO/enter.md T-1953
 pub(crate) mod overlay; // TODO/enter.md T-2101
+pub(crate) mod read_only; // TODO/cli.md T-2108
 pub(crate) mod tmpfs; // TODO/machine.md T-1968
 mod user_ns; // TODO/enter.md T-1927
 pub(crate) use acquire::*;

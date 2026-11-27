@@ -351,6 +351,8 @@ pub const INTERNAL: &[&str] = &[
     "PODVM_MEMO_ID",
     "PODVM_MEMO_PATH",
     "PODVM_RO",
+    // `--read-only` as a mount of the namespace rung (TODO/cli.md T-2108).
+    "PODVM_RO_ROOT",
     "PODVM_SANDPROBE_HOST",
     // `--tmpfs GUEST:size=N` in the record (TODO/machine.md T-1968).
     "PODVM_TMPFS",

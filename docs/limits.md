@@ -55,7 +55,8 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
 - On the namespace rung a volume (`-v HOST:GUEST`) is a bind mount:
   `/proc/mounts` lists it, and `/proc/self/mountinfo` names the host path
   (T-1920). On the userland rung a volume, `--tmpfs` and `--read-only` are
-  a path rewrite of the loader family, not a mount (T-1653). A run with
+  a path rewrite of the loader family, not a mount (T-1653); on the
+  namespace rung `--read-only` is a mount (T-2108, below). A run with
   one of them takes that family also where chroot works (T-1761). A write
   lands in HOST. A static program or a raw `syscall` instruction sees
   the image path, and `/proc/mounts` does not list the volume. Where the
@@ -69,7 +70,7 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   the payload in a user namespace under the one that made the mounts: a
   remount of a volume, of `/proc` or of a sized tmpfs, and an unmount, fail
   with `EPERM`. `run -d`, `create` and `start` of a user with no root and
-  no overlay volume, each verb of root, and a foreground run with the
+  with no overlay volume and no `--read-only` (T-2108), each verb of root, and a foreground run with the
   subordinate range (T-1911) do not: there the payload can remount a `:ro`
   volume writable and change the host file. On each path the rung enters
   the tree with `chroot`, and a payload of uid 0 can leave it and open host
@@ -105,14 +106,40 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   `hostname` or `resolv.conf` of podvm, where docker binds its own over
   the volume, and with `-v DIR:/dev` no device node. `--verbose` names
   each fixup that a volume covers.
-- `:ro` and `--read-only` are a read-only layer of the same interposer
-  (T-1655): a write through libc under a read-only guest path fails with
+- On the userland rung, `:ro` and `--read-only` are a read-only layer of
+  the same interposer (T-1655): a write through libc under a read-only guest path fails with
   `EROFS`, and `/dev` stays writable. The layer reads a host path of a
   volume or of the rootfs (`PODVM_MAPS` names them) by its guest path, and
   the path that a link reaches, so such a write fails the same way
   (T-2040). A host path of the rootfs resolves its links from the
   rootfs, and `..` stops there (T-2045). A raw `syscall` instruction passes
   the layer. Each entry with no interposer table refuses both by name.
+- `--read-only` on the namespace rung (T-2108): where the probe selects
+  the namespace rung and podvm owns the mount namespace of the entry (pid
+  2 of a foreground run of a user with no root; a foreground run of uid 0,
+  which opens a mount namespace of its own; the launcher of `run -d`,
+  `create` and `start`, as for an overlay volume), the root is a bind of
+  the tree remounted read-only. A write to it fails with `EROFS`, also by a
+  raw `syscall` instruction. `/tmp` (the tmpfs of the rung), each
+  `--tmpfs`, each volume with its own mode, and `/dev` of the tree stay
+  writable. Docker differs at `/tmp`: with `--read-only` it gives a
+  read-only `/tmp` where no `--tmpfs /tmp` is given. On the paths that
+  T-2105 locks (a foreground run of a user with no root and `exec` into
+  it, `run -d`, `create` and `start` of such a user, and each verb of uid
+  0 of a user namespace of one id), a remount of `/` writable fails with
+  `EPERM`, also in a mount namespace of the payload. Each verb of root
+  stays open: its payload can remount `/` writable and write the tree of
+  its container, which `rm` removes (experiment 490). An `exec` that does
+  not join the running unit refuses by name; an `exec` that joins makes
+  the same read-only root in a mount namespace of its own first, so that
+  an entry of pod-enter after a refused join (uid 0 of a user namespace
+  of one id) lands on it too, with no `--tmpfs` of the run. The root of
+  `/` in `/proc/self/mountinfo` names the host path of the tree. Each other
+  run (`PODVM_USERNS=0` of a user with no root, a forced launch rung,
+  `--podvm-init=image`, the syscall and emulate tiers, a host where the
+  probe selects another rung) keeps the read-only layer of the
+  interposer, with its limits (the item above). The cost is within the
+  noise of the host (experiment 490, an estimate).
 - `--podvm-volume-base DIR` on the loader family (T-1972): at the start,
   each volume under DIR must open under it as a directory with no
   symbolic link (else exit 125 and one line). At each path call of libc

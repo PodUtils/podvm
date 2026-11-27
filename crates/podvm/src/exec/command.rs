@@ -442,7 +442,7 @@ pub fn exec(args: &[String]) -> i32 {
         relay_title: None,   // podcrates `v0.82.1`: no init and no relay here
         tmpfs: Vec::new(),   // podcrates `v0.86.0` (T-2102)
     };
-    if let Err(c) = serve_devices(&mut plan, &mut err) {
+    if let Err(c) = serve_devices(&mut plan) {
         drop(memo);
         let _ = std::fs::remove_file(&memo_host_path);
         return c;

@@ -62,7 +62,15 @@ pub(crate) fn joins_the_run(
 /// TODO/enter.md T-2101: an overlay volume is a mount of the namespaces of
 /// the running unit only; an `exec` that does not join them would see the
 /// tree of the image at its guest path, so it refuses by name.
+/// TODO/cli.md T-2108: so is the read-only root of `--read-only`.
 pub(super) fn layers_need_join(env: &[String]) -> Result<(), i32> {
+    if podvm_enter::read_only::wanted(env) {
+        eprintln!(
+            "podvm exec: --read-only of the container is a mount of the running container \
+             only, and this exec does not join it; start the container first (TODO/cli.md T-2108)"
+        );
+        return Err(podvm_image::error::EXIT_RUNTIME_ERROR);
+    }
     let layers = podvm_supervise::launcher::overlays_of(env);
     let Some(l) = layers.first() else {
         return Ok(());
@@ -73,6 +81,50 @@ pub(super) fn layers_need_join(env: &[String]) -> Result<(), i32> {
         l.host, l.guest
     );
     Err(podvm_image::error::EXIT_RUNTIME_ERROR)
+}
+
+/// Open the device spec where one rides the plan's environment, T-0501.
+///
+/// `exec` takes no `--device` flag (docker parity: it re-enters), but a
+/// container created with mappings carries the spec in its record, and a
+/// re-entry that dropped it would serve nothing where `run` served. A
+/// spec gone bad since `create` refuses the exec naming it.
+pub(super) fn serve_devices(plan: &mut podvm_enter::Plan) -> std::result::Result<(), i32> {
+    match podvm_enter::device::specs_of(&plan.env).and_then(|s| podvm_enter::device::open_all(&s)) {
+        Ok(opened) => {
+            plan.fds.pass.extend(opened.pass.iter().copied());
+            podvm_enter::device::push_serve(&mut plan.env, &opened);
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("podvm exec: {e}"); // stderr is reentrant on this thread
+            Err(podvm_enter::ExitCode::exit_code(&e))
+        }
+    }
+}
+
+/// TODO/cli.md T-2108: an `exec` that joins a run with a read-only root
+/// makes the same root in a mount namespace of its own first, so that the
+/// entry of pod-enter where the join is refused (its fallback to a mount
+/// namespace of its own) also lands on a read-only root. Where it cannot,
+/// the exec stops: no exec gets a writable root of such a run.
+pub(super) fn seal_for_join(
+    plan: &podvm_enter::Plan,
+    env: &[String],
+    rootfs: &str,
+) -> Result<(), i32> {
+    if !podvm_enter::read_only::wanted(env) {
+        return Ok(());
+    }
+    podvm_enter::read_only::own_mounts()
+        .and_then(|()| {
+            let tree = std::path::Path::new(rootfs);
+            podvm_enter::read_only::seal(tree, &plan.volumes, &plan.tmpfs)
+        })
+        .map_err(|e| {
+            eprintln!("podvm exec: --read-only of the container: {e} (TODO/cli.md T-2108)");
+            podvm_image::error::EXIT_RUNTIME_ERROR
+        })
 }
 
 /// TODO/cli.md T-2061: the refusal of `exec` into a container that ended,

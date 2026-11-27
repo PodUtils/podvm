@@ -1,0 +1,25 @@
+Does --read-only keep the namespace rung with a root that stays read-only?
+2026-11-27T05:22:40Z Linux 6.18.44-fc-v880, uid 0
+podvm SHA-256 4778ededecfd75e94224a0be0a8f223d8711d73dbc3e19570b64ade60b1a28ab
+before SHA-256 82a4a637e18541f2b0554c9b54537b658fe889e101a95621e2a1ef4f9d624090
+image mirror.gcr.io/library/alpine:3.20
+PASS 1: uid 1000, foreground: exit 0, mode=namespace
+PASS 2: uid 1000, foreground: exit 0; /x erofs, /tmp ok, /dev/null ok, /w ENOSPC yes, /newvol ok, /rov erofs
+PASS 3: uid 1000, foreground: exit 0; the probe: remount-root Operation not permitted, write-root Read-only file system, ns-remount-root Operation not permitted, ns-write-root Read-only file system
+PASS 4: uid 1000, foreground: raw openat static OK and dynamic OK, in the run's /tmp: yes and yes, in the host's /tmp: no
+PASS 5: uid 1000, --read-only --tmpfs /w:size=1m: exit 1 (of dd), a write of 2000 KiB gives ENOSPC
+PASS 6: uid 1000, foreground: /newvol ok (the host file is there), /rov erofs, H2 the same
+PASS 7: uid 1000, exec into a foreground run: /x erofs, /tmp ok, /dev/null ok, /w ENOSPC yes, /newvol ok, /rov erofs; locked: yes
+PASS 8: uid 1000, run: exit 0, .Rung namespace; /x erofs, /tmp ok, /dev/null ok, /w ENOSPC yes, /newvol ok, /rov erofs; locked: yes; raw openat in the run's /tmp: yes
+PASS 9: uid 1000, create: exit 0, .Rung namespace; /x erofs, /tmp ok, /dev/null ok, /w ENOSPC yes, /newvol ok, /rov erofs; locked: yes; raw openat in the run's /tmp: yes
+PASS 10: uid 1000, detached: /dev/null of exec writable in 2 of 2 rows (TODO/enter.md T-2107)
+PASS 11: root, foreground: mode=namespace; /x erofs, /tmp ok, /dev/null ok, /w ENOSPC yes, /newvol -, /rov -; raw openat in the run's /tmp: yes
+PASS 12: root, run: exit 0, .Rung namespace, /x erofs, /tmp ok, /dev/null ok, /w ENOSPC yes, /newvol ok, /rov erofs; create: exit 0, .Rung namespace, /x erofs, /tmp ok, /dev/null ok, /w ENOSPC yes, /newvol ok, /rov erofs
+OPEN 13: root: / locked in 0 of 3 rows (foreground, run -d, create)
+PASS 14: uid 0 of one id: foreground mode=namespace, /x erofs, /tmp ok, /dev/null ok, /w ENOSPC yes, /newvol -, /rov -, locked: yes; run -d .Rung namespace, exec /x erofs, /tmp ok, /dev/null ok, /w ENOSPC -, /newvol ok, /rov erofs, locked: yes; exec did not join the run and entered on its own, with no --tmpfs of the run (T-2105)
+PASS 15: uid 1000, PODVM_USERNS=0: mode=userland, /x erofs
+PASS 16: before the fix: mode=userland; the raw openat wrote the host's /tmp: yes
+PASS 17: the median of 20 runs of run --rm IMAGE true, an estimate: uid1000: --read-only 80 ms, no --read-only 79 ms, --read-only before 84 ms; root: --read-only 101 ms, no --read-only 107 ms, --read-only before 105 ms
+PASS 18: 0 process(es) of podvm and 0 tree(s) stayed
+OPEN: rows [13] wait for another entry (TODO/enter.md T-2105, T-2107)
+EACH HELD ROW HOLDS

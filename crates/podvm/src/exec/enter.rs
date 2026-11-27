@@ -1,25 +1,7 @@
 use super::*;
 use podvm_enter::ExitCode as _;
 
-/// Open the device spec where one rides the plan's environment, T-0501.
-///
-/// `exec` takes no `--device` flag (docker parity: it re-enters), but a
-/// container created with mappings carries the spec in its record, and a
-/// re-entry that dropped it would serve nothing where `run` served. A
-/// spec gone bad since `create` refuses the exec naming it.
-pub(super) fn serve_devices(plan: &mut Plan, err: &mut dyn Write) -> std::result::Result<(), i32> {
-    match podvm_enter::device::specs_of(&plan.env).and_then(|s| podvm_enter::device::open_all(&s)) {
-        Ok(opened) => {
-            plan.fds.pass.extend(opened.pass.iter().copied());
-            podvm_enter::device::push_serve(&mut plan.env, &opened);
-            Ok(())
-        }
-        Err(e) => {
-            let _ = writeln!(err, "podvm exec: {e}");
-            Err(e.exit_code())
-        }
-    }
-}
+pub(super) use super::ns::serve_devices; // T-0501
 
 /// Enter an existing rootfs. ⭐ ONE PATH for a container and for an image: the
 /// only difference is where the rootfs came from, and duplicating the entry
@@ -436,7 +418,8 @@ pub(super) fn enter(
         relay_title: Some(podvm_enter::TITLE_EXEC.into()),
         tmpfs: Vec::new(), // podcrates `v0.86.0` (T-2102)
     };
-    if let Err(c) = serve_devices(&mut plan, &mut err) {
+    let sealed = |p: &Plan| super::ns::seal_for_join(p, &container.env, rootfs); // T-2108
+    if let Err(c) = serve_devices(&mut plan).and_then(|()| sealed(&plan)) {
         return c;
     }
     let root = match RootDir::open(rootfs) {

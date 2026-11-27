@@ -12,10 +12,11 @@ The namespace path supplies the mount behavior stated in
 [the architecture](docs/architecture.md), without network isolation. Its user,
 PID and UTS namespaces depend on the caller and the verb, and the banner of each
 run names them; a user namespace of a run is not a security boundary that podvm
-claims against the invoking account. A `:ro` volume of the namespace path is
-read-only for the payload only on the paths that
-[the limits](docs/limits.md) name (T-2105): elsewhere a payload of uid 0
-can remount it, or leave the `chroot` of the tree and write its source.
+claims against the invoking account. A `:ro` volume and the root of
+`--read-only` of the namespace path are read-only for the payload only on
+the paths that [the limits](docs/limits.md) name (T-2105, T-2108): elsewhere
+a payload of uid 0 can remount them, or leave the `chroot` of the tree and
+write the source of a volume.
 `--podvm-confine` holds on each path.
 The Windows, DOS, and `machine ssh` guests run in QEMU on KVM or TCG.
 Under TCG the emulator process is the boundary, not hardware isolation.

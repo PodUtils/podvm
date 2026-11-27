@@ -364,8 +364,20 @@ pub fn read_only_env(
     userland: Option<&Userland>,
     env: &mut Vec<String>,
 ) -> Result<(), i32> {
-    env.retain(|e| !e.starts_with("PODVM_RO="));
+    env.retain(|e| !e.starts_with("PODVM_RO=") && !e.starts_with("PODVM_RO_ROOT="));
     if !read_only && ro_guests.is_empty() {
+        return Ok(());
+    }
+    // TODO/cli.md T-2108: on the namespace rung, `--read-only` is a
+    // read-only bind of the root (`podvm_enter::read_only`), and each `:ro`
+    // volume a bind remounted read-only.
+    let binds = crate::userns::active() || crate::run::binds::planned();
+    if userland.is_none()
+        && read_only
+        && crate::run::read_only::mounted()
+        && (binds || ro_guests.is_empty())
+    {
+        env.push(format!("{}=1", podvm_enter::read_only::VAR));
         return Ok(());
     }
     // TODO/enter.md T-1901 (PodUtils/podrunner#111): the handler of the
@@ -374,8 +386,7 @@ pub fn read_only_env(
     let native = native_static(userland) && !read_only;
     // TODO/enter.md T-1920: in the user namespace of a run, a `:ro` volume
     // is a bind remounted read-only; `--read-only` stays the interposer's.
-    if userland.is_none() && !read_only && (crate::userns::active() || crate::run::binds::planned())
-    {
+    if userland.is_none() && !read_only && binds {
         return Ok(());
     }
     if !native && !matches!(userland.map(|u| u.family), Some(Family::Loader)) {

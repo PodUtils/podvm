@@ -211,9 +211,8 @@ pub(crate) fn prepare(
     env.extend(crate::sandprobe::host_env(store.root())); // T-1666
     super::home::tty_term(o.tty, &mut env); // TODO/cli.md T-2061
     crate::profile::check_needs(verb, &rootfs, &env, &o.needs)?; // T-1659
-                                                                 // ⭐ T-0711: the requested identity travels in the environment, resolved
-                                                                 // against the image, before anything classifies the payload: the object
-                                                                 // reads it on first use in every process (fork and exec keep it).
+                                                                 // ⭐ T-0711: the requested identity travels in the environment, resolved against the
+                                                                 // image, before anything classifies the payload: each process reads it (fork, exec).
     crate::lifecycle::apply_user(verb, &rootfs, o.user.as_ref(), &mut env)?;
     // ⭐ T-0710: the host memo, beside the container record once it exists.
     // Ephemeral here under staging; `create` and `run -d` move it to
@@ -259,10 +258,11 @@ pub(crate) fn prepare(
             a,
         )?)
     } else {
-        // T-1761, T-1920: a volume takes the loader family where no bind holds it.
+        // T-1761, T-1920, T-2108: the loader family where no bind or mount of podvm holds it.
         let bound = super::binds::bound(verb, o.detach, &o.volumes, &findings);
+        let layer = super::read_only::layer(&o, detached, ladder.is_some(), &findings);
         crate::lifecycle::decide_entry_prefer(
-            (!o.volumes.is_empty() && !bound) || o.read_only,
+            (!o.volumes.is_empty() && !bound) || layer,
             verb,
             &maps,
             &argv,

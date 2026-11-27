@@ -146,6 +146,12 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
             return podvm_image::error::EXIT_RUNTIME_ERROR;
         }
     };
+    // TODO/cli.md T-2108: the read-only root, before the open of the root.
+    if let Err(e) = super::read_only::seal_foreground(&p) {
+        eprintln!("podvm run: --read-only: {e} (TODO/cli.md T-2108)"); // reentrant
+        let _ = std::fs::remove_file(&p.memo_host_path);
+        return podvm_image::error::EXIT_RUNTIME_ERROR;
+    }
     let root = match RootDir::open(&p.rootfs) {
         Ok(r) => r,
         Err(e) => {
@@ -178,7 +184,8 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
     let mut env = p.env.clone();
     let volumes = podvm_supervise::launcher::binds_of(&env);
     env.retain(|e| !e.starts_with("PODVM_BINDS=") && !e.starts_with("PODVM_BINDS_BASE="));
-    // TODO/machine.md T-1968: the tmpfs mounts with a limit, as the volumes.
+    podvm_enter::read_only::take(&mut env); // TODO/cli.md T-2108: sealed above
+                                            // TODO/machine.md T-1968: the tmpfs mounts with a limit, as the volumes.
     let tmpfs = podvm_supervise::launcher::tmpfs::of(&env);
     podvm_supervise::launcher::tmpfs::drop_var(&mut env);
     if p.userland.is_none() {

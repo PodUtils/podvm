@@ -34,7 +34,6 @@ pub const TITLE_INIT: &str = "podvm-init";
 pub const TITLE_RUN: &str = "podvm-run";
 /// ... and the process of a join of `exec` and the relay of pod-enter's join.
 pub const TITLE_EXEC: &str = "podvm-exec";
-
 // docker's codes, from the one file that holds them (TODO/cli.md T-0802).
 pub use podvm_probe::exit::{EXIT_CANNOT_INVOKE, EXIT_NOT_FOUND, EXIT_RUNTIME_ERROR};
 
@@ -151,7 +150,8 @@ pub fn ns_fallback_line(cause: &str) -> String {
 pub mod confine;
 pub mod lock;
 /// `-v HOST:GUEST:overlay` on the namespace rung (TODO/enter.md T-2101).
-pub mod overlay; // TODO/enter.md T-2105
+pub mod overlay;
+pub mod read_only; // TODO/cli.md T-2108 // TODO/enter.md T-2105
 
 /// The wait of the payload, with `podvm:` before each line (TODO/cli.md T-2064).
 mod wait;
