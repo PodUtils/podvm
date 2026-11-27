@@ -442,9 +442,10 @@ mod prune; // TODO/supervise.md T-1848
 pub use prune::container_group;
 
 mod entry;
+mod mounts;
 mod prepared;
 pub(crate) mod target; // TODO/machine.md T-2042
-mod typed; // TODO/cli.md T-2060
+mod typed; // TODO/cli.md T-2060 // TODO/cli.md T-2108
 #[cfg(test)]
 use prepared::container_json;
 pub use prepared::Prepared;

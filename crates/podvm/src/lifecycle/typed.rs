@@ -41,6 +41,10 @@ pub const CONTAINER_INSPECT_FIELDS: &[&str] = &[
     "Config.Image",
     "Config.WorkingDir",
     "Config.Labels",
+    "Mounts",
+    "HostConfig",
+    "HostConfig.Binds",
+    "HostConfig.Tmpfs",
     "Tmpfs",
     "Exec.Mode",
     "Exec.Shares",
@@ -117,6 +121,7 @@ fn config(c: &Container) -> Value {
 
 /// The fields of `c` with their types. A dash of the text form is a null.
 pub(super) fn fields(text: &[(&'static str, String)], c: &Container) -> Vec<(&'static str, Value)> {
+    let mounts = super::mounts::of(c); // TODO/cli.md T-2108
     text.iter()
         .map(|(k, v)| {
             let value = match *k {
@@ -127,6 +132,11 @@ pub(super) fn fields(text: &[(&'static str, String)], c: &Container) -> Vec<(&'s
                 "Config.Env" => json!(visible_env(c)),
                 "Config.Cmd" => json!(c.argv),
                 "Tmpfs" => json!(crate::run::tmpfs::words(&c.env)), // T-1968
+                // TODO/cli.md T-2108: docker's mounts of the record.
+                "Mounts" => super::mounts::mounts_json(&mounts),
+                "HostConfig" => super::mounts::host_config(&mounts),
+                "HostConfig.Binds" => super::mounts::binds_json(&mounts),
+                "HostConfig.Tmpfs" => super::mounts::tmpfs_json(&mounts),
                 k if NUMBERS.contains(&k) => v.parse::<i64>().map_or(Value::Null, Value::from),
                 k if TIMES.contains(&k) && v == "-" => Value::Null,
                 _ => Value::String(v.clone()),
@@ -137,17 +147,28 @@ pub(super) fn fields(text: &[(&'static str, String)], c: &Container) -> Vec<(&'s
 }
 
 /// The text of `{{.X}}` where it is not the Go text of the value: `.State`
-/// is the word, as docker's `ps` shows it.
+/// is the word, as docker's `ps` shows it; a null `.HostConfig.Binds` and
+/// `.HostConfig.Tmpfs` are Go's empty list and map, as docker prints them
+/// (TODO/cli.md T-2108).
 pub(super) fn plain(c: &Container) -> Vec<(&'static str, String)> {
-    vec![("State", c.state.word().to_string())]
+    let mounts = super::mounts::of(c);
+    let mut out = vec![("State", c.state.word().to_string())];
+    if super::mounts::binds_json(&mounts).is_null() {
+        out.push(("HostConfig.Binds", "[]".to_string()));
+    }
+    if super::mounts::tmpfs_json(&mounts).is_null() {
+        out.push(("HostConfig.Tmpfs", "map[]".to_string()));
+    }
+    out
 }
 
 /// The document of `inspect`: one object. A name of two parts is a key of an
-/// object of the first (`Exec`, `End`), and `State` and `Config` are whole.
+/// object of the first (`Exec`, `End`), and `State`, `Config` and
+/// `HostConfig` are whole.
 pub(super) fn document(fields: &[(&'static str, Value)]) -> Value {
     let mut o = serde_json::Map::new();
     for (k, v) in fields {
-        if k.starts_with("State.") || k.starts_with("Config.") {
+        if k.starts_with("State.") || k.starts_with("Config.") || k.starts_with("HostConfig.") {
             continue;
         }
         if let Some((group, rest)) = k

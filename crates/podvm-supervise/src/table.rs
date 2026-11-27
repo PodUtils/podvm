@@ -94,6 +94,12 @@ pub struct Hardening {
     /// writes the same. `None` for a record of an older podvm.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hosts: Option<Hosts>,
+    /// Each `-v` and `--tmpfs` of the run, in the order given (TODO/cli.md
+    /// T-2108): `inspect` reads `.Mounts` and `.HostConfig` from it. `None`
+    /// for a record of an older podvm, which `inspect` reads from
+    /// `PODVM_BINDS` and `PODVM_TMPFS` of its env.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mounts: Option<Vec<Mount>>,
 }
 
 /// The parts of `/etc/hosts` of a run (OR-B38-03 of the seventh outside
@@ -242,6 +248,8 @@ pub fn memo_fd_of(env: &[String]) -> Option<i64> {
 
 mod memo;
 pub use memo::*;
+mod mount; // TODO/cli.md T-2108
+pub use mount::{Mount, MountKind};
 
 /// Read the table, with no lock. ⛔ Safe because the table is REPLACED by a
 /// rename, exactly as the image index is: invariant I2 of

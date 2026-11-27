@@ -82,6 +82,10 @@ pub(super) fn container_fields(
     let clone = count(|e| e.clone);
     // T-0413: the served /proc answers beside the four older stories.
     let procfs = count(|e| e.procfs);
+    // TODO/cli.md T-2108: docker's `.Mounts` and `.HostConfig`, as text;
+    // `typed::fields` gives their JSON.
+    let mounts = super::mounts::of(c);
+    let go = |v: serde_json::Value| format::go_text(&v);
     vec![
         ("Id", c.id.clone()),
         ("Name", c.name.clone()),
@@ -172,6 +176,10 @@ pub(super) fn container_fields(
         ("Config.Image", c.image.clone()),
         ("Config.WorkingDir", c.working_dir.clone()),
         ("Config.Labels", c.hardening.labels.join(",")),
+        ("Mounts", go(super::mounts::mounts_json(&mounts))),
+        ("HostConfig", String::new()),
+        ("HostConfig.Binds", go(super::mounts::binds_json(&mounts))),
+        ("HostConfig.Tmpfs", go(super::mounts::tmpfs_json(&mounts))),
         // TODO/machine.md T-1968: each `--tmpfs` with a limit, as memory.
         ("Tmpfs", crate::run::tmpfs::words(&c.env).join(",")),
         // TODO/cli.md T-2053 (OQ-07): what `exec` into the running

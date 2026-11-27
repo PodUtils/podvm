@@ -167,8 +167,28 @@ pub(super) fn tmpfs(verb: &str, spec: &str, o: &mut Opts) -> Result<(), i32> {
             other => return Err(refuse(format!("the option {other:?} is not taken"))),
         }
     }
+    // TODO/cli.md T-2108: the record keeps the last `--tmpfs` of a path,
+    // as docker's map `HostConfig.Tmpfs` does.
+    record_mount(
+        o,
+        podvm_supervise::table::Mount {
+            kind: podvm_supervise::table::MountKind::Tmpfs,
+            source: String::new(),
+            destination: path.clone(),
+            options: opts.to_string(),
+            rw: !opts.split(',').any(|x| x == "ro"),
+        },
+    );
     o.tmpfs.push(path);
     Ok(())
+}
+
+/// TODO/cli.md T-2108: one mount of the record, in the order given; a later
+/// mount of the same kind and destination takes the place of the first.
+fn record_mount(o: &mut Opts, m: podvm_supervise::table::Mount) {
+    let list = o.hardening.mounts.get_or_insert_with(Vec::new);
+    list.retain(|x| x.kind != m.kind || x.destination != m.destination);
+    list.push(m);
 }
 
 /// One `-v`: the pair, and its guest path in the read-only list where the
@@ -185,6 +205,17 @@ pub(super) fn volume(verb: &str, spec: &str, o: &mut Opts) -> std::result::Resul
     o.volume_given
         .push(spec.split(':').next().unwrap_or_default().to_string());
     super::super::overlay::note_mode(mode, &v.guest, o); // :ro, :overlay (T-2101)
+    use crate::lifecycle::volume::Mode;
+    record_mount(
+        o,
+        podvm_supervise::table::Mount {
+            kind: podvm_supervise::table::MountKind::Bind,
+            source: v.host.clone(),
+            destination: v.guest.clone(),
+            options: spec.splitn(3, ':').nth(2).unwrap_or_default().to_string(),
+            rw: !matches!(mode, Mode::Ro | Mode::Mapped { ro: true }),
+        },
+    );
     o.volumes.push(v);
     Ok(())
 }

@@ -359,6 +359,18 @@ string, as docker gives for a label. A key that a map does not have in
 `.A.B` is refused with the keys that it has, where docker prints
 `<no value>`.
 
+`inspect` of a container gives docker's `.Mounts`, `.HostConfig.Binds`
+and `.HostConfig.Tmpfs` from the list of mounts in its record (T-2108).
+`.Mounts` has one object for each `-v`, with `Type` `bind`, `Mode` the
+options of `-v` as given, and `Propagation` `rprivate`. A `--tmpfs` is in
+`.HostConfig.Tmpfs` only, as docker gives it. podvm refuses a named volume
+and `--mount`, so `.Mounts` has no `volume` and no `tmpfs` object. The
+keys of a JSON object are in the order of their names, not in docker's
+order. A record of an older podvm has no list: `inspect` reads its mounts
+from the env of the record, which holds only the mounts of the namespace
+rung. A guest of the machine tier keeps no list, and its `.Mounts` is
+empty.
+
 ## SSH
 
 The source build produces separate `node`, `operator`, `proxy`, and `shell` executables.
