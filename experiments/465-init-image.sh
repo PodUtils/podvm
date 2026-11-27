@@ -86,9 +86,14 @@
 #  11. the pty of `-t` on the namespace rung (TODO/enter.md T-2002): `tty`
 #      names a pty of the init, and a shell that reads two lines from the
 #      pipe of `-it` runs them and gives its exit code;
-#  12. a limit that the supervisor of the init does not apply
-#      (`--podvm-confine`, `--ulimit`) is refused by name with 125
-#      (TODO/enter.md T-2017).
+#  12. the flags that limit a run (TODO/enter.md T-2017): `--podvm-confine`
+#      and a `--device` with w and no r are refused by name with 125; with
+#      `--ulimit nofile=512:1024`, `--security-opt no-new-privileges` and
+#      `--device /dev/null:/dev/xnull`, the command has the soft value 512
+#      and the hard value 1024, PID 1 and a unit of `systemd-run` have the
+#      hard value 1024, each of the three has NoNewPrivs 1, and
+#      `/dev/xnull` is a character device that takes a write; PID 1 and
+#      the device hold the same through `exec` of `run -d`.
 
 set -u
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -586,15 +591,38 @@ else
 	say "clause 11  skipped: no delegated cgroup2 directory"
 fi
 
-# Clause 12: a limit that the init route does not apply is refused.
+# Clause 12: the flags that limit a run with the init of the image.
 if [ -n "$DELEG" ]; then
-	for flags in "--podvm-confine read=/usr" "--ulimit nofile=64"; do
+	for flags in "--podvm-confine read=/usr" "--device /dev/null:/dev/xnull:w"; do
 		# shellcheck disable=SC2086
 		ind timeout 60 "$P" run --rm $flags --podvm-init=image "$IMG" true >/dev/null 2>"$T.12.err"
 		rc=$?
 		say "clause 12  rc $rc (run $flags --podvm-init=image)"
-		{ [ "$rc" -eq 125 ] && grep -q 'does not apply' "$T.12.err"; } || { bad "clause 12: run $flags"; keep "$T.12.err"; }
+		{ [ "$rc" -eq 125 ] && grep -q 'is refused' "$T.12.err"; } || { bad "clause 12: run $flags"; keep "$T.12.err"; }
 	done
+	cat >"$WORK/fx/limits.sh" <<'LIMITS'
+#!/bin/sh
+lim() { awk '/Max open files/{print $5}' "/proc/$1/limits"; }
+nnp() { awk '/NoNewPrivs/{print $2}' "/proc/$1/status"; }
+echo "cmd $(ulimit -Sn) $(ulimit -Hn) $(nnp self)"
+echo "pid1 $(lim 1) $(nnp 1)"
+systemd-run --wait --pipe -q sh -c 'echo unit $(ulimit -Hn) $(awk "/NoNewPrivs/{print \$2}" /proc/self/status)'
+[ -c /dev/xnull ] && echo x >/dev/xnull && echo "dev ok"
+LIMITS
+	want="cmd 512 1024 1;pid1 1024 1;unit 1024 1;dev ok;"
+	hard="--ulimit nofile=512:1024 --security-opt no-new-privileges --device /dev/null:/dev/xnull"
+	# shellcheck disable=SC2086
+	got=$(ind timeout 300 "$P" run --rm $hard --podvm-init=image -v "$WORK/fx:/fx" "$IMG" sh /fx/limits.sh 2>"$T.12.err" | tr '\n' ';')
+	say "clause 12  run $hard: $got"
+	[ "$got" = "$want" ] || { bad "clause 12: the limits of the foreground run"; keep "$T.12.err"; }
+	# shellcheck disable=SC2086
+	ind timeout 300 "$P" run -d --name c465l $hard --podvm-init=image -v "$WORK/fx:/fx" "$IMG" sh -c 'while :; do sleep 1; done' >/dev/null 2>"$T.12.err" ||
+		{ bad "clause 12: run -d"; keep "$T.12.err"; }
+	got=$(as timeout 60 "$P" exec c465l sh /fx/limits.sh 2>&1 | grep -E '^(pid1|dev)' | tr '\n' ';')
+	say "clause 12  exec of run -d: $got"
+	[ "$got" = "pid1 1024 1;dev ok;" ] || bad "clause 12: the limits of run -d"
+	as timeout 60 "$P" rm -f c465l >/dev/null 2>&1
+	stays 12
 else
 	say "clause 12  skipped: no delegated cgroup2 directory"
 fi

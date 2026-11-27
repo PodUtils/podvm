@@ -46,22 +46,62 @@ fn each_missing_part_of_the_host_gives_its_reason() {
     }
 }
 
+/// The plan of a foreground run on the init route: the fields that the
+/// supervisor reads, each other one empty.
+fn plan_of(
+    cwd: &str,
+    volumes: Vec<podvm_enter::VolumeBind>,
+    limits: Vec<podvm_enter::Limit>,
+    no_new_privs: bool,
+    argv: &[&str],
+) -> podvm_enter::Plan {
+    podvm_enter::Plan {
+        argv: v(argv),
+        env: Vec::new(),
+        working_dir: cwd.to_string(),
+        fds: podvm_enter::Fds::default(),
+        banner: String::new(),
+        path_dirs: Vec::new(),
+        names: podvm_enter::NAMES,
+        limits,
+        no_new_privs,
+        die_with_parent: true,
+        confine: None,
+        hostname: None,
+        volumes,
+        userns_ids: None,
+        pid_namespace: false,
+        relay_title: None,
+        tmpfs: Vec::new(),
+    }
+}
+
 #[test]
 fn the_arguments_of_the_supervisor_come_back_as_they_went() {
-    let binds = [podvm_enter::VolumeBind {
-        host: "/srv/t".into(),
-        guest: "/tmp/t".into(),
-        read_only: true,
+    let bind = |guest: &str, host: &str, read_only| podvm_enter::VolumeBind {
+        host: host.into(),
+        guest: guest.into(),
+        read_only,
         host_base: None,
-    }];
+    };
+    let nofile = podvm_enter::ulimit("nofile=64:128").unwrap();
+    let nproc = podvm_enter::ulimit("nproc=unlimited").unwrap();
+    let plan = plan_of(
+        "/work",
+        vec![
+            bind("/tmp/t", "/srv/t", true),
+            bind("/dev/xnull", "/dev/null", false),
+        ],
+        vec![nofile, nproc],
+        true,
+        &["sh", "-c", "exit 7"],
+    );
     let args = host_args(
         "/store/trees/a/rootfs",
         Path::new("/sys/fs/cgroup/d/podvm-init-7"),
-        "/work",
         Some((33, 34)),
         &[4, 27, 100000],
-        &binds,
-        &v(&["sh", "-c", "exit 7"]),
+        &plan,
     );
     assert_eq!(args[0], VERB);
     let spec = parse(&args[1..]).unwrap();
@@ -74,20 +114,20 @@ fn the_arguments_of_the_supervisor_come_back_as_they_went() {
     assert_eq!(spec.ids, Some((33, 34)));
     assert_eq!(spec.groups, vec![4, 27, 100000]);
     assert_eq!(spec.argv, v(&["sh", "-c", "exit 7"]));
+    // TODO/enter.md T-2017: the limits, the bit and a device on /dev.
+    assert_eq!(spec.limits, vec![nofile, nproc]);
+    assert!(spec.no_new_privs);
     let tmp = spec.tmp.unwrap();
-    assert_eq!(tmp.len(), 1);
+    assert_eq!(tmp.len(), 2);
     assert!(tmp[0].read_only && tmp[0].guest == "/tmp/t" && tmp[0].host == "/srv/t");
-    // Root keeps its ids: no --ids, and no group list without them.
-    let root = host_args(
-        "/r",
-        Path::new("/c"),
-        "/",
-        Some((0, 0)),
-        &[4],
-        &[],
-        &v(&["true"]),
-    );
-    assert!(!root.contains(&"--ids".to_string()) && !root.contains(&"--groups".to_string()));
+    assert!(!tmp[1].read_only && tmp[1].guest == "/dev/xnull" && tmp[1].host == "/dev/null");
+    // Root keeps its ids: no --ids, and no group list without them; no
+    // limit and no bit where the run asks for none.
+    let plan = plan_of("/", Vec::new(), Vec::new(), false, &["true"]);
+    let root = host_args("/r", Path::new("/c"), Some((0, 0)), &[4], &plan);
+    for flag in ["--ids", "--groups", harden::ULIMIT, harden::NO_NEW_PRIVS] {
+        assert!(!root.contains(&flag.to_string()), "{flag}: {root:?}");
+    }
 }
 
 /// TODO/enter.md T-2002: the command of `--user NAME` gets the groups
@@ -149,6 +189,9 @@ fn a_wrong_argument_of_the_supervisor_is_named() {
             "--hold takes no command",
         ),
         (v(&["--bind", "/etc:/x", "--", "true"]), "--bind"),
+        (v(&["--ulimit", "nofile", "--", "true"]), "--ulimit"),
+        (v(&["--ulimit", "nofile=2:1", "--", "true"]), "--ulimit"),
+        (v(&["--ulimit"]), "takes a value"),
         (v(&["--what", "--", "true"]), "no argument"),
         (v(&["--cwd"]), "takes a value"),
     ] {
@@ -187,6 +230,9 @@ fn the_supervisor_of_a_detached_run_gets_the_record() {
     }))
     .expect("a record of the table");
     c.working_dir = "/srv".to_string();
+    // TODO/enter.md T-2017: the limits and the bit of the record.
+    c.of.hardening.ulimits = v(&["nofile=123"]);
+    c.of.hardening.no_new_privs = true;
     let job = podvm_supervise::launcher::InitJob {
         container: &c,
         pass: &[],
@@ -207,6 +253,8 @@ fn the_supervisor_of_a_detached_run_gets_the_record() {
     assert_eq!(spec.cwd, "/srv");
     assert_eq!(spec.argv, v(&["sh", "--state", "-c", "true"]));
     assert!(!spec.tty && spec.hold.is_none() && spec.attach.is_none());
+    assert_eq!(spec.limits, c.of.hardening.limits());
+    assert!(spec.no_new_privs);
 }
 
 /// TODO/enter.md T-2002: which run keeps an init for a container that
@@ -325,27 +373,6 @@ fn a_run_discards_only_with_rm_and_read_only_volumes() {
         (false, vec![vol("/a")], false),
     ] {
         assert_eq!(discards(rm, &volumes, &ro), want, "{rm} {}", volumes.len());
-    }
-}
-
-/// TODO/enter.md T-2017: each limit of a run that the supervisor of the
-/// init does not apply is refused by its name, the first one that the
-/// caller gave; a run with none of them goes on.
-#[test]
-fn a_limit_that_the_init_route_drops_is_named() {
-    for (asked, want) in [
-        ([false, false, false, false], None),
-        ([true, false, false, false], Some("--podvm-confine")),
-        ([false, true, false, false], Some("--ulimit")),
-        (
-            [false, false, true, false],
-            Some("--security-opt no-new-privileges"),
-        ),
-        ([false, false, false, true], Some("--device")),
-        ([true, true, true, true], Some("--podvm-confine")),
-        ([false, true, false, true], Some("--ulimit")),
-    ] {
-        assert_eq!(stays::unserved(asked), want, "{asked:?}");
     }
 }
 

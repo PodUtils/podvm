@@ -469,6 +469,9 @@ mod timeout_tests;
 #[cfg(test)]
 mod profile_tests;
 
+// TODO/enter.md T-2017: the flags of the init route.
+#[cfg(test)]
+mod init_route_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

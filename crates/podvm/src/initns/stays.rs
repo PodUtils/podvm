@@ -1,8 +1,8 @@
 //! TODO/enter.md T-2002, T-2017: what the caller of `run -d` and `create`
 //! with `--podvm-init=image` gets before a byte is fetched: a refusal by
 //! name where the host lacks a part of the namespace rung, where the rung
-//! of the run is another one, or where the run has a limit that the
-//! supervisor of the init does not apply.
+//! of the run is another one, or where the run has a flag that the
+//! supervisor of the init cannot apply.
 
 use super::detach::delegated;
 use super::Host;
@@ -18,21 +18,15 @@ unsafe extern "C" {
 pub fn check(verb: &str, o: &crate::run::Opts) -> Result<(), i32> {
     // TODO/enter.md T-2017: with no tier the init boots on the namespace
     // rung (a tier was set by `route` else), in the foreground too.
-    if o.init_image && o.tier.is_none() {
-        let asked = [
-            o.confine.is_some(),
-            !o.hardening.ulimits.is_empty(),
-            o.hardening.no_new_privs,
-            !o.devices.is_empty(),
-        ];
-        if let Some(flag) = unserved(asked) {
-            eprintln!(
-                "podvm {verb}: --podvm-init=image: the namespace rung does not apply {flag} to \
-                 the init of the image or to its command, and podvm starts no run with a \
-                 limit that it dropped (TODO/enter.md T-2017)"
-            );
-            return Err(podvm_image::error::EXIT_RUNTIME_ERROR);
-        }
+    if o.init_image
+        && o.tier.is_none()
+        && let Some(why) = unserved(o.confine.is_some(), &o.devices)
+    {
+        eprintln!(
+            "podvm {verb}: --podvm-init=image: {why}; podvm starts no run with a limit that it \
+             dropped (TODO/enter.md T-2017)"
+        );
+        return Err(podvm_image::error::EXIT_RUNTIME_ERROR);
     }
     if !stays(o.init_image, o.tier.is_some(), o.detach, verb) {
         return Ok(());
@@ -50,19 +44,39 @@ pub fn check(verb: &str, o: &crate::run::Opts) -> Result<(), i32> {
     refused(verb, super::refusal(&host))
 }
 
-/// The first flag of `asked` (the confine layer, a `--ulimit`, the
-/// no-new-privileges bit, a `--device`) that a run with the init of the
-/// image on the namespace rung does not apply: its supervisor starts the
-/// init and the command with no entry of pod-enter, which holds them
-/// (measured 2026-11-20: each was dropped with no line).
-pub fn unserved(asked: [bool; 4]) -> Option<&'static str> {
-    const FLAGS: [&str; 4] = [
-        "--podvm-confine",
-        "--ulimit",
-        "--security-opt no-new-privileges",
-        "--device",
-    ];
-    asked.iter().position(|a| *a).map(|i| FLAGS[i])
+/// Why a run with the init of the image on the namespace rung cannot keep
+/// a flag that it asks for, or none. Its supervisor applies `--ulimit`,
+/// `--security-opt no-new-privileges` and each `--device` that reads (a
+/// bind on the `/dev` of the init); two flags stay refused:
+///
+/// * `confine`, the confine layer of `--podvm-confine`: its seccomp filter
+///   denies each mount call and each new namespace, and its Landlock domain
+///   each change of the mounts. The init mounts file systems as PID 1 and
+///   opens namespaces for the sandbox of a unit, and a layer on the command
+///   only does not hold, as the command can ask the init for a process
+///   with no layer (`systemd-run`);
+/// * a `--device` of `devices` with `w` and no `r`: the descriptor serve
+///   of the interposer holds it, and no interposer loads in the init.
+pub fn unserved(confine: bool, devices: &[String]) -> Option<String> {
+    if confine {
+        return Some(
+            "--podvm-confine is refused: the init of the image mounts file systems and \
+             opens namespaces (systemd: its mount units and the sandbox of each unit), which \
+             the seccomp filter and the Landlock domain of the confine layer deny, and a \
+             layer on the command only does not hold, as the command can ask the init for a \
+             process with no layer"
+                .to_string(),
+        );
+    }
+    let only_writes = devices
+        .iter()
+        .find(|d| podvm_enter::device::parse(d).is_ok_and(|m| !m.read));
+    only_writes.map(|d| {
+        format!(
+            "--device {d} is refused: a device with w and no r is served by the interposer, \
+             and no interposer loads in the init of the image; give rw"
+        )
+    })
 }
 
 /// True for a container that stays with the init of its image and no

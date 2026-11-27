@@ -127,14 +127,24 @@ pub(super) fn push_volume_base(
 }
 
 /// The volumes at or under `/tmp`, and the others: in the user namespace of
-/// a foreground run, the first go to pod-enter (OQ-01, T-1970).
+/// a foreground run, the first go to pod-enter (OQ-01, T-1970). With the
+/// init of the image (`init_image`), also each one at or under `/dev` and
+/// `/run`, which the supervisor binds after the mounts of the init there
+/// (TODO/enter.md T-2017: a `--device` on its `/dev`).
 pub(super) fn split_tmp(
     volumes: &[podvm_enter::userland::Volume],
+    init_image: bool,
 ) -> (
     Vec<podvm_enter::userland::Volume>,
     Vec<podvm_enter::userland::Volume>,
 ) {
-    let at_tmp = |g: &str| g == "/tmp" || g.starts_with("/tmp/");
+    let at_tmp = |g: &str| {
+        if init_image {
+            crate::initns::mounts::late(g)
+        } else {
+            g == "/tmp" || g.starts_with("/tmp/")
+        }
+    };
     if !crate::userns::active() {
         return (Vec::new(), volumes.to_vec());
     }
@@ -201,7 +211,7 @@ pub(super) fn bind(
         return Ok(());
     }
     banner.push_str(&super::overlay::banner(o, rootfs));
-    let (_, rest) = split_tmp(&o.volumes);
+    let (_, rest) = split_tmp(&o.volumes, o.init_image);
     // TODO/enter.md T-2101: pid 2 mounts each overlay volume after the
     // binds; no other volume shares a path with one (`overlay::refuse_tier`).
     let (layers, rest) = super::overlay::split(&rest, &o.overlay_volumes);

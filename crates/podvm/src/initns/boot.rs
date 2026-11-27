@@ -79,8 +79,14 @@ pub struct Spec {
     pub ids: Option<(u32, u32)>,
     /// The supplementary groups of the command, with `ids`.
     pub groups: Vec<u32>,
-    /// A tmpfs on `/tmp` with these binds.
+    /// A tmpfs on `/tmp`, and these binds at or under `/tmp`, `/dev` and
+    /// `/run` after the mounts of the init ([`mounts::late`]).
     pub tmp: Option<Vec<mounts::Bind>>,
+    /// The limits of `--ulimit` and the bit of `--security-opt
+    /// no-new-privileges`, for the init and the command (TODO/enter.md
+    /// T-2017, [`super::harden`]).
+    pub limits: Vec<podvm_enter::Limit>,
+    pub no_new_privs: bool,
     /// The console of the init goes to stderr as it comes.
     pub verbose: bool,
     /// Nothing of the run stays after it (the tree goes, and each volume is
@@ -174,6 +180,11 @@ fn become_init(spec: &Spec, leaves: Option<&cgroup::Leaves>, slave: Option<&Path
         }
     }
     join::drop_groups();
+    // TODO/enter.md T-2017: the last step before the exec, so that the
+    // mounts above come before a limit of the caller.
+    if let Err(e) = super::harden::apply(&spec.limits, spec.no_new_privs) {
+        return e;
+    }
     // A session of its own, with the console on 0, 1 and 2.
     // SAFETY: setsid takes nothing; dup2 takes two open descriptors.
     unsafe { setsid() };
