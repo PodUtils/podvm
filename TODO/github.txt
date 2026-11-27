@@ -595,3 +595,4 @@
 703 issue open
 704 issue closed
 705 issue open
+706 issue open
