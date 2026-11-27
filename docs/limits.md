@@ -87,8 +87,15 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   mounts it; the launcher of a detached run enters a user and a mount
   namespace of its own and mounts it there before the entry of pod-enter,
   whose `Plan::volumes` (podcrates `v0.85.0`) has no overlay. A lower file whose owner the
-  user namespace does not map can be read, and a change of it fails
-  (`EOVERFLOW` at the copy-up). No other volume may be at, over or under
+  user namespace does not map (a file of root on a host where the caller
+  has no root, or of another user) can be read, and a write, `chmod` or
+  `rename` of it fails with `EOVERFLOW` ("Value too large for data type",
+  os error 75) at the copy-up, in the payload and not at the start of the
+  run (T-2108, OR-B42-05). podvm does not walk the lower tree at the start
+  and does not refuse such a tree, because a lower tree that the payload
+  only reads (a copy of `/usr`) is a normal use; a file of the caller maps
+  and copies up. To change such a file, copy it into a lower tree that the
+  caller owns. No other volume may be at, over or under
   GUEST, and GUEST may not be at or under `/tmp`, `/dev`, `/proc` or
   `/sys`, where the rung mounts its own file systems after the volumes.
   HOST and the store must not hold each other. The userland rung (the path

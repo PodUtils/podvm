@@ -142,17 +142,15 @@ fn trust_record(
     }
 }
 
-/// The banner line of a store root that other users can reach, or nothing.
-///
-/// ⛔ TODO/supervise.md T-1715: the container record keeps each `-e` value
-/// under the store root, so a root that group or other can reach gives the
-/// values to each local user.
+/// The banner line of a store whose container table or `containers/` other
+/// users can read, or nothing. ⛔ TODO/supervise.md T-1715: the record keeps
+/// each `-e` value. TODO/cli.md T-2108 (OR-B42-08): the real modes decide,
+/// not the mode of the root alone (`store_reach`).
 pub(super) fn store_note(store: &podvm_image::Store) -> String {
-    match store.exposed_mode() {
+    match crate::store_reach::Reach::of(store).and_then(|r| r.warning()) {
         None => String::new(),
-        Some(mode) => format!(
-            "podvm: the store root {} is mode {mode:o}: other users can read the \
-             container table, which keeps each -e value; chmod 700 it \
+        Some(words) => format!(
+            "podvm: the store root {} is {words}; chmod 700 the root \
              (TODO/supervise.md T-1715)\n",
             store.root().display()
         ),

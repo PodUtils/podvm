@@ -31,6 +31,53 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
   `PODVM_MACHINE_ROOT=initramfs`, `--podvm-engine` and an arm64 guest exit
   125 by name. A saved state does not serve the route.
 
+### Fixed: `cp` streams a tar and keeps the time, refusals exit 1, the words of the outside pass, 2026-11-27
+
+Record: T-2108 (OR-B42-05, OR-B42-06, OR-B42-07, OR-B42-08).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `cp NAME:PATH -` writes a tar of the path to stdout, and `cp - NAME:PATH`
+  unpacks a tar from stdin into the directory PATH, as docker does. The
+  entries going out are named by the last name of the path (`./` where it
+  ends with `/.`) and are owned by 0:0. A tar going in keeps the mode and
+  the time of each entry. A name above the destination (`..`), a link on
+  the way, a special file, a damaged or empty stream and a destination that
+  is not a directory are refused with exit 1 and the name of the entry; no
+  file lands outside the root of the container. A tar going out is checked
+  for special files before its first byte. A terminal on stdout or stdin is
+  refused. The row `-` of the parity table is `Native` now.
+- `cp` of a directory with no `-r`, of a FIFO or another special file, and
+  of two named sides, and `wait` of a container that was never started, exit
+  1 (a refusal after the flags parsed, as the published table says), not
+  125. `wait` of a created container says that it was never started and
+  names `podvm start`. A flag that does not parse stays 125.
+- `cp` keeps the modification time of each file, directory and link, in
+  both directions, and never follows a link to set it. The access time is
+  the modification time, as docker sets it.
+- `-v H:G:overlay`: the help of `-v` and `docs/limits.md` name the limit of
+  a lower file whose owner the user namespace does not map (`EOVERFLOW`,
+  "Value too large for data type", at the copy-up). podvm does not walk the
+  lower tree at the start: a tree that the payload only reads is a normal
+  use.
+- The warning "other users can read the container table" names the real
+  modes now, and it appears only where the table or `containers/` is open to
+  group or other. A store root of mode 755 with a table of 0600 and
+  `containers/` of 0700 gives no warning, and `podvm doctor` says so.
+- `-q` silences the `--user` line (the payload keeps the caller's access).
+- `-v H:G:ro,rw` is refused (a conflict) where `ro` won silently.
+- A line of an env file with a name that has white space (`export I=9`,
+  `FOO BAR=2`, `FOO =2`) or that starts with a digit (`1BAD=1`) is refused
+  with the line number. A value keeps its trailing space (and its leading
+  one), as docker keeps it. Before, `B = x` was read as `B= x`.
+- `stop -t -1` is refused with a line that says why: a wait for ever has
+  no bound, and every wait of podvm has one. Give the seconds, as
+  `-t 3600`.
+- Left open with a reason (`TODO/cli.md`, T-2108): the order and the columns
+  of `ps`, `{{json .}}`, `range` and `table` templates, the names of
+  `verify` and `images` for an import, `doctor` and QEMU, the variables
+  `PODVM_*` and the descriptor 17 of the payload, and `upperdir=` in the
+  mount table.
+
 ### Fixed: `--read-only` keeps the namespace rung with a read-only root, 2026-11-27
 
 Record: T-2108 (OR-B42-02).

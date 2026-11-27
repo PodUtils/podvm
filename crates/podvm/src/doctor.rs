@@ -249,7 +249,11 @@ pub fn doctor(verb: &str, args: &[String]) -> i32 {
     );
     let store = podvm_image::open_store();
     match &store {
-        Ok(store) => examine_store_mode(store.root(), store.exposed_mode(), &mut report),
+        Ok(store) => examine_store_mode(
+            store.root(),
+            crate::store_reach::Reach::of(store),
+            &mut report,
+        ),
         Err(e) => report.note(
             "store_mode",
             format!("podvm cannot open its store to read the mode of its root: {e}"),
@@ -264,21 +268,19 @@ pub fn doctor(verb: &str, args: &[String]) -> i32 {
 /// the table keeps each `-e` value: a root that group or other can reach
 /// gives them to each local user. A note, not a failure: podvm runs, and
 /// the fix is one `chmod` of a directory that podvm did not create.
-fn examine_store_mode(root: &std::path::Path, exposed: Option<u32>, report: &mut Doctor) {
-    match exposed {
-        None => report.ok(
-            "store_mode",
-            format!("{} is reachable by its owner only", root.display()),
-        ),
-        Some(mode) => report.note(
-            "store_mode",
-            format!(
-                "{} is mode {mode:o}: other users can read the container table, which \
-                 keeps each -e value. Run chmod 700 {} (TODO/supervise.md T-1715)",
-                root.display(),
-                root.display()
-            ),
-        ),
+fn examine_store_mode(
+    root: &std::path::Path,
+    reach: Option<crate::store_reach::Reach>,
+    report: &mut Doctor,
+) {
+    let Some(r) = reach else {
+        let owner = format!("{} is reachable by its owner only", root.display());
+        return report.ok("store_mode", owner);
+    };
+    // TODO/cli.md T-2108 (OR-B42-08): the modes of the parts decide.
+    match r.row(root) {
+        (true, text) => report.note("store_mode", text),
+        (false, text) => report.ok("store_mode", text),
     }
 }
 

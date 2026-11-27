@@ -5,6 +5,11 @@ pub(super) fn is_link(path: &std::path::Path) -> bool {
     std::fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink())
 }
 
+/// The modification time of `from` goes to `to`; neither is followed.
+pub(super) fn keep_time(from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
+    super::cp_tar::times::keep(&std::fs::symlink_metadata(from)?, to)
+}
+
 /// Replicate one symlink as a symlink: the target bytes are copied, never
 /// resolved, so an absolute target escapes nothing. The caller gates the
 /// link's own path; the target is opaque here by design.
@@ -32,7 +37,7 @@ pub(super) fn replicate_link(
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
             if dst.is_dir() && !is_link(dst) {
                 eprintln!("podvm cp: {} exists and is a directory", shown(dst));
-                return EXIT_RUNTIME_ERROR;
+                return EXIT_CLI_ERROR; // TODO/cli.md T-2108
             }
             if let Err(e) = std::fs::remove_file(dst) {
                 eprintln!("podvm cp: {}: {e}", shown(dst));
@@ -47,6 +52,13 @@ pub(super) fn replicate_link(
             eprintln!("podvm cp: {}: {e}", shown(dst));
             return EXIT_RUNTIME_ERROR;
         }
+    }
+    if let Err(e) = keep_time(src, dst) {
+        eprintln!(
+            "podvm cp: {}: the modification time is not kept: {e}",
+            shown(dst)
+        );
+        return EXIT_RUNTIME_ERROR;
     }
     eprintln!("podvm cp: symlink {} -> {}", shown(dst), target.display());
     0
@@ -211,7 +223,7 @@ pub(super) fn copy_tree(
                     "podvm cp: {} is not a file or directory; special files are refused",
                     shown(&src_path)
                 );
-                return EXIT_RUNTIME_ERROR;
+                return EXIT_CLI_ERROR; // TODO/cli.md T-2108: a refusal after the parse
             }
             files.push((src_path, dst_path));
         }
@@ -224,11 +236,11 @@ pub(super) fn copy_tree(
             "podvm cp: {} is a symlink; writing through one is refused",
             shown(dst)
         );
-        return EXIT_RUNTIME_ERROR;
+        return EXIT_CLI_ERROR; // TODO/cli.md T-2108
     }
     if dst.is_file() {
         eprintln!("podvm cp: {} exists and is not a directory", shown(dst));
-        return EXIT_RUNTIME_ERROR;
+        return EXIT_CLI_ERROR; // TODO/cli.md T-2108
     }
     if let Err(e) = std::fs::create_dir_all(dst) {
         eprintln!("podvm cp: {}: {e}", shown(dst));
@@ -283,6 +295,14 @@ pub(super) fn copy_tree(
                 return EXIT_RUNTIME_ERROR;
             }
         }
+        // TODO/cli.md T-2108 (OR-B42-07): the modification time stays.
+        if let Err(e) = keep_time(from, to) {
+            eprintln!(
+                "podvm cp: {}: the modification time is not kept: {e}",
+                shown(to)
+            );
+            return EXIT_RUNTIME_ERROR;
+        }
     }
     for (from, to) in &links {
         if replicate_link(from, to, root) != 0 {
@@ -294,6 +314,15 @@ pub(super) fn copy_tree(
     for (from, to) in &modes {
         if let Ok(m) = std::fs::symlink_metadata(from) {
             let _ = std::fs::set_permissions(to, m.permissions());
+        }
+        // After the mode and after each entry of the directory: a new
+        // entry would move the time again (TODO/cli.md T-2108).
+        if let Err(e) = keep_time(from, to) {
+            eprintln!(
+                "podvm cp: {}: the modification time is not kept: {e}",
+                shown(to)
+            );
+            return EXIT_RUNTIME_ERROR;
         }
     }
     eprintln!(

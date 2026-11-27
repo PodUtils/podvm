@@ -70,16 +70,19 @@ fn a_volume_spelling_podvm_cannot_serve_is_refused() {
 }
 
 /// TODO/enter.md T-2101: one table for the options of `-v`: each mode with
-/// the others, and the refusal of a pair that conflicts. `ro` wins over
-/// `rw`; `overlay` takes neither.
+/// the others, and the refusal of a pair that conflicts: `ro` with `rw`,
+/// and `overlay` with either.
 #[test]
 fn the_options_of_a_volume_give_one_mode() {
     let cases: &[(&str, Result<Mode, &str>)] = &[
         ("", Ok(Mode::Rw)),
         ("rw", Ok(Mode::Rw)),
         ("ro", Ok(Mode::Ro)),
-        ("ro,rw", Ok(Mode::Ro)),
-        ("rw,ro", Ok(Mode::Ro)),
+        // TODO/cli.md T-2108 (OR-B42-08): a pair that conflicts is refused.
+        ("ro,rw", Err("conflict")),
+        ("rw,ro", Err("conflict")),
+        ("ro,rw,z", Err("conflict")),
+        ("mapped,ro,rw", Err("conflict")),
         ("ro,z", Ok(Mode::Ro)),
         ("overlay", Ok(Mode::Overlay)),
         ("overlay,z", Ok(Mode::Overlay)),

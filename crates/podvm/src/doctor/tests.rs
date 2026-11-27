@@ -126,23 +126,47 @@ fn the_memfd_exec_row_follows_the_probe() {
     assert!(d.render("tcg").contains("note memfd_exec: not measured"));
 }
 
-/// TODO/supervise.md T-1715. A store root that group or other can reach is
-/// a note with the `chmod` that fixes it, never a failure; a private root
-/// is ok.
+/// TODO/supervise.md T-1715, T-2108 (OR-B42-08). A store whose table is open
+/// to group or other is a note with the real modes and the `chmod` that
+/// fixes it, never a failure; a root of mode 755 whose parts are closed, and
+/// a private root, are ok.
 #[test]
-fn the_store_mode_row_names_an_exposed_root() {
+fn the_store_mode_row_names_an_exposed_table_by_its_modes() {
+    use crate::store_reach::Reach;
     let root = std::path::Path::new("/s/podvm");
     let mut d = Doctor::default();
-    examine_store_mode(root, Some(0o755), &mut d);
+    let open = Reach {
+        root: 0o755,
+        table: Some(0o644),
+        containers: Some(0o700),
+    };
+    examine_store_mode(root, Some(open), &mut d);
     assert_eq!(d.exit_code(false), 0);
     let text = d.render("tcg");
     assert!(
-        text.contains("note store_mode: /s/podvm is mode 755"),
+        text.contains("note store_mode: /s/podvm is mode 755 and the container table is mode 644"),
         "{text}"
     );
     assert!(text.contains("keeps each -e value"), "{text}");
     assert!(text.contains("chmod 700 /s/podvm"), "{text}");
     assert!(d.fixes.is_empty());
+
+    // The report of OR-B42-08: root 755, table 600, containers/ 700.
+    let mut d = Doctor::default();
+    let closed = Reach {
+        root: 0o755,
+        table: Some(0o600),
+        containers: Some(0o700),
+    };
+    examine_store_mode(root, Some(closed), &mut d);
+    assert_eq!(d.exit_code(false), 0);
+    let text = d.render("tcg");
+    assert!(
+        text.contains("ok store_mode: /s/podvm is mode 755"),
+        "{text}"
+    );
+    assert!(text.contains("table is mode 600"), "{text}");
+    assert!(!text.contains("note store_mode"), "{text}");
 
     let mut d = Doctor::default();
     examine_store_mode(root, None, &mut d);

@@ -433,6 +433,7 @@ pub use wait_rm_cp::*;
 mod cp_args;
 mod cp_root; // TODO/cli.md T-2087
 mod cp_rule; // TODO/cli.md T-2079
+mod cp_tar; // TODO/cli.md T-2108
 use cp_args::*;
 use cp_root::copy_one;
 

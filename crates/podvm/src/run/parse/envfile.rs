@@ -70,26 +70,48 @@ pub(crate) fn env_lines(
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     let mut out = Vec::new();
     for (n, raw) in text.lines().enumerate() {
-        let line = raw.trim();
+        // As docker: the front of the line goes, and nothing else of a line
+        // with an `=`; the value is the bytes after the first `=`, a trailing
+        // space too (TODO/cli.md T-2108, OR-B42-08).
+        let line = raw.trim_start();
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
-        let Some((k, v)) = line.split_once('=') else {
+        let Some((key, v)) = line.split_once('=') else {
+            let line = line.trim_end();
             if line.contains(char::is_whitespace) {
                 return Err((n + 1, format!("has white space in the name: {line:?}")));
             }
+            name_ok(line).map_err(|why| (n + 1, why))?;
             out.extend(host(line));
             continue;
         };
-        let key = k.trim();
         if key.is_empty() {
             return Err((n + 1, format!("has no name: {line:?}")));
         }
+        if key.contains(char::is_whitespace) {
+            let hint = if key.starts_with("export ") {
+                "; an env file takes NAME=VALUE, and `export` is not part of it"
+            } else {
+                ""
+            };
+            return Err((n + 1, format!("has white space in the name: {key:?}{hint}")));
+        }
+        name_ok(key).map_err(|why| (n + 1, why))?;
         // TODO/cli.md T-1828: the value as the line gives it, quotes too,
         // as docker and podman keep it (`B="two words"` is `"two words"`).
         out.push(format!("{key}={v}"));
     }
     Ok(out)
+}
+
+/// A name of an env file does not start with a digit: no shell and no
+/// payload reads it as a name (TODO/cli.md T-2108, OR-B42-08).
+fn name_ok(key: &str) -> std::result::Result<(), String> {
+    if key.starts_with(|c: char| c.is_ascii_digit()) {
+        return Err(format!("has a name that starts with a digit: {key:?}"));
+    }
+    Ok(())
 }
 
 /// `--env-file0 PATH` (PodUtils/podrunner#300, TODO/cli.md T-1971): the

@@ -48,14 +48,15 @@ fn env_file_loads_and_stubs_parse() {
     let file = dir.join("test.env");
     std::fs::write(
         &file,
-        "# a comment\n\nA=1\nB = two words\nC=\"quoted\"\nD='single'\n",
+        "# a comment\n\nA=1\nB= two words\nC=\"quoted\"\nD='single'\n",
     )
     .unwrap();
     let path = file.to_str().unwrap().to_string();
     // Both spellings land in the same place, at the flag's position:
     // a later -e wins over the file.
     // TODO/cli.md T-1828: the value as the line gives it, quotes and a
-    // leading space too, as docker and podman keep it.
+    // leading space too, as docker and podman keep it. (`B = two words`,
+    // a name with a space, is refused since T-2108: docker refuses it.)
     let o = parse("run", &v(&["--env-file", &path, "-e", "A=9", "img"])).unwrap();
     assert_eq!(
         o.env,

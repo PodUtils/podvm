@@ -22,8 +22,9 @@ impl Mode {
     }
 }
 
-/// The mode of the options of `-v`. `ro` wins over `rw`, as before;
-/// `overlay` with `ro`, `rw` or `mapped` is a pair that conflicts.
+/// The mode of the options of `-v`. `ro` with `rw` is a pair that
+/// conflicts (TODO/cli.md T-2108, OR-B42-08: it was `ro`, silently; docker
+/// refuses it), and so is `overlay` with `ro`, `rw` or `mapped`.
 pub fn mode_of(opts: &str) -> Result<Mode, String> {
     let (mut ro, mut rw, mut overlay, mut mapped) = (false, false, false, false);
     for o in opts.split(',') {
@@ -45,6 +46,12 @@ pub fn mode_of(opts: &str) -> Result<Mode, String> {
                 ))
             }
         }
+    }
+    if ro && rw {
+        return Err(format!(
+            "the options {opts:?} conflict: ro makes the volume read-only and rw makes it \
+             writable; name one (TODO/cli.md T-2108)"
+        ));
     }
     match (overlay, ro || rw || mapped) {
         (true, true) => Err(format!(

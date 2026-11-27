@@ -37,6 +37,7 @@ mod remote;
 mod run;
 mod runsc;
 mod sandprobe;
+mod store_reach; // TODO/cli.md T-2108
 mod system;
 #[cfg(test)]
 mod test_socket; // TODO/gate.md T-2067
