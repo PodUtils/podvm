@@ -6001,3 +6001,59 @@ info` names the rungs.
 ## Done
 
 **Done (2026-11-26).** `podvm_enter::overlay` (the layer), `run::overlay` (the refusals and the banner), `run::binds::bind` (pid 2 of a foreground run), `launcher::overlays_of` and the launcher's own namespaces (`run -d`, `create`, `start`), `exec::ns::layers_need_join`, `.VolumeOverlay` of `system info`, the help of `-v` and the parity row. The tests: `the_options_of_a_volume_give_one_mode` (each mode with the others; `overlay,ro`, `ro,overlay` and `overlay,rw` conflict; an overlay takes a directory), `an_overlay_volume_takes_a_guest_path_of_its_own`, and `overlay_layer` of podvm-enter (a test with its own `main`: as root and as uid 1000, a write, a change, a chmod, a rename and a removal through the layer; the lower directory stays the same byte for byte and mode for mode, and the upper one holds a whiteout). The removal of a tree failed on the `work/work` directory of overlayfs (mode 0000): `OpenOptions::custom_flags` loses `O_PATH` on musl, whose `O_ACCMODE` holds it, so `tree::open_dirs` opens with `sys::open` now (`a_tree_with_read_only_directories_is_removed_and_no_link_is_followed` has a directory of mode 0000). Experiment 485 as uid 1000 with a private store (`experiments/results/volume-overlay.txt`): 9 clauses in 9 pass: a confined `run -d` makes each change and runs a script of H, `exec` sees each one, the upper layer and its whiteout are in the tree of the container, `rm -f`, `run --rm` and `create`/`start`/`rm` leave no tree, the userland rung (`run` and `run -d` under `scripts/dev/nouserns.c`), `PODVM_USERNS=0` and the syscall, emulate, machine, incus and runsc tiers refuse by name at 125 (no guest started), `system info` gives `held` true here and false with no user namespace, and H keeps the SHA-256 and the mode of each file. The ask to podcrates (an overlay kind of `VolumeBind`) is in the report of the worker; podvm's launcher keeps its own namespaces until pod-enter has it.
+
+# T-2105: On the namespace rung, the payload can remount a `:ro` volume writable and write the host file
+
+**Source:** PodUtils/podrunner#378 (COORD-147 of podrunner, from a member of the team, 2026-11-27; podrunner tasks 578 and 603); measured by the lead on 2026-11-27
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** open
+
+## Problem
+
+On the namespace rung the payload runs as root of the user namespace in
+which podvm (or pod-enter) made the binds of the volumes, with
+`CAP_SYS_ADMIN` there. The kernel locks the flags of a mount
+(`MNT_LOCK_READONLY` and the others) only when it copies a mount
+namespace into a less privileged user namespace. So the payload can
+remount a `:ro` volume writable. Measured as uid 1000 on the cloud host
+with the release binary of `e05b31f`, `mirror.gcr.io/library/alpine:3.20`,
+`-v H:/x:ro` and a static program in a second volume:
+`mount(NULL, "/x", NULL, MS_REMOUNT|MS_BIND, NULL)` returned 0, a write to
+`/x/f` passed, and the host file changed. busybox's `mount -o
+remount,bind,rw` returned 0 and left the mount read-only. The payload can
+also unmount the volume (`umount /x` returned 0). With
+`--podvm-confine`, Landlock refuses mount(2).
+
+## Premise
+
+The same class is likely for each flag that podvm sets on a mount that
+the payload's user namespace owns: `--read-only` of the root, `nosuid` and
+`nodev`, the size of a `--tmpfs GUEST:size=N` (a remount with another
+size), the lower of an overlay volume. Not measured yet.
+
+## Approach
+
+After the binds and mounts of the run, and before the payload starts,
+enter one more user namespace (a map of the same ids) and a mount
+namespace, so that the kernel copies each mount into a less privileged
+user namespace and locks its flags and the mounts beneath (`MNT_LOCKED`).
+Find where the binds are made on each path (podvm's own user namespace,
+`userns/host.rs`; pod-enter's `ns_volume`): podvm's part in podvm, and
+pod-enter's part as a COORD issue `(to podcrates)` with a second path in
+podvm meanwhile.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test -p podvm --bin podvm locked` passes with a table test of the
+flags; as uid 1000 on the namespace rung, for `run`, `run -d` with `exec`,
+and `create` with `start`: a remount of a `:ro` volume writable, of the
+root of `--read-only` writable, and of a `--tmpfs GUEST:size=N` to another
+size each fail with `EPERM`; an unmount of a volume fails; the host file
+stays the same byte for byte.

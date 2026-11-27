@@ -88,8 +88,8 @@ each step below is done.
 ## Rules learned
 
 * A worktree under `.claude/worktrees/` gets the interposer objects as
-  symlinks (`crates/podvm-interpose/target`, `target-glibc234`). Commit
-  `5916373` tracked the symlink `target-glibc234` (its ignore rule ended in
+  symlinks (the two build directories of the interposer). Commit
+  `5916373` tracked the symlink of the glibc 2.34 build (its ignore rule ended in
   `/`, which matches a directory only); the checkout of the merge on `main`
   replaced the directory of the built objects with a symlink to itself.
   The rule has no `/` now. After a merge, check `git ls-files
