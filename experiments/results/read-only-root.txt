@@ -1,6 +1,6 @@
 Does --read-only keep the namespace rung with a root that stays read-only?
-2026-11-27T05:22:40Z Linux 6.18.44-fc-v880, uid 0
-podvm SHA-256 4778ededecfd75e94224a0be0a8f223d8711d73dbc3e19570b64ade60b1a28ab
+2026-11-27T05:30:15Z Linux 6.18.44-fc-v880, uid 0
+podvm SHA-256 55d91f659d992c92051a5b50be57cfa0106fbe84aa56fba01623e83d55483666
 before SHA-256 82a4a637e18541f2b0554c9b54537b658fe889e101a95621e2a1ef4f9d624090
 image mirror.gcr.io/library/alpine:3.20
 PASS 1: uid 1000, foreground: exit 0, mode=namespace
@@ -19,7 +19,7 @@ OPEN 13: root: / locked in 0 of 3 rows (foreground, run -d, create)
 PASS 14: uid 0 of one id: foreground mode=namespace, /x erofs, /tmp ok, /dev/null ok, /w ENOSPC yes, /newvol -, /rov -, locked: yes; run -d .Rung namespace, exec /x erofs, /tmp ok, /dev/null ok, /w ENOSPC -, /newvol ok, /rov erofs, locked: yes; exec did not join the run and entered on its own, with no --tmpfs of the run (T-2105)
 PASS 15: uid 1000, PODVM_USERNS=0: mode=userland, /x erofs
 PASS 16: before the fix: mode=userland; the raw openat wrote the host's /tmp: yes
-PASS 17: the median of 20 runs of run --rm IMAGE true, an estimate: uid1000: --read-only 80 ms, no --read-only 79 ms, --read-only before 84 ms; root: --read-only 101 ms, no --read-only 107 ms, --read-only before 105 ms
+PASS 17: the median of 20 runs of run --rm IMAGE true, an estimate: uid1000: --read-only 82 ms, no --read-only 76 ms, --read-only before 81 ms; root: --read-only 82 ms, no --read-only 83 ms, --read-only before 86 ms
 PASS 18: 0 process(es) of podvm and 0 tree(s) stayed
 OPEN: rows [13] wait for another entry (TODO/enter.md T-2105, T-2107)
 EACH HELD ROW HOLDS

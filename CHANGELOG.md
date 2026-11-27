@@ -33,6 +33,23 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 - The removal of a tree detaches a mount that another mount at the same
   path hid, in more passes; before, one pass left it, and the tree stayed.
 
+### Fixed: `run -d` with an `:overlay` volume gives the payload the device nodes, 2026-11-27
+
+Record: T-2107.
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- As a user with no root, `run -d`, `create` and `start` with an
+  `:overlay` volume gave the payload regular files for `/dev/null`,
+  `/dev/zero` and `/dev/urandom` (the last one ended after 1 MiB) and no
+  `/dev/ptmx`. The launcher takes a user and a mount namespace of its own
+  for the layers, and pod-enter binds the devices of the host only in a
+  user namespace that it makes itself. The launcher now binds the devices
+  (`null`, `zero`, `full`, `random`, `urandom`, `tty`) and gives the tree a
+  new devpts instance with its `ptmx`, as a run with no volume does, and
+  `exec` into the unit sees them. The code is one module,
+  `podvm_enter::devices`, which a foreground run uses too. As root the
+  launcher binds nothing: the nodes of the image are real ones.
+
 ### Fixed: the payload no longer changes a mount of its run on most paths of the namespace rung, 2026-11-27
 
 Record: T-2105 (PodUtils/podrunner#378).

@@ -38,119 +38,19 @@ pub fn host_pid(pid: i64) -> Option<i64> {
 /// after 1 MiB). A bind in the mount namespace of pid 2, which the mount
 /// namespace of the payload copies; the removal of the tree takes it off
 /// first (`podvm_extract::tree::unbind_devices`). A path that is a link or
-/// no regular file of the tree is left alone.
+/// no regular file of the tree is left alone, with a line. The code is
+/// `podvm_enter::devices` (TODO/enter.md T-2107), which the launcher of an
+/// overlay volume uses too, with the list of pod-enter.
 pub fn bind_devices(rootfs: &std::path::Path) {
     if !active() {
         return;
     }
-    const MS_BIND: u64 = 0x1000;
-    let dev = rootfs.join("dev");
-    if !std::fs::symlink_metadata(&dev).is_ok_and(|m| m.is_dir()) {
-        return;
-    }
-    for d in podvm_extract::tree::BOUND_DEVICES {
-        let target = rootfs.join(d);
-        let host = std::path::Path::new("/").join(d);
-        match std::fs::symlink_metadata(&target) {
-            Ok(m) if !m.is_file() => continue,
-            Ok(_) => {}
-            Err(_) => {
-                if std::fs::File::create(&target).is_err() {
-                    continue;
-                }
-            }
-        }
-        let (Ok(src), Ok(dst)) = (
-            std::ffi::CString::new(host.as_os_str().as_encoded_bytes()),
-            std::ffi::CString::new(target.as_os_str().as_encoded_bytes()),
-        ) else {
-            continue;
-        };
-        // SAFETY: NUL-ended paths; a bind takes no type and no data.
-        unsafe {
-            mount(
-                src.as_ptr(),
-                dst.as_ptr(),
-                core::ptr::null(),
-                MS_BIND,
-                core::ptr::null(),
-            )
-        };
-    }
-    new_pts(&dev);
-}
-
-/// PodUtils/podrunner#216: a new devpts instance for the tree and its
-/// `ptmx` on `/dev/ptmx`, so that `openpty` works in a foreground run, with
-/// the options of pod-enter's own instance (`pod_enter::DEVPTS_OPTIONS`)
-/// that `run -d` gets. A link at the `/dev/ptmx` of the image is left
-/// alone; a refusal of the kernel is one line.
-///
-/// The instance goes on the `/dev/pts` of the mount namespace of pid 2,
-/// which the user namespace owns, so no mount reaches the host: pod-enter
-/// binds that `/dev/pts` on the tree, and its `ptmx` goes on the `/dev/ptmx`
-/// of the tree here.
-fn new_pts(dev: &std::path::Path) {
-    const MS_BIND: u64 = 0x1000;
-    let pts = std::path::Path::new("/dev/pts");
-    let ptmx = dev.join("ptmx");
-    if !std::fs::symlink_metadata(pts).is_ok_and(|m| m.is_dir()) {
-        return;
-    }
-    let (Ok(target), Ok(opts)) = (
-        std::ffi::CString::new(pts.as_os_str().as_encoded_bytes()),
-        std::ffi::CString::new(podvm_enter::DEVPTS_OPTIONS),
-    ) else {
-        return;
-    };
-    // SAFETY: NUL-ended strings; devpts reads its options as a C string.
-    let r = unsafe {
-        mount(
-            c"devpts".as_ptr(),
-            target.as_ptr(),
-            c"devpts".as_ptr(),
-            podvm_enter::DEVPTS_FLAGS,
-            opts.as_ptr().cast(),
-        )
-    };
-    if r != 0 {
-        eprintln!(
-            "podvm: the run has no terminal of its own: the mount of a new devpts \
-             instance failed: {}",
-            std::io::Error::last_os_error()
-        );
-        return;
-    }
-    match std::fs::symlink_metadata(&ptmx) {
-        Ok(m) if m.file_type().is_symlink() => return,
-        Ok(_) => {}
-        Err(_) => {
-            if std::fs::File::create(&ptmx).is_err() {
-                return;
-            }
-        }
-    }
-    let (Ok(src), Ok(dst)) = (
-        std::ffi::CString::new(pts.join("ptmx").as_os_str().as_encoded_bytes()),
-        std::ffi::CString::new(ptmx.as_os_str().as_encoded_bytes()),
-    ) else {
-        return;
-    };
-    // SAFETY: NUL-ended paths; a bind takes no type and no data.
-    let r = unsafe {
-        mount(
-            src.as_ptr(),
-            dst.as_ptr(),
-            core::ptr::null(),
-            MS_BIND,
-            core::ptr::null(),
-        )
-    };
-    if r != 0 {
-        eprintln!(
-            "podvm: the run has no /dev/ptmx: the bind of the ptmx of its devpts failed: {}",
-            std::io::Error::last_os_error()
-        );
+    let names: Vec<&str> = podvm_extract::tree::BOUND_DEVICES
+        .iter()
+        .filter_map(|d| d.strip_prefix("dev/"))
+        .collect();
+    for line in podvm_enter::devices::bind(rootfs, &names) {
+        eprintln!("{line}");
     }
 }
 

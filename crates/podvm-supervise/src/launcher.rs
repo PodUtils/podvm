@@ -316,6 +316,7 @@ fn enter_in_launcher(
         // namespace where it is not root), mounts each layer on the tree,
         // and enters the namespace rung there, whose mount namespace copies
         // the layers. No other rung: a layer is never a writable bind.
+        // TODO/cli.md T-2108: the read-only root takes the same namespace.
         if container.rung != "namespace" {
             return Err(format!(
                 "-v {}:{}:overlay needs the namespace rung, and the record names {} \
@@ -324,15 +325,17 @@ fn enter_in_launcher(
             ));
         }
         let base = env.iter().find_map(|e| e.strip_prefix("PODVM_BINDS_BASE="));
-        podvm_enter::overlay::enter_own_namespace()
-            .and_then(|()| {
-                podvm_enter::overlay::mount_all(
-                    std::path::Path::new(&container.rootfs),
-                    &layers,
-                    base,
-                )
-            })
-            .map_err(|e| format!("starting with an overlay volume: {e}"))?;
+        // TODO/enter.md T-2107: and the devices of the host, which pod-enter
+        // binds only in a user namespace of its own, not in this one.
+        let lines =
+            podvm_enter::overlay::prepare(std::path::Path::new(&container.rootfs), &layers, base)
+                .map_err(|e| format!("starting in the launcher's own namespace: {e}"))?;
+        // A log that takes no line stops the notes; the payload still runs.
+        for line in lines {
+            if writeln!(log, "{line}").is_err() {
+                break;
+            }
+        }
         // TODO/enter.md T-2105: the payload under the namespace of the layers.
         plan.userns_ids = podvm_enter::lock::payload_ids(plan.userns_ids);
         if ro_root {

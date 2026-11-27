@@ -6184,7 +6184,7 @@ a tag of podcrates enters the tree with `pivot_root` (COORD-268).
 **Milestone:** none
 **Priority:** P2
 **Effort:** S
-**Status:** open
+**Status:** done
 
 ## Problem
 
@@ -6207,11 +6207,52 @@ the same list, or (better) take the overlay kind of volume of pod-enter
 
 ## Decision
 
--
+The launcher binds the devices itself, with the code of the foreground run
+moved to one module (`podvm_enter::devices::bind`; AGENTS.md 2a: no second
+copy). pod-enter's own bind (`ns_dev_bind`, `m.devices`) is `pub(crate)`
+and runs only in the second try of `spawn_own`, after `unshare(CLONE_NEWNS)`
+failed with `EPERM`; in the launcher's namespace the first try works, so it
+never runs. The choice at each path is `pod_enter::choose` and the list is
+`pod_enter::DEVICES` (both public), so the launcher binds the same six nodes
+as a run with no volume. `overlay::prepare` is the whole entry
+(`enter_own_namespace`, `mount_all`, and the binds where the process is in a
+user namespace); as root of the initial user namespace the nodes of the
+image are real and nothing is bound. The foreground run keeps its four
+nodes (`BOUND_DEVICES`, which the removal of a tree unmounts). A refusal
+gives one line, in the log of the container for the launcher.
+The ask to podcrates stays as T-2101 has it: an overlay kind of
+`VolumeBind`, and with it the devices in pod-enter's first try too
+(`NsMount::devices` for a namespace that a user namespace owns); podvm then
+drops `podvm_enter::devices` for the launcher.
 
 ## Prove
 
-`cargo test -p podvm-supervise overlay` passes with a test of the devices
-of the launcher's namespace; as uid 1000, `run -d -v H:/c:overlay
+`cargo test -p podvm-enter` passes with a test of the devices of the
+launcher's namespace (`overlay_devices`); as uid 1000, `run -d -v H:/c:overlay
 mirror.gcr.io/library/alpine:3.20 sh -c 'ls -l /dev/null /dev/zero /dev/ptmx; head -c 4 /dev/zero | wc -c'`
 shows character devices and 4.
+
+## Done
+
+**Done (2026-11-27).** `podvm_enter::devices::bind` (moved from
+`userns::host::bind_devices` and `new_pts`, with the choice of
+`pod_enter::choose`), `overlay::prepare`, and the launcher's call to it.
+Cause: `overlay::enter_own_namespace` puts the launcher in a user namespace
+where `unshare(CLONE_NEWNS)` works, so pod-enter takes its first try with
+no `mount.user` and no device binds (`m.devices` is set in the second try
+only). Tests: `a_path_of_the_image_that_is_not_a_file_stays_with_one_line`
+and `a_tree_without_a_dev_directory_takes_no_bind` (podvm-enter, the
+choice and the refusals), and `overlay_devices` (a test with its own `main`:
+`overlay::prepare` on a tree of regular files; as uid 1000 each node is a
+character device, `zero` reads zeros, `urandom` reads 2 MiB, `null` takes a
+write, `ptmx` opens, and the layer is mounted; as root nothing is bound).
+Measured as uid 1000 with the release binary, `alpine:3.20`, `run -d -v
+H:/c:overlay`: before, `/dev/null` and `/dev/zero` were regular files (0 and
+1048576 bytes), `/dev/ptmx` was missing, and `head -c 2097152 /dev/urandom`
+gave 1048576 bytes; after, `ls -l` shows `crw-rw-rw-` 1,3 / 1,5 / 5,2, the
+read gives 4 and 2097152 bytes, `exec` and `create`/`start` see the same,
+and the listing equals that of a run with no volume. Experiments 485 and
+489 give the same rows as before the change, as root and as uid 1000
+(489 rows 7, 8, 9, 10, 11, 13 stay OPEN as T-2105 has them; row 14 needs
+the binary of `6a8d7f7` and fails as before).
+

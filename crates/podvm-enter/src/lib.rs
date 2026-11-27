@@ -145,13 +145,13 @@ pub fn ns_fallback_line(cause: &str) -> String {
     pod_enter::ns_fallback_line(&NAMES, cause)
 }
 
-/// The launch ladder with podvm's names.
 /// The spec of `--podvm-confine` (TODO/enter.md T-1658).
 pub mod confine;
+pub mod devices;
 pub mod lock;
 /// `-v HOST:GUEST:overlay` on the namespace rung (TODO/enter.md T-2101).
-pub mod overlay;
-pub mod read_only; // TODO/cli.md T-2108 // TODO/enter.md T-2105
+pub mod overlay; // TODO/enter.md T-2105 // TODO/enter.md T-2107
+pub mod read_only; // TODO/cli.md T-2108
 
 /// The wait of the payload, with `podvm:` before each line (TODO/cli.md T-2064).
 mod wait;

@@ -582,7 +582,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #686 | [gh action] requested | closed (gate 45843797814 passed on `f9ffcaa`) | the gate after the fix of the syscall tier's `brk` (T-1991) and the native-tier fixes |
 | #687 | COORD-263: the answer to PodUtils/podcrates#273: podvm's copy of ext.rs records 65535 past group 65535 (846e733); podvm takes pod_guest::ext4 at the next tag (to podcrates) | open | T-1968, T-1994 |
 | #688 | [gh action] requested | closed (on `f8b2d9e`: gate 45857683010 and kvm `init` 45857688665 passed) | the gate and the `init` job of `kvm.yml` after T-1994 steps 2 and 3 and T-2054 item 1 |
-| #689 | COORD-264: pod-enter: an overlay kind of volume in Plan::volumes (to podcrates) | open | T-2101 |
+| #689 | COORD-264: pod-enter: an overlay kind of volume in Plan::volumes (to podcrates) | open | T-2101, T-2107 |
 | #690 | COORD-265: podvm took podcrates v0.86.0 (T-2102) and answers #667 with --tmpfs GUEST:size=N (to podcrates) | open | T-2102, T-1968 |
 | #691 | [gh action] requested | closed (on `04d8e00`: gate 45899896587, kvm `init` 45899901002 and `guest` 45903501515 passed) | the gate and the `kvm.yml` jobs `init` and `guest` after the saved state on the disk root (T-1994, T-2008) |
 | #692 | COORD-266: four asks from podvm's docker-parity fixes: a /v2/ ping in pod-oci, a tmpfs mode in pod-enter, the exit code of a failed spawn in pod-supervise, an /etc/hosts that pod-rootfs keeps (to podcrates) | open | T-2070, T-2079, T-2087 |
