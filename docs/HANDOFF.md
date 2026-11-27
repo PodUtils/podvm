@@ -1,10 +1,10 @@
 # Handoff
 
-The state on 2026-11-26 after the Claude Code session that released
-`0.2.0-beta.41`. A fresh session reads `AGENTS.md` first, then this file,
+The state on 2026-11-27 after the second Claude Code session of that day.
+A fresh session reads `AGENTS.md` first, then this file,
 `TODO/PROGRESS.md` and `docs/decisions.md`. The handoffs before this one
-are in git: `git show 5377e4a5:docs/HANDOFF.md`. Remove this file when
-each step below is done.
+are in git: `git show 5377e4a5:docs/HANDOFF.md` and `git show
+acf6932:docs/HANDOFF.md`. Remove this file when each step below is done.
 
 ## The rulings that stay in force
 
@@ -14,6 +14,8 @@ each step below is done.
   read the logs and the runs yourself, and never wait for a notice of the
   harness. Work each step below until it is done or truly blocked; ask the
   owner only for a decision that only the owner can make.
+* "P1 before the beta" (2026-11-27): `0.2.0-beta.42` waits for the fix of
+  T-2105 and T-2106 in pod-enter (COORD-268, #695).
 * "podrunner first" (2026-11-18): after a red run of podvm's CI, each ask
   of podrunner comes first.
 * "Schema ids": an added optional field keeps `run-report.v1`; a changed
@@ -21,76 +23,109 @@ each step below is done.
 
 ## Where things are
 
-* Workflow dispatch: in the Claude Code session of 2026-11-26, the GitHub
-  tool refused each dispatch ("Actions has been disabled for this user"),
-  and a push from the session started no workflow (no gate, no
-  `issue-sync`, no `secrets`). Each run went through an issue `[gh action]
-  requested` (#674). The scheduled `issue-sync` (06:17 UTC) writes the
-  blocks of the issues that the session opened.
-* `v0.2.0-beta.41` is released (release run 45777325284 on `332efaa`, 59 assets, with the image on ghcr.io). Its gate 45772974200, `workloads.yml`
-  45772978726, the nightly trial 45772982947 and `arm.yml` 45772987551
-  passed on the version commit `332efaa`. The integration tests as uid
-  1000 (37 binaries) passed on `7c2b161`. The tenth outside pass (T-2100,
-  [the report](history/outside-pass-2026-11-26.md)) found no P0 or P1
-  finding in the binary of `7c2b161`. The pass was not blind by a tool:
-  the tester ran as root on the host of the checkout.
-* The beta carries T-2093 (podrunner#354), T-2094 (podrunner#355), T-2098
-  (#671), T-2048 (a signal during the save of a guest state, experiment
-  480), T-2054 item 5 and three findings of the tenth pass.
-* On `main` after the beta (CHANGELOG, "Unreleased"): OR-B41-02 (the copy
-  of QEMU in `PODVM_STORE`), OR-B41-07 (an incus `--rm` run after the OOM
-  killer), OR-B41-13 (`notebook` with no notebook), OR-B41-14 (`system
-  df`).
-* PodUtils/podrunner#359 (COORD-135, bytes read through each volume):
-  T-2099 is partial. COORD-255 (#672) gives the feasibility: no counter
-  exists on either tier; the recommended route is a counting FUSE
-  pass-through in the guest and the container. It waits for podrunner's
-  choice of the route and the field.
-* COORD-256 (#675) asks podcrates for the path of the emulator in the
-  machine legs of `pod-hostprobe` (OR-B41-01, OR-B40-07).
-* The measured Claude Code host: cgroup v1, no `/dev/kvm`, the `incus`
-  package of apt is installed (incusd 6.0.0 runs as root with
-  `INCUS_DIR` in a private directory). The 37 integration test binaries
-  pass there as uid 1000, also `pid_init_hidden`, `store_gates` and
-  `refusal_text`, which failed on the host of 2026-11-25.
-* T-2078 remaining 3 still needs a run on the hosted runner of
-  PodUtils/podrunner#346 with the beta.
+* Workflow dispatch: a push from a Claude Code session starts no workflow,
+  and the session cannot dispatch. Each run goes through an issue
+  `[gh action] requested` (the owner's agent runs it). PR #707 (merged in
+  `413990b`) adds the startup of Gemini / Antigravity Cloud sessions
+  (`--no-watchers`, `--run-watcher watch|runs`); `scripts/dev/checks.sh`
+  now sources `scripts/cloud-env.sh`.
+* `v0.2.0-beta.41` is the newest release (2026-11-26). Each change after it
+  is in the `## Unreleased` sections of `CHANGELOG.md`.
+* Merged on `main` in this session (each with a table test):
+  * T-1947: one bounded parser of each number flag (`crates/podvm/src/number.rs`),
+    and `stop -t -1` refused with its own line (T-2108). COORD-270 (#698)
+    asks podcrates for a shared parser.
+  * An argument that is not UTF-8: one line with its position and class,
+    125 (T-2087 OR-B40-09, T-2108 OR-B42-04). A payload word cannot pass as
+    bytes until `pod_enter::Plan` takes bytes: COORD-271 (#701).
+  * `--podvm-mem` under 256 MiB is refused with the minimum (OR-B41-15);
+    `probe` gives the namespaces of a foreground `run` (OR-B38-10).
+  * The pty of `-it` is the controlling terminal for a user with no root on
+    the namespace rung (OR-B38-17, OR-B40-13). The root case and `-t`
+    without `-i` need COORD-188 (#584, amended with the exact place in
+    `launch::spawn_with`).
+  * docker's `--format` templates (`{{json .}}`, `table`, `range`,
+    `index`, `join`; `crates/podvm/src/format/`). COORD-272 (#703) asks
+    podcrates to take the engine.
+  * `inspect` gives docker's `.Mounts`, `.HostConfig.Binds` and
+    `.HostConfig.Tmpfs` (T-2108 OR-B42-08).
+  * T-2017: the init route of the image applies `--ulimit`,
+    no-new-privileges and each `--device` that reads; `--podvm-confine` and
+    a write-only device stay refused (call C28 amended in place: the rule
+    "refuse what the route does not apply" stays, the list is shorter; the
+    owner may review it).
+  * T-1998: `--podvm-tier=incus --podvm-vm --podvm-init=image` (an image
+    with a kernel as an incus VM; qcow2 writer, direct boot). COORD-273
+    (#705) asks pod-guest to take the ext4 and qcow2 writers.
+  * The tests that create a container set `PODVM_SPARE_TREE=0`, and the
+    guard `crates/podvm/tests/spare_tree_off.rs` holds the class (T-1859).
+* The last gate (45988037109 on `2497a26`) failed in one test,
+  `tty_ctty`: the hosted runner runs `-it` on the userland rung, where the
+  shell cannot open `/dev/tty`. A worker fixes the userland rung on the local branch `wip/ctty2` (worktree `.claude/worktrees/ctty2`); merge it, or do the fix again if the worktree is gone.
+* The hosted proof of T-1998 (kvm 45991827383, #706) did not pass: incusd
+  had the `qemu` driver, but the first `run -d` gave no line until the
+  bound of the experiment (1500 s). The boot wait of podvm has a bound of
+  180 s, so the time went before the boot. Experiment 492 now runs with
+  `--verbose` and lists the state of incusd when clause 1 fails.
+* A worker works the small rows of T-2100 (OR-B41-02, OR-B41-17), T-2108 (OR-B42-08) and T-2079 (OR-B39-19) on the local branch `wip/polish`.
+* The integration tests pass as uid 1000 on `3d9c3cb` (45 binaries); the
+  merges after it ran `scripts/dev/checks.sh` and their own new tests as
+  uid 1000.
+* Open asks to podcrates: COORD-268 (#695, P1, blocks the beta), #677,
+  #678, #680, #683, #684, #689, #690, #692, #697, #698, #701, #703, #705,
+  COORD-188 (#584). To podrunner: #672, #676, #693.
 
 ## Next steps, in order
 
-0. The release of `0.2.0-beta.42` waits for podcrates (the owner's ruling
-   "P1 before the beta", 2026-11-27): podcrates fixes T-2105 and T-2106 in
-   pod-enter (COORD-268, #695). Then take the tag, prove experiments 489
-   and 490 with no OPEN row, run a blind QA of the candidate, and the gate
-   of the beta. The eleventh outside pass (T-2108) ran on `40c5934`.
-1. Make the docs true for beta.41 (README, `docs/limits.md`, the
-   per-release state of `TODO/PROGRESS.md`), as after beta.40. Watch
-   COORD-257 (#676) for podrunner's take of beta.41 and its rerun of the
-   runner-image build (#671).
-2. T-2078 remaining 3 (a hosted run of podrunner#346 with beta.41).
-3. Sweep the open issues (`AGENTS.md`, section 8 item 7). Watch #672
-   (COORD-255) for podrunner's choice, and #675 (COORD-256) for the tag
-   of podcrates.
-4. The open rows of T-2100: OR-B41-06 (a `run --rm` that SIGPIPE ends
-   keeps its record: podvm dies with SIGPIPE by design, T-1769, and
-   `eprintln!` panics on EPIPE, so the fix needs a design), OR-B41-08
-   (T-1939), OR-B41-09 (needs `diff_ids` in `pod_oci::spec::Config`), the
-   P3 rows.
-5. podrunner: T-1968 is done on `main` (the machine tier's sized disk,
-   experiment 481; `--tmpfs GUEST:size=N` on the namespace rung with
-   podcrates `v0.86.0`, T-2102). Podrunner's 9p work mount stays unbounded
-   by the disk (#583 says so). T-1994 steps 1 to 3 are on `main` (a root
-   disk of each image, experiment 482; systemd as PID 1 of the guest,
-   experiment 483); the saved state on the disk root is in progress.
-   T-2101 (`-v HOST:GUEST:overlay`, podrunner#368, experiment 485) and
-   T-1991 (the syscall tier's `brk`, experiment 484) are on `main`. Each
-   waits for the next beta, then a COORD to podrunner. T-2103
-   (podrunner#371) is in progress. Then #596 and #599 (T-1996, T-1998,
-   T-1999), T-1990, T-2088 and the open rows of T-2070, T-2079, T-2087,
-   T-2100.
-6. T-2054 items 2 and 3, then the work order of `TODO/PROGRESS.md`.
+1. Make the gate green: the fix of `tty_ctty` on the userland rung (`/dev/tty` through the interposer, a table of the rungs). Then one request for the gate of the head of
+   `main`, and run the whole integration suite as uid 1000.
+2. T-1998: request `kvm.yml` with `-f only=incusvm` again, read the
+   `--verbose` lines in the result file (the artifact `incus-vm`), find
+   the stage that takes the time (the disk, the qcow2 write or the import),
+   and give it a bound of its own with one line.
+3. T-2017 Prove: experiment 465 clause 12 needs a host whose user has a
+   subordinate id range (the cloud host refused the creation of one).
+   Clauses 2 and 3 (cgroup2 limits, the runsc and machine tiers) remain.
+4. `0.2.0-beta.42` waits for podcrates (COORD-268, #695): take the tag,
+   prove experiments 489 and 490 with no OPEN row, run a blind QA of the
+   candidate, and the gate of the beta. Then the COORDs to podrunner for
+   each ask that the beta delivers (T-1968, T-2101, T-2103, T-2104,
+   T-1991, T-1994, T-1998, T-2105, T-2106).
+5. Sweep the open issues (`AGENTS.md`, section 8 item 7), and take each
+   podcrates tag that answers a COORD above.
+6. The open rows of T-2070, T-2079, T-2087, T-2100 and T-2108, then
+   T-1990, T-2088, T-2054 items 2 and 3, and the work order of
+   `TODO/PROGRESS.md`.
 
 ## Rules learned
+
+* The hosted runner gives no unprivileged user namespace, so `run -it`
+  there takes the userland rung: a test of a terminal that passes on the
+  namespace rung of the cloud host can fail in the gate (45988037109).
+  Make a test of the terminal a table over the rungs that CI gives.
+* A test that imports an image and creates a container sets
+  `PODVM_SPARE_TREE=0`: else a detached spare-tree fill writes into its
+  directory after the test removed it, and the check T-1859 fails the gate
+  (45960813246). The guard `spare_tree_off.rs` holds the class.
+* While a request `[gh action] requested` pins the head of `main`, merge a
+  worker's branch in its own worktree (merge `main` into it there) and keep
+  record commits on a local branch `hold/rec` in a worktree; fast-forward
+  `main` after the request ran. The stop hook asks to push each commit of
+  `main`.
+* `git cherry-pick` takes no `-q`: a chain `git cherry-pick -q X && ...`
+  stops there.
+* The hook `commit-msg` refuses the name of a tool or a model in a commit
+  message (for example the name of a harness in a subject).
+* `incus query` refuses `--project`: put `?project=NAME` in the path.
+* An experiment on a hosted runner must print each stage of a long run
+  (`--verbose`) and the state at a failure: kvm 45991827383 ended at the
+  bound with no line to read.
+* After a usage limit, a worker stops with its work saved: continue it with
+  SendMessage, not a new worker.
+* A test row that the record names (`number_flags`) and a later fix of the
+  same value (T-2108's `stop -t -1`) can disagree: run the whole
+  integration suite as uid 1000 after each merge (it found this one before
+  the gate did).
 
 * Run the whole integration suite as uid 1000 after each merge, not only
   the tests that a worker names: the fix of #547 (`de5e01b`) refused

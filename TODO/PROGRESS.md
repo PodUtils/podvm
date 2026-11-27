@@ -22,10 +22,12 @@ start.
 * KVM is free (the owner, 2026-11-09). Probe `/dev/kvm` on the current host.
   `kvm.yml` (T-1682) gives a hosted runner with it, and `arm.yml` a hosted
   arm64 runner (T-1721).
-* A push starts the gate, `secrets` and `issue-sync`. The session
-  dispatches other workflows directly. A newer push cancels the
-  gate of an older commit. The issue `[gh action] requested` is the
-  fallback only (`docs/decisions.md`, 2026-11-13, "Workflow fallback").
+* A push from a Claude Code session starts no workflow, and the session
+  cannot dispatch one: each run goes through a NEW issue `[gh action]
+  requested` (`docs/decisions.md`, 2026-11-13, "Workflow fallback";
+  `AGENTS.md`, section 9). The scheduled `issue-sync` runs each day.
+* `0.2.0-beta.42` waits for podcrates' fix of T-2105 and T-2106
+  (COORD-268, #695; the owner's ruling "P1 before the beta").
 
 Each partial entry names its remaining clauses. Each blocked entry names
 its blocker and the condition that clears it.
