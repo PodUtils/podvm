@@ -296,18 +296,18 @@ pub const USER: &[Group] = &[
             ),
             v(
                 "PODVM_WINDOWS_INSTALL_DEADLINE",
-                "seconds",
-                "Bounds the time of an install.",
+                "1 to 18446744073709551",
+                "Bounds the time of an install, in seconds. Another value is an error with exit 125.",
             ),
             v(
                 "PODVM_WINDOWS_INSTALL_MEM",
-                "a size, such as 8G",
-                "Sets the memory of the guest of an install.",
+                "a size, such as 8G, up to 9223372036854775807 bytes",
+                "Sets the memory of the guest of an install. Another value is an error with exit 125.",
             ),
             v(
                 "PODVM_WINDOWS_INSTALL_CPUS",
-                "a number",
-                "Sets the CPU count of the guest of an install.",
+                "1 to 64",
+                "Sets the CPU count of the guest of an install. Another value is an error with exit 125.",
             ),
             v(
                 "PODVM_WINDOWS_ISO_BUS",

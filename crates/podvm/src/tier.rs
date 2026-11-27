@@ -62,24 +62,8 @@ pub fn refusal(verb: &str, value: &str) -> String {
 /// power. Zero is refused: a zero-byte guest is not a configuration.
 /// Overflow is refused rather than wrapped.
 pub fn parse_mem(s: &str) -> Option<u64> {
-    let cut = s.find(|c: char| !c.is_ascii_digit()).unwrap_or(s.len());
-    let (digits, suffix) = s.split_at(cut);
-    let n: u64 = digits.parse().ok()?;
-    if n == 0 {
-        return None;
-    }
-    let upper = suffix.to_ascii_uppercase();
-    let suf = upper.strip_suffix('B').unwrap_or(&upper);
-    let suf = suf.strip_suffix('I').unwrap_or(suf);
-    let mult: u64 = match suf {
-        "" => 1,
-        "K" => 1u64 << 10,
-        "M" => 1u64 << 20,
-        "G" => 1u64 << 30,
-        "T" => 1u64 << 40,
-        _ => return None,
-    };
-    n.checked_mul(mult)
+    // TODO/gate.md T-1947: the rule of `--podvm-mem` in `crate::number`.
+    crate::number::parse(&crate::number::PODVM_MEM, s).ok()
 }
 
 /// True where a configured guest memory in bytes crosses the file-size
@@ -291,7 +275,10 @@ mod tests {
         assert_eq!(parse_mem("1.5G"), None);
         // ⛔ Overflow wraps nowhere: a shift past 64 bits is refused.
         assert_eq!(parse_mem("18446744073709551615T"), None);
-        assert_eq!(parse_mem("18446744073709551615"), Some(u64::MAX));
+        // TODO/gate.md T-1947: the bound is the signed 64-bit count of docker.
+        assert_eq!(parse_mem("9223372036854775807"), Some(i64::MAX as u64));
+        assert_eq!(parse_mem("9223372036854775808"), None);
+        assert_eq!(parse_mem("18446744073709551615"), None);
     }
 
     /// ⭐ TODO/machine.md T-1305. The ceiling comparison: over refuses, equal

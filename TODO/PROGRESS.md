@@ -7,7 +7,7 @@ start.
 
 ## State
 
-679 entries: 19 open, 42 partial, 6 blocked, 612 done.
+679 entries: 19 open, 41 partial, 6 blocked, 613 done.
 
 * The newest release is `v0.2.0-beta.41` (2026-11-26). [CHANGELOG](../CHANGELOG.md)
   holds what each release ships, with its known gaps.
@@ -54,8 +54,8 @@ status with `podvm-count` in the same commit as the work.
    `docs/methodology/quality.md`): each beta passes the gate of
    `docs/maintenance.md`, "Releases". Work the open entries of the external
    QA of `0.2.0-beta.31` (T-2088, T-1938 to T-1941 and T-1952 to T-1954)
-   by their class, with T-1947 (fail safe at the edges). The harness of the CLI
-   (`tests/cli_contract.rs`) guards the surface.
+   by their class. The harness of the CLI (`tests/cli_contract.rs`) and the
+   table of the number flags (`number::tests`) guard the surface.
 4. [T-1911](probe.md): `-u UID` in the user namespace (the range is opt-in
    until each verb keeps the store rule).
 5. The Windows guest plan (`podvm run windows:NAME`; the owner accepts the

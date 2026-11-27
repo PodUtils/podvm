@@ -83,42 +83,8 @@ pub fn program_in(argv0: &str, working_dir: &str) -> String {
     format!("{wd}/{argv0}")
 }
 
-/// One docker `--ulimit NAME=SOFT[:HARD]` as a limit of the payload.
-///
-/// TODO/cli.md T-1655. `NAME` is a word of `pod-enter`'s [`Resource`]
-/// (`nofile`, `nproc`, `fsize`, ...); each value is a whole number or `-1`
-/// / `unlimited` for no limit; a missing `HARD` is `SOFT`, as docker reads
-/// it. A soft value over the hard one is refused here; a hard value over
-/// the caller's own hard limit is refused by the child, by name.
-pub fn ulimit(spec: &str) -> std::result::Result<Limit, String> {
-    let (name, values) = spec
-        .split_once('=')
-        .ok_or_else(|| format!("{spec:?} is not NAME=SOFT[:HARD]"))?;
-    let resource = Resource::from_word(name).ok_or_else(|| {
-        format!("{name:?} names no resource limit (nofile, nproc, fsize, cpu, as, core, ...)")
-    })?;
-    let value = |v: &str| match v {
-        "-1" | "unlimited" => Ok(pod_enter::limits::INFINITY),
-        n => n
-            .parse::<u64>()
-            .map_err(|_| format!("{v:?} in {spec:?} is not a whole number or -1")),
-    };
-    let (soft, hard) = match values.split_once(':') {
-        Some((s, h)) => (value(s)?, value(h)?),
-        None => {
-            let v = value(values)?;
-            (v, v)
-        }
-    };
-    if soft > hard {
-        return Err(format!("{spec:?}: the soft value is over the hard one"));
-    }
-    Ok(Limit {
-        resource,
-        soft,
-        hard,
-    })
-}
+mod ulimit; // TODO/gate.md T-1947: kept in a module for the size of this file
+pub use ulimit::ulimit;
 
 /// A runtime error with podvm's text. Exits 125.
 pub fn runtime(text: impl Into<String>) -> Error {

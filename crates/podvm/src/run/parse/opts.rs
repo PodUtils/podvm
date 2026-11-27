@@ -337,14 +337,10 @@ pub(super) fn init_check(verb: &str, o: &Opts) -> Result<(), i32> {
     Err(podvm_image::error::EXIT_FLAG_ERROR)
 }
 
-/// `--podvm-mem VALUE`: a byte count with an optional K/M/G/T suffix.
+/// `--podvm-mem VALUE`: a byte count with an optional K/M/G/T suffix
+/// (the rule `PODVM_MEM` of [`crate::number`]).
 pub(super) fn mem_arg(verb: &str, a: &str) -> Result<u64, i32> {
-    crate::tier::parse_mem(a).ok_or_else(|| {
-        eprintln!(
-            "podvm {verb}: --podvm-mem takes a byte count with an optional K/M/G/T suffix, not {a:?}"
-        );
-        podvm_image::error::EXIT_FLAG_ERROR
-    })
+    crate::number::flag(verb, &crate::number::PODVM_MEM, a)
 }
 
 /// `--tls-verify=VALUE`: true or false.

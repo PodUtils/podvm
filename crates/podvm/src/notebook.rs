@@ -26,7 +26,9 @@ use std::time::{Duration, Instant};
 
 use podvm_image::error::{EXIT_FLAG_ERROR, EXIT_RUNTIME_ERROR};
 
-const USAGE: &str = "\
+use crate::number::{CYCLES, KILL_AFTER, RESTART_AFTER};
+
+pub(crate) const USAGE: &str = "\
 usage: podvm notebook NB --persist DIR [--cycles N] [--kill-after S]
                       [--restart-kernel-after CELL]... [--image IMAGE]
 
@@ -44,9 +46,6 @@ pub const MARIMO_IMAGE: &str = "ghcr.io/marimo-team/marimo:latest";
 pub use podvm_probe::exit::EXIT_KILLED;
 /// The time from SIGTERM to SIGKILL.
 const GRACE: Duration = Duration::from_secs(3);
-/// The bounds of `--cycles` and `--kill-after` (one year), T-1947.
-const MAX_CYCLES: u64 = 1000;
-const MAX_KILL_AFTER: u64 = 365 * 24 * 3600;
 
 /// The arguments of `podvm notebook`.
 #[derive(Debug, Default, PartialEq)]
@@ -81,29 +80,16 @@ pub fn parse(args: &[String]) -> Result<Args, String> {
         };
         // TODO/gate.md T-1947, PodUtils/podvm#493, #506: a number out of its
         // bound is refused by name, never clamped or wrapped.
-        let number = |name: &str, v: String, max: u64| -> Result<u64, String> {
-            v.parse::<u64>()
-                .ok()
-                .filter(|n| (1..=max).contains(n))
-                .ok_or(format!(
-                    "{name} takes a whole number from 1 to {max}, not {v:?}"
-                ))
+        let number = |rule: &crate::number::Rule, v: String| -> Result<u64, String> {
+            crate::number::check(rule, &v)
         };
         match flag {
             "--persist" => persist = Some(PathBuf::from(value("--persist")?)),
-            "--cycles" => a.cycles = number("--cycles", value("--cycles")?, MAX_CYCLES)? as u32,
-            "--kill-after" => {
-                a.kill_after = Some(number(
-                    "--kill-after",
-                    value("--kill-after")?,
-                    MAX_KILL_AFTER,
-                )?)
-            }
-            "--restart-kernel-after" => a.restart_after.push(number(
-                "--restart-kernel-after",
-                value("--restart-kernel-after")?,
-                u32::MAX as u64,
-            )? as usize),
+            "--cycles" => a.cycles = number(&CYCLES, value("--cycles")?)? as u32,
+            "--kill-after" => a.kill_after = Some(number(&KILL_AFTER, value("--kill-after")?)?),
+            "--restart-kernel-after" => a
+                .restart_after
+                .push(number(&RESTART_AFTER, value("--restart-kernel-after")?)? as usize),
             "--image" => a.image = Some(value("--image")?),
             f if f.starts_with('-') => return Err(format!("unknown option {f:?}")),
             _ if nb.is_none() => nb = Some(PathBuf::from(arg)),

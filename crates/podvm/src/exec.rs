@@ -74,8 +74,9 @@ usage: podvm exec [options] <container|image> <command> [arg...]
                    as in run: machine tier only and refused elsewhere, one
                    emulator token per occurrence, repeatable, never split
   --podvm-mem S   as in run: machine tier only and refused elsewhere, the
-                   guest memory in bytes with an optional K/M/G/T suffix
-                   (TODO/machine.md T-1305)
+                   guest memory in bytes with an optional K/M/G/T suffix,
+                   from 1 to 9223372036854775807 bytes (TODO/machine.md
+                   T-1305)
 
   A detached full Windows machine (run -d windows:2025) takes the
     command through its QEMU Guest Agent as cmd.exe /d /c COMMAND, with
@@ -163,6 +164,12 @@ struct Opts {
     ask: crate::complete::Ask,
 }
 
+/// The parser of `exec` for the table of [`crate::number`].
+#[cfg(test)]
+pub(crate) fn parse_probe(args: &[String]) -> std::result::Result<(), i32> {
+    parse(args).map(drop)
+}
+
 /// ⛔ Parsing stops at the image name, exactly as `run`'s does: everything
 /// after it is the payload's, dashes and all.
 fn parse(args: &[String]) -> std::result::Result<Opts, i32> {
@@ -210,13 +217,9 @@ fn parse(args: &[String]) -> std::result::Result<Opts, i32> {
                     }
                 },
                 "--podvm-qemu-arg" => o.qemu_args.push(a.clone()),
-                "--podvm-mem" => match crate::tier::parse_mem(a) {
-                    Some(m) => o.mem = Some(m),
-                    None => {
-                        eprintln!("podvm exec: --podvm-mem takes a byte count with an optional K/M/G/T suffix, not {a:?}");
-                        return Err(EXIT_FLAG_ERROR);
-                    }
-                },
+                "--podvm-mem" => {
+                    o.mem = Some(crate::number::flag("exec", &crate::number::PODVM_MEM, a)?)
+                }
                 _ => o.platform = Some(a.clone()),
             }
             continue;
@@ -304,16 +307,8 @@ fn parse(args: &[String]) -> std::result::Result<Opts, i32> {
                 .qemu_args
                 .push(other["--podvm-qemu-arg=".len()..].to_string()),
             other if other.starts_with("--podvm-mem=") => {
-                match crate::tier::parse_mem(&other["--podvm-mem=".len()..]) {
-                    Some(m) => o.mem = Some(m),
-                    None => {
-                        eprintln!(
-                            "podvm exec: --podvm-mem takes a byte count with an optional K/M/G/T suffix, not {:?}",
-                            &other["--podvm-mem=".len()..]
-                        );
-                        return Err(EXIT_FLAG_ERROR);
-                    }
-                }
+                let v = &other["--podvm-mem=".len()..];
+                o.mem = Some(crate::number::flag("exec", &crate::number::PODVM_MEM, v)?)
             }
             other if other.starts_with('-') => {
                 // ⛔ Unreachable through the table above; an assertion, not a

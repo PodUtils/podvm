@@ -22,9 +22,6 @@ pub const BOOT_BOUND: Duration = Duration::from_secs(180);
 /// that sets the bound of the boot, in seconds.
 pub const BOOT_BOUND_VAR: &str = "PODVM_INIT_BOOT_TIMEOUT";
 
-/// The largest bound that [`BOOT_BOUND_VAR`] takes.
-const BOOT_BOUND_MAX: u64 = 3600;
-
 /// The bound of the boot: [`BOOT_BOUND_VAR`], else [`BOOT_BOUND`]. A value
 /// that is not a number of seconds from 1 to 3600 is an error, not the
 /// default.
@@ -32,18 +29,15 @@ pub fn boot_bound() -> Result<Duration, String> {
     bound_of(std::env::var_os(BOOT_BOUND_VAR).as_deref())
 }
 
-/// [`boot_bound`] for the value `v` of the variable.
+/// [`boot_bound`] for the value `v` of the variable: the rule
+/// `BOOT_TIMEOUT` of [`crate::number`] (TODO/gate.md T-1947), after the
+/// white space at each end of the text.
 pub(crate) fn bound_of(v: Option<&std::ffi::OsStr>) -> Result<Duration, String> {
     let Some(v) = v else {
         return Ok(BOOT_BOUND);
     };
-    match v.to_str().map(str::trim).map(str::parse::<u64>) {
-        Some(Ok(n)) if (1..=BOOT_BOUND_MAX).contains(&n) => Ok(Duration::from_secs(n)),
-        _ => Err(format!(
-            "{BOOT_BOUND_VAR}={}: not a number of seconds from 1 to {BOOT_BOUND_MAX}",
-            v.to_string_lossy()
-        )),
-    }
+    let text = v.to_string_lossy();
+    crate::number::check(&crate::number::BOOT_TIMEOUT, text.trim()).map(Duration::from_secs)
 }
 
 /// What podvm does after one `systemctl is-system-running --wait`.

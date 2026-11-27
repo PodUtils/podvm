@@ -46,10 +46,8 @@ pub fn parse(verb: &str, a: &str) -> Result<(PathBuf, u16), i32> {
     if addr != "127.0.0.1" {
         return Err(bad("the address in the guest is 127.0.0.1"));
     }
-    let port: u16 = match port.parse() {
-        Ok(p) if p > 0 => p,
-        _ => return Err(bad("the port is 1 to 65535")),
-    };
+    let port =
+        crate::number::check(&crate::number::CHANNEL_PORT, port).map_err(|why| bad(&why))? as u16;
     if !host.starts_with('/') {
         return Err(bad("the host socket is an absolute path"));
     }

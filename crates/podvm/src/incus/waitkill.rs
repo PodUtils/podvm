@@ -303,12 +303,8 @@ pub fn signal_of(args: &[String]) -> Result<(i32, Vec<String>), Refusal> {
                 continue;
             }
         };
-        sig = crate::lifecycle::signal_number(&v).ok_or_else(|| {
-            (
-                EXIT_FLAG_ERROR,
-                format!("{v:?} is not a signal podvm knows"),
-            )
-        })?;
+        sig = crate::lifecycle::signal_number(&v)
+            .ok_or_else(|| (EXIT_FLAG_ERROR, crate::lifecycle::signal_refusal(&v)))?;
     }
     Ok((sig, rest))
 }

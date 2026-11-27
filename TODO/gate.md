@@ -5760,7 +5760,7 @@ One test file walks each verb of the table. (a) Each flag row of the verb is in 
 **Milestone:** none
 **Priority:** P1
 **Effort:** M
-**Status:** partial
+**Status:** done
 
 ## Problem
 
@@ -5780,9 +5780,11 @@ The second path stays, also where the first path holds: a fallback that is never
 
 ## Prove
 
-`podvm run --kill-after 99999999999999999999` and a planted `panic!` in a verb exit 125 with one named line; `cargo test --release -p podvm --bin podvm` passes.
+`podvm notebook NB --persist DIR --kill-after 99999999999999999999` and a planted `panic!` in a verb exit 125 with one named line; `cargo test --release -p podvm --bin podvm` passes.
 
 ## Done
+
+**Done (2026-11-27).** Each number of a flag or a variable has a rule in `crates/podvm/src/number.rs` (the flag, what it takes, its kind and its range), and `number::check` is the one bounded parser: digits only (a size takes `b`, `k`, `m`, `g` or `t`, with `i` and `b` after it; `--cpus` takes a decimal in thousandths), no sign, no exponent, no space, and a product that overflows is "too large". A value out of the range gives one line (`--pids-limit takes a count of processes from 1 to 4194304, not "-1"`, or `"V" is too large (the bound is N)`) and the flag-error exit (125). The rules: `--timeout`, `--podvm-timeout`, `stop -t` (0 allowed), `--pids-limit` (1 to 4194304, the kernel's `PID_MAX_LIMIT`), `--cpus` (0.01 to 1024), `--memory` (6 MiB up), `--storage-opt size=` (64 MiB up), `--tmpfs size=` (0 is no limit), `--podvm-mem`, `--podvm-cpus` (1 to 64), `--ports`, `-p`, `--podvm-channel`, `--allow-connect` (1 to 65535), `kill -s` (1 to 64), `logs --tail` and `--limit-bytes`, `windows --max-bytes`, `notebook --cycles`, `--kill-after` and `--restart-kernel-after`, `PODVM_INIT_BOOT_TIMEOUT`, and `PODVM_WINDOWS_INSTALL_MEM`, `_CPUS` and `_DEADLINE` (a bad value was ignored; it is a refusal now); the size bound is docker's `i64::MAX`. `--ulimit` keeps its parser in `podvm-enter` (digits only, a line with the range). `stop -t -1` and `kill -s -1` read the value (`parity::admit_all` read "-1" as an unknown option). Tests: `number::tests::each_number_flag_has_one_bounded_parser` walks each rule with a value below, at each edge, inside, above, overflowing and not a number (the sign, the exponent, the space, a Unicode digit), through the rule and through the production parser of each verb that takes the flag (a rule with no probe fails it); `the_help_names_each_range` and `each_rule_is_in_the_parity_table_or_the_variables` hold the help, the parity table and the `podvm man` variables against the same table; `tests/number_flags.rs` pins the line of the binary for each family. Measured with the release binary as uid 1000 (alpine:3.20): `run --pids-limit -1` gave "takes a count of processes" and gives the range; `--memory 99999999999999999999g` gave "takes bytes with b, k, m or g" and gives "is too large (the bound is 9223372036854775807)"; `stop -t -1` gave "unknown option" and gives the range. The side file of a lost end of a run and the lock of the table's writer are podcrates' and are in the crate that podvm takes (podcrates@T-872, PodUtils/podvm#568, taken in `6b5a6cb`; `v0.86.0`): the launcher retries the write of the end 5 times, then writes `end.json` beside the record, which the reconcile reads in place of `Dead`; the temp file of the table is locked from its creation. `two_writers_and_a_sweep_lose_no_write_of_the_table` (`podvm-supervise`) holds two writers and a sweep of the staging directory. A shared bounded parser of a number (podssh and podnet have the same rule) is an ask to podcrates (AGENTS.md 2a) that a COORD issue still has to open.
 
 **Partial (2026-11-17).** The panic hook (`names/stdout.rs`): each panic that is not a print failure ends with one line (`podvm VERB: internal error: MESSAGE at FILE:LINE. This is a bug of podvm ...`) and exit 125, after the default report where `RUST_BACKTRACE` is set. Measured: the repro of 506 on the build before its fix gave exit 125 with that line (before: SIGABRT, exit 134). The numbers of `notebook` go through one bounded parser (T-1943). Remaining: the bounded parser for each other number flag, the lock of the table's writer (COORD-181, #568), and the side file of a lost end of a run.
 

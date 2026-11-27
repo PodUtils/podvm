@@ -266,13 +266,7 @@ pub(super) fn confine(verb: &str, a: &str) -> std::result::Result<podvm_enter::c
 /// The vCPUs of `--podvm-cpus`: a whole number from 1 to 64.
 /// TODO/cli.md T-1654.
 pub(super) fn cpus(verb: &str, a: &str) -> std::result::Result<u32, i32> {
-    match a.parse::<u32>() {
-        Ok(n) if (1..=64).contains(&n) => Ok(n),
-        _ => {
-            eprintln!("podvm {verb}: --podvm-cpus takes a whole number from 1 to 64, not {a:?}");
-            Err(EXIT_FLAG_ERROR)
-        }
-    }
+    crate::number::flag(verb, &crate::number::PODVM_CPUS, a).map(|n| n as u32)
 }
 
 /// `--network`: `broker` (TODO/net.md T-1665) or `host` (TODO/cli.md
@@ -299,13 +293,7 @@ pub(super) fn network(verb: &str, a: &str, o: &mut Opts) -> Result<(), i32> {
 pub(super) fn ports(verb: &str, a: &str) -> Result<Vec<u16>, i32> {
     a.split(',')
         .filter(|p| !p.is_empty())
-        .map(|p| match p.parse::<u16>() {
-            Ok(n) if n > 0 => Ok(n),
-            _ => {
-                eprintln!("podvm {verb}: --ports takes ports from 1 to 65535, not {p:?}");
-                Err(EXIT_FLAG_ERROR)
-            }
-        })
+        .map(|p| crate::number::flag(verb, &crate::number::PORTS, p).map(|n| n as u16))
         .collect()
 }
 

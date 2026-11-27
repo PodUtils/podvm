@@ -55,6 +55,65 @@ fn a_table_without_the_userland_drive_still_parses() {
     assert!(t.containers[0].userland_exec.is_empty());
 }
 
+/// TODO/gate.md T-1947, PodUtils/podvm#568 (podcrates `v0.70.0`, taken in
+/// podvm): two writers of the table at once, and a third process that
+/// sweeps the staging directory the way each `Store::open` does, lose no
+/// write. The table lock and the lock of the temp file (`create_locked` of
+/// pod-supervise) are the two paths; each write lands, and no temp file stays.
+#[test]
+fn two_writers_and_a_sweep_lose_no_write_of_the_table() {
+    const EACH: usize = 30;
+    let d = std::env::temp_dir().join(format!("podvm-t1947-table-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&d);
+    std::fs::create_dir_all(&d).unwrap();
+    let store = std::sync::Arc::new(Store::open(&d).unwrap());
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let sweeper = {
+        let (store, stop) = (store.clone(), stop.clone());
+        std::thread::spawn(move || {
+            while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                let _ = store.sweep_staging();
+            }
+        })
+    };
+    let writers: Vec<_> = ["a", "b"]
+        .into_iter()
+        .map(|who| {
+            let store = store.clone();
+            std::thread::spawn(move || {
+                for i in 0..EACH {
+                    let id = format!("{who}{i:03}");
+                    let c: Container = serde_json::from_value(serde_json::json!({
+                        "id": id, "name": id, "image": "img", "manifest_digest": "sha256:0",
+                        "rootfs": "/tmp", "argv": ["true"], "env": [], "working_dir": "/",
+                        "created_at": "now", "started_at": null, "finished_at": null,
+                        "state": "created", "pid": null, "launcher_pid": null,
+                        "exit_code": null, "noticed": null, "rung": "chroot"
+                    }))
+                    .unwrap();
+                    update(&store, |t| {
+                        t.containers.push(c);
+                        Ok(())
+                    })
+                    .unwrap_or_else(|e| panic!("{who} write {i}: {e}"));
+                }
+            })
+        })
+        .collect();
+    for w in writers {
+        w.join().unwrap();
+    }
+    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    sweeper.join().unwrap();
+    let t = read(&store).unwrap();
+    assert_eq!(t.containers.len(), 2 * EACH, "a write was lost");
+    let left: Vec<_> = std::fs::read_dir(d.join("staging"))
+        .map(|r| r.flatten().map(|e| e.file_name()).collect())
+        .unwrap_or_default();
+    assert!(left.is_empty(), "temp files stay: {left:?}");
+    let _ = std::fs::remove_dir_all(&d);
+}
+
 fn tally_rec(dev: u64, ino: u64, uid: u32, gid: u32, set: u32) -> Vec<u8> {
     let mut r = Vec::with_capacity(32);
     r.extend(dev.to_le_bytes());

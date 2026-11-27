@@ -130,48 +130,32 @@ pub(crate) fn parse(args: &[String]) -> Result<Option<Args>, i32> {
             }
             "--max-bytes" => {
                 let v = value(&mut it, "--max-bytes")?;
-                a.max_bytes = Some(v.parse().map_err(|_| {
-                    eprintln!("podvm windows: --max-bytes {v} is not a count of bytes");
-                    EXIT_FLAG_ERROR
-                })?);
-                if a.max_bytes == Some(0) {
-                    eprintln!("podvm windows: --max-bytes 0 downloads nothing");
-                    return Err(EXIT_FLAG_ERROR);
-                }
+                a.max_bytes = Some(crate::number::flag(
+                    "windows",
+                    &crate::number::MAX_BYTES,
+                    v,
+                )?);
             }
             "--podvm-mem" => {
                 let v = value(&mut it, "--podvm-mem")?;
-                a.mem = Some(crate::tier::parse_mem(v).ok_or_else(|| {
-                    eprintln!("podvm windows: --podvm-mem {v} is not a size");
-                    EXIT_FLAG_ERROR
-                })?);
+                a.mem = Some(crate::number::flag(
+                    "windows",
+                    &crate::number::PODVM_MEM,
+                    v,
+                )?);
             }
             "--podvm-cpus" => {
                 let v = value(&mut it, "--podvm-cpus")?;
-                let n: u32 = v.parse().map_err(|_| {
-                    eprintln!("podvm windows: --podvm-cpus {v} is not a count");
-                    EXIT_FLAG_ERROR
-                })?;
-                if n == 0 {
-                    eprintln!("podvm windows: --podvm-cpus 0 is not a machine");
-                    return Err(EXIT_FLAG_ERROR);
-                }
-                a.cpus = Some(n);
+                a.cpus =
+                    Some(crate::number::flag("windows", &crate::number::PODVM_CPUS, v)? as u32);
             }
             "--podvm-timeout" => {
                 let v = value(&mut it, "--podvm-timeout")?;
-                let n: u64 = v.parse().map_err(|_| {
-                    eprintln!("podvm windows: --podvm-timeout {v} is not a count of seconds");
-                    EXIT_FLAG_ERROR
-                })?;
-                // 0 would mean forever, and no run waits unbounded: name a
-                // positive count of seconds. The default still applies where
-                // the flag is absent.
-                if n == 0 {
-                    eprintln!("podvm windows: --podvm-timeout 0 is refused: name a positive count of seconds");
-                    return Err(EXIT_FLAG_ERROR);
-                }
-                a.timeout = Some(n);
+                a.timeout = Some(crate::number::flag(
+                    "windows",
+                    &crate::number::PODVM_TIMEOUT,
+                    v,
+                )?);
             }
             "--podvm-qemu-arg" => a.emu_args.push(value(&mut it, "--podvm-qemu-arg")?.clone()),
             "--guest" => {

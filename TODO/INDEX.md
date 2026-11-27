@@ -609,7 +609,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1944](cli.md) | P2 | M | none | cli | done | The external QA of `0.2.0-beta.31`, second batch: `cp`, `import` and the helpers of credentials |
 | [T-1945](cli.md) | P1 | M | none | cli | done | `exec --env-file`, and a `-v` source that is opened with no symbolic link (PodUtils/podrunner#277) |
 | [T-1946](gate.md) | P1 | M | none | gate | done | The contract of the CLI: one table-driven harness of each verb |
-| [T-1947](gate.md) | P1 | M | none | gate | partial | Fail safe at the edges: a panic hook, checked numbers, and the writes of the store |
+| [T-1947](gate.md) | P1 | M | none | gate | done | Fail safe at the edges: a panic hook, checked numbers, and the writes of the store |
 | [T-1948](gate.md) | P2 | M | none | gate | done | Each banner and each inspect field says what the entered mechanism did |
 | [T-1949](gate.md) | P1 | S | none | gate | done | The gate of a beta: workloads, the harness, an outside pass, and the known gaps |
 | [T-1950](gate.md) | P1 | M | none | gate | done | The external QA of `0.2.0-beta.31`: verify the third batch of reports |
@@ -748,7 +748,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-679 entries: 19 open, 42 partial, 6 blocked, 612 done.
+679 entries: 19 open, 41 partial, 6 blocked, 613 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -758,10 +758,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 1 | 21 | 1 | 276 | 299 |
+| P1 | 1 | 20 | 1 | 277 | 299 |
 | P2 | 13 | 16 | 4 | 216 | 249 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 19 | 42 | 6 | 612 | 679 |
+| **All** | 19 | 41 | 6 | 613 | 679 |
 
 ## Work order
 

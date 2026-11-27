@@ -1,10 +1,13 @@
 use super::*;
 
 /// ⚠ By name or by number, and an unknown one is refused rather than defaulted:
-/// sending the wrong signal is not something a caller can notice.
+/// sending the wrong signal is not something a caller can notice. A number is
+/// the rule `SIGNAL` of [`crate::number`] (TODO/gate.md T-1947).
 pub(crate) fn signal_number(v: &str) -> Option<i32> {
-    if let Ok(n) = v.parse::<i32>() {
-        return (n > 0 && n < 65).then_some(n);
+    if v.starts_with(|c: char| c.is_ascii_digit()) {
+        return crate::number::parse(&crate::number::SIGNAL, v)
+            .ok()
+            .map(|n| n as i32);
     }
     let name = v.trim_start_matches("SIG").to_ascii_uppercase();
     Some(match name.as_str() {
@@ -19,6 +22,20 @@ pub(crate) fn signal_number(v: &str) -> Option<i32> {
         "STOP" => 19,
         _ => return None,
     })
+}
+
+/// The line that refuses the signal `v`: the range where `v` is a number, the
+/// names where it is not.
+pub(crate) fn signal_refusal(v: &str) -> String {
+    if v.starts_with(|c: char| c.is_ascii_digit() || c == '-' || c == '+') {
+        return crate::number::check(&crate::number::SIGNAL, v)
+            .err()
+            .unwrap_or_default();
+    }
+    format!(
+        "--signal takes a name (HUP, INT, QUIT, KILL, USR1, USR2, TERM, CONT or STOP) or a \
+         number from 1 to 64, not {v:?}"
+    )
 }
 
 /// `podvm wait <container>...`
