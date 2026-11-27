@@ -29,10 +29,16 @@ PB="${PODVM_446_BIN:-$REPO/target/x86_64-unknown-linux-musl/release/podvm}"
 export PODVM_STORE="${PODVM_STORE:-$REPO/.work/qa/store}"
 RUNS="${PODVM_446_RUNS:-10}"
 A=mirror.gcr.io/library/alpine:3.20
+# T-1953 (PodUtils/podvm#558): a run in a mount namespace of its own (a caller
+# with no capability) keeps its answer in probe-userns.json; the run of root
+# keeps it in probe.json. The experiment saves both and reads the one that the
+# first run wrote.
 C="$PODVM_STORE/probe.json"
+CU="$PODVM_STORE/probe-userns.json"
 W="$(mktemp -d)"
 [ -f "$C" ] && cp "$C" "$W/saved.json"
-trap 'if [ -f "$W/saved.json" ]; then cp "$W/saved.json" "$C"; else rm -f "$C"; fi; rm -rf "$W"' EXIT INT TERM
+[ -f "$CU" ] && cp "$CU" "$W/saved-userns.json"
+trap 'for f in "" -userns; do case $f in -userns) t=$CU ;; *) t=$C ;; esac; if [ -f "$W/saved$f.json" ]; then cp "$W/saved$f.json" "$t"; else rm -f "$t"; fi; done; rm -rf "$W"' EXIT INT TERM
 
 [ -x "$PB" ] || { echo "no podvm binary at $PB: COULD NOT RUN" >&2; exit 2; }
 "$PB" image inspect "$A" >/dev/null 2>&1 || { echo "no alpine 3.20 in $PODVM_STORE: COULD NOT RUN" >&2; exit 2; }
@@ -45,9 +51,10 @@ verdict() { # clause, test, what
 ms() { echo $(( $(date +%s%N) / 1000000 )); }
 median() { tr ' ' '\n' | grep . | sort -n | awk '{a[NR]=$1} END {print (NR ? a[int((NR+1)/2)] : "-")}'; }
 
-rm -f "$C"
+rm -f "$C" "$CU"
 cold=$(PODVM_DEBUG=1 "$PB" run --rm "$A" true 2>&1 | grep 'the probe')
 warm=$(PODVM_DEBUG=1 "$PB" run --rm "$A" true 2>&1 | grep 'the probe')
+[ -f "$CU" ] && C=$CU
 echo "  1| $cold"
 echo "  1| $warm"
 verdict 1 'case "$cold" in *"ran now"*) ;; *) false ;; esac && case "$warm" in *"came from the cache"*) ;; *) false ;; esac' \
@@ -62,7 +69,7 @@ verdict 2 'case "$other" in *"another build of podvm took the cached answer (0.0
 c=""; w=""; p=""
 i=0
 while [ $i -lt "$RUNS" ]; do
-	rm -f "$C"
+	rm -f "$C" "$CU"
 	t0=$(ms); "$PB" run --rm "$A" true >/dev/null 2>&1; t1=$(ms); c="$c $((t1 - t0))"
 	t0=$(ms); "$PB" run --rm "$A" true >/dev/null 2>&1; t1=$(ms); w="$w $((t1 - t0))"
 	t0=$(ms); "$PB" probe --json >/dev/null 2>&1; t1=$(ms); p="$p $((t1 - t0))"

@@ -389,6 +389,7 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
                 // while the payload runs. A hold that cannot start leaves
                 // the run as it was: the record lands at the end.
                 let code = child.and_then(|c| {
+                    note_entered(&store, &fg.id, &c, &p.rung, r); // #547
                     take_hold(&store, &fg.id, c.pid, &mut fg.hold, &mut err);
                     podvm_enter::wait_forwarding(&c, &mut err)
                 });

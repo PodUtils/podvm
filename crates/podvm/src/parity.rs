@@ -373,7 +373,7 @@ pub const TABLE: &[Row] = &[
     Row { verb: "probe", flag: Some("--json"), status: Native, note: "the findings as one JSON document on stdout" },
     Row { verb: "probe", flag: Some("--rows"), status: Native, note: "every probe as one row, in the format verification/probe emits" },
     Row { verb: "probe", flag: Some("--strict"), status: Native, note: "exit non-zero below the namespace rung, so a caller gates without parsing" },
-    Row { verb: "probe", flag: Some("--cached"), status: Native, note: "serve $store/probe.json where its key still holds" },
+    Row { verb: "probe", flag: Some("--cached"), status: Native, note: "serve $store/probe.json (probe-userns.json in a user namespace of its own) where its key still holds" },
     Row { verb: "probe", flag: Some("-h, --help"), status: Native, note: "prints this verb's usage and exits 0" },
     // ⭐ TODO/milestones.md T-1112. The one verb with no docker equivalent
     // at all: a disposable Windows guest, which is a disk image rather than

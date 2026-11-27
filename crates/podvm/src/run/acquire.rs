@@ -4,6 +4,7 @@ use super::*;
 /// that ride beside it (the alias, the interposer, each device mapping and
 /// the userland account). It answers the banner and the entered rung, which
 /// the caller reuses for `--strict` and the container record.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn entry_banner(
     findings: &podvm_probe::Findings,
     facts: podvm_probe::isolation::Facts,
@@ -12,6 +13,7 @@ pub(super) fn entry_banner(
     devices: &[podvm_enter::device::Mapping],
     dropped_preload: Option<&str>,
     userland_note: &str,
+    downgraded: bool,
 ) -> (
     String,
     podvm_probe::select::Rung,
@@ -26,6 +28,11 @@ pub(super) fn entry_banner(
     let entered = userland
         .map(|_| podvm_probe::select::Rung::Userland)
         .unwrap_or_else(|| podvm_enter::entered_rung(selection.rung));
+    // T-1953 (#547): the entry's own fallback is the rung that runs.
+    let entered = match entered {
+        podvm_probe::select::Rung::Namespace if downgraded => podvm_enter::ENTERED_RUNG,
+        e => e,
+    };
     // TODO/cli.md T-2053 (OQ-07): what the entry opens, from its facts.
     let opened = podvm_probe::isolation::of_entry(entered, facts);
     let mut banner = podvm_probe::report::entry_banner_of(findings, &selection, entered, opened);

@@ -133,7 +133,16 @@ pub(crate) fn dos_run(
         podvm_windows::cleanup(&plan);
         return EXIT_RUNTIME_ERROR;
     }
-    match podvm_windows::dos::run(&plan, &batch, &token, timeout) {
+    // TODO/enter.md T-1953 (PodUtils/podvm#566): a signal ends the emulator,
+    // then the run directory, then podvm with the signal.
+    let stop = super::stop::Stop::arm(verb);
+    let run = podvm_windows::dos::run(&plan, &batch, &token, timeout);
+    if let Some(signo) = stop.signal() {
+        podvm_windows::cleanup(&plan);
+        kept(&plan);
+        stop.end(signo);
+    }
+    match run {
         Ok(out) => {
             use std::io::Write;
             let _ = std::io::stdout().write_all(&out.stdout);

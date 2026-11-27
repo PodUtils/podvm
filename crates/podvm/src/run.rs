@@ -411,6 +411,7 @@ mod acquire;
 pub(crate) mod binds; // TODO/enter.md T-1920
 pub(crate) mod cgroup; // TODO/cli.md T-1747
 mod devices; // TODO/enter.md T-1939
+mod fallback; // TODO/enter.md T-1953
 pub(crate) mod overlay; // TODO/enter.md T-2101
 pub(crate) mod tmpfs; // TODO/machine.md T-1968
 mod user_ns; // TODO/enter.md T-1927

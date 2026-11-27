@@ -40,7 +40,7 @@ pub const SET: [(i32, &str); 8] = [
     (30, "SIGPWR"),
 ];
 
-fn name(signo: i32) -> Option<&'static str> {
+pub fn name(signo: i32) -> Option<&'static str> {
     SET.iter().find(|(s, _)| *s == signo).map(|(_, n)| *n)
 }
 
@@ -260,7 +260,7 @@ fn send(stdin: &mut Option<std::process::ChildStdin>, line: Vec<u8>) -> Result<(
 /// End podvm with `signo`, as before the forward: unblock it in this thread
 /// and send it to this process; an exit with 128 and the signal where it
 /// does not end podvm.
-fn raise(signo: i32) -> ! {
+pub fn raise(signo: i32) -> ! {
     let mut now = 0u64;
     let _ = k::sigblock(0, &mut now);
     let _ = k::sigrestore(now & !(1u64 << (signo - 1)));

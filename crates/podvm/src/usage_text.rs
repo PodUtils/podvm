@@ -66,8 +66,9 @@ usage: podvm probe [--json | --rows] [--strict] [--cached]
   --strict    exit non-zero when the selected rung is below `namespace`, or
               when a control of the bogus-argument discriminator could not
               answer. A caller gates on this without parsing anything.
-  --cached    the hot path: serve $store/probe.json when its key still holds,
-              and measure and rewrite it when it does not. Without this flag
+  --cached    the hot path: serve $store/probe.json when its key still holds
+              ($store/probe-userns.json for a run in a user namespace of its
+              own), and measure and rewrite it when it does not. Without this flag
               podvm probe measures and touches no store, because a diagnostic
               that can answer from a file is not a diagnostic.
 

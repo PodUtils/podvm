@@ -30,6 +30,21 @@ use crate::store::Store;
 
 pub const CACHE_FILE: &str = "probe.json";
 
+/// The cache file of a run in a mount namespace of its own (the user
+/// namespace of `run` and `probe`): its answer is the answer of the
+/// namespace rung, which a plain process of the same user does not give,
+/// so the two do not share a file and do not replace each other's answer
+/// (TODO/enter.md T-1953, PodUtils/podvm#558).
+pub const CACHE_FILE_ENTERED: &str = "probe-userns.json";
+
+/// The cache file of the entry that this process measures in.
+pub fn cache_file() -> &'static str {
+    match podvm_probe::entry_variant() {
+        "userns" => CACHE_FILE_ENTERED,
+        _ => CACHE_FILE,
+    }
+}
+
 /// Where a probe answer came from, so the caller can say so rather than imply
 /// a measurement that did not happen.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -106,7 +121,7 @@ pub fn measure(why: impl Into<String>) -> (String, Source) {
 /// The hot path: serve the cache when its key matches, and measure and rewrite
 /// when it does not.
 pub fn resolve(store: &Store) -> Probe {
-    let path = store.root().join(CACHE_FILE);
+    let path = store.root().join(cache_file());
     let live = podvm_probe::confinement_key(&identity::read());
 
     let why = match std::fs::read_to_string(&path) {

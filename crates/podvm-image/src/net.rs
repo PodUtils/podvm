@@ -153,6 +153,39 @@ impl Net {
         Ok(t)
     }
 
+    /// The trust of a request: podvm's own, or (for a registry that the
+    /// caller named insecure) the one that checks no certificate.
+    fn trust(&mut self, verify: bool) -> Result<Trust, Refusal> {
+        if verify {
+            Ok(self.verified.clone())
+        } else {
+            self.unverified().map_err(Refusal::Refused)
+        }
+    }
+
+    /// The status of the FIRST answer of `url`, with no redirect followed
+    /// and the body not read (TODO/enter.md T-1953, PodUtils/podvm#560). A
+    /// reach check asks one host one question: a 301 is that host's answer,
+    /// and a host that the redirect names was not asked, so it neither
+    /// answers nor appears in an error.
+    pub fn first_status(
+        &mut self,
+        method: &'static str,
+        url: &str,
+        verify: bool,
+        limits: Limits,
+    ) -> Result<u16, Refusal> {
+        let request = Request::new(method, url)
+            .timeout(limits.head)
+            .body_idle(limits.idle)
+            .trust(self.trust(verify)?);
+        let body = self
+            .client
+            .send_streamed(request)
+            .map_err(|f| Refusal::Transport(transport(method, url, &f)))?;
+        Ok(body.status())
+    }
+
     /// One `method` (a GET or a HEAD) to `url` with `headers`, and each
     /// redirect after it. A status of 400 or more is [`Refusal::Status`].
     pub fn send(
@@ -163,11 +196,7 @@ impl Net {
         verify: bool,
         limits: Limits,
     ) -> Result<Body, Refusal> {
-        let trust = if verify {
-            self.verified.clone()
-        } else {
-            self.unverified().map_err(Refusal::Refused)?
-        };
+        let trust = self.trust(verify)?;
         let first = authority(url).to_ascii_lowercase();
         let mut url = url.to_string();
         for _ in 0..=REDIRECTS {
