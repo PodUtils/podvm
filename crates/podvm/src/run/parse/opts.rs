@@ -112,6 +112,8 @@ pub(crate) struct Opts {
     pub(crate) ro_volumes: Vec<String>,
     /// The guest paths of the `:overlay` volumes (TODO/enter.md T-2101).
     pub(crate) overlay_volumes: Vec<String>,
+    /// The guest paths of the `:mapped` volumes (TODO/machine.md T-2103).
+    pub(crate) mapped_volumes: Vec<String>,
     /// The guest paths of `--tmpfs`, made writable directories of the run.
     pub(crate) tmpfs: Vec<String>,
     /// `size=` of `--tmpfs /tmp`: the cap of `/tmp` on the syscall tier
@@ -194,6 +196,7 @@ impl Opts {
             read_only: false,
             ro_volumes: Vec::new(),
             overlay_volumes: Vec::new(),
+            mapped_volumes: Vec::new(),
             tmpfs: Vec::new(),
             tmp_size: None,
             tmpfs_sizes: Vec::new(),

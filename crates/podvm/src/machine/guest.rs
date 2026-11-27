@@ -94,6 +94,9 @@ pub struct Request<'a> {
     /// `-v HOST:GUEST[:ro]`: each a 9p mount of the host directory
     /// (TODO/machine.md T-1723); `true` is read-only.
     pub volumes: Vec<(PathBuf, String, bool)>,
+    /// The guest paths of the `-v HOST:GUEST:mapped` volumes: their 9p
+    /// share keeps the guest's owners and modes in xattrs (T-2103).
+    pub mapped: Vec<String>,
     /// podvm's stdin where it is a pipe or a file, read to its end: the
     /// command's stdin in the guest (`/podvm/stdin`).
     pub stdin: Option<Vec<u8>>,
@@ -211,14 +214,12 @@ pub fn boot(r: &Request) -> i32 {
     // the modules (the pin); a kernel of PODVM_MACHINE_KERNEL has none, and
     // a volume is then a copy, as before.
     let nine = !r.volumes.is_empty() && !assets.volume_modules.is_empty();
+    if let Err(e) = vol::check_mapped(&r.volumes, &r.mapped, nine) {
+        return fail(e); // T-2103
+    }
     let mut copies = r.copies.clone();
     let vols = if nine {
-        let g: Vec<_> = r
-            .volumes
-            .iter()
-            .map(|(_, g, ro)| (g.clone(), *ro))
-            .collect();
-        vol::vols(&g)
+        vol::of_run(&r.volumes, &r.mapped)
     } else {
         copies.extend(r.volumes.iter().map(|(h, g, _)| (h.clone(), g.clone())));
         Vec::new()
@@ -389,7 +390,7 @@ pub fn boot(r: &Request) -> i32 {
     if let Some(line) = notice(r, accel, &source) {
         eprintln!("{line}");
     }
-    vol::notices(r.verb, &r.volumes, nine, r.disk.is_some());
+    vol::notices(r.verb, &r.volumes, &r.mapped, nine, r.disk.is_some());
     let sock = stderr::socket_path(&nonce);
     let _ = std::fs::remove_file(&sock);
     let mut extra = stderr::argv(&sock);
@@ -416,8 +417,7 @@ pub fn boot(r: &Request) -> i32 {
         extra.extend(channel::argv(&ch));
     }
     for (v, (host, _, _)) in vols.iter().zip(&r.volumes) {
-        extra.push("-virtfs".to_string());
-        extra.push(vol::virtfs(host, v));
+        extra.extend(vol::argv(host, v));
     }
     extra.extend(disk_file.iter().flat_map(|d| disk::argv(d)));
     extra.extend(root.iter().flat_map(|(p, _)| disk::root::argv(p))); // T-1994

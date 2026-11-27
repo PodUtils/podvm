@@ -336,8 +336,16 @@ on overlayfs. A guest whose root disk does not mount ends the run with
 user-mode network: it reaches the host's loopback at
 10.0.2.2. `-v HOST:GUEST[:ro]` is a 9p mount of the host directory (T-1723): a write
 in the guest lands there with the host user's ownership, and `:ro` refuses a
-write with EROFS. The 9p modules come from the pinned modloop. With a kernel
-of `PODVM_MACHINE_KERNEL` a volume is a copy, and the run says so. stderr comes back on its own
+write with EROFS. `-v HOST:GUEST:mapped` (also `mapped,ro`, T-2103) is a
+9p share with `security_model=mapped-xattr,fmode=0644,dmode=0755` and
+`access=client`: a user of the image writes as its own uid, the guest owner
+and mode live in `user.virtfs.*` attributes of the host files, and the
+host user owns each file (0644, a directory 0755) and removes it with no
+root. HOST must be on a file system with user attributes, and a saved
+state does not serve the mode. The 9p modules come from the pinned
+modloop. With a kernel
+of `PODVM_MACHINE_KERNEL` a volume is a copy, and the run says so (a
+`:mapped` volume refuses). stderr comes back on its own
 serial port. stdin reaches the guest where it is a pipe or a file (at
 most 64 MiB, read before the boot). With `-t` the command runs on a terminal
 of a virtio console with the size of the host terminal, stdin goes there

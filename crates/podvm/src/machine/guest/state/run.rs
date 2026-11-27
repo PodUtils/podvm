@@ -192,12 +192,7 @@ pub fn run(r: &Request, c: &Ctx) -> Outcome {
             return Outcome::Boot;
         }
     };
-    let vols: Vec<vol::Vol> = vol::vols(
-        &r.volumes
-            .iter()
-            .map(|(_, g, ro)| (g.clone(), *ro))
-            .collect::<Vec<_>>(),
-    );
+    let vols = vol::of_run(&r.volumes, &r.mapped);
     let frame = match job(r, &nonce, &vols, held) {
         Ok(f) => f,
         Err(e) => {

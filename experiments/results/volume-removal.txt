@@ -1,0 +1,37 @@
+Can the host user remove what a guest user wrote in a writable volume?
+2026-11-26T22:34:01Z Linux 6.18.44-fc-v880, uid 0, incus 6.0.0
+podvm SHA-256 fd1129045a682bef5c2703c62dda84cf7b23f8bfe9a45c592cc81d386f7c61ed
+image mirror.gcr.io/library/alpine:3.20
+  | write: exit 0: '1001 640 /data/f\n1001 700 /data/d' machine.md T-1875)
+podvm: 8 MiB of 17 MiB
+podvm: 16 MiB of 17 MiB
+podvm run: the store copy of QEMU 11.1.3 is in WORK/home/store/tools/qemu-11.1.3
+podvm run: machine tier: -v WORK/H:/data:mapped is a 9p mount with security_model=mapped-xattr,fmode=0644,dmode=0755: the owners and modes of the guest live in user.virtfs.* attributes of the host files, which the host user owns (TODO/machine.md T-2103)
+PASS 1: the guest user wrote and sees '1001 640 /data/f\n1001 700 /data/d'
+PASS 2: host owners and modes {'f': (1000, '0o644'), 'd': (1000, '0o755'), 'd/x': (1000, '0o644')}, user.virtfs.uid of d b'\xe9\x03\x00\x00'
+  | read: exit 0: "1001 640 /data/f\n1001 700 /data/d\nx\nother: ls: can't open '/data/d': Permission denied\nwrite: touch: /data/new: Read-only file system" podvm run: machine tier: -v WORK/H:/data:mapped,ro is a 9p mount with security_model=mapped-xattr,fmode=0644,dmode=0755: the owners and modes of the guest live in user.virtfs.* attributes of the host files, which the host user owns (TODO/machine.md T-2103)
+PASS 3: a second guest reads ['1001 640 /data/f', '1001 700 /data/d', 'x', "other: ls: can't open '/data/d': Permission denied", 'write: touch: /data/new: Read-only file system']
+PASS 4: uid 1000 rm -rf exit 0, 0 entries left 
+  | incus tier: exit 125: podvm run: -v WORK/H:/data:mapped: the mode is a 9p share of the machine tier (security_model=mapped-xattr), and this run is not on it: give --podvm-tier=machine, or a volume with no `mapped` (TODO/machine.md T-2103)
+  | overlay: exit 125: podvm run: -v "WORK/H:/data:mapped,overlay": the options "mapped,overlay" conflict: overlay keeps HOST read-only and makes GUEST writable, so it takes neither ro, rw nor mapped (TODO/enter.md T-2101)
+  | a file: exit 125: podvm run: -v "WORK/file:/data:mapped": the host path "WORK/file" is not a directory, and a mapped volume is a 9p share of a directory (TODO/enter.md T-2101, TODO/machine.md T-2103)
+PASS 5: 3 of 3 refusals by name at 125
+PASS 6: 0 emulator(s) of the runs stayed
+  | run -d a: exit 0: w486a podvm run: incus tier: incusd 6.0.0 at WORK/incus/unix.socket, image podvm-c64c687cbea93001-fd1129045a682bef-v4 imported now (TODO/machine.md T-1718)
+  | run -d b: exit 0: w486b podvm run: incus tier: incusd 6.0.0 at WORK/incus/unix.socket, image podvm-c64c687cbea93001-fd1129045a682bef-v4 from incus (TODO/machine.md T-1718)
+  | the record: 'v1\nhost /var/tmp/podvm-486-f3ba75ur/H2\nmap 1065536 65536\nmap 1131072 65536\n'
+PASS 7: run -d, wait and its code [(0, 0, '0'), (0, 0, '0')], 1 record(s)
+  | the entries: [('da', 1066537, '0o700'), ('db', 1132073, '0o700'), ('ea', 1066537, '0o755'), ('eb', 1132073, '0o755')]
+PASS 8: uid 1000 rm -rf exit 1: ["rm: cannot remove 'WORK/H2/da': Permission denied", "rm: cannot remove 'WORK/H2/ea/y': Permission denied", "rm: cannot remove 'WORK/H2/db': Permission denied", "rm: cannot remove 'WORK/H2/eb/y': Permission denied"]
+  | volume rm: exit 0 in 1.8 s: /var/tmp/podvm-486-f3ba75ur/H2 
+PASS 9: volume rm exit 0; H2 there: False
+PASS 10: instances [], records 0
+  | /: exit 125: podvm volume rm: / is the root of the host (TODO/machine.md T-2103)
+  | the home directory: exit 125: podvm volume rm: WORK/home is the home directory or a directory above it (TODO/machine.md T-2103)
+  | a link: exit 125: podvm volume rm: "WORK/link" is a link: name the directory itself (TODO/machine.md T-2103)
+  | a file: exit 125: podvm volume rm: "WORK/file" is not a directory (TODO/machine.md T-2103)
+  | a directory of root: exit 125: podvm volume rm: WORK/rootdir belongs to uid 0, and the caller is uid 1000: podvm removes the caller's own directory only (TODO/machine.md T-2103)
+  | no tier: exit 125: podvm volume rm: requires --podvm-tier=incus (TODO/machine.md T-2103)
+PASS 11: 6 of 6 refusals by name at 125; each path stays
+PASS 12: instances [], images 0, shutdown 0, dnsmasq ended 0, incusbr0 left False
+THE HOST USER REMOVES WHAT A GUEST USER WROTE

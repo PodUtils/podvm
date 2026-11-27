@@ -218,17 +218,10 @@ pub(super) fn machine_tier(
         None
     };
     // `-v HOST:GUEST[:ro]`: a 9p mount of the host directory
-    // (TODO/machine.md T-1723).
-    let volumes: Vec<_> = o
-        .volumes
-        .iter()
-        .map(|v| {
-            (
-                std::path::PathBuf::from(&v.host),
-                v.guest.clone(),
-                o.ro_volumes.contains(&v.guest),
-            )
-        })
+    // (TODO/machine.md T-1723); `:mapped` keeps the guest's owners (T-2103).
+    let ro = |v: &podvm_enter::userland::Volume| o.ro_volumes.contains(&v.guest);
+    let volumes: Vec<_> = (o.volumes.iter())
+        .map(|v| (v.host.clone().into(), v.guest.clone(), ro(v)))
         .collect();
     let mut copies = Vec::new();
     // TODO/probe.md T-1666: the probe of probe-inside, at /.podvm.
@@ -305,6 +298,7 @@ pub(super) fn machine_tier(
         qemu_args: o.qemu_args.clone(),
         copies,
         volumes,
+        mapped: o.mapped_volumes.clone(),
         tty: o.tty,
         stdin: p.stdin,
         net_none: o.net_none || o.sealed,

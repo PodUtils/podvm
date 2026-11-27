@@ -193,7 +193,10 @@ fn the_script_of_the_guest_and_the_job_of_a_run_are_two_texts() {
         "A=the \"$@\" of a variable".to_string(),
         crate::initns::MARK.to_string(),
     ];
-    let vols = vol::vols(&[("/data".to_string(), false), ("/ro".to_string(), true)]);
+    let vols = vol::vols(
+        &[("/data".to_string(), false), ("/ro".to_string(), true)],
+        &[],
+    );
     let j = init::job(
         "RNONCE",
         &argv,

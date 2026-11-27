@@ -88,6 +88,11 @@ fn the_options_of_a_volume_give_one_mode() {
         ("overlay,ro", Err("conflict")),
         ("ro,overlay", Err("conflict")),
         ("overlay,rw", Err("conflict")),
+        ("mapped", Ok(Mode::Mapped { ro: false })),
+        ("mapped,rw", Ok(Mode::Mapped { ro: false })),
+        ("ro,mapped", Ok(Mode::Mapped { ro: true })),
+        ("mapped,ro,z", Ok(Mode::Mapped { ro: true })),
+        ("mapped,overlay", Err("conflict")),
         ("overlayfs", Err("has nothing to act on")),
         ("nocopy", Err("has nothing to act on")),
     ];
@@ -106,6 +111,13 @@ fn the_options_of_a_volume_give_one_mode() {
     let e = parse(&format!("{h}/f:/c:overlay")).unwrap_err();
     assert!(e.contains("not a directory"), "{e}");
     assert_eq!(parse(&format!("{h}/f:/c")).unwrap().1, Mode::Rw);
+    // TODO/machine.md T-2103: a mapped volume is a share of a directory.
+    let e = parse(&format!("{h}/f:/c:mapped")).unwrap_err();
+    assert!(e.contains("9p share of a directory"), "{e}");
+    assert_eq!(
+        parse(&format!("{h}:/c:mapped,ro")).unwrap().1,
+        Mode::Mapped { ro: true }
+    );
     let _ = std::fs::remove_dir_all(&d);
 }
 

@@ -178,6 +178,7 @@ pub(super) async fn detached(c: &Client, job: &Job<'_>, image: &str, d: &Detach)
         let hint = super::space::after_failure(c, job.plan().as_ref(), false, t).await;
         return super::run::fail_twice(job.verb, (super::run::ids_hint(e, d.init_image), hint));
     }
+    super::volmap::note(c, job.store, &name, &job.volumes, job.verb).await; // T-2103
     let cmd = super::Cmd {
         argv: job.argv.clone(),
         env: job.env.clone(),

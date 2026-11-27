@@ -112,6 +112,9 @@ pub struct Asks {
     /// (T-1968), which the saved guest does not have.
     pub disk: bool,
     pub volumes: usize,
+    /// A `:mapped` volume: the devices of a saved state use
+    /// `security_model=none` (T-2103).
+    pub mapped: bool,
     pub stdin: usize,
     /// An x86_64 guest on an x86_64 host.
     pub native: bool,
@@ -131,6 +134,7 @@ impl Asks {
             copies: !r.copies.is_empty(),
             disk: r.disk.is_some(),
             volumes: r.volumes.len(),
+            mapped: !r.mapped.is_empty(),
             stdin: r.stdin.as_ref().map_or(0, Vec::len),
             native: r.arch == arch::Arch::Amd64 && arch::Arch::host() == arch::Arch::Amd64,
             pinned_kernel,
@@ -172,6 +176,9 @@ pub fn refusal(a: &Asks) -> Option<String> {
     }
     if a.disk {
         return no("--storage-opt size= (TODO/machine.md T-1968)");
+    }
+    if a.mapped {
+        return no("a :mapped volume (TODO/machine.md T-2103)");
     }
     if a.volumes > SLOTS {
         return Some(format!(

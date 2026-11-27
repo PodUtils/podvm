@@ -72,6 +72,7 @@ pub(super) fn line(r: &Request, accel: Accel, mem: u64, kernel: &Path, p: &Paths
                 tag: format!("podvm{i}"),
                 guest: String::new(),
                 ro: *ro,
+                mapped: false,
             },
         ));
     }

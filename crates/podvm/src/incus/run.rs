@@ -406,6 +406,7 @@ async fn run_in(
             let hint = super::space::after_failure(c, job.plan().as_ref(), false, t).await;
             return Err((fail_twice(job.verb, (e, hint)), mine));
         }
+        super::volmap::note(c, job.store, inst, &job.volumes, job.verb).await; // T-2103
         let step = async {
             super::net::push_port(c, inst, job.channel.as_ref()).await?;
             c.start(inst).await.map_err(|e| e.to_string())?;

@@ -54,6 +54,7 @@ fn help_argv(verb: &str) -> Vec<&str> {
         // TODO/cli.md T-2064: it is a command, and its section shows the usage.
         "container prune" => vec!["container", "prune"],
         "machine ssh" => vec!["machine", "ssh"],
+        "volume rm" => vec!["volume", "rm"], // TODO/machine.md T-2103
         _ => vec![verb],
     }
 }

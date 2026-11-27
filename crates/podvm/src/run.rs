@@ -54,7 +54,7 @@ pub const RUN_OPTIONS: &str = "\
                    bind does not refuse its writes); w alone keeps the
                    descriptor serve of the interposer; m parses and
                    grants nothing (TODO/enter.md T-0501, T-1939)
-  -v, --volume H:G[:rw|:ro|:overlay]
+  -v, --volume H:G[:rw|:ro|:overlay|:mapped]
                    show the host path H at the guest path G. Repeatable. A
                    path rewrite through PODVM_MAPS on the userland loader
                    family, not a mount: a write lands in H, and :ro refuses
@@ -70,7 +70,12 @@ pub const RUN_OPTIONS: &str = "\
                    be at, over or under G, nor G under /tmp, /dev, /proc or
                    /sys. Each other rung and tier refuses it (125), never a
                    writable fallback; `system info --format '{{json
-                   .VolumeOverlay}}'` names the rungs (TODO/enter.md T-2101)
+                   .VolumeOverlay}}'` names the rungs (TODO/enter.md T-2101).
+                   :mapped (or mapped,ro), the machine tier only: a 9p
+                   share with security_model=mapped-xattr; a user of the
+                   image writes as its own uid, its owner and mode live in
+                   user.virtfs.* attributes, and the host user owns and
+                   removes each file (TODO/machine.md T-2103)
   --unsafe-host-paths
                    podvm's own, userland rung only: opt into the
                    pass-through with no PODVM_MAPS anchoring, so absolute

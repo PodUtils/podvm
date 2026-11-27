@@ -8,6 +8,29 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Added: a writable host volume that the host user can remove, 2026-11-26
+
+Record: T-2103 (PodUtils/podrunner#371).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `-v HOST:GUEST:mapped` (and `mapped,ro`) on the machine tier gives the
+  directory HOST to the guest as a 9p share with
+  `security_model=mapped-xattr,fmode=0644,dmode=0755`, mounted with
+  `access=client`. A user of the image writes as its own uid. The guest
+  owner and mode live in `user.virtfs.*` attributes of the host files. The
+  host user owns each file (0644, a directory 0755) and removes it with no
+  root. A file system of HOST with no user attributes, a kernel with no 9p
+  module, a saved state, each other tier, `overlay` and a host file refuse
+  the mode by name with 125.
+- `podvm volume rm --podvm-tier=incus HOST...` removes a host directory
+  that incus instances wrote in as the ids of their maps. Each run of the
+  incus tier with a writable volume records the id map of its instance in
+  the store. The removal starts one short instance with each recorded map
+  (no image, no NIC, HOST as its disk device). The root of that map removes
+  what it can, and podvm removes the rest as the caller. No id of the
+  caller goes into a map. HOST must be a directory of the caller, not a
+  link, not `/`, not the home directory, with no mount under it.
+
 ### Fixed: a foreground run of a user with no root leaves no zombie, 2026-11-26
 
 Record: T-2087 (OR-B40-05, the follow-up of experiment 485).

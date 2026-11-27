@@ -24,30 +24,8 @@
 //! it says the guardrail itself is degraded and continues. A guard that goes
 //! quiet is worse than one that says it went quiet.
 
-/// The four statuses `TOOL.md` section 6.8 defines, and podvm has no fifth.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Status {
-    /// Real semantics: what docker does, for the same input.
-    Native,
-    /// Works, with a documented difference that the banner states every time.
-    Degraded,
-    /// Accepted and does nothing. Listed here, so a caller can see it is a
-    /// no-op instead of concluding it worked.
-    Stub,
-    /// Fails, with a named reason. ⛔ Never silently ignored.
-    None,
-}
-
-impl Status {
-    pub fn word(self) -> &'static str {
-        match self {
-            Status::Native => "Native",
-            Status::Degraded => "Degraded",
-            Status::Stub => "Stub",
-            Status::None => "None",
-        }
-    }
-}
+mod status;
+pub use status::Status;
 
 /// One row: a verb, or a flag of a verb.
 ///
@@ -220,7 +198,11 @@ pub const TABLE: &[Row] = &[
     Row { verb: "events", flag: Option::None, status: NoneStatus, note: "there is no daemon to emit events" },
     Row { verb: "search", flag: Option::None, status: NoneStatus, note: "not implemented; podvm resolves a reference and does not browse a registry" },
     Row { verb: "network", flag: Option::None, status: NoneStatus, note: "the payload shares this machine's network namespace, so there is nothing to create or attach" },
-    Row { verb: "volume", flag: Option::None, status: NoneStatus, note: "podvm cannot mount, so a volume would be a copy pretending to be a mount" },
+    Row { verb: "volume", flag: Option::None, status: Degraded, note: "podvm keeps no named volumes: a volume is a host path of -v, and `volume rm --podvm-tier=incus HOST` is the one subverb (TODO/machine.md T-2103)" },
+    Row { verb: "volume", flag: Some("-h, --help"), status: Native, note: "prints this verb's usage and exits 0" },
+    Row { verb: "volume rm", flag: Option::None, status: Degraded, note: "removes the host directory HOST of a volume of the incus tier and what its instances wrote there as the ids of their maps: a short instance with each map that the runs of the store recorded removes what its root can, then podvm removes the rest as the caller. HOST is the caller's own directory, not a link, not /, not the home directory, with no mount under it; no id of the caller goes into a map (TODO/machine.md T-2103)" },
+    Row { verb: "volume rm", flag: Some("--podvm-tier"), status: Native, note: "requires incus" },
+    Row { verb: "volume rm", flag: Some("-h, --help"), status: Native, note: "prints this verb's usage and exits 0" },
     Row { verb: "compose", flag: Option::None, status: NoneStatus, note: "not implemented; it needs the lifecycle and a network" },
     Row { verb: "swarm", flag: Option::None, status: NoneStatus, note: "not implemented, and out of the shape TOOL.md section 2.0 describes" },
     Row { verb: "builder", flag: Option::None, status: NoneStatus, note: "the counterpart of a verb podvm does not have" },
@@ -256,7 +238,7 @@ pub const TABLE: &[Row] = &[
     Row { verb: "run", flag: Some("-h, --help"), status: Native, note: "prints this verb's usage and exits 0" },
     Row { verb: "run", flag: Some("-d, --detach"), status: Native, note: "starts a detached launcher and prints the container id, returning when the payload is running" },
     Row { verb: "run", flag: Some("--name"), status: Native, note: "names the container. A name already in use is refused rather than making the second one unreachable. A foreground run leaves a record under it: `ps -a` lists it as Exited with `logs` reading its output (TODO/supervise.md T-1421)" },
-    Row { verb: "run", flag: Some("-v, --volume"), status: Degraded, note: "HOST:GUEST[:rw|:ro|:overlay|:z|:Z], repeatable (z and Z label a source for SELinux, which podvm does not: both are accepted and do nothing, T-2061): a path rewrite through PODVM_MAPS on the userland rung's loader family, never a mount or a copy. A write lands in HOST, as with a bind mount; a static program or a raw syscall instruction sees the image's path; /proc/mounts does not list it. On run --podvm-tier=machine a 9p mount of the host directory, :ro read-only (TODO/machine.md T-1723); on --podvm-tier=runsc a bind mount (T-1729); on --podvm-tier=incus a disk device of the instance (T-1722). Refused by name: on the chroot rung, the memfd family, a forced PODVM_MODE, create and exec on the machine tier; a named or anonymous volume. :ro fails a write with EROFS through the read-only layer of the interposer (T-1655), and on the native-static rung through its handler of Syscall User Dispatch, also for a static program (T-1901). A working directory or a first program in a volume resolves through the same table. The banner names a noexec source, and --strict refuses (TODO/enter.md T-1653, T-1655). :overlay (the namespace rung only, also -d, create and start): HOST is the read-only lower layer of an overlayfs mount on GUEST, each write goes to an upper layer in the tree of the container, which rm removes; each other rung and tier refuses it by name, never a writable fallback (TODO/enter.md T-2101)" },
+    Row { verb: "run", flag: Some("-v, --volume"), status: Degraded, note: "HOST:GUEST[:rw|:ro|:overlay|:mapped|:z|:Z], repeatable (z and Z label a source for SELinux, which podvm does not: both are accepted and do nothing, T-2061): a path rewrite through PODVM_MAPS on the userland rung's loader family, never a mount or a copy. A write lands in HOST, as with a bind mount; a static program or a raw syscall instruction sees the image's path; /proc/mounts does not list it. On run --podvm-tier=machine a 9p mount of the host directory, :ro read-only (TODO/machine.md T-1723); on --podvm-tier=runsc a bind mount (T-1729); on --podvm-tier=incus a disk device of the instance (T-1722). Refused by name: on the chroot rung, the memfd family, a forced PODVM_MODE, create and exec on the machine tier; a named or anonymous volume. :ro fails a write with EROFS through the read-only layer of the interposer (T-1655), and on the native-static rung through its handler of Syscall User Dispatch, also for a static program (T-1901). A working directory or a first program in a volume resolves through the same table. The banner names a noexec source, and --strict refuses (TODO/enter.md T-1653, T-1655). :overlay (the namespace rung only, also -d, create and start): HOST is the read-only lower layer of an overlayfs mount on GUEST, each write goes to an upper layer in the tree of the container, which rm removes; each other rung and tier refuses it by name, never a writable fallback (TODO/enter.md T-2101). :mapped (with rw or ro; the machine tier only): a 9p share with security_model=mapped-xattr,fmode=0644,dmode=0755 and access=client, so a user of the image writes as its own uid and keeps its owner and mode in user.virtfs.* attributes of the host files, which the host user owns and removes; a HOST with no user attributes is refused by name, and each other tier refuses it (TODO/machine.md T-2103)" },
     Row { verb: "run", flag: Some("-p, --publish"), status: Degraded, note: "a detached Windows guest only (run -d -p [IP:]HOST:GUEST windows:NAME): a forward of its user-mode NIC, on 127.0.0.1 where no address is written; each other run refuses it, as its payload shares this machine's network namespace, so a published port is already this machine's port (TODO/machine.md T-1869)" },
     Row { verb: "run", flag: Some("--network, --net"), status: Degraded, note: "host or broker. host: the payload shares the network of this machine, as each rung that opens no network namespace gives it (each rootfs rung, and the runsc tier); the machine and incus tiers refuse it, as their guest has its own network (TODO/cli.md T-2087). broker: an egress broker of the run (pod-broker) that allows the hosts of --allow on the ports of --ports and dials through the host's proxy; it needs a holding mechanism (--podvm-tier=syscall or machine), and each other rung refuses it. Each other value is refused: there is no network namespace to select (TODO/net.md T-1665)" },
     Row { verb: "run", flag: Some("--ports"), status: Native, note: "podvm's own, with --network broker: the ports that the broker allows, 443 by default (TODO/net.md T-1665)" },

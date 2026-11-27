@@ -28,6 +28,7 @@ fn refuse(verb: &str, o: &Opts, why: &str) -> i32 {
 /// The refusal of a tier or a mode that holds no overlay, by name, before
 /// anything is fetched; and the guest paths that a layer cannot take.
 pub(super) fn refuse_tier(verb: &str, tier: Tier, o: &Opts) -> Result<(), i32> {
+    refuse_mapped(verb, tier, o)?; // TODO/machine.md T-2103
     if o.overlay_volumes.is_empty() {
         return Ok(());
     }
@@ -137,12 +138,42 @@ pub(super) fn banner(o: &Opts, rootfs: &std::path::Path) -> String {
     out
 }
 
-/// The guest path of a `:ro` or an `:overlay` volume in its list of `o`.
+/// The guest path of a `:ro`, an `:overlay` or a `:mapped` volume in its
+/// lists of `o`.
 pub(super) fn note_mode(mode: crate::lifecycle::volume::Mode, guest: &str, o: &mut Opts) {
     use crate::lifecycle::volume::Mode;
     match mode {
         Mode::Ro => o.ro_volumes.push(guest.to_string()),
         Mode::Overlay => o.overlay_volumes.push(guest.to_string()),
+        Mode::Mapped { ro } => {
+            if ro {
+                o.ro_volumes.push(guest.to_string());
+            }
+            o.mapped_volumes.push(guest.to_string());
+        }
         Mode::Rw => {}
     }
+}
+
+/// TODO/machine.md T-2103: `:mapped` is a mode of the 9p share of the
+/// machine tier; each other tier and rung refuses it by name, before
+/// anything is fetched, and never takes it as a plain volume.
+fn refuse_mapped(verb: &str, tier: Tier, o: &Opts) -> Result<(), i32> {
+    let Some(g) = o.mapped_volumes.first() else {
+        return Ok(());
+    };
+    if tier == Tier::Machine {
+        return Ok(());
+    }
+    let host = o
+        .volumes
+        .iter()
+        .find(|v| &v.guest == g)
+        .map_or("", |v| v.host.as_str());
+    eprintln!(
+        "podvm {verb}: -v {host}:{g}:mapped: the mode is a 9p share of the machine tier \
+         (security_model=mapped-xattr), and this run is not on it: give \
+         --podvm-tier=machine, or a volume with no `mapped` (TODO/machine.md T-2103)"
+    );
+    Err(EXIT_FLAG_ERROR)
 }
