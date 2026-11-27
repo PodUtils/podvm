@@ -6123,3 +6123,95 @@ stays the same byte for byte.
 ## Done
 
 **Partial (2026-11-27).** `podvm_enter::lock` (the ids `0:0` for a caller whose map holds one id, with the table test `locked_ids_of_each_map` of podvm-enter), its use in the plans of a foreground run (`run::foreground`), of the launcher (`launcher.rs`, also after the namespace of an overlay volume) and of `exec` (`exec::enter`, `exec::command`), and the join of the owner of the mounts before the payload's own namespace (`userns::lock::mount_owner`, `userns::join`; the test `locked_owner_of_this_process_is_its_own_namespace`). Experiment 489 (`experiments/489-locked-mounts.py`, `experiments/results/locked-mounts.txt`), as root and as uid 1000 with private stores: locked (7 of 7 mount calls fail, the source of the `:ro` volume keeps its SHA-256): a foreground run of uid 1000, `exec` into it, `run -d` of uid 1000 with an overlay volume and `exec`, and a foreground run, `run -d` and `create`/`start` of uid 0 of a user namespace of one id; the binary of `6a8d7f7` shows the fault (the remount works and the host file changes); `--read-only` is no mount and a remount of `/` fails; no process and no tree stays. Cost: 20 runs of `run --rm alpine true`, median 140 ms before and 145 ms after as uid 1000 (125 ms and 123 ms as root, a path with no change), within the noise of the host (an estimate). The integration tests `pid_init_hidden`, `orphan_reap`, `podvm_zombies`, `user_ns_detached`, `hostname_detached`, `detached_rm`, `lifecycle_exit`, `tty_job_control`, `exec_hosts`, `tmpfs_exec`, `ro_native` and `volumes_default_rung` pass as root and as uid 1000 (`user_ns_detached` skips for root and `ro_native` skips one case for uid 1000, as on `6a8d7f7`). Remaining, each open in experiment 489: `run -d`, `create` and `start` of uid 1000 (pod-enter's own user namespace) and every verb of root (the initial user namespace) need the nested namespace in pod-enter; the way out of the chroot writes a host file on every path (11 of 11 rows) and needs `pivot_root` in pod-enter; a foreground run with the subordinate range (T-1911) needs maps of each id of the range, written from outside; `--podvm-init=image` (T-2002) is not measured. For uid 0 of a user namespace of one id, `exec` does not join a detached run (EPERM of `setns(pidfd, CLONE_NEWNS)`, as on `6a8d7f7`) and enters on its own, which now nests too.
+
+# T-2106: On the namespace rung, a payload of uid 0 leaves the chroot of the tree and reaches host files
+
+**Source:** found by the worker of T-2105 on 2026-11-27 (experiment 489, row 13); PodUtils/podrunner#378 (its `:ro` CA bundle of `run -d`)
+**Category:** enter
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** blocked
+
+## Problem
+
+The namespace rung enters the tree with `chroot(rootpath)` (pod-enter
+`launch.rs`), not `pivot_root`, so the host's `/` stays in the mount
+namespace of the payload. A payload of uid 0 has `CAP_SYS_CHROOT` in its
+user namespace: `mkdir x; chroot x; chdir("..")` 64 times and then
+`chroot(".")` puts it at the host's `/`, where it opens host paths with its
+own ids. Measured with the binary of `6a8d7f7`: it wrote the source of a
+`:ro` volume as uid 1000 in a foreground run and in `run -d`, and as host
+root in a `run -d` of root. The nested user namespace of T-2105 also gives
+`CAP_SYS_CHROOT`, so the way out stays after that fix. `--podvm-confine`
+(Landlock) stops the write.
+
+## Premise
+
+bwrap and runc enter with `pivot_root` and detach the old root, so no path
+of the old root stays in the mount namespace. The kernel moves
+`MNT_LOCKED` from the old root to the new one, so the detach also works in
+pod-enter's own user namespace.
+
+## Approach
+
+Ask podcrates (COORD-268): in the child of `spawn_with` for `NsEntry::Own`,
+after the binds and before the entry of the root, bind the root onto
+itself where it is not a mount, `pivot_root(".", ".")`, `umount2(".",
+MNT_DETACH)`, keep the landing check. podvm takes the tag, and experiment
+489 row 13 turns from OPEN to PASS. podvm's own entries of a root (the
+init of the image, `initns/boot.rs`) are checked for the same way out.
+
+## Decision
+
+-
+
+## Prove
+
+`python3 experiments/489-locked-mounts.py` passes row 13 as root and as
+uid 1000: the way out of the chroot reaches no host path in a foreground run, `run -d` with `exec`, and
+`create` with `start`.
+
+## Blocker
+
+The entry of the root is in `pod-enter` (podcrates `v0.86.0`). Clears when
+a tag of podcrates enters the tree with `pivot_root` (COORD-268).
+
+# T-2107: `run -d` with an `:overlay` volume has no device nodes
+
+**Source:** found by the worker of T-2105 on 2026-11-27; T-2101
+**Category:** enter
+**Milestone:** none
+**Priority:** P2
+**Effort:** S
+**Status:** open
+
+## Problem
+
+As uid 1000, `run -d` with an `:overlay` volume gives the payload regular
+files for `/dev/null`, `/dev/zero` and `/dev/urandom` (1 MiB) and no
+`/dev/ptmx`. The launcher's own namespace for overlay volumes
+(`overlay::enter_own_namespace`, T-2101) skips pod-enter's binds of the
+devices: `m.devices` is set only in `spawn_own`.
+
+## Premise
+
+A foreground run with an `:overlay` volume binds the devices (pid 2 mounts
+the layers after pod-enter's binds). Only the launcher's path lacks them.
+
+## Approach
+
+Bind the devices in the launcher's own namespace as pod-enter does, from
+the same list, or (better) take the overlay kind of volume of pod-enter
+(COORD-264, #689) and drop the launcher's own namespace.
+
+## Decision
+
+-
+
+## Prove
+
+`cargo test -p podvm-supervise overlay` passes with a test of the devices
+of the launcher's namespace; as uid 1000, `run -d -v H:/c:overlay
+mirror.gcr.io/library/alpine:3.20 sh -c 'ls -l /dev/null /dev/zero /dev/ptmx; head -c 4 /dev/zero | wc -c'`
+shows character devices and 4.

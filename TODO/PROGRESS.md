@@ -7,7 +7,7 @@ start.
 
 ## State
 
-676 entries: 19 open, 41 partial, 5 blocked, 611 done.
+678 entries: 20 open, 41 partial, 6 blocked, 611 done.
 
 * The newest release is `v0.2.0-beta.41` (2026-11-26). [CHANGELOG](../CHANGELOG.md)
   holds what each release ships, with its known gaps.
