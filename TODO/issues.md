@@ -477,7 +477,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #581 | [Donor] Index: the podvm donor study of 2026-11-17 | open | T-1956 to T-1963 |
 | #582 | COORD-186: pod-incus: the state of an instance (CPU time, peak memory, disk) and the pool of its root disk, for asks 1, 2 and 6 of PodUtils/podrunner#296 (to podcrates) | closed (podcrates@T-925 in podcrates `v0.71.0`, PodUtils/podcrates#228, taken in `c213375`) | T-1964, T-1965, T-1969 |
 | #583 | COORD-187: the answer to PodUtils/podrunner#296: the state of each of the seven asks, and when each comes (to podrunner) | open | T-1964 to T-1969 |
-| #584 | COORD-188: pod-enter: a session with the pty as the controlling terminal of the payload (Fds), so that Ctrl-C and job control work under run -t (to podcrates) | open | T-1970 |
+| #584 | COORD-188: pod-enter: a session with the pty as the controlling terminal of the payload (Fds), so that Ctrl-C and job control work under run -t (to podcrates) | open | T-1970, T-2070, T-2087 |
 | #585 | COORD-189: the answer to PodUtils/podrunner#300: --env-file0 is on main; --env-file holds on the machine and incus tiers; --podvm-volume-base off the namespace rung is T-1972 (to podrunner) | closed (released in `v0.2.0-beta.33` (T-1971) and `v0.2.0-beta.37` (T-1972); PodUtils/podrunner#300 lists the takes podrunner@T-405 and podrunner@T-532) | T-1971, T-1972 |
 | #586 | COORD-190: the answer to PodUtils/podrunner#301: the syscall tier now maps the path of a Unix socket (on main, for the next beta) (to podrunner) | closed (podrunner closed PodUtils/podrunner#301 with `v0.2.0-beta.33`) | T-1973 |
 | #587 | COORD-191: podvm took podcrates v0.71.0 in c213375 (and v0.70.0 in 6b5a6cb) (to podcrates) | closed (PodUtils/podcrates#228 lists the take; `v0.2.0-beta.33` released) | T-1955 |
@@ -594,6 +594,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #698 | COORD-270: pod-core: one bounded parser of a number that a flag takes, with one refusal line (to podcrates) | open | T-1947 |
 | #699 | [gh action] requested | closed (gate 45958922063 failed on `ddbc820`: the `stop -t -1` row of `number_flags`; fixed in `71142da`) | the gate after T-1947 and T-2108 (`stop -t -1`) on `ddbc820` |
 | #700 | [gh action] requested | closed (gate 45960813246 failed on `cd952a3`: `cp_stream.rs` left a `podvm-*` directory, T-1859; fixed with `PODVM_SPARE_TREE=0` and the guard `spare_tree_off.rs`) | the gate after the fix of the `stop -t -1` row (`71142da`) on `cd952a3` |
+| #701 | COORD-271: pod-enter and pod-supervise: the argv and the environment of the payload as bytes, so that a word that is not UTF-8 reaches execve (to podcrates) | open | T-2087, T-2108 |
 
 ## Messages whose title does not start with COORD-NNN
 
