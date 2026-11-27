@@ -103,6 +103,9 @@ pub fn admit(verb: &str, arg: &str, usage: &str) -> Result<(), i32> {
     }
 }
 
+/// The short flags that take a value, by verb ([`admit_all`]).
+const SHORT_VALUED: &[(&str, &str)] = &[("stop", "-t"), ("kill", "-s")];
+
 /// Admit-first, one read path (T-0808): refuse every dash-arg the table
 /// does not list before any match arm runs, so an arm for a flag with no
 /// row is unreachable. A value that starts with `-` must use the `=` form.
@@ -119,10 +122,14 @@ pub fn admit_all(verb: &str, args: &[String], usage: &str) -> Option<i32> {
         {
             return Some(c);
         }
-        value_next = a.starts_with("--")
+        // TODO/gate.md T-1947: a short flag that takes a number reads the
+        // next word as its value, so `stop -t -1` refuses the value by name
+        // and not "-1" as an unknown option.
+        value_next = (a.starts_with("--")
             && !a.contains('=')
             && !super::filter::BOOLEAN_LONGS.contains(&a.as_str())
-            && flag(verb, a).is_some();
+            && flag(verb, a).is_some())
+            || SHORT_VALUED.contains(&(verb, a.as_str()));
     }
     None
 }

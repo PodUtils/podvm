@@ -13,74 +13,43 @@ pub(crate) const ROOT_SIZE: &str = "podvm.root.size";
 pub(crate) const CPU: &str = "limits.cpu";
 pub(crate) const CPU_ALLOWANCE: &str = "limits.cpu.allowance";
 
-/// One flag and its value as the incus key and value.
+/// One flag and its value as the incus key and value. Each number goes
+/// through its rule of [`crate::number`], so a value out of the range, a
+/// sign, an exponent and a word are one refusal that names the range
+/// (TODO/gate.md T-1947).
 pub(crate) fn incus_limit(verb: &str, flag: &str, v: &str) -> Result<(&'static str, String), i32> {
-    let bad = |why: &str| {
-        eprintln!("podvm {verb}: {flag} {v:?}: {why} (TODO/machine.md T-1897)");
+    use crate::number::{check, CPUS, MEMORY, PIDS_LIMIT, STORAGE_SIZE};
+    let refuse = |text: String| {
+        eprintln!("podvm {verb}: {text} (TODO/machine.md T-1897)");
         EXIT_FLAG_ERROR
     };
     match flag {
         "--memory" => {
-            let (num, mult) = match v.to_ascii_lowercase().chars().last() {
-                Some('k') => (&v[..v.len() - 1], 1u64 << 10),
-                Some('m') => (&v[..v.len() - 1], 1 << 20),
-                Some('g') => (&v[..v.len() - 1], 1 << 30),
-                Some('b') => (&v[..v.len() - 1], 1),
-                _ => (v, 1),
-            };
-            let n: u64 = num
-                .parse()
-                .map_err(|_| bad("takes bytes with b, k, m or g"))?;
-            // OR-B41-16: a product past u64 is too large, not too small.
-            let bytes = n.checked_mul(mult).ok_or_else(|| {
-                bad("is larger than 16 EiB, the most that a count of bytes holds")
-            })?;
-            if bytes < 6 << 20 {
-                return Err(bad("takes at least 6m, as docker does"));
-            }
+            let bytes = check(&MEMORY, v).map_err(refuse)?;
             Ok(("limits.memory", format!("{bytes}B")))
         }
         "--cpus" => {
-            let c: f64 = v.parse().map_err(|_| bad("takes a number of CPUs"))?;
-            if !(c > 0.0 && c <= 1024.0) {
-                return Err(bad("takes more than 0 and at most 1024 CPUs"));
-            }
+            let milli = check(&CPUS, v).map_err(refuse)?;
             // A whole number is a count of CPUs; a part is a share of time.
-            if c.fract() == 0.0 {
-                Ok((CPU, format!("{}", c as u64)))
+            if milli.is_multiple_of(1000) {
+                Ok((CPU, (milli / 1000).to_string()))
             } else {
-                Ok((CPU_ALLOWANCE, format!("{}%", (c * 100.0).round() as u64)))
+                Ok((CPU_ALLOWANCE, format!("{}%", (milli + 5) / 10)))
             }
         }
         "--storage-opt" => {
             let Some(size) = v.strip_prefix("size=") else {
-                return Err(bad(
-                    "takes size=N (docker's form); podvm knows no other option",
-                ));
+                return Err(refuse(format!(
+                    "--storage-opt {v:?} takes size=N (docker's form); podvm knows no other option"
+                )));
             };
             // `10g`, `10G`, `10GB` and `10GiB` (docker's and incus's
             // spellings) name the same size.
-            let t = size.trim_end_matches(['b', 'B']);
-            let t = t.strip_suffix(['i', 'I']).unwrap_or(t);
-            let (num, mult) = match t.chars().last().map(|c| c.to_ascii_lowercase()) {
-                Some('k') => (&t[..t.len() - 1], 1u64 << 10),
-                Some('m') => (&t[..t.len() - 1], 1 << 20),
-                Some('g') => (&t[..t.len() - 1], 1 << 30),
-                Some('t') => (&t[..t.len() - 1], 1 << 40),
-                _ => (t, 1),
-            };
-            let n: u64 = num
-                .parse()
-                .map_err(|_| bad("takes size=N with k, m, g or t"))?;
-            let bytes = n.checked_mul(mult).filter(|b| *b >= 64 << 20);
-            let bytes = bytes.ok_or_else(|| bad("takes a size of at least 64m"))?;
+            let bytes = check(&STORAGE_SIZE, size).map_err(refuse)?;
             Ok((ROOT_SIZE, format!("{bytes}B")))
         }
         _ => {
-            let n: u64 = v.parse().map_err(|_| bad("takes a count of processes"))?;
-            if n == 0 {
-                return Err(bad("takes 1 or more"));
-            }
+            let n = check(&PIDS_LIMIT, v).map_err(refuse)?;
             Ok(("limits.processes", n.to_string()))
         }
     }

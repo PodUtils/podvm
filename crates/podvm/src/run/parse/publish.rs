@@ -65,11 +65,9 @@ fn parse_forward(spec: &str) -> Result<Forward, String> {
         Some((_, p)) => return Err(format!("the protocol {p:?} is not tcp or udp")),
         None => (spec, Proto::Tcp),
     };
+    // TODO/gate.md T-1947: the rule `PUBLISH` of `crate::number`.
     let port = |s: &str| -> Result<u16, String> {
-        s.parse::<u16>()
-            .ok()
-            .filter(|p| *p > 0)
-            .ok_or_else(|| format!("{s:?} is no port (1 to 65535)"))
+        crate::number::check(&crate::number::PUBLISH, s).map(|p| p as u16)
     };
     let parts: Vec<&str> = body.split(':').collect();
     let (host, host_port, guest_port) = match parts.as_slice() {
@@ -118,8 +116,8 @@ mod tests {
     #[test]
     fn windows_ports_refuse_a_bad_value() {
         for (bad, says) in [
-            ("0:3389", "no port"),
-            ("70000:1", "no port"),
+            ("0:3389", "takes a port"),
+            ("70000:1", "takes a port"),
             ("1:2/sctp", "not tcp or udp"),
             ("x.y:1:2", "no IPv4"),
             ("1:2:3:4", "takes"),

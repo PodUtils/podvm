@@ -100,7 +100,7 @@ fn value<'a>(it: &mut std::slice::Iter<'a, String>, flag: &str) -> Result<&'a St
 }
 
 /// Parse the arm. `Ok(None)` is `-h/--help`: printed, and the exit is 0.
-pub(super) fn parse(args: &[String]) -> Result<Option<Args>, i32> {
+pub(crate) fn parse(args: &[String]) -> Result<Option<Args>, i32> {
     let mut kernel = None;
     let mut initramfs = None;
     let mut user_key = None;
@@ -126,26 +126,15 @@ pub(super) fn parse(args: &[String]) -> Result<Option<Args>, i32> {
             "--user" => user = value(&mut it, "--user")?.clone(),
             "--podvm-mem" => {
                 let v = value(&mut it, "--podvm-mem")?;
-                mem = crate::tier::parse_mem(v).ok_or_else(|| {
-                    eprintln!("podvm machine ssh: --podvm-mem {v} is not a size\n{USAGE}");
-                    EXIT_FLAG_ERROR
-                })?;
+                mem = crate::number::flag("machine ssh", &crate::number::PODVM_MEM, v)?;
             }
             "--podvm-timeout" => {
                 let v = value(&mut it, "--podvm-timeout")?;
-                let n: u64 = v.parse().map_err(|_| {
-                    eprintln!(
-                        "podvm machine ssh: --podvm-timeout {v} is not a count of seconds\n{USAGE}"
-                    );
-                    EXIT_FLAG_ERROR
-                })?;
-                if n == 0 {
-                    eprintln!(
-                        "podvm machine ssh: --podvm-timeout 0 is refused: name a positive count of seconds\n{USAGE}"
-                    );
-                    return Err(EXIT_FLAG_ERROR);
-                }
-                timeout = Duration::from_secs(n);
+                timeout = Duration::from_secs(crate::number::flag(
+                    "machine ssh",
+                    &crate::number::PODVM_TIMEOUT,
+                    v,
+                )?);
             }
             "--podvm-qemu-arg" => emu_args.push(value(&mut it, "--podvm-qemu-arg")?.clone()),
             other if other.starts_with('-') => {

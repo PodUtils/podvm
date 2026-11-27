@@ -24,10 +24,12 @@ use super::Opts;
 /// limit": PATH stays a directory. `Err` is why VALUE is not a size.
 pub(super) fn sized(path: &str, value: &str, o: &mut Opts) -> Result<(), String> {
     o.tmpfs_sizes.retain(|(p, _)| p != path);
-    if !value.is_empty() && value.trim_start_matches('0').is_empty() {
+    // TODO/gate.md T-1947: the rule `TMPFS_SIZE` of `crate::number`; 0 is
+    // docker's "no limit".
+    let n = crate::number::check(&crate::number::TMPFS_SIZE, value)?;
+    if n == 0 {
         return Ok(());
     }
-    let n = crate::tier::parse_mem(value).ok_or_else(|| format!("size={value:?} is not a size"))?;
     if path == "/tmp" {
         o.tmp_size = Some(n);
     }

@@ -10,13 +10,14 @@ use crate::run::limits::{incus_limit, CPU, CPU_ALLOWANCE};
 use super::verbs::{block_on, connect, ours, valid_name};
 
 const VERB: &str = "update";
-const USAGE: &str = "\
+pub(crate) const USAGE: &str = "\
 usage: podvm update --podvm-tier=incus NAME [--memory BYTES] [--cpus N] [--pids-limit N]
 
   Update at least one limit on a running podvm container in Incus.
-  -m, --memory BYTES  at least 6m. Takes b, k, m or g.
-  --cpus N            a CPU count or, for a fraction, a scheduler share.
-  --pids-limit N      at least one process.
+  -m, --memory BYTES  from 6291456 to 9223372036854775807 bytes; b, k, m, g or t.
+  --cpus N            a CPU count or, for a fraction, a scheduler share;
+                      from 0.01 to 1024.
+  --pids-limit N      from 1 to 4194304 processes.
 ";
 
 #[derive(Debug)]

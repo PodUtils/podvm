@@ -310,11 +310,11 @@ mod script;
 /// valid grace, and an overflow or a non-number is refused.
 #[test]
 fn the_stop_grace_is_checked_seconds_and_zero_is_valid() {
-    assert_eq!(grace_ms("0"), Some(0));
-    assert_eq!(grace_ms("1"), Some(1000));
-    assert_eq!(grace_ms("10"), Some(10_000));
-    assert_eq!(grace_ms(""), None);
-    assert_eq!(grace_ms("abc"), None);
-    assert_eq!(grace_ms("-1"), None);
-    assert_eq!(grace_ms("18446744073709551615"), None);
+    assert_eq!(grace_of("0").ok(), Some(0));
+    assert_eq!(grace_of("1").ok(), Some(1000));
+    assert_eq!(grace_of("10").ok(), Some(10_000));
+    assert_eq!(grace_of("").ok(), None);
+    assert_eq!(grace_of("abc").ok(), None);
+    assert_eq!(grace_of("-1").ok(), None);
+    assert_eq!(grace_of("18446744073709551615").ok(), None);
 }

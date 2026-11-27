@@ -74,18 +74,16 @@ fn on_sata(argv: Vec<String>) -> Vec<String> {
 /// `PODVM_WINDOWS_INSTALL_CPUS`; else the defaults (4096 MiB). Run
 /// 43767666467: the emulator went idle at 2.14 GB read of the ISO, with the
 /// guest's CPU near 7%, so the size of the guest is the next suspect.
-pub(super) fn install_args() -> super::args::Args {
-    let mem = std::env::var("PODVM_WINDOWS_INSTALL_MEM")
-        .ok()
-        .and_then(|v| crate::tier::parse_mem(&v));
-    let cpus = std::env::var("PODVM_WINDOWS_INSTALL_CPUS")
-        .ok()
-        .and_then(|v| v.parse().ok());
-    super::args::Args {
+pub(super) fn install_args() -> Result<super::args::Args, i32> {
+    // TODO/gate.md T-1947: a value out of its rule is a refusal, not the
+    // default.
+    let mem = crate::number::env("windows", &crate::number::INSTALL_MEM)?;
+    let cpus = crate::number::env("windows", &crate::number::INSTALL_CPUS)?.map(|n| n as u32);
+    Ok(super::args::Args {
         mem,
         cpus,
         ..Default::default()
-    }
+    })
 }
 
 #[cfg(test)]

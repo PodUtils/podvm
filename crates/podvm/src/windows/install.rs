@@ -131,7 +131,7 @@ pub(crate) fn install(verb: &str, e: &Entry, iso: &Path, quiet: bool) -> Result<
         return Ok(golden);
     }
     let target = target_of(verb, e)?;
-    let mut plan = super::plan::build(&super::root_bus::install_args())?;
+    let mut plan = super::plan::build(&super::root_bus::install_args()?)?;
     // The root disk goes into the store, where `preflight` counted its room.
     let work =
         super::install_dir::WorkDir::install(e.name).map_err(|why| fail(verb, e.name, why))?;
@@ -422,9 +422,7 @@ fn watch(
 ) -> Result<(), i32> {
     use std::os::unix::fs::MetadataExt;
     // `PODVM_WINDOWS_INSTALL_DEADLINE` (seconds) bounds an experiment.
-    let deadline = std::env::var("PODVM_WINDOWS_INSTALL_DEADLINE")
-        .ok()
-        .and_then(|v| v.parse().ok())
+    let deadline = crate::number::env(verb, &crate::number::INSTALL_DEADLINE)?
         .map(Duration::from_secs)
         .unwrap_or_else(|| inst::deadline(guest.plan.accel));
     let mut phase = Phase::Booting;

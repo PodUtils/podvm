@@ -8,6 +8,37 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: each number flag is refused outside its range with one true line, 2026-11-27
+
+Record: T-1947.
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- Each number that a flag or a variable takes goes through one bounded
+  parser with a range: `--timeout`, `--podvm-timeout`, `stop -t`,
+  `--pids-limit`, `--cpus`, `--memory`, `--storage-opt size=`,
+  `--tmpfs P:size=`, `--podvm-mem`, `--podvm-cpus`, `--ports`, `-p`,
+  `--podvm-channel`, `--allow-connect`, `kill -s`, `--ulimit`, `logs --tail`
+  and `--limit-bytes`, `windows --max-bytes`, the flags of `notebook`,
+  `PODVM_INIT_BOOT_TIMEOUT` and `PODVM_WINDOWS_INSTALL_MEM`, `_CPUS` and
+  `_DEADLINE`. A value out of the range, a sign, an exponent, a word and a
+  value that overflows give one line with the flag, the range and the
+  value (`--pids-limit takes a count of processes from 1 to 4194304, not
+  "-1"`), and exit 125. Before, an overflow said "takes bytes with b, k, m
+  or g" or "takes a count of processes", `--cpus 0.001` gave a share of
+  0 %, `--pids-limit` took a count that the kernel refuses later, and a
+  bad `PODVM_WINDOWS_INSTALL_MEM` was ignored.
+- `stop -t -1` and `kill -s -1` say what is wrong with the value; before,
+  they said that "-1" is an unknown option.
+- `--memory`, `--storage-opt size=`, `--tmpfs size=` and `--podvm-mem` take
+  the one spelling of a size (`512m`, `1GiB`, `100b`, `1gb`) up to
+  9223372036854775807 bytes, docker's bound. `--podvm-mem` over it was
+  taken before.
+- Two processes that write the table of containers at once lose no write,
+  and an end of a run that the table refuses goes to a file beside the
+  record (`end.json`) that the next reconcile reads. Both are podcrates'
+  (T-872, PodUtils/podvm#568, taken in `6b5a6cb`; `v0.86.0` has them); a
+  test now holds the two writers.
+
 ### Added: the machine tier boots the kernel of the image, 2026-11-27
 
 Record: T-1994 (PodUtils/podrunner#316 ask 2).

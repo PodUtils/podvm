@@ -2,7 +2,15 @@
 //! One table for the family: each row is a value and the words that its
 //! refusal must hold.
 
-use super::parse::{access::dir_refusal, bound, envfile::utf8_line};
+use super::parse::{access::dir_refusal, envfile::utf8_line};
+
+/// The refusal of `--timeout` for `a` (the rule of `crate::number`).
+mod bound {
+    pub const MAX: u64 = crate::number::SECONDS_MAX;
+    pub fn refusal(a: &str) -> String {
+        crate::number::check(&crate::number::TIMEOUT, a).unwrap_err()
+    }
+}
 
 #[test]
 fn a_refused_value_says_what_is_wrong_with_it() {

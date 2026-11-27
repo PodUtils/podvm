@@ -67,10 +67,16 @@ pub fn stop(args: &[String]) -> i32 {
                 println!("{STOP_USAGE}");
                 return 0;
             }
-            "-t" | "--time" | "--timeout" => match it.next().and_then(|v| grace_ms(v)) {
-                Some(v) => grace = v,
+            "-t" | "--time" | "--timeout" => match it.next() {
+                Some(v) => match grace_of(v) {
+                    Ok(ms) => grace = ms,
+                    Err(text) => {
+                        eprintln!("podvm stop: {text}");
+                        return EXIT_FLAG_ERROR;
+                    }
+                },
                 None => {
-                    eprintln!("podvm stop: -t takes a number of seconds");
+                    eprintln!("podvm stop: -t needs a value: whole seconds from 0");
                     return EXIT_FLAG_ERROR;
                 }
             },
@@ -111,11 +117,12 @@ pub fn stop(args: &[String]) -> i32 {
     code
 }
 
-/// The grace of `stop -t SECONDS` in milliseconds. `None` for a value that
-/// is not a whole number of seconds or that overflows (T-1691). Zero is
-/// valid: it sends SIGKILL at once, as `docker stop -t 0` does (call C12).
-pub(crate) fn grace_ms(v: &str) -> Option<u64> {
-    v.parse::<u64>().ok()?.checked_mul(1000)
+/// The grace of `stop -t SECONDS` in milliseconds, or the line that refuses
+/// the value: the rule `STOP_GRACE` of [`crate::number`] (T-1691, T-1947).
+/// Zero is valid: it sends SIGKILL at once, as `docker stop -t 0` does
+/// (call C12).
+pub(crate) fn grace_of(v: &str) -> Result<u64, String> {
+    crate::number::check(&crate::number::STOP_GRACE, v).map(|s| s * 1000)
 }
 
 /// Stop one container: the per-name half of `stop`, shared with
@@ -243,7 +250,7 @@ pub fn kill(args: &[String]) -> i32 {
                 Some(v) => match signal_number(v) {
                     Some(n) => sig = n,
                     None => {
-                        eprintln!("podvm kill: {v:?} is not a signal podvm knows");
+                        eprintln!("podvm kill: {}", signal_refusal(v));
                         return EXIT_FLAG_ERROR;
                     }
                 },

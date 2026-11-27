@@ -20,9 +20,6 @@ usage: podvm logs [-f|--follow] [--tail N] [--limit-bytes N] [--podvm-tier incus
                    in pieces of 64 KiB; --tail is refused.
 ";
 
-/// The largest `--limit-bytes`: the largest offset of a file (`off_t`).
-pub const LIMIT_BYTES_MAX: u64 = i64::MAX as u64;
-
 /// What `logs` was asked for. One parser, so the flag cannot be accepted in
 /// one position and lost in another (TODO/supervise.md T-1318).
 #[derive(Debug)]
@@ -34,22 +31,13 @@ pub struct LogsArgs {
     pub want: String,
 }
 
-/// The one parser of a whole number of a flag: decimal digits only, from
-/// `lo` to `hi`. Each other value (empty, a sign, a letter, past the range)
-/// is refused with the flag, the range and the value.
-pub(crate) fn whole(flag: &str, what: &str, raw: &str, lo: u64, hi: u64) -> Result<u64, String> {
-    let n = (!raw.is_empty() && raw.bytes().all(|b| b.is_ascii_digit()))
-        .then(|| raw.parse::<u64>().ok())
-        .flatten()
-        .filter(|n| (lo..=hi).contains(n));
-    n.ok_or_else(|| format!("{flag} takes a {what} from {lo} to {hi}, not {raw:?}"))
-}
-
-/// The value of one valued flag of `logs`.
+/// The value of one valued flag of `logs`: the rules `TAIL` and
+/// `LIMIT_BYTES` of [`crate::number`] (TODO/gate.md T-1947).
 fn value(flag: &str, raw: &str) -> Result<u64, String> {
+    use crate::number::{check, LIMIT_BYTES, TAIL};
     match flag {
-        "--tail" => whole(flag, "non-negative line count", raw, 0, u64::MAX),
-        _ => whole(flag, "byte count", raw, 1, LIMIT_BYTES_MAX),
+        "--tail" => check(&TAIL, raw),
+        _ => check(&LIMIT_BYTES, raw),
     }
 }
 

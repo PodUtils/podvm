@@ -164,13 +164,18 @@ pub const RUN_OPTIONS: &str = "\
                    command (TODO/cli.md T-1654)
   --cpus N, --pids-limit N
                    limits of a native run where the host delegates a cgroup2
-                   subtree, and of the incus tier; else refused by name
-                   (TODO/machine.md T-1747, T-1897)
+                   subtree, and of the incus tier; else refused by name.
+                   N of --cpus is from 0.01 to 1024 (a whole number is a
+                   count of CPUs, a part is a share of time); N of
+                   --pids-limit is from 1 to 4194304; a value out of its
+                   range is a flag error (TODO/machine.md T-1747, T-1897,
+                   TODO/gate.md T-1947)
   --storage-opt size=N
                    the incus tier: the size of the root disk of the
                    instance (a copy of the root device of the default
                    profile); a pool that holds no size (the driver dir)
-                   refuses the run (TODO/machine.md T-1964). The machine
+                   refuses the run (TODO/machine.md T-1964). N is from
+                   67108864 to 9223372036854775807 bytes. The machine
                    tier: a disposable ext4 disk of N bytes (64m to 16T)
                    holds the root and the working directory of the guest,
                    and a write past it gets ENOSPC; it does not bound a -v
@@ -202,15 +207,16 @@ pub const RUN_OPTIONS: &str = "\
   --cap-drop ALL   the same bit; a named capability is refused
                    (TODO/cli.md T-1655)
   --timeout S      podman's: at S seconds the payload and its tree are
-                   killed with SIGKILL; `.End.Reason` reads wall
-                   (TODO/cli.md T-1655)
+                   killed with SIGKILL; `.End.Reason` reads wall. S is
+                   from 1 to 18446744073709551 (TODO/cli.md T-1655)
   --podvm-qemu-arg A
                    podvm's own, machine tier only and refused elsewhere: one
                    token for the emulator per occurrence. Repeatable, and never
                    split on whitespace (TODO/machine.md T-1302)
   --podvm-mem S   podvm's own, machine tier only and refused elsewhere: the
                    memory of the virtual machine in bytes, with an optional
-                   K/M/G/T suffix, as QEMU's -m; the guest kernel keeps a
+                   K/M/G/T suffix, from 1 to 9223372036854775807 bytes, as
+                   QEMU's -m; the guest kernel keeps a
                    part of it (256M gives 85 % to MemTotal). A
                    guest over the RLIMIT_FSIZE ceiling is refused before it
                    starts, naming both numbers (TODO/machine.md T-1305)
@@ -326,6 +332,12 @@ pub const RUN_OPTIONS: &str = "\
 ";
 
 mod parse;
+
+/// The parser of `run` and `create` for the table of [`crate::number`].
+#[cfg(test)]
+pub(crate) fn parse_probe(verb: &str, args: &[String]) -> Result<(), i32> {
+    parse::parse(verb, args).map(drop)
+}
 pub use parse::*;
 
 mod foreground;

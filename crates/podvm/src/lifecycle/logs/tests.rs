@@ -11,14 +11,14 @@ fn v(a: &[&str]) -> Vec<String> {
 /// one is the number, and each other one is a flag error (125).
 #[test]
 fn the_values_of_logs_are_parsed_by_one_rule() {
-    let max = LIMIT_BYTES_MAX.to_string();
-    let past = (LIMIT_BYTES_MAX + 1).to_string();
+    let max = crate::number::I64_MAX.to_string();
+    let past = (crate::number::I64_MAX + 1).to_string();
     // (flag, value, the number, or None for a refusal)
     let cases: &[(&str, &str, Option<u64>)] = &[
         ("--limit-bytes", "1", Some(1)),
         ("--limit-bytes", "1000", Some(1000)),
         ("--limit-bytes", "007", Some(7)),
-        ("--limit-bytes", &max, Some(LIMIT_BYTES_MAX)),
+        ("--limit-bytes", &max, Some(crate::number::I64_MAX)),
         ("--limit-bytes", &past, None),
         ("--limit-bytes", "18446744073709551616", None),
         ("--limit-bytes", "0", None),
@@ -120,7 +120,7 @@ fn the_help_states_the_bounds() {
         "--limit-bytes N",
         "64 KiB",
         "of any size, read\n                   in pieces of 64 KiB",
-        &LIMIT_BYTES_MAX.to_string(),
+        &crate::number::I64_MAX.to_string(),
     ] {
         assert!(LOGS_USAGE.contains(want), "{want}");
     }

@@ -206,14 +206,8 @@ pub fn run_flags(mut args: &[String]) -> Result<(RunFlags, &[String]), String> {
             _ => return Ok((f, args)),
         };
         for p in ports.split(',').filter(|p| !p.is_empty()) {
-            match p.parse::<u16>() {
-                Ok(n) if n > 0 => f.allow_connect.push(n),
-                _ => {
-                    return Err(format!(
-                        "--allow-connect {ports}: each port is a number from 1 to 65535"
-                    ))
-                }
-            }
+            let n = crate::number::check(&crate::number::ALLOW_CONNECT, p)?;
+            f.allow_connect.push(n as u16);
         }
         args = rest;
     }
