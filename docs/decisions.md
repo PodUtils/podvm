@@ -63,6 +63,7 @@ before; they stay in force where no row here supersedes them.
 | 2026-11-19 | GitHub-hosted parity | Relayed by PodUtils/podrunner#313 (COORD-103 of podrunner): githome and cfb need units with the toolset of the GitHub-hosted `ubuntu-latest`, with systemd. podrunner asks podvm for the init of the image as PID 1 on the incus tier (T-1993) and a root on a disk with the init of the image on the machine tier (T-1994). systemd on the userland rung is not asked (no root, no namespace, no PID 1). |
 | 2026-11-24 | Watchers | "Always start the ORG wide issue watcher as part of session startup. Always start the repo wide script watcher for actions, if you do not have it, look for sibling repos, they have one that uses the forge api to watch/notify you on your repo's actions, background mcp are unreliable." Each session starts both at its start, with no question, as background processes with a log (`.work/watch.log`, `.work/runs.log`), and reads the logs itself; it never waits for a notice of the harness. The watcher of the runs is `runs.py` of podcrates (forge API), taken at `v0.83.0` (PodUtils/podcrates#259, COORD-245). This amends "Watcher" (2026-11-15): the Monitor tool is no longer the host of the watcher. `AGENTS.md`, sections 8 and 9. |
 | 2026-11-24 | Work until done | "Never bother me with trivial, useless questions and do not waste my time, case in point: I told you to resume from previous handoff, it implies you continue working until all tasks are done or genuinely blocked/waiting on things out of your control." A session that resumes from the handoff works each step and the work order until each is done or truly blocked, and asks the owner only for a decision that only the owner can make. A step that the handoff orders (a beta behind its gate) needs no new word. `AGENTS.md`, section 10. |
+| 2026-11-27 | P1 before the beta | "No, podcrates will answer & fix it properly first" (the answer to Q11). `0.2.0-beta.42` is not released while the two P1 faults of the namespace rung are open: a payload of uid 0 can remount a `:ro` volume writable on the paths that pod-enter enters (T-2105) and can leave the chroot of the tree (T-2106). podcrates fixes them in pod-enter (COORD-268, #695); podvm takes the tag, proves both closed with experiments 489 and 490, and then runs the gate of the beta. The rule of the gate "no P1 stays open" (call C25) stays as it is. |
 | 2026-11-25 | Hosted sessions and worker roles | Claude Code and Codex use the shared startup and build setup. The lead runs the watchers and gives workers separate worktrees. An outside tester starts with the binary and its manual and sets up the test containers. The [hosted-session procedure](hosted-sessions.md) gives the owner's model and effort for each role. |
 
 ## Calls made without a ruling
@@ -103,24 +104,6 @@ Each call stays in force until the owner rules otherwise.
 | 2026-11-26 | C30 | A foreground `run` on the namespace rung opens a PID namespace also where podvm opens no user namespace of its own (a caller of uid 0, and `PODVM_USERNS=0`), as `run -d` does since T-1930 and as docker does (T-2054 item 1). Before, the payload of such a run saw each process of the host, podvm's argv, and the descriptor of the lock of the image. pod-enter's init is PID 1 (`podvm-init`), podvm keeps the lock, and an entry that pod-enter puts on the chroot fall back (an image with no `/tmp`) enters again with no PID namespace and gives the lock to the payload, with the same one line as before. Measured: 20 runs of `run --rm alpine true` as root, median 530 ms before and 554 ms after, within the noise of the host (an estimate). C21 opened the namespaces for a caller that is not uid 0 and did not rule that uid 0 has no PID namespace. In the same change, podvm's pid 2 is no longer the child subreaper in its own PID namespace: pid 1 reaps each orphan at once, and the end of the payload sends SIGKILL to each process of the namespace (OR-B40-05, T-1708 holds). |
 
 ## Questions for the owner
-
-Q11 (2026-11-27, T-2105, T-2106, the release gate): two P1 faults of the
-namespace rung are open in `0.2.0-beta.41` and on `main`. A payload of uid
-0 can remount a `:ro` volume writable (T-2105) and can leave the chroot of
-the tree (T-2106); both reach host files with the payload's ids, and as
-host root for a run of root. `main` locks the mount flags on the paths
-that podvm controls (a foreground run as a user with no root, its `exec`,
-an overlay `run -d`, uid 0 of a one-id user namespace); the rest and the
-way out of the chroot need pod-enter (COORD-268, #695). `--podvm-confine`
-stops both on each path. `main` also carries 15 asks of podrunner since
-beta.41. The rule of the gate ("no P1 stays open", call C25) is the
-owner's. The recommendation: release `0.2.0-beta.42` with both faults in
-"Known gaps" and the advice of `--podvm-confine`, because beta.42 closes
-more of the fault than beta.41, which stays the newest release until
-then; release the fix of T-2106 as the next beta when podcrates tags it.
-The other choice: hold the beta until podcrates tags COORD-268. Until the
-owner answers, the session runs the blind QA of the candidate and holds
-the release request.
 
 Q10 (2026-11-20, T-2008, call C27): the machine tier now saves the state
 of a guest that booted the init of an image, by default, and each later
