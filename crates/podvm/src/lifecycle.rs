@@ -36,6 +36,8 @@ usage: podvm ps [-a|--all] [-q|--quiet] [--format T] [--no-trunc] [--podvm-tier 
        [--filter key=value]
 
   Fields: .ID .Names .Image .Command .CreatedAt .Status .State .Ports .Pid
+  --format T takes the template language of `podvm images --help`, with
+  `table` and `json` (TODO/cli.md T-2087).
 
   --filter takes name=<substring>, matched against the name (or the id
   prefix), and label=<key>[=<value>], matched against the labels of the
@@ -342,12 +344,13 @@ pub fn ps(args: &[String]) -> i32 {
     // ⛔ Checked before anything is read, exactly as `images --format` is: a
     // template validated only inside the loop over results is never checked at
     // all when there are none, and a caller's typo then reads as "no containers".
-    if let Some(t) = &template
-        && let Err(bad) = format::check(t, &fields)
-    {
-        eprintln!("podvm ps: {bad}");
-        return EXIT_CLI_ERROR;
-    }
+    let template = match format::list_template(template.as_deref(), &fields) {
+        Ok(t) => t,
+        Err(bad) => {
+            eprintln!("podvm ps: {bad}");
+            return EXIT_CLI_ERROR;
+        }
+    };
     let s = match store() {
         Ok(s) => s,
         Err(c) => return c,
@@ -388,16 +391,7 @@ pub fn ps(args: &[String]) -> i32 {
         return 0;
     }
     if let Some(t) = &template {
-        for c in &list {
-            match format::render(t, &ps_fields(c, no_trunc)) {
-                Ok(line) => println!("{line}"),
-                Err(bad) => {
-                    eprintln!("podvm ps: {bad}");
-                    return EXIT_CLI_ERROR;
-                }
-            }
-        }
-        return 0;
+        return ps_template(t, &list, no_trunc);
     }
     let mut rows = vec![vec![
         "CONTAINER ID".to_string(),

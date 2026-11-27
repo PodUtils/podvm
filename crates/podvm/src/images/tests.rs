@@ -163,8 +163,11 @@ fn a_template_naming_a_field_no_verb_has_is_refused_without_any_record() {
     // empty store made `--format '{{.Nope}}'` print nothing and exit 0.
     assert!(format::check("{{.Nope}}", IMAGE_FIELDS).is_err());
     assert!(format::check("{{.Tag", IMAGE_FIELDS).is_err());
-    assert!(format::check("table {{.Tag}}", IMAGE_FIELDS).is_err());
-    assert!(format::check("json", IMAGE_FIELDS).is_err(), "OR-B41-05");
+    // T-2087 (OR-B40-15): docker's `table` and `json`; a bad field is refused.
+    let list = |t: &str| format::list_template(Some(t), IMAGE_FIELDS);
+    assert!(list("table {{.Tag}}").is_ok_and(|t| t.is_some()));
+    assert!(list("json").is_ok_and(|t| t.is_some()), "OR-B41-05");
+    assert!(list("table {{.Nope}}").is_err());
     assert!(format::check("{{.Digest}}", IMAGE_FIELDS).is_ok());
     // ⚠ The two verbs do not have the same fields, and each is checked
     // against its own list.

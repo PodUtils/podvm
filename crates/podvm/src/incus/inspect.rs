@@ -225,7 +225,10 @@ pub fn inspect(args: &[String]) -> i32 {
             };
             let fields = fields(&i, &exit, &cmd, &usage);
             match &template {
-                Some(t) => match crate::format::render(t, &fields) {
+                Some(t) => match crate::format::Template::parse(t).and_then(|t| {
+                    let data = crate::format::Data::text(&fields);
+                    t.render(&data.with_root(json(&i, &exit, &cmd, &usage)))
+                }) {
                     Ok(line) => println!("{line}"),
                     Err(bad) => {
                         eprintln!("podvm inspect: {bad}");

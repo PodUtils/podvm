@@ -22,6 +22,28 @@ pub(super) fn ps_field_names() -> Vec<&'static str> {
     ]
 }
 
+/// The column names of `ps --format 'table ...'` that are not the words of
+/// the field's name: docker's (TODO/cli.md T-2087, OR-B40-15).
+pub(super) const PS_HEADERS: &[(&str, &str)] = &[("ID", "CONTAINER ID")];
+
+/// `ps --format`: each container through the template (TODO/cli.md T-2087).
+pub(super) fn ps_template(t: &format::Template, list: &[Container], no_trunc: bool) -> i32 {
+    let rows: Vec<_> = list
+        .iter()
+        .map(|c| format::Data::text(&ps_fields(c, no_trunc)))
+        .collect();
+    match t.render_list(&rows, PS_HEADERS) {
+        Ok(text) => {
+            print!("{text}");
+            0
+        }
+        Err(bad) => {
+            eprintln!("podvm ps: {bad}");
+            EXIT_CLI_ERROR
+        }
+    }
+}
+
 pub(super) fn ps_fields(c: &Container, no_trunc: bool) -> Vec<(&'static str, String)> {
     vec![
         ("ID", if no_trunc { c.id.clone() } else { c.short_id() }),

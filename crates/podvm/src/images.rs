@@ -102,7 +102,8 @@ usage: podvm images [options] [image]
   -q, --quiet      print image IDs only, the same as --format '{{.ID}}'
       --digests    show the DIGEST column
       --no-trunc   print full IDs and digests
-      --format T   a Go-template-shaped string of {{.Field}} placeholders
+      --format T   docker's template: fields, json, table, range, index,
+                   join, upper, lower, len, println, | and ( ) (T-2087)
       --filter key=value
                    name=<substring> matches the repository or tag;
                    label=<key>[=<value>] matches the labels of the image's
@@ -155,7 +156,8 @@ usage: podvm inspect [--format T] [--verbose] [--podvm-tier incus] <image> [imag
   note: a field has docker's type. A list, a map, a number and a boolean
     are those in `{{json .X}}`, and `{{.X}}` prints them as Go does:
     `[a b]`, `map[k:v]`, a dash for null. `--format` reads the fields
-    that plain `inspect` prints (TODO/cli.md T-2060).
+    that plain `inspect` prints (T-2060), and `.` is that document. The
+    language is that of `podvm images --help`, with no `table`.
 
   note: .Size is the compressed bytes in the store. .UnpackedBytes is the sum
     of the sizes of the regular files of the layers after whiteouts and
