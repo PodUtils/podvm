@@ -598,6 +598,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #702 | [gh action] requested | closed (gate 45988037109 failed on `2497a26`: `tty_ctty` on the userland rung of the runner, where the shell cannot open `/dev/tty`) | the gate after the spare-tree fix, the arguments that are not UTF-8, the controlling terminal of `-it` and the `--format` templates, on `2497a26` |
 | #703 | COORD-272: a shared crate for docker's `--format` templates (a bounded part of Go's text/template) (to podcrates) | open | T-2087 |
 | #704 | [gh action] requested | open | the hosted proof of T-1998 (`kvm.yml`, `only=incusvm`, experiment 492) on `f609146` |
+| #705 | COORD-273: pod-guest: take podvm's ext4 disk writer and its qcow2 writer (to podcrates) | open | T-1994, T-1998 |
 
 ## Messages whose title does not start with COORD-NNN
 
