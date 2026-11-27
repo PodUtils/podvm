@@ -31,6 +31,29 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
   caller goes into a map. HOST must be a directory of the caller, not a
   link, not `/`, not the home directory, with no mount under it.
 
+### Fixed: `--env-file`, `run -d`, `--tmpfs` mode, `cp` and `exec` faults of the outside passes, 2026-11-26
+
+Record: T-2070 (OR-B38-11, OR-B38-12, OR-B38-16, OR-B38-07, OR-B38-14), T-2079 (OR-B39-15), T-2087 (OR-B40-12).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `--env-file` takes a line with a name and no `=` as docker does: the
+  value of the name in the environment of the caller, and nothing where the
+  caller has none. A UTF-8 byte order mark on line 1 is no part of the
+  first name. White space in a bare name is refused with its line number.
+- `run -d IMAGE /nonexistent` ends with 127 (126 for a command that is not
+  invocable), as the foreground `run` and docker do. Before, it ended with
+  125.
+- `--tmpfs P:mode=M` gives the mode M to the directory of the run. A mode
+  that is not octal up to 7777 is refused by name. A tmpfs with `size=` has
+  the mode 1777 of the kernel; each other mode is refused by name, and no
+  line was given before.
+- `cp -r` onto an earlier copy of a tree with links replaces a link of the
+  destination by the link or the file of the source, and writes through
+  none. Before, it stopped half way. The lines of `cp` name the path of the
+  container, no more a path of the store.
+- `exec` of a run with no `--add-host` of its own keeps the edits of the
+  payload to `/etc/hosts`. Before, each `exec` wrote the file again.
+
 ### Fixed: a foreground run of a user with no root leaves no zombie, 2026-11-26
 
 Record: T-2087 (OR-B40-05, the follow-up of experiment 485).

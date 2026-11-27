@@ -143,3 +143,72 @@ fn a_shimmed_device_maps_to_the_hosts() {
     );
     let _ = std::fs::remove_dir_all(&base);
 }
+
+/// TODO/cli.md T-2070 (OR-B38-07): a copy of a tree onto an earlier copy
+/// replaces a link of the destination by the link or the file of the source
+/// and writes through none. One table: the kind of the source entry, and
+/// the link that waits at its place (to a file outside the tree).
+#[test]
+fn a_copy_of_a_tree_replaces_a_link_of_the_destination() {
+    let base = std::env::temp_dir().join(format!("podvm-cp-repl-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&base);
+    let (src, root) = (base.join("src"), base.join("rootfs"));
+    let dst = root.join("tmp/tree");
+    let outside = base.join("outside");
+    std::fs::create_dir_all(src.join("sub")).unwrap();
+    std::fs::create_dir_all(dst.join("sub")).unwrap();
+    std::fs::write(&outside, b"keep").unwrap();
+    std::fs::write(src.join("file"), b"new").unwrap();
+    std::os::unix::fs::symlink("file", src.join("lnk")).unwrap();
+    std::os::unix::fs::symlink("../file", src.join("sub/lnk2")).unwrap();
+    std::fs::create_dir_all(src.join("dir")).unwrap();
+    // The first copy: each name of the source waits as a link to `outside`
+    // (the second copy of a tree with links, and a link that the payload
+    // made).
+    for n in ["file", "lnk", "sub/lnk2"] {
+        std::os::unix::fs::symlink(&outside, dst.join(n)).unwrap();
+    }
+    assert_eq!(copy_tree(&src, &dst, &root, false), 0);
+    assert_eq!(
+        std::fs::read(&outside).unwrap(),
+        b"keep",
+        "no write through"
+    );
+    assert!(!is_link(&dst.join("file")));
+    assert_eq!(std::fs::read(dst.join("file")).unwrap(), b"new");
+    for (n, to) in [("lnk", "file"), ("sub/lnk2", "../file")] {
+        assert_eq!(
+            std::fs::read_link(dst.join(n)).unwrap(),
+            std::path::Path::new(to)
+        );
+    }
+    // A second copy onto the first is the same tree again.
+    assert_eq!(copy_tree(&src, &dst, &root, false), 0);
+    // A link of the destination for a directory of the source, and a link
+    // on the way, still refuse, and name the path of the container.
+    std::fs::remove_dir(dst.join("dir")).unwrap();
+    std::os::unix::fs::symlink(&outside, dst.join("dir")).unwrap();
+    assert_ne!(copy_tree(&src, &dst, &root, false), 0);
+    assert_eq!(std::fs::read(&outside).unwrap(), b"keep");
+    let _ = std::fs::remove_dir_all(&base);
+}
+
+/// TODO/cli.md T-2070 (OR-B38-14): a line of `cp` names a path of the
+/// container, never a path of the store.
+#[test]
+fn a_line_of_cp_names_the_path_of_the_container() {
+    use std::path::Path;
+    let root = Path::new("/store/trees/abc/rootfs");
+    for (p, want) in [
+        ("/store/trees/abc/rootfs", "/"),
+        ("/store/trees/abc/rootfs/tmp/x", "/tmp/x"),
+        ("/home/me/file", "/home/me/file"),
+        ("/store/trees/abc/rootfs2/x", "/store/trees/abc/rootfs2/x"),
+    ] {
+        assert_eq!(
+            super::super::cp_root::shown(root, Path::new(p)),
+            want,
+            "{p}"
+        );
+    }
+}

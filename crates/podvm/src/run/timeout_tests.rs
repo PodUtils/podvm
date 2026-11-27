@@ -109,7 +109,8 @@ fn ulimit_plan_keeps_the_last_value_and_resolves_minus_one() {
 /// keeps its last value.
 #[test]
 fn run_values_refuse_and_keep_as_docker_does() {
-    use super::parse::values::{env_arg, push_label, read_env_file};
+    use super::parse::envfile::read_env_file;
+    use super::parse::values::{env_arg, push_label};
     use crate::complete::check_add_host;
     let e = check_add_host("foo:notanip").unwrap_err();
     assert!(e.contains("notanip"), "{e}");

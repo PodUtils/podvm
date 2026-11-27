@@ -112,6 +112,7 @@ fn every_field_of_opts_is_classified(o: Opts) {
         tmpfs: _,             // TABLE: --tmpfs
         tmp_size: _,          // with --tmpfs
         tmpfs_sizes: _,       // with --tmpfs; the rung (run::tmpfs, T-1968)
+        tmpfs_modes: _,       // with --tmpfs: the mode of the directory (T-2070)
         hardening: _,         // TABLE: --ulimit, --security-opt, --cap-drop, --label
         ask: _,               // TABLE: --add-host
     } = o;

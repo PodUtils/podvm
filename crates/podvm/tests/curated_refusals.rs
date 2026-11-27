@@ -273,7 +273,8 @@ fn log_driver_refuses_anything_but_json_file() {
     let _ = std::fs::remove_dir_all(&store);
 }
 
-/// Clause 3, flag-error half: a line without `=` and a missing file are flag
+/// Clause 3, flag-error half: a line with white space in a bare name (a bare
+/// name alone takes the host value, T-2070) and a missing file are flag
 /// errors, never silent env. Both refuse at parse time, before any fetch.
 #[test]
 fn env_file_refusals_name_the_file() {
@@ -282,7 +283,7 @@ fn env_file_refusals_name_the_file() {
     let dir = store.join("env");
     std::fs::create_dir_all(&dir).expect("create the env-file directory");
     let bad = dir.join("bad.env");
-    std::fs::write(&bad, "FOO=from-file\nNOEQUALS\n").expect("write the bad env file");
+    std::fs::write(&bad, "FOO=from-file\nTWO WORDS\n").expect("write the bad env file");
     let bad_arg = format!("--env-file={}", bad.display());
     let out = run(&["run", "--rm", &bad_arg, DUMMY_IMAGE, "true"], &store);
     let err = text(&out.stderr);
@@ -293,7 +294,7 @@ fn env_file_refusals_name_the_file() {
         out.status.code()
     );
     assert!(
-        err.contains("has no `=`"),
+        err.contains("line 2 has white space in the name"),
         "bad env-file did not name the line fault: {err:?}"
     );
     let missing = dir.join("absent.env");

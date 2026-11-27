@@ -168,11 +168,23 @@ pub fn create(
 /// TODO/supervise.md T-1807: since podcrates `v0.44.0` (podcrates@T-582)
 /// `pod_supervise::start` clears the end fields of the run before itself.
 pub fn start(store: &Store, want: &str, record: &podvm_image::Record) -> Result<Container> {
-    Ok(pod_supervise::start(
-        &settings(store),
-        want,
-        launcher::enter(store, record),
-    )?)
+    start_coded(store, want, record).map_err(|(e, _)| e)
+}
+
+/// [`start`], and for a payload that the entry could not start the exit
+/// code of that failure (126 or 127 for a command that is not invocable or
+/// not found, as a foreground run gives), so that `run -d` ends with the
+/// code of `run` (TODO/cli.md T-2070, OR-B38-12).
+pub fn start_coded(
+    store: &Store,
+    want: &str,
+    record: &podvm_image::Record,
+) -> std::result::Result<Container, (Error, Option<i32>)> {
+    pod_supervise::start(&settings(store), want, launcher::enter(store, record)).map_err(|f| {
+        let mut e = Error::from(f);
+        let code = launcher::take_code(&mut e.0);
+        (e, code)
+    })
 }
 
 /// The hold of a foreground payload: the record reads `Running` while it

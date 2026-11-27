@@ -81,3 +81,39 @@ fn only_a_record_of_the_namespace_rung_with_the_mark_boots_the_init() {
         assert_eq!(super::init_of_image(&c), want, "{rung} {env:?}");
     }
 }
+
+/// TODO/cli.md T-2070 (OR-B38-12): the exit code of a failed spawn rides in
+/// the text that the launcher sends, and `start` takes it out again. One
+/// table: a failure of each exit class, and texts that carry no valid mark.
+#[test]
+fn a_failed_spawn_keeps_the_exit_code_of_a_foreground_run() {
+    use super::{spawn_failure, take_code};
+    use podvm_enter::Error as E;
+    let rows: Vec<(podvm_enter::Error, i32)> = vec![
+        (
+            E::NotFound("\"/nonexistent\": nothing to start".into()),
+            127,
+        ),
+        (
+            E::CannotInvoke("\"/etc/passwd\": not invocable".into()),
+            126,
+        ),
+    ];
+    for (err, code) in rows {
+        let sentence = err.to_string();
+        let mut text = spawn_failure(err);
+        assert_ne!(text, sentence, "the mark is in the text");
+        assert_eq!(take_code(&mut text), Some(code), "{text}");
+        assert_eq!(text, sentence, "the sentence stays whole");
+    }
+    for plain in [
+        "",
+        "the payload could not be started",
+        "\u{1}exit=x;y",
+        "\u{1}exit=127",
+    ] {
+        let mut text = plain.to_string();
+        assert_eq!(take_code(&mut text), None, "{plain:?}");
+        assert_eq!(text, plain, "a text with no valid mark stays as it is");
+    }
+}

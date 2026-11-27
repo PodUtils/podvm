@@ -117,20 +117,22 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
             let _ = podvm_supervise::remove(&store, &c.id, true);
             return podvm_image::error::EXIT_RUNTIME_ERROR;
         }
-        return match podvm_supervise::start(&store, &c.id, &p.record) {
+        return match podvm_supervise::start_coded(&store, &c.id, &p.record) {
             Ok(c) => {
                 println!("{}", c.id);
                 r.ran = true;
                 r.container = Some(c.id.clone());
                 0
             }
-            Err(e) => {
+            Err((e, code)) => {
                 eprintln!("podvm run: {e}");
                 // ⚠ The record is removed again: a container that could not be
                 // started is not one `ps` should list as created, and leaving
                 // it would also hold its name against a retry.
                 let _ = podvm_supervise::remove(&store, &c.id, true);
-                podvm_image::error::EXIT_RUNTIME_ERROR
+                // TODO/cli.md T-2070, OR-B38-12: the code of a foreground run
+                // (127 not found, 126 not invocable).
+                code.unwrap_or(podvm_image::error::EXIT_RUNTIME_ERROR)
             }
         };
     }

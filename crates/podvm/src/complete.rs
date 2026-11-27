@@ -54,6 +54,9 @@ pub struct Ask {
     /// stays (`pod_rootfs`, PodUtils/podvm#557). Set by the entry, not by
     /// a flag.
     pub entry_mounts_proc: bool,
+    /// TODO/cli.md T-2079 (OR-B39-15): keep the `/etc/hosts` of the run,
+    /// with the edits of its payload (`exec` of a run that wrote it).
+    pub keep_hosts: bool,
 }
 
 /// `<store>/config`, and the one key T-0804 defines.
@@ -142,6 +145,7 @@ pub fn prepare(
             .filter(|r| r.is_dir())
             .map(|r| r.join(REACH_CACHE)),
         entry_mounts_proc: ask.entry_mounts_proc,
+        keep_hosts: ask.keep_hosts,
         ..podvm_complete::Options::default()
     };
     let report = match podvm_complete::complete(rootfs, &opts) {
