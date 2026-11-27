@@ -589,7 +589,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #693 | COORD-267: the answer to PodUtils/podrunner#378: confirmed, a payload on the namespace rung can remount a :ro volume writable; podvm fixes it as P1 (T-2105) (to podrunner) | open | T-2105, T-2106 |
 | #694 | [gh action] requested | closed (gate 45935156214 passed on `6ffb947`) | the gate after the merges of T-2103, T-2104, T-1953 and the docker-parity fixes |
 | #695 | COORD-268 (security, P1): pod-enter: enter the tree with pivot_root, and a nested user namespace for each own-namespace entry, so a payload cannot leave the chroot or remount a :ro volume (to podcrates) | open | T-2105, T-2106, T-2108 |
-| #696 | [gh action] requested | open | the gate after T-2105, T-2107 and T-2108 (OR-B42-02) |
+| #696 | [gh action] requested | closed (gate 45947913637 passed on `d42677e`) | the gate after T-2105, T-2107 and T-2108 (OR-B42-02) |
 | #697 | COORD-269: pod-guest: the module closure from the text of modules.dep and modules.builtin, with compressed modules (to podcrates) | open | T-1994 |
 
 ## Messages whose title does not start with COORD-NNN
