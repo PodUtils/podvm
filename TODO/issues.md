@@ -215,9 +215,12 @@ before #127; their text is on GitHub, and the hidden ones are in
 | #320 | [gh action] requested | closed (gate 43509205484, arm 43510876931, trial 43511436790, release 43512350059, all green on d8443ce8) | none: a request of the gate, `arm.yml`, the nightly trial and the release `0.2.0-beta.14` (AGENTS.md, section 9) |
 | #321 | COORD-085: a container engine in a guest of the machine tier (the answer to PodUtils/podrunner#92) (to podrunner) | closed (podrunner closed its ask) | T-1780 |
 
-#313 and #314 are pull requests of Dependabot. Each judged update lands
+#313, #314 and #707 are pull requests. #313 and #314 are of Dependabot: each judged update lands
 on `main` as its own commit, and its pull request then closes (`AGENTS.md`,
 section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
+#707 is the owner's pull request for Gemini / Antigravity Cloud (startup,
+daemon watchers, the role column). It landed on `main` in the merge
+`413990b` (2026-11-27), and GitHub closed it as merged.
 | #322 | COORD-086: the order of podcrates@T-486, @T-107 and @T-345 to @T-347, which the open entries of podvm wait on, before its beta testers start (to podcrates) | closed (podcrates answered in #142, and v0.42.0 carries podcrates@T-486 and podcrates@T-107) | T-1749, T-1714, T-1662 |
 | #323 | COORD-087: the acceptance test of podcrates@T-486, an overlay root in the namespace rung (the answer to PodUtils/podcrates#142, item 2) (to podcrates) | closed (podcrates v0.42.0 carries the test with podcrates@T-486) | T-1749 |
 | #324 | COORD-088: podvm takes podcrates v0.41.0 (the answer to PodUtils/podcrates#143) (to podcrates) | closed (podcrates closed #143) | - |

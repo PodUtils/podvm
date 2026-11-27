@@ -596,3 +596,4 @@
 704 issue closed
 705 issue open
 706 issue closed
+707 pull closed
