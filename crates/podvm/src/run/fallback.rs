@@ -30,10 +30,12 @@ pub(super) fn cause(
 
 /// [`cause`] for the findings of the probe. A foreground run goes on in
 /// chroot, and the line of the fallback goes to stderr once, as pod-enter
-/// writes it at the entry. A detached run (`run -d`, `create`) is refused
-/// at once: its launcher gives the container a PID namespace, which only
-/// the namespace rung has, and the refusal came at `start` with the same
-/// words, after the record existed.
+/// writes it at the entry. `run -d` is refused at once: its launcher gives
+/// the container a PID namespace, which only the namespace rung has, and
+/// the refusal came at `start` with the same words, after the record
+/// existed. `create` makes its record as docker does (a container that is
+/// never started serves `cp`, `inspect` and `rm`), and `start` refuses it
+/// with the same words.
 pub(super) fn decide(
     verb: &str,
     findings: &podvm_probe::Findings,
@@ -51,6 +53,9 @@ pub(super) fn decide(
     ) else {
         return Ok(None);
     };
+    if detached && verb == "create" {
+        return Ok(None);
+    }
     if detached {
         eprintln!("podvm {verb}: the PID namespace needs the namespace rung, and {why}");
         return Err(podvm_image::error::EXIT_RUNTIME_ERROR);

@@ -15,9 +15,9 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 
 - A run that enters chroot because the image has no `/tmp` mount point now
   names `chroot` in `--report`, `inspect` and the container record, and
-  `--strict` refuses it for the rung. `run -d` and `create` of such an image
-  are refused at once: a detached container has a PID namespace, which only
-  the namespace rung gives.
+  `--strict` refuses it for the rung. `run -d` of such an image is refused
+  at once: a detached container has a PID namespace, which only the
+  namespace rung gives. `create` makes the record, and `start` refuses it.
 - `probe --cached` is served from the second call on for a caller with no
   capability: the key of a run in a mount namespace that podvm made reads the
   namespace that the run came from. That entry keeps its answer in
