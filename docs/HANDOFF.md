@@ -61,24 +61,22 @@ acf6932:docs/HANDOFF.md`. Remove this file when each step below is done.
     guard `crates/podvm/tests/spare_tree_off.rs` holds the class (T-1859).
 * The last gate (45988037109 on `2497a26`) failed in one test,
   `tty_ctty`: the hosted runner runs `-it` on the userland rung, where the
-  shell cannot open `/dev/tty`. A worker fixes the userland rung on the local branch `wip/ctty2` (worktree `.claude/worktrees/ctty2`); merge it, or do the fix again if the worktree is gone.
+  shell cannot open `/dev/tty`. The cause was the session, not `/dev/tty`: a shell or a terminal starts podvm as the leader of its group, so its `setsid` failed and the payload stayed in the session of the caller. Merged in `af8abf0`: for `run` and `exec` with `-t` and `-i`, podvm forks once (`run/pty/session.rs`), the child leads a new session with the pty, and the parent relays signals and the exit code (`ps` shows two podvm processes). `tty_ctty` is a table over the rungs, with a row for a host with no user namespace. As root on the namespace rung the payload gets no terminal (job control off, Ctrl-C works) until COORD-188.
 * The hosted proof of T-1998 (kvm 45991827383, #706) did not pass: incusd
   had the `qemu` driver, but the first `run -d` gave no line until the
   bound of the experiment (1500 s). The boot wait of podvm has a bound of
   180 s, so the time went before the boot. Experiment 492 now runs with
   `--verbose` and lists the state of incusd when clause 1 fails.
-* A worker works the small rows of T-2100 (OR-B41-02, OR-B41-17), T-2108 (OR-B42-08) and T-2079 (OR-B39-19) on the local branch `wip/polish`.
-* The integration tests pass as uid 1000 on `3d9c3cb` (45 binaries); the
-  merges after it ran `scripts/dev/checks.sh` and their own new tests as
-  uid 1000.
+* Merged in `c6b199e`: each file of the machine tier goes to the store (`Store::configured_root`; sockets stay in `XDG_RUNTIME_DIR` for the length limit) (OR-B41-02); `ps` has docker's order, columns and words (`.RunningFor`, `lifecycle/ps_view.rs`); `verify` names an image as `images` does; `rm -f` of a missing container exits 0 (T-2079 is done). COORD-274 (#708) and COORD-275 (#709) ask podcrates for the rest.
+* The integration tests pass as uid 1000 on `c6b199e` (47 binaries,
+  each merge of this session included).
 * Open asks to podcrates: COORD-268 (#695, P1, blocks the beta), #677,
-  #678, #680, #683, #684, #689, #690, #692, #697, #698, #701, #703, #705,
+  #678, #680, #683, #684, #689, #690, #692, #697, #698, #701, #703, #705, #708, #709,
   COORD-188 (#584). To podrunner: #672, #676, #693.
 
 ## Next steps, in order
 
-1. Make the gate green: the fix of `tty_ctty` on the userland rung (`/dev/tty` through the interposer, a table of the rungs). Then one request for the gate of the head of
-   `main`, and run the whole integration suite as uid 1000.
+1. Request the gate of the head of `main` (the last gate failed before the fix of `tty_ctty`, `af8abf0`), and read it.
 2. T-1998: request `kvm.yml` with `-f only=incusvm` again, read the
    `--verbose` lines in the result file (the artifact `incus-vm`), find
    the stage that takes the time (the disk, the qcow2 write or the import),

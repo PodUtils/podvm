@@ -603,6 +603,8 @@ daemon watchers, the role column). It landed on `main` in the merge
 | #704 | [gh action] requested | closed (kvm 45990289364 failed on `f609146`: experiment 492 gave `--project` to `incus query`, which refuses it, so it stopped before podvm ran) | the hosted proof of T-1998 (`kvm.yml`, `only=incusvm`, experiment 492) on `f609146` |
 | #705 | COORD-273: pod-guest: take podvm's ext4 disk writer and its qcow2 writer (to podcrates) | open | T-1994, T-1998 |
 | #706 | [gh action] requested | closed (kvm 45991827383 failed on `a6fa765`: the first `run -d` of experiment 492 gave no line until the bound of 1500 s; T-1998 stays partial) | the hosted proof of T-1998 (`kvm.yml`, `only=incusvm`, experiment 492) on `a6fa765`, after the fix of the script |
+| #708 | COORD-274: pod-hostprobe: the census names the paths of a test fixture in `probe` and `doctor` (to podcrates) | open | T-2100 |
+| #709 | COORD-275: pod-supervise: a list of the containers that needs no lock, so `ps -a` works on a read-only store (to podcrates) | open | T-2070, T-2108 |
 
 ## Messages whose title does not start with COORD-NNN
 
