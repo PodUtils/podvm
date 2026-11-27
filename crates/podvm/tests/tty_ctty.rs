@@ -12,17 +12,30 @@
 //! job of the shell. The image is the one of the host's programs
 //! (`host_image`).
 //!
-//! ⚠ podvm makes the pty the terminal of a new session of its own, where
-//! it can leave the caller's session (`run/pty.rs`, `leave_the_session`):
-//! as uid 1000, podvm runs in a user namespace as a child, and it can. As
-//! root, podvm leads its group (here its session), so the payload of root
-//! gets the pty as its terminal only from the fork of `pod-enter`
-//! (COORD-188, podcrates@T-927). The test skips as root with a line.
+//! The table has a row for each rung that this host and CI give: the rung
+//! that podvm takes here (a user: the namespace rung through podvm's own
+//! user namespace; root: the namespace rung of root), and the rung of a
+//! host that refuses each user namespace (the userland rung), which the
+//! test makes with a user namespace that allows no child. The runner of
+//! GitHub refuses each user namespace, so there the first row is the
+//! userland rung already and the second row cannot be made: the test says
+//! so in one line. As root the second row is not made: a user namespace of
+//! the test would make podvm uid 0 of a nested namespace, which no caller
+//! has.
+//!
+//! ⚠ One rung gives no job control: where the shell is in a PID namespace
+//! that holds no process of podvm (the namespace rung of root: its parent
+//! is the init of `pod-enter`, or is outside the namespace). The first
+//! group of the shell is podvm's there, which the shell cannot name, so
+//! podvm gives that payload no terminal (`run/pty/session.rs`,
+//! `ctty_holds`) until `pod-enter` gives it a session (podcrates@T-927).
+//! For that rung the rule is the gap as documented: no terminal (not the
+//! caller's), job control off, Ctrl-C ends `sleep 30`, and exit 0.
 
 mod host_image;
 mod tty_session;
-use host_image::{podvm, text};
-use tty_session::{pty, session, Steps};
+use host_image::text;
+use tty_session::{can_prep_no_userns, podvm_on, pty, session_on, Prep, Steps};
 
 const IMAGE: &str = "localhost/t2070:1";
 
@@ -68,9 +81,10 @@ fn stat_of(out: &str, tag: &str) -> Option<Stat> {
     })
 }
 
-/// One rule for each path of `-it`: the controlling terminal, the
-/// foreground group, the leader of the session, and no line of a shell
-/// that has no terminal.
+/// One rule for each rung and each path of `-it`: the controlling
+/// terminal is not the caller's (its session is another), the foreground group,
+/// the leader of the session, the keys, and no line of a shell that has no
+/// terminal.
 #[test]
 fn the_pty_of_run_it_and_exec_it_is_the_controlling_terminal() {
     let Some(tar) = host_image::layout(IMAGE, &["sleep"]) else {
@@ -84,75 +98,114 @@ fn the_pty_of_run_it_and_exec_it_is_the_controlling_terminal() {
     unsafe extern "C" {
         fn geteuid() -> u32;
     }
+    let mut preps = vec![Prep::Host];
     // SAFETY: geteuid takes nothing and cannot fail.
     if unsafe { geteuid() } == 0 {
-        eprintln!("T-2070: as root the payload has the pty as its terminal only with podcrates@T-927; skipped");
-        return;
+        eprintln!("T-2070: as root the row with no user namespace is not made (see the module)");
+    } else if can_prep_no_userns() {
+        preps.push(Prep::NoUserns);
+    } else {
+        eprintln!(
+            "T-2070: this host refuses a user namespace to the test: the first row is the rung of \
+             a host with none"
+        );
     }
     let (dir, store) = host_image::store_with("t2070", tar);
-    let d = podvm(
-        &store,
-        &["run", "-d", "--name", "t2070", IMAGE, "sleep", "300"],
-    );
-    assert!(d.status.success(), "run -d: {}", text(&d.stderr));
+    let mut failures = Vec::new();
+    for prep in preps {
+        let name = format!("t2070-{prep:?}").to_lowercase();
+        let d = podvm_on(&store, prep)
+            .args(["run", "-d", "--name", &name, IMAGE, "sleep", "300"])
+            .output()
+            .unwrap();
+        assert!(d.status.success(), "{prep:?}: run -d: {}", text(&d.stderr));
+        let cases: [&[&str]; 2] = [
+            &["run", "--rm", "-it", IMAGE, "sh", "-i"],
+            &["exec", "-it", &name, "sh", "-i"],
+        ];
+        for args in cases {
+            if let Err(why) = check(&store, prep, args) {
+                failures.push(format!("{prep:?} {args:?}: {why}"));
+            }
+        }
+        let _ = podvm_on(&store, prep).args(["rm", "-f", &name]).output();
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// One session of `args`: its output, or the failure.
+fn run(
+    store: &std::path::Path,
+    prep: Prep,
+    args: &[&str],
+    steps: Steps,
+) -> Result<(String, i64), String> {
+    match session_on(store, prep, args, steps) {
+        Ok((0, out, caller)) => Ok((out, caller)),
+        Ok((code, out, _)) => Err(format!("exit {code}; output: {out:?}")),
+        Err(e) => Err(e),
+    }
+}
+
+/// The rule of one row: first the stat of the shell, then the keys.
+fn check(store: &std::path::Path, prep: Prep, args: &[&str]) -> Result<(), String> {
+    let (out, caller) = run(
+        store,
+        prep,
+        args,
+        &[(PROBE, "E42N", 1), (b"exit 0\n", "exit 0", 1)],
+    )?;
+    let s = stat_of(&out, "S=").ok_or_else(|| format!("no stat of the shell; output: {out:?}"))?;
+    let parent = stat_of(&out, "P=");
+    let fail = |why: &[&str]| Err(format!("{}; {s:?}; output: {out:?}", why.join(", ")));
+    // The gap of the module: no process of podvm in the PID namespace.
+    let gap = s.ppid == 0 || out.contains("(podvm-init)");
     // `sleep 30` outlasts the wait of a step (20 s): only the key ends it.
-    let steps: Steps = &[
-        (PROBE, "E42N", 1),
+    let ctrl_c: &[(&[u8], &str, usize)] = &[
         (b"sleep 30\n", "sleep 30", 1),
         (b"\x03", "", 0),
         (b"echo C$((40+3))\n", "C43", 1),
+    ];
+    let ctrl_z: &[(&[u8], &str, usize)] = &[
         (b"sleep 30\n", "sleep 30", 2),
         (b"\x1a", "Stopped", 1),
         (b"kill -9 %1; sleep 1; jobs; echo Z$((40+4))\n", "Z44", 1),
-        (b"exit 0\n", "exit 0", 1),
     ];
-    let cases: &[&[&str]] = &[
-        &["run", "--rm", "-it", IMAGE, "sh", "-i"],
-        &["exec", "-it", "t2070", "sh", "-i"],
-    ];
-    let mut failures = Vec::new();
-    for args in cases {
-        let out = match session(&store, args, steps) {
-            Ok((0, out)) => out,
-            Ok((code, out)) => {
-                failures.push(format!("{args:?}: exit {code}; output: {out:?}"));
-                continue;
-            }
-            Err(e) => {
-                failures.push(e);
-                continue;
-            }
-        };
-        let Some(s) = stat_of(&out, "S=") else {
-            failures.push(format!("{args:?}: no stat of the shell; output: {out:?}"));
-            continue;
-        };
-        let parent = stat_of(&out, "P=");
-        let leader = s.session == s.pid || s.session == s.ppid;
-        let mut why = Vec::new();
-        if s.tty_nr == 0 {
-            why.push("the shell has no controlling terminal (tty_nr 0)");
-        }
-        if s.tpgid != s.pgrp {
-            why.push("the group of the shell is not the foreground group");
-        }
-        if !leader {
-            why.push("the leader of the session is not the shell or its parent");
-        }
-        if parent.is_some_and(|p| p.tty_nr != s.tty_nr && s.session == s.ppid) {
-            why.push("the parent leads the session on another terminal");
-        }
-        if out.contains("job control turned off") {
-            why.push("the shell turned job control off");
+    let exit: &[(&[u8], &str, usize)] = &[(b"exit 0\n", "exit 0", 1)];
+    let mut why = Vec::new();
+    // The terminal of a payload in the caller's session is the caller's
+    // (the fault of a run that did not leave it).
+    if caller > 0 && s.session == caller {
+        why.push("the shell is in the session of the caller's terminal");
+    }
+    if gap {
+        if s.tty_nr != 0 {
+            why.push("a shell with no podvm in its PID namespace has a terminal");
         }
         if !why.is_empty() {
-            failures.push(format!(
-                "{args:?}: {}; {s:?}; output: {out:?}",
-                why.join(", ")
-            ));
+            return fail(&why);
         }
+        return run(store, prep, args, &[ctrl_c, exit].concat()).map(|_| ());
     }
-    let _ = podvm(&store, &["rm", "-f", "t2070"]);
-    let _ = std::fs::remove_dir_all(&dir);
-    assert!(failures.is_empty(), "{}", failures.join("\n"));
+    // The leader of the session is the shell or its parent (podvm).
+    if s.session != s.pid && s.session != s.ppid {
+        why.push("the leader of the session is not the shell or its parent");
+    }
+    if s.tty_nr == 0 {
+        why.push("the shell has no controlling terminal (tty_nr 0)");
+    }
+    if s.tpgid != s.pgrp {
+        why.push("the group of the shell is not the foreground group");
+    }
+    if parent.is_some_and(|p| p.tty_nr != s.tty_nr) {
+        why.push("the parent leads the session on another terminal");
+    }
+    if out.contains("job control turned off") {
+        why.push("the shell turned job control off");
+    }
+    if !why.is_empty() {
+        return fail(&why);
+    }
+    run(store, prep, args, &[ctrl_c, ctrl_z, exit].concat()).map(|_| ())
 }

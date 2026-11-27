@@ -97,9 +97,9 @@ impl Term {
     }
 
     /// Start the relay of `run -t`; stdin goes to the pty only with `-i`.
-    pub(crate) fn start(self, stdin: bool) -> Running {
+    pub(crate) fn start(self, stdin: bool, ctty: bool) -> Running {
         Running {
-            relay: self.pty.relay(stdin),
+            relay: self.pty.relay(stdin, ctty),
             slaves: self.slaves,
         }
     }
@@ -126,8 +126,11 @@ impl Running {
 
 /// Start the relay where a pty is open; the target of the interrupt key
 /// is set at the spawn ([`on_spawn`]).
-pub(crate) fn start(term: Option<Term>, stdin: bool) -> Option<Running> {
-    term.map(|t| t.start(stdin))
+/// `outside`: the command enters a PID namespace that this process is not
+/// a member of ([`crate::run::pty::session::ctty_holds`]).
+pub(crate) fn start(term: Option<Term>, stdin: bool, outside: bool) -> Option<Running> {
+    let ctty = crate::run::pty::session::ctty_holds(outside);
+    term.map(|t| t.start(stdin, ctty))
 }
 
 /// The hook of the spawn: the interrupt key of the pty goes to `pid`.

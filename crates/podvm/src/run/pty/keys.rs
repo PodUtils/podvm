@@ -3,7 +3,7 @@
 //!
 //! `pod-enter` makes no session (COORD-188 asks for one). Where podvm left
 //! the caller's session, the pty is the controlling terminal of podvm's
-//! session (`super::leave_the_session`, T-2070), and the foreground group
+//! session (`super::session`, T-2070), and the foreground group
 //! of that session can be podvm's own: a SIGINT of the line discipline
 //! would reach podvm, whose waiter forwards it, and the payload would take
 //! it twice. Elsewhere the pty is the controlling terminal of no process,

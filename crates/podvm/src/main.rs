@@ -78,6 +78,7 @@ fn main() -> std::process::ExitCode {
     }
     let outer_mnt = podvm_probe::mount_namespace(); // PodUtils/podvm#558: before the entry's own
     userns::enter_if(&argv); // T-1909: before any thread
+    run::pty::session::split_if(&argv); // TODO/cli.md T-2070: before any thread
     if userns::active() || userns::joined() {
         podvm_probe::own_mount_namespace(outer_mnt);
     }

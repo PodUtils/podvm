@@ -469,7 +469,7 @@ pub fn exec(args: &[String]) -> i32 {
     // the userland families through the one shared drive, the chroot
     // sequence as before. The ephemeral memo is removed on every path
     // out, as before.
-    let relay = tty::start(term, o.interactive);
+    let relay = tty::start(term, o.interactive, false); // no PID namespace
     let code = match &userland {
         Some(u) => {
             crate::lifecycle::enter_userland_with("exec", &root, &plan, u, &mut err, &mut |p, _| {
