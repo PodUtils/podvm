@@ -588,4 +588,4 @@
 696 issue closed
 697 issue open
 698 issue open
-699 issue open
+699 issue closed
