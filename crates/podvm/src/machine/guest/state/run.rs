@@ -278,7 +278,7 @@ pub fn run(r: &Request, c: &Ctx) -> Outcome {
         }
         Plan::Save { .. } => {
             let script = template(&files.nonce);
-            let made = super::super::archive::tools(c.modules, Vec::new())
+            let made = super::super::archive::tools(c.modules, Vec::new(), None)
                 .and_then(|tools| {
                     // The root disk holds the image: the initrd has podvm's
                     // files only (T-1994).

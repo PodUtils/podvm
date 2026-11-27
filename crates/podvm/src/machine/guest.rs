@@ -28,6 +28,7 @@ mod input;
 pub(crate) mod job; // TODO/machine.md T-2008
 pub(crate) mod kernel;
 pub(crate) mod kernel_arm64; // TODO/machine.md T-1890
+pub(crate) mod kernel_image; // TODO/machine.md T-1994, part 2
 mod line;
 mod mem; // TODO/machine.md T-1922
 pub(crate) mod net;
@@ -55,7 +56,7 @@ pub use archive::{base_archive, run_archive};
 use drive::drive;
 pub use input::{read_stdin, MAX_STDIN};
 pub use line::notice;
-use line::{no_nic, with_cpus};
+use line::{no_nic, with_broker, with_cpus};
 
 /// The version of the base archive format; a change of [`cpio`] bumps it,
 /// so an old cached archive is not reused. 2 keeps the hard links; 3 the
@@ -206,14 +207,15 @@ pub fn boot(r: &Request) -> i32 {
     if std::fs::symlink_metadata(r.rootfs.join("bin/sh")).is_err() {
         return fail("the image has no /bin/sh, which runs /podvm-init in the guest".to_string());
     }
-    let assets = match arch::kernel(r.store_root, r.arch) {
+    // T-1994 part 2: the kernel of the image (`own`) where the variable asks.
+    let (assets, own) = match kernel_image::of_run(r) {
         Ok(k) => k,
         Err(e) => return fail(format!("the guest kernel: {e}")),
     };
     // TODO/machine.md T-1723: a volume is a 9p mount where the kernel has
-    // the modules (the pin); a kernel of PODVM_MACHINE_KERNEL has none, and
-    // a volume is then a copy, as before.
-    let nine = !r.volumes.is_empty() && !assets.volume_modules.is_empty();
+    // the modules (the pin, or the kernel of the image); a kernel of
+    // PODVM_MACHINE_KERNEL has none, and a volume is then a copy.
+    let nine = !r.volumes.is_empty() && (own.is_some() || !assets.volume_modules.is_empty());
     if let Err(e) = vol::check_mapped(&r.volumes, &r.mapped, nine) {
         return fail(e); // T-2103
     }
@@ -249,15 +251,21 @@ pub fn boot(r: &Request) -> i32 {
         }
     }
     // TODO/machine.md T-1994: the root on the disk of the image.
-    let on_disk = match disk::root_wanted(r, !assets.modules.is_empty()) {
+    let set = !assets.modules.is_empty() || own.is_some();
+    let on_disk = match disk::root_wanted(r, set) {
         Ok(b) => b,
         Err(e) => return fail(e),
     };
-    let disk_load = match disk::add_modules(r, on_disk, !assets.modules.is_empty(), &mut modules) {
+    let own_load = own.as_ref().map(|o| o.load.as_slice());
+    let disk_load = match disk::add_modules(r, on_disk, set, own_load, &mut modules) {
         Ok(names) => names, // TODO/machine.md T-1968
         Err(e) => return fail(e),
     };
-    let tools = match tools(&modules, engine_names) {
+    let tools = match tools(
+        &modules,
+        engine_names,
+        own.as_ref().map(|o| o.release.clone()),
+    ) {
         Ok(t) => t,
         Err(e) => return fail(e),
     };
@@ -387,6 +395,9 @@ pub fn boot(r: &Request) -> i32 {
     if pid1.is_some() {
         source.push_str(", systemd of the image as PID 1 of the guest (T-1994)");
     }
+    if let Some(o) = &own {
+        source.push_str(&format!(", the kernel {} of the image", o.release));
+    }
     if let Some(line) = notice(r, accel, &source) {
         eprintln!("{line}");
     }
@@ -444,22 +455,7 @@ pub fn boot(r: &Request) -> i32 {
     if r.net_none {
         no_nic(&mut argv);
     }
-    if let Some(port) = r.broker {
-        let (h, p) = crate::broker::GUEST_FORWARD;
-        if let Some(nic) = argv
-            .iter_mut()
-            .find(|a| a.starts_with("user,model=virtio-net-pci"))
-        {
-            // One relay of podvm for each connection of the guest: a
-            // `tcp:` chardev would be one connection for the whole run.
-            let me = std::env::current_exe().unwrap_or_default();
-            *nic = format!(
-                "{nic},restrict=on,guestfwd=tcp:{h}:{p}-cmd:{} {} 127.0.0.1:{port}",
-                me.display(),
-                crate::broker::RELAY_ARG
-            );
-        }
-    }
+    with_broker(&mut argv, r.broker);
     with_cpus(&mut argv, r.cpus);
     // TODO/machine.md T-2016: one more boot where the emulator crashed
     // before the command ran.

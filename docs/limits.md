@@ -403,6 +403,30 @@ exit code 137 (T-1994). `exec -t` of a guest exits 125 (T-2043).
 A `--platform linux/arm64` guest needs `qemu-system-aarch64` on PATH and a
 kernel named by `PODVM_MACHINE_KERNEL_ARM64`, runs under TCG on an x86_64
 host, and has no `-t`, 9p volume or podvm in the guest (T-1890).
+`PODVM_MACHINE_IMAGE_KERNEL=1` boots the one kernel of the image in place
+of the pinned kernel, and `PODVM_MACHINE_IMAGE_KERNEL=RELEASE` the kernel
+of that release (T-1994): `/boot/vmlinuz-RELEASE` or
+`/usr/lib/modules/RELEASE/vmlinuz`, a bzImage of x86. The guest boots on
+the root disk of the image with podvm's own initramfs, not with the initrd
+of the image; podvm takes the modules of the run out of
+`/lib/modules/RELEASE` of the image, with each module that its
+`modules.dep` names, and decompresses `.ko.gz`, `.ko.xz` and `.ko.zst` on
+the host. The image needs `modules.dep` (`depmod`). Each run needs
+virtio_pci, virtio_blk, ext4 and overlay; a NIC needs virtio_net, a `-v`
+needs 9pnet_virtio and 9p, and `-t`, `run -d`, `--podvm-channel` and
+`--podvm-sealed` need virtio_console. The serial console (8250 with
+`SERIAL_8250_CONSOLE`), `DEVTMPFS` and `BLK_DEV_INITRD` must be built in. A
+driver that is not a module, not in `modules.builtin` and not `=y` in the
+config of the release exits 125 before the boot with one line that names
+it. Without a config and `modules.builtin`, only the boot tells: a module
+that the kernel does not load ends the run with 125 and its line. A
+kernel with no serial console gives the host no marker; that case is not
+measured. A saved state does not serve this route, so each run boots.
+`PODVM_MACHINE_KERNEL`, `PODVM_MACHINE_ROOT=initramfs`, `--podvm-engine`
+and an arm64 guest exit 125. Measured under TCG with a kernel of Debian 13
+on the Arch Linux image (experiment 491): a run with systemd as PID 1 and
+a 9p volume took 28.8 s with the build of the root disk. KVM and nested
+KVM are not measured.
 The machine tier needs `qemu-system-x86_64` on the host; `podvm doctor`
 checks it. Where the host has none, `run --podvm-tier=machine`, `podvm
 windows` and `run windows:NAME` fetch a pinned static QEMU 11.1.3 and its
@@ -632,7 +656,7 @@ C26). Experiment 465 measures each line below as uid 1000.
   were used last for an image. Requests with `-t`, `run -d`,
   `--podvm-engine`, `--podvm-sealed`, `--network broker`, more than four
   volumes, more than 64 KiB of stdin, an arm64 guest or a kernel from
-  `PODVM_MACHINE_KERNEL` use a fresh boot, with systemd as PID 1 of the
+  `PODVM_MACHINE_KERNEL` or `PODVM_MACHINE_IMAGE_KERNEL` use a fresh boot, with systemd as PID 1 of the
   guest on the root disk where the image has it (T-1994). On the root
   disk the state holds the memory of the guest with its upper layer (a
   tmpfs); the disk stays out of the state, and its SHA-256 (from its

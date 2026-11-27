@@ -154,7 +154,9 @@ pub fn refusal(a: &Asks) -> Option<String> {
         return no("a guest of another architecture than x86_64 on x86_64");
     }
     if !a.pinned_kernel {
-        return no("the kernel of PODVM_MACHINE_KERNEL");
+        return no(
+            "a kernel that is not the pin (PODVM_MACHINE_KERNEL, PODVM_MACHINE_IMAGE_KERNEL)",
+        );
     }
     if a.tty {
         return no("-t");

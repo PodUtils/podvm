@@ -5818,6 +5818,22 @@ other guest: the marker already carries the code and the count of OOM
 kills, and `SuccessAction=exit-force` would give QEMU only the code of
 the guest.
 
+Decision (2026-11-27, part 2): a variable selects the kernel of the
+image, not a flag (call C16: a variable needs no row of the parity
+table; a flag can follow when a caller needs one): no value and `0` keep
+the pinned kernel, `1` takes the one kernel of the image, and a release
+takes the kernel of that release. The guest
+boots that kernel with podvm's own initramfs, not with the initrd of the
+image: the root of a guest is the read-only root disk under the overlay
+of `guest-root`, and an initrd of a distribution (initramfs-tools, dracut,
+mkinitcpio) mounts `root=` read-write itself and execs the init with no
+unit of the run; an image can also have no initrd. The label
+`cloudimg-rootfs` of the ask is then not needed: `guest-root` finds the
+disk by its serial. The search of podcrates `v0.86.0` found the closure
+of a module set only for a squashfs modloop (`pod_guest::modloop::modules`);
+podvm extends its own `engine::closure` for the text of an image, and the
+form from the text of `modules.dep` is an ask to podcrates (rule 2a).
+
 ## Prove
 
 `kvm.yml`: `run --podvm-tier=machine --podvm-init=image` of an image with systemd boots from its disk image; `systemctl is-system-running` gives `running` or `degraded`; the exit code of the payload unit is the exit code of the run; a second run of the same digest reuses the disk image.
@@ -5825,6 +5841,8 @@ the guest.
 Step 1: `python3 -I experiments/482-machine-disk-root.py` as uid 1000
 under TCG. Steps 2 and 3: `python3 -I experiments/483-machine-image-init.py`
 as uid 1000 under TCG.
+Part 2 (the kernel of the image): `python3 -I
+experiments/491-machine-image-kernel.py` as uid 1000 under TCG.
 
 ## Done
 
@@ -5996,18 +6014,71 @@ SIGTERM took 1 s and gave Exited (7) and the trap's line, and `stop` of a
 command that ignores SIGTERM took 11 s and gave Exited (137); no
 emulator stayed.
 
-Remaining: steps 1 to 3, the state and the lifecycle under KVM on
-`kvm.yml` (the step of experiment 469 makes its base archive with
-`PODVM_MACHINE_ROOT=initramfs`, as the routes of 468 keep the root on the
-disk); an arm64 guest; `exec -t` of a guest (T-2043); the kernel and the
-initrd of the image itself (PodUtils/podrunner#316 ask 2), not started:
-a variable selects the kernel of the image (`/boot/vmlinuz-KVER`) with
-podvm's initramfs and the modules of `/usr/lib/modules/KVER` of the
-image (virtio_blk, ext4, overlay, 9p and their closure from its
-`modules.dep`, `modules.builtin` for each one built in, compressed
-modules through `finit_module` with `MODULE_INIT_COMPRESSED_FILE`), a
-refusal by name of each missing one, and a proof with an image that has
-a kernel (`uname -r`, systemd as PID 1, the exit code, a 9p volume).
+**Partial (2026-11-27), part 2: the kernel of the image.** With
+`PODVM_MACHINE_IMAGE_KERNEL=1` (the one kernel of the image) or
+`=RELEASE`, a run of the machine tier boots the kernel of its image on
+the root disk of step 1, with systemd as PID 1 where `--podvm-init=image`
+asks for it (steps 2 and 3). `machine/guest/kernel_image.rs` finds each
+`/boot/vmlinuz-RELEASE` and `/usr/lib/modules/RELEASE/vmlinuz` of the
+image through its links, checks the bzImage magic, and reads
+`modules.dep`, `modules.builtin` and the config of the release
+(`/boot/config-RELEASE` or `/lib/modules/RELEASE/config`). The run takes
+the drivers of its parts: virtio_pci, virtio_blk, ext4 and overlay (and
+crc32c_generic where it is a module) for each run, virtio_net where the
+guest has a NIC, 9pnet_virtio and 9p for a `-v`, and virtio_console for
+`-t`, `run -d`, `--podvm-channel` and `--podvm-sealed`; each module comes
+with the modules that `modules.dep` names for it (`engine::closure`, which
+now takes the compressed suffixes). The serial console (8250), `DEVTMPFS`
+and `BLK_DEV_INITRD` must be built in. A driver that is in neither list
+and not `=y` in the config is a refusal before the boot, with exit 125
+and one line that names each missing driver, what needs it and its config
+symbol. podvm reads each module on the host within 64 MiB and
+decompresses `.ko.gz`, `.ko.xz` and `.ko.zst`, so the kernel needs no
+decompressor. The initramfs of the run holds podvm, the modules and the
+file `/podvm/modules/image-kernel`; `guest-root` loads each module, and
+`guest-net` and `guest-9p` then load no module of the pin. A module that
+the kernel does not take is the one line of `guest-root` and exit 125.
+The saved state does not serve the route (`state::refusal`), so each run
+boots. `PODVM_MACHINE_KERNEL`, `PODVM_MACHINE_ROOT=initramfs`,
+`--podvm-engine` and an arm64 guest are refusals by name.
+
+Proof: experiment 491 as uid 1000 under TCG, eight of eight clauses
+PASS. The fixture is the Arch Linux image of experiment 483 with one more
+layer: the kernel package of Debian 13 `6.12.117+deb13-amd64` (4,230
+modules as `.ko.xz`, 9p as modules) or `6.12.117+deb13-cloud-amd64`
+(`# CONFIG_NET_9P is not set`), with a `modules.dep` of depmod's form.
+(1) With the default state, `--podvm-init=image` and a 9p volume: exit 7
+in 28.8 s with the build of the root disk, `uname -r`
+`6.12.117+deb13-amd64`, PID 1 systemd and PID 2 kthreadd, `running`, the
+host's file read in the guest and the guest's file on the host,
+`/proc/modules` with 9p, 9pnet, 9pnet_virtio, netfs, ext4, jbd2, mbcache,
+crc16, crc32c_generic, overlay and virtio_blk, and no saved state.
+(2) podvm's init with the NIC and `--storage-opt size=256m`: exit 3,
+10.0.2.15 on the NIC and a root of 258,016 KiB. (3) `run -d` with the
+init: `exec` gave the release, PID 1 systemd and 4; `stop` and `rm` gave
+0. (4) The cloud kernel by its release: exit 0 and its `uname -r`.
+(5) The cloud kernel with `-v`: exit 125 with no boot and one line that
+names 9pnet_virtio and 9p with `CONFIG_9P_FS is not set`. (6) No kernel,
+an unknown release, both variables and `PODVM_MACHINE_ROOT=initramfs`:
+125 by name. (7) With no variable the same image booted the pinned
+`6.12.110-0-virt`. (8) No emulator, run directory or partial file
+stayed. The table-driven unit tests
+`the_choice_of_a_kernel_of_the_image_holds_or_refuses_by_name`,
+`each_driver_is_a_module_built_in_or_named_missing`,
+`the_kernel_of_an_image_is_found_through_its_links` and
+`a_module_of_an_image_is_read_plain_or_decompressed_within_its_bound` pin
+the choice, the closure, the refusals, the layouts and the bounds.
+[Transcript](../experiments/results/machine-image-kernel.txt)
+
+Remaining: steps 1 to 3, the state, the lifecycle and the kernel of the
+image under KVM on `kvm.yml` (the step of experiment 469 makes its base
+archive with `PODVM_MACHINE_ROOT=initramfs`, as the routes of 468 keep the
+root on the disk); nested KVM in a guest of the kernel of the image (`-cpu
+host` under KVM; not measured, the cloud host has TCG only); an arm64
+guest; `exec -t` of a guest (T-2043); the hosted snapshot itself with its
+kernel (Ubuntu, `.ko.zst`); vsock modules (no route of the machine tier
+uses vsock: the channels are virtio console ports); a saved state of the
+kernel of the image.
 
 # T-1996: On the incus tier, an instance of the hosted snapshot has 231,072 ids, `/dev/fuse` and a machine-id of its own
 
@@ -6105,7 +6176,12 @@ incusd runs a VM image (a qcow2 root with a GPT and an ESP, or a direct boot of 
 
 ## Decision
 
--
+Decision (2026-11-27, T-1994 part 2): the direct boot of this mode takes
+the kernel of the image from `machine/guest/kernel_image.rs` (the search
+of `/boot/vmlinuz-RELEASE` and `/usr/lib/modules/RELEASE/vmlinuz` through
+the links of the image, the choice by `PODVM_MACHINE_IMAGE_KERNEL`, the
+bzImage check and the refusal of a missing driver by name), so that the
+two tiers have one search. The mode itself is not started.
 
 ## Prove
 

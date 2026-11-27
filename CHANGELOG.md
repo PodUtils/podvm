@@ -8,6 +8,29 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Added: the machine tier boots the kernel of the image, 2026-11-27
+
+Record: T-1994 (PodUtils/podrunner#316 ask 2).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `PODVM_MACHINE_IMAGE_KERNEL=1` boots the one kernel of the image
+  (`/boot/vmlinuz-RELEASE` or `/usr/lib/modules/RELEASE/vmlinuz`) in place
+  of the pinned Alpine kernel, and `PODVM_MACHINE_IMAGE_KERNEL=RELEASE` the
+  kernel of that release. The guest boots on the root disk of the image,
+  with systemd as PID 1 for `--podvm-init=image`, a 9p volume, the
+  network, `--storage-opt size=` and `run -d`. podvm loads the modules of
+  the run out of `/lib/modules/RELEASE` of the image, with their
+  dependencies from its `modules.dep`, and decompresses `.ko.gz`, `.ko.xz`
+  and `.ko.zst` itself. With no value or `0` the pinned kernel boots, as
+  before.
+- A driver that the run needs and the kernel of the image lacks
+  (virtio_pci, virtio_blk, ext4, overlay, virtio_net, 9p, virtio_console,
+  the serial console) exits 125 before the boot, with one line that names
+  it and its config symbol. An image with no kernel, a release that it
+  does not have, `PODVM_MACHINE_KERNEL` beside the variable,
+  `PODVM_MACHINE_ROOT=initramfs`, `--podvm-engine` and an arm64 guest exit
+  125 by name. A saved state does not serve the route.
+
 ### Fixed: `--read-only` keeps the namespace rung with a read-only root, 2026-11-27
 
 Record: T-2108 (OR-B42-02).

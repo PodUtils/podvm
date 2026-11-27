@@ -14,6 +14,10 @@ pub struct Tools {
     /// The modules of `--podvm-engine`, in their order (T-1780): the init
     /// loads the names of [`ENGINE_LIST`].
     pub engine: Vec<String>,
+    /// The release of the kernel of the image (TODO/machine.md T-1994):
+    /// `guest-root` loads each module, and [`super::kernel_image::MARK`]
+    /// holds the release.
+    pub image_kernel: Option<String>,
 }
 
 /// The names of the modules of `--podvm-engine`, one on a line.
@@ -50,6 +54,14 @@ pub fn run_archive(
                 (0, 0),
             )?;
         }
+        if let Some(release) = &t.image_kernel {
+            w.entry(
+                super::kernel_image::MARK.trim_start_matches('/'),
+                cpio::REG | 0o644,
+                format!("{release}\n").as_bytes(),
+                (0, 0),
+            )?;
+        }
         if !t.engine.is_empty() {
             let list = t.engine.join("\n") + "\n";
             w.entry(
@@ -64,26 +76,28 @@ pub fn run_archive(
     w.finish()
 }
 
-/// podvm's own bytes and the module files, for the run archive.
+/// podvm's own bytes and the module files, for the run archive; none
+/// where the guest loads no module and boots no kernel of its image
+/// (`image_kernel`, TODO/machine.md T-1994). A module of an image can be
+/// compressed ([`super::kernel_image::read_module`]).
 pub(super) fn tools(
     modules: &[(String, PathBuf)],
     engine: Vec<String>,
+    image_kernel: Option<String>,
 ) -> Result<Option<Tools>, String> {
-    if modules.is_empty() {
+    if modules.is_empty() && image_kernel.is_none() {
         return Ok(None);
     }
     let podvm = std::fs::read("/proc/self/exe").map_err(|e| format!("/proc/self/exe: {e}"))?;
     let mut m = Vec::new();
     for (n, p) in modules {
-        m.push((
-            n.clone(),
-            std::fs::read(p).map_err(|e| format!("{}: {e}", p.display()))?,
-        ));
+        m.push((n.clone(), super::kernel_image::read_module(p)?));
     }
     Ok(Some(Tools {
         podvm,
         modules: m,
         engine,
+        image_kernel,
     }))
 }
 

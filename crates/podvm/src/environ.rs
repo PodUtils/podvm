@@ -180,6 +180,18 @@ pub const USER: &[Group] = &[
                  recorded, and a change of the file is refused. --podvm-engine refuses it.",
             ),
             v(
+                "PODVM_MACHINE_IMAGE_KERNEL",
+                "0, 1, a release",
+                "Boots the kernel of the image in place of the pinned kernel (T-1994). 1 takes the \
+                 one kernel of the image (/boot/vmlinuz-RELEASE or \
+                 /usr/lib/modules/RELEASE/vmlinuz), and a release takes that kernel. The guest \
+                 boots on the root disk of the image with the modules of \
+                 /lib/modules/RELEASE of the image. A driver that the run needs and the kernel \
+                 lacks exits 125 by name before the boot. A saved state does not serve it, and \
+                 PODVM_MACHINE_KERNEL, PODVM_MACHINE_ROOT=initramfs, --podvm-engine and an \
+                 arm64 guest exit 125. With no value or 0, the guest boots the pinned kernel.",
+            ),
+            v(
                 "PODVM_MACHINE_KERNEL_ARM64",
                 "a file",
                 "Names the kernel of a linux/arm64 guest.",

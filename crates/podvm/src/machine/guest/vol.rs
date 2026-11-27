@@ -301,7 +301,7 @@ fn join_held(file: &str) -> Result<bool, String> {
 /// The subcommand. Exit 0 where each volume is mounted, 1 otherwise.
 pub fn main(args: &[String]) -> i32 {
     let mut failed = Vec::new();
-    for m in MODULES {
+    for m in super::net::pinned(&MODULES) {
         if let Err(e) = super::net::load(m) {
             failed.push(e);
         }

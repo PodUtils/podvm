@@ -1,0 +1,83 @@
+Run: python3 -I experiments/491-machine-image-kernel.py as uid 1000 (setpriv), with the release build of this commit's tree and PODVM_491_DEBS = a directory with the two packages (each checked by its SHA-256). WORK names the owned scratch directory.
+Does a machine guest boot the kernel of its image, with systemd of the image as PID 1, a 9p volume and the exit code of the command?
+2026-11-27T06:23:59Z Linux 6.18.44-fc-v880, uid 1000, TCG, no /dev/kvm: True
+podvm SHA-256 960e713ae46e4111004654aa59cd99c00ae94c24ad032210a16603fc4e0d492b
+image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b
+kernel debian: 6.12.117+deb13-amd64, linux-image-6.12.117+deb13-amd64_6.12.117-1_amd64.deb SHA-256 ca712d36790184f6ac125ce2b20ea4e2202ae6bb7817b7de268f1f0115ccda73
+kernel cloud: 6.12.117+deb13-cloud-amd64, linux-image-6.12.117+deb13-cloud-amd64_6.12.117-1_amd64.deb SHA-256 e9893e5295d0549b8852611f12a4b8b5f6cc4b8128dcc2086b9847793b904ab7
+$ podvm pull -q ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b
+  | exit 0 in 14.6 s
+$ podvm save -o WORK/arch.tar ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b
+  | exit 0 in 0.5 s
+  | podvm save: saved ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b as 6 blobs (185.4 MiB), digest sha256:9bef8f23f6fb578d4c8e309d14fe1714ffdea2e967a5e4652dad65abf69d75d9
+  | linux-image-6.12.117+deb13-amd64_6.12.117-1_amd64.deb: 4230 modules, a layer of 107 MiB
+$ podvm load -i WORK/debian.tar
+  | exit 0 in 5.2 s
+  | Loaded image: localhost/kern491-debian:1
+  | linux-image-6.12.117+deb13-cloud-amd64_6.12.117-1_amd64.deb: 1138 modules, a layer of 34 MiB
+$ podvm load -i WORK/cloud.tar
+  | exit 0 in 4.9 s
+  | Loaded image: localhost/kern491-cloud:1
+$ PODVM_MACHINE_IMAGE_KERNEL=1 podvm run --rm --verbose --podvm-tier=machine --podvm-net none --podvm-init=image -v WORK/vol:/data localhost/kern491-debian:1 sh -c PAYLOAD
+  | exit 7 in 28.8 s
+  | KERNEL=6.12.117+deb13-amd64
+  | PID1=systemd PID2=kthreadd
+  | STATE=running
+  | HOSTFILE=from-host
+  | MODULES=9p,9pnet,9pnet_virtio,crc16,crc32c_generic,ext4,jbd2,mbcache,netfs,overlay,virtio_blk,
+  | fccd9a525e0c: Extracted (33146 entries, 0 whiteouts); 0 extended attributes set, 2 not set (the first: security.capability of usr/bin/newgidmap, EPERM; the sidecar names each)
+  | 8f1a3f638556: Extracted (10 entries, 0 whiteouts)
+  | f9b891f38f9e: Extracted (2 entries, 0 whiteouts)
+  | 2dacb2369e13: Extracted (6 entries, 0 whiteouts)
+  | e0e3e0934cc1: Extracted (5210 entries, 0 whiteouts)
+  | podvm run: this host has no QEMU; podvm fetches the static QEMU 11.1.3 and its firmware (25 MiB) into WORK/store/tools/qemu-11.1.3 (TODO/machine.md T-1875)
+  | podvm run: the store copy of QEMU 11.1.3 is in WORK/store/tools/qemu-11.1.3
+  | podvm run: machine tier: a guest under TCG (the emulator process is the boundary, not hardware isolation), root disk built now, systemd of the image as PID 1 of the guest (T-1994), the kernel 6.12.117+deb13-amd64 of the image (TODO/machine.md T-1656)
+  | podvm run: machine tier: -v WORK/vol:/data is a 9p mount of the host directory: a write in the guest lands there, with the host user's ownership (TODO/machine.md T-1723)
+PASS 1: exit 7, uname -r 6.12.117+deb13-amd64, PID1=systemd PID2=kthreadd, state running, the volume from-host/from-guest, saved states []
+$ PODVM_MACHINE_IMAGE_KERNEL=1 podvm run --rm --podvm-tier=machine --storage-opt size=256m localhost/kern491-debian:1 sh -c echo KERNEL=$(uname -r); echo NET=$(cat /proc/net/fib_trie | grep -c 10.0.2.15); echo ROOT=$(df -k / | tail -1); exit 3
+  | exit 3 in 4.7 s
+  | KERNEL=6.12.117+deb13-amd64
+  | NET=2
+  | ROOT=overlay 258016 44 252732 1% /
+PASS 2: exit 3, uname -r 6.12.117+deb13-amd64, 10.0.2.15 in 2 lines of fib_trie, the root overlay 258016 44 252732 1% /
+$ PODVM_MACHINE_IMAGE_KERNEL=1 podvm run -d --name k491 --podvm-tier=machine --podvm-net none --podvm-init=image localhost/kern491-debian:1 sleep 600
+  | exit 0 in 0.2 s
+  | d047ad30f7f86d5da2c46408df0952a0430773746d4b7417ce98fa82c57ee308
+$ podvm exec k491 sh -c echo KERNEL=$(uname -r) PID1=$(cat /proc/1/comm); exit 4
+  | exit 4 in 19.5 s
+  | KERNEL=6.12.117+deb13-amd64 PID1=systemd
+$ podvm stop k491
+  | exit 0 in 0.3 s
+  | k491
+$ podvm rm k491
+  | exit 0 in 0.0 s
+  | k491
+PASS 3: run -d held, exec gave KERNEL=6.12.117+deb13-amd64 PID1=systemd, stop exited 0, rm 0
+$ PODVM_MACHINE_IMAGE_KERNEL=6.12.117+deb13-cloud-amd64 podvm run --rm --podvm-tier=machine localhost/kern491-cloud:1 sh -c echo KERNEL=$(uname -r)
+  | exit 0 in 13.7 s
+  | KERNEL=6.12.117+deb13-cloud-amd64
+PASS 4: exit 0, uname -r 6.12.117+deb13-cloud-amd64
+$ PODVM_MACHINE_IMAGE_KERNEL=1 podvm run --rm --podvm-tier=machine -v WORK/vol:/data localhost/kern491-cloud:1 true
+  | exit 125 in 0.0 s
+  | podvm run: machine tier: the guest kernel: PODVM_MACHINE_IMAGE_KERNEL: the kernel 6.12.117+deb13-cloud-amd64 of the image has no 9pnet_virtio (CONFIG_NET_9P_VIRTIO is not set) and 9p (CONFIG_9P_FS is not set) for a -v volume (9p): not in its modules.dep, not in its modules.builtin
+PASS 5: exit 125 in 0.0 s, 1 line(s) that name 9p
+$ PODVM_MACHINE_IMAGE_KERNEL=1 podvm run --rm --podvm-tier=machine ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b true
+  | exit 125 in 7.4 s
+  | podvm run: machine tier: the guest kernel: PODVM_MACHINE_IMAGE_KERNEL: the image has no kernel: no /boot/vmlinuz-RELEASE and no /usr/lib/modules/RELEASE/vmlinuz
+$ PODVM_MACHINE_IMAGE_KERNEL=9.9.9 podvm run --rm --podvm-tier=machine localhost/kern491-debian:1 true
+  | exit 125 in 0.0 s
+  | podvm run: machine tier: the guest kernel: PODVM_MACHINE_IMAGE_KERNEL: the image has no kernel of the release 9.9.9 (its kernels: 6.12.117+deb13-amd64)
+$ PODVM_MACHINE_IMAGE_KERNEL=1 PODVM_MACHINE_KERNEL=/nonexistent podvm run --rm --podvm-tier=machine localhost/kern491-debian:1 true
+  | exit 125 in 0.0 s
+  | podvm run: machine tier: the guest kernel: PODVM_MACHINE_IMAGE_KERNEL and PODVM_MACHINE_KERNEL each name a kernel of the guest: set one
+$ PODVM_MACHINE_IMAGE_KERNEL=1 PODVM_MACHINE_ROOT=initramfs podvm run --rm --podvm-tier=machine localhost/kern491-debian:1 true
+  | exit 125 in 0.0 s
+  | podvm run: machine tier: the guest kernel: PODVM_MACHINE_IMAGE_KERNEL does not serve PODVM_MACHINE_ROOT=initramfs: the kernel of the image boots on the root disk of the image only
+PASS 6: each refusal exited 125 and named its reason; failed: []
+$ podvm run --rm --podvm-tier=machine localhost/kern491-debian:1 sh -c echo KERNEL=$(uname -r)
+  | exit 0 in 6.9 s
+  | KERNEL=6.12.110-0-virt
+PASS 7: exit 0, uname -r 6.12.110-0-virt with no variable
+PASS 8: 0 emulator(s), and run directories or partial files []
+THE GUEST BOOTS THE KERNEL OF ITS IMAGE

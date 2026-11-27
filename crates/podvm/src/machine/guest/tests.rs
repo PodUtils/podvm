@@ -43,6 +43,7 @@ fn the_run_archive_carries_init_and_the_console_nodes() {
             podvm: b"ELF".to_vec(),
             modules: vec![("virtio_net".to_string(), b"KO".to_vec())],
             engine: vec!["veth".to_string()],
+            image_kernel: Some("6.12.1-test".to_string()),
         }),
         &[],
         None,
@@ -52,6 +53,11 @@ fn the_run_archive_carries_init_and_the_console_nodes() {
     assert_eq!(cpio::member(&a, "/virtio_net.ko"), Some(&b"KO"[..]));
     // TODO/machine.md T-1780: the init loads the names of the list.
     assert_eq!(cpio::member(&a, "podvm/engine.list"), Some(&b"veth\n"[..]));
+    // TODO/machine.md T-1994: the mark of the kernel of the image.
+    assert_eq!(
+        cpio::member(&a, "podvm/modules/image-kernel"),
+        Some(&b"6.12.1-test\n"[..])
+    );
     let text = String::from_utf8_lossy(&a);
     assert!(text.contains("dev/console\0") && text.contains("dev/ttyS0\0"));
     assert!(text.contains("podvm-init\0") && text.contains("echo hi"));

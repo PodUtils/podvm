@@ -84,6 +84,7 @@ Separate crate: `crates/podvm-interpose`.
 | `pod-ws` | `0.86.0` |
 | `rustls` | `0.23.46` |
 | `rustls-pki-types` | `1.16.0` |
+| `ruzstd` | `0.9.1` |
 | `serde` | `1.0.229` |
 | `serde_json` | `1.0.154` |
 | `sha1` | `0.11.0` |

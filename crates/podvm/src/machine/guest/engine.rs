@@ -49,10 +49,16 @@ pub const TOP: &[&str] = &[
     "ip6table_filter",
 ];
 
-/// The name of a module of a path of `modules.dep`.
-fn name_of(path: &str) -> String {
+/// The name of a module of a path of `modules.dep`: the file name with no
+/// suffix of a module, plain or compressed, and `_` for `-`, as kmod
+/// compares names (TODO/machine.md T-1994: the modules of an image).
+pub(super) fn name_of(path: &str) -> String {
     let file = path.rsplit('/').next().unwrap_or(path);
-    file.trim_end_matches(".ko").replace('-', "_")
+    let stem = super::kernel_image::SUFFIXES
+        .iter()
+        .find_map(|s| file.strip_suffix(s))
+        .unwrap_or(file);
+    stem.replace('-', "_")
 }
 
 /// The modules of `top` and of their dependencies, in an order where each

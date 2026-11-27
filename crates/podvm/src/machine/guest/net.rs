@@ -199,12 +199,23 @@ fn load_named(names: &[String]) -> i32 {
     rc
 }
 
+/// The modules of the pin that a step of the guest loads: none where
+/// `guest-root` loaded each module of the kernel of the image
+/// (TODO/machine.md T-1994, [`super::kernel_image::MARK`]).
+pub(crate) fn pinned<'a>(names: &'a [&'a str]) -> &'a [&'a str] {
+    if std::path::Path::new(super::kernel_image::MARK).exists() {
+        &[]
+    } else {
+        names
+    }
+}
+
 pub fn main(args: &[String]) -> i32 {
     if args.first().is_some_and(|a| a == "--load") {
         return load_named(&args[1..]);
     }
     let mut failed = Vec::new();
-    for m in MODULES {
+    for m in pinned(&MODULES) {
         if let Err(e) = load(m) {
             failed.push(e);
         }

@@ -177,11 +177,13 @@ pub fn root_of(r: &super::Request) -> Result<(PathBuf, root::Got), String> {
 /// cannot have a disk, or the modules of the disk added to `modules`
 /// (each name once). `pinned`: the kernel has the module set of the pin.
 /// The names of the disk's modules come back in the order of their load;
-/// none where the run has neither.
+/// none where the run has neither. `own`: the modules of the kernel of
+/// the image in place of the pinned set (T-1994, `kernel_image`).
 pub fn add_modules(
     r: &super::Request,
     root: bool,
     pinned: bool,
+    own: Option<&[(String, PathBuf)]>,
     modules: &mut Vec<(String, PathBuf)>,
 ) -> Result<Vec<String>, String> {
     if let Some(bytes) = r.disk
@@ -193,7 +195,11 @@ pub fn add_modules(
         return Ok(Vec::new());
     }
     let mut names = Vec::new();
-    for (n, p) in self::modules(r.store_root)? {
+    let set = match own {
+        Some(o) => o.to_vec(),
+        None => self::modules(r.store_root)?,
+    };
+    for (n, p) in set {
         names.push(n.clone());
         if !modules.iter().any(|(m, _)| *m == n) {
             modules.push((n, p));
