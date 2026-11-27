@@ -8,6 +8,30 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: the payload no longer changes a mount of its run on most paths of the namespace rung, 2026-11-27
+
+Record: T-2105 (PodUtils/podrunner#378).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- A foreground `run` of a user with no root, `exec` into it, `run -d`,
+  `create` and `start` with an overlay volume, and each verb of uid 0 of a
+  user namespace of one id put the payload in a user namespace under the
+  one that made the mounts of the run. The payload stays uid 0. A remount
+  of a `:ro` volume writable, a remount that clears `nosuid`, `nodev` or
+  `noexec`, a remount of `--tmpfs GUEST:size=N` with another size, and an
+  unmount of a volume or a tmpfs fail with `EPERM`, also in a mount
+  namespace that the payload opens. Before, each of them worked, and a
+  write through the volume changed the host file.
+- Known gap: `run -d`, `create` and `start` of a user with no root (with
+  no overlay volume), each verb of root, and a foreground run with the
+  subordinate range keep the fault until pod-enter nests the payload. On
+  each path of the rung, a payload of uid 0 can leave the `chroot` of the
+  tree and open host files with the rights of its ids, the source of a
+  `:ro` volume included; this needs `pivot_root` in pod-enter. Where
+  this matters, use `--podvm-confine` (measured as uid 1000: Landlock
+  refuses the remount, and the write to the host file after the way out)
+  or a copy of the data.
+
 ### Added: `run -d` of a guest with systemd as PID 1, and its stop, 2026-11-26
 
 Record: T-1994 (PodUtils/podrunner#313 ask 2).

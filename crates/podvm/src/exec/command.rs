@@ -435,12 +435,12 @@ pub fn exec(args: &[String]) -> i32 {
         no_new_privs: false,
         die_with_parent: false,
         confine: None,
-        hostname: None,       // T-1908: the name rides in the env of the record
-        volumes: Vec::new(),  // T-1920: `exec` joins the mounts of the run
-        userns_ids: None,     // podcrates `v0.62.0`; T-1927 fills it for `run -d`
+        hostname: None,      // T-1908: the name rides in the env of the record
+        volumes: Vec::new(), // T-1920: `exec` joins the mounts of the run
+        userns_ids: podvm_enter::lock::payload_ids(None), // T-2105: a fresh entry nests
         pid_namespace: false, // podcrates `v0.65.0`; T-1930 sets it for `run -d`
-        relay_title: None,    // podcrates `v0.82.1`: no init and no relay here
-        tmpfs: Vec::new(),    // podcrates `v0.86.0` (T-2102)
+        relay_title: None,   // podcrates `v0.82.1`: no init and no relay here
+        tmpfs: Vec::new(),   // podcrates `v0.86.0` (T-2102)
     };
     if let Err(c) = serve_devices(&mut plan, &mut err) {
         drop(memo);

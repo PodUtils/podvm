@@ -237,9 +237,10 @@ fn enter_in_launcher(
             Vec::new()
         },
         // TODO/enter.md T-1927: the ids of `--user` or the image's `USER`
-        // inside the user namespace of the namespace rung.
+        // inside the user namespace of the namespace rung; T-2105: else
+        // 0:0 in a namespace of one id (`podvm_enter::lock`).
         userns_ids: (container.rung == "namespace")
-            .then(|| table::userns_ids_of(&env))
+            .then(|| podvm_enter::lock::payload_ids(table::userns_ids_of(&env)))
             .flatten(),
         // TODO/enter.md T-1930 (PodUtils/podrunner#200): a PID namespace
         // with its own `/proc` on the namespace rung (podcrates `v0.65.0`;
@@ -323,6 +324,8 @@ fn enter_in_launcher(
                 )
             })
             .map_err(|e| format!("starting with an overlay volume: {e}"))?;
+        // TODO/enter.md T-2105: the payload under the namespace of the layers.
+        plan.userns_ids = podvm_enter::lock::payload_ids(plan.userns_ids);
         podvm_enter::spawn_namespace(&root, &plan, log).map_err(spawn_failure)?
     } else if container.userland_exec.is_empty() {
         let findings = podvm_probe::run();

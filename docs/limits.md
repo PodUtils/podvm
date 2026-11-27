@@ -63,6 +63,18 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   image), podvm prints why and refuses the volume on the chroot rung; it
   refuses one on the memfd family too. A working directory or a first program in a volume resolves
   through the same table, to the file of the volume.
+- The mounts of the namespace rung (T-2105). A foreground `run` of a user
+  with no root, `exec` into it, `run -d`, `create` and `start` with an
+  overlay volume, and each verb of uid 0 of a user namespace of one id run
+  the payload in a user namespace under the one that made the mounts: a
+  remount of a volume, of `/proc` or of a sized tmpfs, and an unmount, fail
+  with `EPERM`. `run -d`, `create` and `start` of a user with no root and
+  no overlay volume, each verb of root, and a foreground run with the
+  subordinate range (T-1911) do not: there the payload can remount a `:ro`
+  volume writable and change the host file. On each path the rung enters
+  the tree with `chroot`, and a payload of uid 0 can leave it and open host
+  files with the rights of its ids. `--podvm-confine` holds against both
+  (Landlock).
 - `-v HOST:GUEST:overlay` (T-2101) holds on the namespace rung only, also
   with `run -d`, `create` and `start`: HOST, a directory, is the read-only
   lower layer of an overlayfs mount on GUEST, in a user namespace

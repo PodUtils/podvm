@@ -70,7 +70,16 @@ pub(super) fn join_if() {
         let theirs = std::fs::read_link(format!("/proc/{pid}/ns/{ns}"));
         matches!((&ours, &theirs), (Ok(a), Ok(b)) if a != b)
     };
-    let mut flags = CLONE_NEWUSER;
+    // TODO/enter.md T-2105: the payload of a foreground run is in a user
+    // namespace under the one that owns the mounts of the run. This process
+    // joins the owner, and pod-enter joins the payload's own namespace with
+    // its mounts in one call (`ns_join`).
+    use super::lock::Owner;
+    let owner = super::lock::mount_owner(pid);
+    let mut flags = match owner {
+        Owner::Payload => CLONE_NEWUSER,
+        Owner::Ours | Owner::Other(_) => 0,
+    };
     if differs("uts") {
         flags |= CLONE_NEWUTS;
     }
@@ -78,8 +87,13 @@ pub(super) fn join_if() {
     if pid_ns {
         flags |= CLONE_NEWPID;
     }
+    let into_owner = match &owner {
+        // SAFETY: a descriptor of a user namespace, on one thread.
+        Owner::Other(o) => unsafe { setns(std::os::fd::AsRawFd::as_raw_fd(o), CLONE_NEWUSER) == 0 },
+        Owner::Payload | Owner::Ours => true,
+    };
     // SAFETY: a pidfd and namespace types, on one thread.
-    let joined = fd >= 0 && unsafe { setns(fd as i32, flags) } == 0;
+    let joined = fd >= 0 && into_owner && (flags == 0 || unsafe { setns(fd as i32, flags) } == 0);
     if !joined {
         // ⛔ Not on with the verb: outside the namespaces of the run, the
         // command would act on the host's processes and files.

@@ -255,8 +255,9 @@ fn run_inner(args: &[String], r: &mut super::report::Report) -> i32 {
         // binds the volumes itself (`userns::bind_volumes`), except those
         // at or under `/tmp`, which pod-enter binds after its tmpfs (OQ-01).
         volumes,
-        // TODO/enter.md T-1927: the ids of `--user` or the image's `USER`.
-        userns_ids: podvm_supervise::table::userns_ids_of(&p.env),
+        // TODO/enter.md T-1927: the ids of `--user` or the image's `USER`;
+        // T-2105: else 0:0 in a namespace of one id (`podvm_enter::lock`).
+        userns_ids: podvm_enter::lock::payload_ids(podvm_supervise::table::userns_ids_of(&p.env)),
         // TODO/enter.md T-2054 item 1: pod-enter's PID namespace where podvm
         // opened none (uid 0, `PODVM_USERNS=0`), as `run -d` (T-1930).
         pid_namespace: pid_init,
