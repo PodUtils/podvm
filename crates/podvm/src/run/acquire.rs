@@ -100,6 +100,7 @@ pub(super) fn with_opened(
             name: o.name.clone(),
             added: o.ask.add_hosts.clone(),
         }),
+        mounts: Some(o.hardening.mounts.clone().unwrap_or_default()), // T-2108: empty too
         ..super::report::with_detached_path(o.hardening.clone(), o.detach)
     }
 }

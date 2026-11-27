@@ -8,6 +8,21 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: `inspect` of a container gives docker's `.Mounts` and `.HostConfig.Binds`, 2026-11-27
+
+Record: T-2108 (OR-B42-08).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- The record of a container keeps one list of the mounts of its run: each
+  `-v` and each `--tmpfs`, the same for each rung and tier. `inspect`
+  gives docker's `.Mounts` (one object for each `-v`, with `Type`,
+  `Source`, `Destination`, `Mode`, `RW` and `Propagation`; `[]` where there
+  is none), `.HostConfig.Binds` and `.HostConfig.Tmpfs`. Before, `.Mounts`
+  and `.HostConfig` were unknown fields, and
+  `{{range .Mounts}}{{.Source}}:{{.Destination}}{{end}}` failed with exit 1.
+- A record of an older podvm has no list: `inspect` reads its mounts from
+  `PODVM_BINDS` and `PODVM_TMPFS` of the record.
+
 ### Fixed: the init of the image on the namespace rung applies `--ulimit`, no-new-privileges and `--device`, 2026-11-27
 
 Record: T-2017.

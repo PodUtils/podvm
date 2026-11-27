@@ -181,12 +181,12 @@ usage: podvm inspect [--format T] [--verbose] [--podvm-tier incus] <image> [imag
 
   A container: .Id .Name .Image .State .Status .Pid .ExitCode .Created
     .StartedAt .FinishedAt .Rung .Tier .Labels .Command .Config (with
-    .Config.Env .Config.Cmd .Config.Image .Config.WorkingDir
-    .Config.Labels), and docker's
-    .State.Status .State.Running .State.ExitCode .State.Pid
-    .State.StartedAt .State.FinishedAt. .State alone is the word (created,
-    running, exited, dead); the JSON gives State as docker's object, with
-    null for an exit code that does not exist yet.
+    .Config.Env .Config.Cmd .Config.Image .Config.WorkingDir .Config.Labels),
+    and docker's .State.Status .State.Running .State.ExitCode .State.Pid
+    .State.StartedAt .State.FinishedAt .Mounts (each -v; [] for none)
+    .HostConfig.Binds .HostConfig.Tmpfs (T-2108). .State alone is the word
+    (created, running, exited, dead); the JSON gives State as docker's
+    object, with null for an exit code that does not exist yet.
 
   An instance of the incus tier: .Id .Name .Image .State .State.Status
     .State.Running .State.ExitCode .Status .Running .ExitCode .Created
