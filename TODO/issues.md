@@ -595,6 +595,8 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #699 | [gh action] requested | closed (gate 45958922063 failed on `ddbc820`: the `stop -t -1` row of `number_flags`; fixed in `71142da`) | the gate after T-1947 and T-2108 (`stop -t -1`) on `ddbc820` |
 | #700 | [gh action] requested | closed (gate 45960813246 failed on `cd952a3`: `cp_stream.rs` left a `podvm-*` directory, T-1859; fixed with `PODVM_SPARE_TREE=0` and the guard `spare_tree_off.rs`) | the gate after the fix of the `stop -t -1` row (`71142da`) on `cd952a3` |
 | #701 | COORD-271: pod-enter and pod-supervise: the argv and the environment of the payload as bytes, so that a word that is not UTF-8 reaches execve (to podcrates) | open | T-2087, T-2108 |
+| #702 | [gh action] requested | open | the gate after the spare-tree fix, the arguments that are not UTF-8, the controlling terminal of `-it` and the `--format` templates, on `2497a26` |
+| #703 | COORD-272: a shared crate for docker's `--format` templates (a bounded part of Go's text/template) (to podcrates) | open | T-2087 |
 
 ## Messages whose title does not start with COORD-NNN
 
