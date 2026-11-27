@@ -432,7 +432,13 @@ pub(super) fn enter(
     // ⭐ TODO/enter.md T-1410: the shared entry decision drives here. The
     // container's memo is its own: nothing ephemeral is removed on a way out.
     super::tty::proc_of();
-    let relay = super::tty::start(term, o.interactive);
+    // T-2070: a join of a run of root enters its PID namespace, which this
+    // process is not a member of; the join of a user namespace (T-1910)
+    // made this process a member.
+    let outside = userland.is_none()
+        && joins_the_run(state, &container.rung, container.pid)
+        && !crate::userns::joined();
+    let relay = super::tty::start(term, o.interactive, outside);
     let code = match &userland {
         Some(u) => {
             let outcome = crate::lifecycle::enter_userland_with(

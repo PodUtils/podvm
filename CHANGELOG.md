@@ -76,21 +76,24 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
   with one line and exit 1. `inspect` with a template that fits no image
   and no container names the field that fails for each kind.
 
-### Fixed: the pty of `-it` is the controlling terminal of the payload of a user, 2026-11-27
+### Fixed: the pty of `-it` is the controlling terminal of the payload, 2026-11-27
 
 Record: T-2070 (OR-B38-17), T-2087 (OR-B40-13).
 Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 
-- As a user with no root on the namespace rung, `run -it IMAGE sh` and
-  `exec -it CTR sh` into a `run -d` give the shell the pty as its
-  controlling terminal. The shell no longer says "can't access tty; job
-  control turned off": its group is the foreground group of the pty,
-  Ctrl-C ends its foreground job and the shell goes on, and Ctrl-Z stops
-  the job. podvm leads the session of the pty, as the parent of the
-  payload.
-- Known gap: as root and with `-t` and no `-i`, the pty is still the
-  controlling terminal of no process. That needs the session of the
-  payload in podcrates (podcrates@T-927, COORD-188).
+- `run -it IMAGE sh` and `exec -it CTR sh` into a `run -d` give the shell
+  the pty as its controlling terminal on the namespace rung of a user and
+  on the userland rung of a host with no user namespace (a GitHub
+  runner). The shell no longer says "can't access tty; job control turned
+  off": its group is the foreground group of the pty, Ctrl-C ends its
+  foreground job and the shell goes on, and Ctrl-Z stops the job. podvm
+  leads the session of the pty, as the parent of the payload. Where a
+  shell started podvm, podvm forks once at its start to lead that
+  session; before, the payload of such a run stayed in the caller's
+  session, with the caller's terminal.
+- Known gap: on the namespace rung of root and with `-t` and no `-i`, the
+  pty is still the controlling terminal of no process. That needs the
+  session of the payload in podcrates (podcrates@T-927, COORD-188).
 
 ### Fixed: findings of the outside passes: arguments that are not UTF-8, the least memory of a guest, the banner of `probe`, 2026-11-27
 

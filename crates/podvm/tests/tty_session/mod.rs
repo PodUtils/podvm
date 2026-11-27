@@ -19,6 +19,81 @@ use super::host_image::text;
 unsafe extern "C" {
     fn ioctl(fd: c_int, req: c_ulong, ...) -> c_int;
     fn setsid() -> c_int;
+    fn unshare(flags: c_int) -> c_int;
+    fn open(path: *const std::ffi::c_char, flags: c_int, ...) -> c_int;
+    fn getuid() -> u32;
+    fn getgid() -> u32;
+}
+
+/// Where podvm runs: as the test runs, or in a user namespace of its own
+/// where no further user namespace can be made (`max_user_namespaces` 0),
+/// as on a host that refuses them to a user (the runner of GitHub, whose
+/// AppArmor refuses them): there podvm takes the userland rung.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Prep {
+    Host,
+    NoUserns,
+}
+
+/// The four files that make the user namespace of [`Prep::NoUserns`]: the
+/// caller keeps its uid and gid, and the namespace allows no child.
+fn no_userns_files() -> Vec<(std::ffi::CString, Vec<u8>)> {
+    // SAFETY: getuid and getgid cannot fail.
+    let (uid, gid) = unsafe { (getuid(), getgid()) };
+    [
+        ("/proc/self/setgroups", "deny".to_string()),
+        ("/proc/self/uid_map", format!("{uid} {uid} 1")),
+        ("/proc/self/gid_map", format!("{gid} {gid} 1")),
+        ("/proc/sys/user/max_user_namespaces", "0".to_string()),
+    ]
+    .into_iter()
+    .map(|(p, v)| (std::ffi::CString::new(p).unwrap(), v.into_bytes()))
+    .collect()
+}
+
+/// In the child, before the exec: system calls only, on buffers made
+/// before the fork. The exec of a program by a user that is not uid 0
+/// drops each capability of the new namespace.
+fn enter_no_userns(files: &[(std::ffi::CString, Vec<u8>)]) -> std::io::Result<()> {
+    const CLONE_NEWUSER: c_int = 0x1000_0000;
+    const O_WRONLY: c_int = 1;
+    // SAFETY: each path is a C string and each buffer lives for the call.
+    unsafe {
+        if unshare(CLONE_NEWUSER) != 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        for (path, value) in files {
+            let fd = open(path.as_ptr(), O_WRONLY);
+            if fd < 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            // One write call; the drop closes the descriptor.
+            std::fs::File::from_raw_fd(fd).write_all(value)?;
+        }
+    }
+    Ok(())
+}
+
+/// podvm on `store`, as `prep` says; the caller adds the arguments.
+pub fn podvm_on(store: &Path, prep: Prep) -> Command {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_podvm"));
+    cmd.env("PODVM_SPARE_TREE", "0").env("PODVM_STORE", store);
+    if prep == Prep::NoUserns {
+        let files = no_userns_files();
+        // SAFETY: the hook makes system calls only.
+        unsafe { cmd.pre_exec(move || enter_no_userns(&files)) };
+    }
+    cmd
+}
+
+/// True where this host lets the test make the namespace of
+/// [`Prep::NoUserns`]; false where it refuses each user namespace already.
+pub fn can_prep_no_userns() -> bool {
+    let mut cmd = Command::new("/bin/sh");
+    let files = no_userns_files();
+    // SAFETY: the hook makes system calls only.
+    unsafe { cmd.pre_exec(move || enter_no_userns(&files)) };
+    cmd.args(["-c", "true"]).status().is_ok_and(|s| s.success())
 }
 
 const TIOCGPTN: c_ulong = 0x8004_5430;
@@ -66,8 +141,22 @@ pub fn session(
     args: &[&str],
     steps: &[(&[u8], &str, usize)],
 ) -> Result<(i32, String), String> {
+    session_on(store, Prep::Host, args, steps).map(|(code, out, _)| (code, out))
+}
+
+/// [`session`] as `prep` says; also gives the session of the caller's
+/// terminal (`TIOCGSID` of its master; the spawn returns after the exec,
+/// so after the `setsid` of the hook): the session of podvm, which leads
+/// it, as the test sees pids.
+pub fn session_on(
+    store: &Path,
+    prep: Prep,
+    args: &[&str],
+    steps: &[(&[u8], &str, usize)],
+) -> Result<(i32, String, i64), String> {
     let (master, slave) = pty().ok_or("no pty")?;
     let fd = slave.as_raw_fd();
+    let files = (prep == Prep::NoUserns).then(no_userns_files);
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_podvm"));
     cmd.env("PODVM_SPARE_TREE", "0")
         .env("PODVM_STORE", store)
@@ -78,14 +167,17 @@ pub fn session(
         cmd.stdin(Stdio::from(OwnedFd::from_raw_fd(libc_dup(fd))))
             .stdout(Stdio::from(OwnedFd::from_raw_fd(libc_dup(fd))))
             .stderr(Stdio::from(OwnedFd::from_raw_fd(libc_dup(fd))))
-            .pre_exec(|| {
+            .pre_exec(move || {
                 // The terminal of a terminal emulator: a session of its own
                 // whose controlling terminal is the pty.
                 setsid();
                 if ioctl(0, TIOCSCTTY, 0) != 0 {
                     return Err(std::io::Error::last_os_error());
                 }
-                Ok(())
+                match &files {
+                    Some(f) => enter_no_userns(f),
+                    None => Ok(()),
+                }
             });
     }
     let mut child = cmd.spawn().map_err(|e| e.to_string())?;
@@ -103,6 +195,11 @@ pub fn session(
         }
     });
     let mut master = master;
+    const TIOCGSID: c_ulong = 0x5429;
+    let mut sid: c_int = 0;
+    // SAFETY: TIOCGSID of a master writes the session of its slave.
+    unsafe { ioctl(master.as_raw_fd(), TIOCGSID, &mut sid) };
+    let caller = i64::from(sid);
     let seen = |want: &str, times: usize| text(&out.lock().unwrap()).matches(want).count() >= times;
     let mut result = Ok(());
     std::thread::sleep(Duration::from_millis(500));
@@ -138,7 +235,7 @@ pub fn session(
     std::thread::sleep(Duration::from_millis(200));
     let all = text(&out.lock().unwrap());
     result
-        .map(|()| (code, all.clone()))
+        .map(|()| (code, all.clone(), caller))
         .map_err(|e| format!("{e}; output: {all:?}"))
 }
 
