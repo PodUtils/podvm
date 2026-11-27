@@ -130,7 +130,7 @@ builds static musl binaries under `target/x86_64-unknown-linux-musl/release/`.
 The build status verifies input and output bytes.
 
 For repository work, read [AGENTS.md](AGENTS.md) first.
-For Claude Code and Codex, see [Hosted sessions](docs/hosted-sessions.md).
+For Claude Code, Codex, and Gemini / Antigravity Cloud, see [Hosted sessions](docs/hosted-sessions.md).
 Use `podvm-dev session --check` for a lane report. Use `podvm-dev check`
 for the complete Linux check ([the gate](docs/methodology/gate.md)).
 
@@ -241,7 +241,7 @@ Each later tag has the podvm identity and `podvm-*` assets. `podvm-verify` decid
 | --- | --- |
 | [AGENTS.md](AGENTS.md) | Session entry point and task routing |
 | [HUMAN.md](HUMAN.md) | Operator procedure |
-| [Hosted sessions](docs/hosted-sessions.md) | Claude Code and Codex startup and worker roles |
+| [Hosted sessions](docs/hosted-sessions.md) | Claude Code, Codex, and Gemini / Antigravity startup and worker roles |
 | [Architecture](docs/architecture.md) | Execution paths and data boundaries |
 | [Code map](docs/code-map.md) | Source ownership |
 | [Limits](docs/limits.md) | Current constraints and proof gaps |

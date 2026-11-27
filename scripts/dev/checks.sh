@@ -11,7 +11,11 @@
 # the record only).
 
 set -u
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/../.." || exit 1
+if [ -f scripts/cloud-env.sh ]; then
+	# shellcheck source=scripts/cloud-env.sh
+	. ./scripts/cloud-env.sh || exit 1
+fi
 fail=0
 step() {
 	name=$1

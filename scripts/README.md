@@ -8,8 +8,9 @@ for a lane report when a task needs one.
 
 | Script | Purpose |
 | --- | --- |
-| session-start.sh | Git identity and hook setup, and pinned watchers for the lead checkout |
-| cloud-setup.sh | Pinned Zig and Rust toolchains, including Cargo and the musl target, and a host report |
+| session-start.sh | Git identity, hook setup, and pinned watchers (`--no-watchers`, `--run-watcher`) |
+| cloud-setup.sh | Pinned Zig and Rust toolchains, musl target, optional `--dev-tools`, and a host report |
+| cloud-env.sh | Shell environment (`PATH`, bounded `CARGO_BUILD_JOBS`, `CARGO_NET_GIT_FETCH_WITH_CLI`) |
 | common/fetch-zig.sh | Download Zig for cloud and CI setup and check the SHA-256 pin |
 | qa-bundle.sh BINARY OUTPUT_DIR | Copy a candidate binary, generate its manual, and write SHA256SUMS in a new directory |
 | podvm-dev session | Host report, CodeGraph update, and lane setup |

@@ -117,8 +117,9 @@ The text of 2a and 2b is podcrates' docs/session-protocol.md at
 ## 4. Permissions and tools
 
 * For Claude Code, `.claude/settings.json` allows routine tools in
-  `acceptEdits` mode. For Codex, use the permissions of the current session.
-  Do not ask for permission again for routine commands already authorized.
+  `acceptEdits` mode. For Codex and Gemini / Antigravity Cloud, use the
+  permissions of the current session. Do not ask for permission again for
+  routine commands already authorized.
 * Use shell tools (`git`, `curl`, `cargo`, `gh`) before MCP tools.
 * Use the services of <https://web.pkgforge.dev/llms.txt> first for each
   web or git search and read (the owner's ruling "Web access",
@@ -129,9 +130,10 @@ The text of 2a and 2b is podcrates' docs/session-protocol.md at
   Read the quick card of a service first (`https://SERVICE.web.pkgforge.dev/llms.txt`).
   A 503 or a 429 is temporary: try again, then use the tool of the
   harness. Where the egress of the session refuses the host (403 from the
-  proxy), use the tool of the harness. Use GitHub MCP for issues and
-  comments. Dispatch workflows as shown in section 9. Give this rule to each
-  subagent in its brief.
+  proxy), use the tool of the harness or authenticated `gh`. Use GitHub
+  MCP for issues and comments, or authenticated `gh` when GitHub MCP tools
+  are absent. Dispatch workflows as shown in section 9. Give this rule to
+  each subagent in its brief.
 * Use CodeGraph before a source search when a `.codegraph/` exists.
 * The captured reference trees are not in the tree. Each reference is an
   issue with the label `reference`; `references/README.md` maps them, and
@@ -155,7 +157,9 @@ The project is 0BSD. Carried material keeps its own terms
 
 * Builds can use all the memory of the machine. The lead schedules one
   Cargo build at a time across all worktrees of this repository.
-  `.claude/settings.json` sets `CARGO_BUILD_JOBS=4` for Claude Code.
+  `.claude/settings.json` sets `CARGO_BUILD_JOBS=4` for Claude Code;
+  `scripts/cloud-env.sh` caps default `CARGO_BUILD_JOBS` at the host CPU
+  count when below 4 (2 on Antigravity VMs).
 * The disk is limited. Remove `target/debug` when a build fails with "No
   space left on device".
 * A token, a key or a device id is a credential. Do not put one in output,
@@ -178,7 +182,10 @@ to select each worker's model and effort.
 
 1. Run `sh scripts/session-start.sh` from the checkout in Codex.
    In Claude Code, the `SessionStart` hook calls the same script.
-   Run it by hand if the hook did not run.
+   In Gemini / Antigravity Cloud, `.agents/environment.json` runs
+   `sh scripts/session-start.sh --no-watchers && sh scripts/cloud-setup.sh --dev-tools`
+   at VM startup. Run `sh scripts/session-start.sh` by hand if the hook or
+   environment setup did not run.
 2. Read [the handoff](docs/HANDOFF.md) first when it exists, then
    [the progress record](TODO/PROGRESS.md) (the state and the only work
    order), then [the decisions](docs/decisions.md).
@@ -190,12 +197,16 @@ to select each worker's model and effort.
    2026-11-24) as background processes, each with a log: the watcher of
    the organization (issues, pull requests, COORD messages) and the
    watcher of the Actions runs of this repository.
-   `scripts/session-start.sh` starts each one that does not run. If it
-   reports a failure, follow the recovery in section 9. Do this each
-   session, with no question. Read the logs yourself (`tail .work/watch.log
-   .work/runs.log`) after each push, each dispatch and between steps. A
-   notice of the harness (Monitor, a task notification, an MCP event) can
-   fail to come: never wait for one.
+   `scripts/session-start.sh` starts each one that does not run on Claude
+   Code and Codex. On Gemini / Antigravity Cloud, start each watcher as a
+   persistent daemon task (`IsDaemon: true`):
+   `sh scripts/session-start.sh --run-watcher watch` and
+   `sh scripts/session-start.sh --run-watcher runs`. If a watcher reports a
+   failure, follow the recovery in section 9. Do this each session, with no
+   question. Read the logs yourself (`tail .work/watch.log .work/runs.log`)
+   after each push, each dispatch and between steps. A notice of the
+   harness (Monitor, a task notification, an MCP event) can fail to come:
+   never wait for one.
 6. Set up the pinned toolchain and update `PATH` as shown in
    [Operator procedure](HUMAN.md#cloud-or-linux-session). That procedure
    builds both record tools and runs `podvm-gate`. Tool setup and the record
@@ -222,7 +233,9 @@ watches them.
    each with its SHA-256 and self-test. Keep each running as a background
    process with its log (`.work/watch.log`, `.work/runs.log`; start it again when
    it ends). From the lead checkout, run `sh scripts/session-start.sh`
-   to fetch, test, and restart them. Check both logs after a restart.
+   to fetch, test, and restart them (or `--run-watcher watch` and
+   `--run-watcher runs` as daemon tasks on Gemini / Antigravity Cloud).
+   Check both logs after a restart.
    If a watcher still cannot run, inspect the corresponding issues or
    Actions runs with the tools in section 4 until it runs again.
    `.work/` stays ignored. Ask podcrates for changes to the watchers.
@@ -285,10 +298,11 @@ watches them.
      COORD issue `(to podcrates)`, so that podcrates ports it.
 
 5. The lead dispatches the workflows of this repository. Claude Code uses
-   `actions_run_trigger` (the owner's account). In Codex, check `gh auth
-   status` and use `gh workflow run` when `gh` has access. Verify the
-   run and its revision after dispatch. Read the run and job logs
-   by section 4 (`docs/decisions.md`, 2026-11-09, "Workflow dispatch").
+   `actions_run_trigger` (the owner's account). In Codex and Gemini /
+   Antigravity Cloud, check `gh auth status` and use `gh workflow run` when
+   `gh` has access. Verify the run and its revision after dispatch. Read
+   the run and job logs by section 4 (`docs/decisions.md`, 2026-11-09,
+   "Workflow dispatch").
 
    When the session cannot start a run through an available dispatch route,
    open a NEW issue in this repository titled
