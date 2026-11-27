@@ -151,8 +151,10 @@ fn hostname_flag_takes_a_host_name() {
 
 /// TODO/machine.md T-1993, TODO/enter.md T-2002: `--podvm-init=image`
 /// holds on a foreground `run` (the namespace rung, else the machine
-/// tier) and on the incus tier with `run -d` or `create`; each other
-/// place refuses by name at the parse, and `podvm` holds everywhere.
+/// tier), on `run -d` of the machine tier (systemd as PID 1 of a guest
+/// that stays, T-1994) and on the incus tier with `run -d` or `create`;
+/// each other place refuses by name at the parse, and `podvm` holds
+/// everywhere.
 #[test]
 fn where_the_init_of_the_image_holds() {
     for (verb, flags, holds) in [
@@ -160,7 +162,7 @@ fn where_the_init_of_the_image_holds() {
         ("run", &["--podvm-tier=machine"][..], true),
         // T-2002: a container that stays takes the namespace rung.
         ("run", &["-d"][..], true),
-        ("run", &["-d", "--podvm-tier=machine"][..], false),
+        ("run", &["-d", "--podvm-tier=machine"][..], true),
         ("run", &["-d", "--podvm-tier=incus"][..], true),
         ("run", &["--podvm-tier=incus"][..], false),
         ("run", &["--podvm-tier=syscall"][..], false),

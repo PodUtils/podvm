@@ -90,3 +90,60 @@ pub(super) fn remove(verb: &str, name: &str, force: bool) -> i32 {
         }
     }
 }
+
+/// SIGTERM to the keeper of the guest `r` of `run -d`, and the wait of
+/// `grace` for its end. True where the keeper ended with the guest
+/// and wrote the end of the record; false where it runs on (the caller
+/// then ends the emulator) or no keeper of it runs.
+pub(super) fn sigterm_keeper(r: &machines::Record, grace: Duration) -> bool {
+    if !machines::alive(r.keeper_pid, r.keeper_start) {
+        return false;
+    }
+    let _ = podvm_probe::sys::kill(i64::from(r.keeper_pid), 15);
+    let t0 = Instant::now();
+    while t0.elapsed() < grace {
+        if !r.running() && !machines::alive(r.keeper_pid, r.keeper_start) {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// TODO/machine.md T-1994: `stop` of a guest of `run -d` gives its
+    /// keeper SIGTERM and waits for it: a keeper that ends with the guest
+    /// is a stop with the exit code of the command; one that runs on past
+    /// the grace, or no keeper, is not (the caller then ends the emulator).
+    #[test]
+    fn stop_gives_the_keeper_sigterm_and_waits_for_its_end() {
+        let keeper = |script: &str| {
+            let c = std::process::Command::new("sh")
+                .args(["-c", script])
+                .spawn()
+                .unwrap();
+            std::thread::sleep(Duration::from_millis(200));
+            let pid = c.id();
+            let r = machines::Record {
+                keeper_pid: pid,
+                keeper_start: machines::start_of(pid).unwrap(),
+                ..Default::default()
+            };
+            (c, r)
+        };
+        let grace = Duration::from_secs(2);
+        for (script, ends) in [("exec sleep 30", true), ("trap '' TERM; sleep 5", false)] {
+            let (mut c, r) = keeper(script);
+            assert_eq!(sigterm_keeper(&r, grace), ends, "{script}");
+            let _ = c.kill();
+            let _ = c.wait();
+        }
+        assert!(
+            !sigterm_keeper(&machines::Record::default(), grace),
+            "no keeper"
+        );
+    }
+}

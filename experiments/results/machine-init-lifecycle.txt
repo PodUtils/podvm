@@ -1,0 +1,82 @@
+Run: python3 -I experiments/487-machine-init-lifecycle.py as uid 1000 (setpriv), PODVM_487_BIN = the release build of this commit's tree. WORK names the owned scratch directory. A control byte of the console is written as \xNN.
+Does a guest with systemd as PID 1 hold the lifecycle of a container?
+2026-11-27T02:50:58Z Linux 6.18.44-fc-v880, uid 1000, TCG, no /dev/kvm: True
+podvm SHA-256 26b05cd8869843cb5f956a186c8a69915374f8d7adb0571f199dc462cecabb76
+image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b
+$ podvm pull -q ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b
+  | exit 0 in 21.6 s
+$ podvm run -d --name lc --podvm-tier=machine --podvm-net none --podvm-init=image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b sh -c WAITER
+  | exit 0 in 20.2 s
+  | 2a67f8b612809f855f871e3fc26acd54635a1a73844d85550659b291a23ebebd
+$ podvm ps -a
+  | exit 0 in 0.0 s
+  | CONTAINER ID   IMAGE                                                                                                           COMMAND         CREATED                STATUS   NAMES
+  | 2a67f8b61280   ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b   (linux guest)   2026-11-27T02:51:20Z   Up       lc
+PASS 1: run -d exited 0, lc is Up
+$ podvm logs lc
+  | exit 0 in 0.0 s
+$ podvm logs lc
+  | exit 0 in 0.0 s
+$ podvm logs lc
+  | exit 0 in 0.0 s
+$ podvm logs lc
+  | exit 0 in 0.0 s
+$ podvm logs lc
+  | exit 0 in 0.0 s
+$ podvm logs lc
+  | exit 0 in 0.0 s
+  | started
+PASS 2: logs gave started after 25 s of the wait
+$ podvm exec lc sh -c echo PID1=$(cat /proc/1/comm) PID2=$(cat /proc/2/comm) STATE=$(systemctl is-system-running); exit 3
+  | exit 3 in 0.6 s
+  | PID1=systemd PID2=kthreadd STATE=running
+PASS 3: exec exited 3: PID1=systemd PID2=kthreadd STATE=running
+$ podvm exec -e A=b -w /tmp lc sh -c echo A=$A PWD=$PWD
+  | exit 0 in 0.1 s
+  | A=b PWD=/tmp
+PASS 4: exec -e -w exited 0
+$ podvm exec -t lc tty
+  | exit 125 in 0.0 s
+  | podvm exec: -t: the exec channel of a guest of the machine tier carries no terminal, so podvm refuses rather than running the command without one; run -t --podvm-tier=machine gives one (TODO/cli.md T-2043)
+PASS 5: exec -t exited 125 and names the refusal
+$ podvm stop lc
+  | exit 0 in 0.9 s
+  | lc
+$ podvm ps -a
+  | exit 0 in 0.0 s
+  | CONTAINER ID   IMAGE                                                                                                           COMMAND         CREATED                STATUS       NAMES
+  | 2a67f8b61280   ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b   (linux guest)   2026-11-27T02:51:20Z   Exited (5)   lc
+$ podvm inspect --format {{.State.ExitCode}} lc
+  | exit 0 in 0.0 s
+  | 5
+$ podvm logs lc
+  | exit 0 in 0.0 s
+  | started
+  | got-term
+PASS 6: stop exited 0 in 0.9 s; lc is Exited (5), exit code 5, got-term in the logs: True
+$ podvm rm lc
+  | exit 0 in 0.0 s
+  | lc
+$ podvm ps -a
+  | exit 0 in 0.0 s
+  | CONTAINER ID   IMAGE   COMMAND   CREATED   STATUS   NAMES
+PASS 7: rm exited 0
+$ podvm run --rm -t --podvm-tier=machine --podvm-net none --podvm-init=image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b sh -c tty; exit 6
+  | exit 6 in 14.5 s
+  | /dev/hvc0
+PASS 8: run -t exited 6
+$ podvm run --rm --podvm-tier=machine --podvm-net none --podvm-init=image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b sh -c WAITER (SIGTERM after started)
+  | exit 5 in 15.9 s
+  | started
+  | got-term
+  | podvm run: forwarded SIGTERM to the payload in the guest
+PASS 9: the foreground run that got SIGTERM exited 5
+$ podvm create --podvm-tier=machine --podvm-net none --podvm-init=image ghcr.io/pkgforge-dev/archlinux:latest@sha256:b2507f1964270cab3cc190aa8df858521f6a7e45e969146a012877891d5dfc9b true
+  | exit 125 in 0.0 s
+  | podvm create: --podvm-init=image holds on a foreground run (the namespace rung, else the runsc tier, else the machine tier), on run -d and create with no tier (the namespace rung), on run -d with --podvm-tier=machine and on --podvm-tier=incus with run -d or create (TODO/machine.md T-1993, T-1994, TODO/enter.md T-2002, T-2007)
+PASS 10: create exited 125
+$ podvm ps -a
+  | exit 0 in 0.0 s
+  | CONTAINER ID   IMAGE   COMMAND   CREATED   STATUS   NAMES
+PASS 11: 0 emulator(s), run directories or partial files [], 0 container(s)
+A GUEST WITH SYSTEMD AS PID 1 HOLDS THE LIFECYCLE OF A CONTAINER

@@ -302,15 +302,26 @@ pub fn ready_main(args: &[String]) -> i32 {
         // The watchdog ends the run at the bound; say why first.
         eprintln!("podvm {READY_VERB}: {STARTED}: {e}");
     }
-    let why = match wait_ready() {
-        Ok(()) => format!(
+    let why = match wait_ready().and_then(|()| console_in()) {
+        Ok(console) => format!(
             "the init script of the run: {}",
-            Command::new("/bin/sh").arg(script).exec()
+            Command::new("/bin/sh").arg(script).stdin(console).exec()
         ),
         Err(e) => e,
     };
     fail(nonce, held, &why)
 }
+
+/// The serial line of the markers as the stdin of the init script, as the
+/// kernel gives it to the script of a guest with no init of the image:
+/// `guest-signals` (T-2041) reads the signals of the host there, and
+/// `guest-job` the job of a run (T-2008). The unit itself has no stdin.
+pub fn console_in() -> Result<std::fs::File, String> {
+    std::fs::File::open(CONSOLE).map_err(|e| format!("{CONSOLE}: {e}"))
+}
+
+/// The first serial port: the markers, the job and the signals.
+pub const CONSOLE: &str = "/dev/ttyS0";
 
 /// Host side: the path in `rootfs` of the file that the image path `p`
 /// names, with each link of each component resolved inside the image (an

@@ -5299,6 +5299,11 @@ entry stays on the machine tier for each run that the saved state serves
 (the default, call C27: clause 6), for an init that is not systemd and
 for `PODVM_MACHINE_ROOT=initramfs` (clause 7).
 
+Amended (2026-11-26, T-1994): (7) holds now for the machine tier. `run -d
+--podvm-tier=machine --podvm-init=image` boots systemd as PID 1 of the
+guest, and `exec`, `stop` and `rm` serve it (experiment 487); `run -d`
+on the runsc tier with the init stays refused by name.
+
 # T-2003: On the userland rung, a program with a library in a directory of its RUNPATH does not load (`systemctl`)
 
 **Source:** the measure of T-2002 (2026-11-19); the research bundle of the owner (2026-11-19, `run/libpath.rs` of a branch that is not in this tree); COORD-207 (#603) asks podcrates

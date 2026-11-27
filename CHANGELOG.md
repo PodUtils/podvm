@@ -8,6 +8,22 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Added: `run -d` of a guest with systemd as PID 1, and its stop, 2026-11-26
+
+Record: T-1994 (PodUtils/podrunner#313 ask 2).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `run -d --podvm-tier=machine --podvm-init=image` starts a guest that
+  stays, with systemd of the image as PID 1. `ps`, `logs`, `exec` (with
+  `-e` and `-w`), `stop`, `inspect` and `rm` serve it. `exec -t` is
+  refused by name, as for each guest of the machine tier.
+- `stop` of a guest of the machine tier gives the command SIGTERM, as
+  `docker stop` does, and the exit code of the command is the exit code
+  of the container. Before, `stop` ended the emulator, and the record had
+  no exit code.
+- A signal to a foreground run with systemd as PID 1 now reaches the
+  command: the reader of signals in the guest had no input there.
+
 ### Added: a writable host volume that the host user can remove, 2026-11-26
 
 Record: T-2103 (PodUtils/podrunner#371).

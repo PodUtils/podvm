@@ -356,7 +356,11 @@ live, and stdout and stderr share it, as under docker (T-1723); a change of
 the size during the run does not reach the guest. `create` with the
 machine tier reports the profile and exits 125; `exec NAME` enters a
 running guest of `run -d` (T-1750), and `exec --podvm-tier=machine`
-with no such guest exits 125.
+with no such guest exits 125. `stop NAME` of such a guest gives the
+command SIGTERM through its keeper, as `docker stop`; the exit code of the
+command ends the record (`ps`, `inspect`, `wait`). A command that runs on
+10 s after the SIGTERM is killed with its guest, and the record has the
+exit code 137 (T-1994). `exec -t` of a guest exits 125 (T-2043).
 A `--platform linux/arm64` guest needs `qemu-system-aarch64` on PATH and a
 kernel named by `PODVM_MACHINE_KERNEL_ARM64`, runs under TCG on an x86_64
 host, and has no `-t`, 9p volume or podvm in the guest (T-1890).
@@ -630,7 +634,9 @@ C26). Experiment 465 measures each line below as uid 1000.
   `PODVM_RUNSC_ARGS` gives more flags of `runsc`, each a flag, after the
   flags of the tier; a flag that breaks the tier is the caller's.
   Experiment 468 has the times of each route.
-- `run -d`, `create` and `exec` with the init hold on the incus tier only
+- `run -d`, `create` and `exec` with the init hold on the incus tier;
+  `run -d` and `exec` also on the machine tier, with systemd as PID 1 of
+  the guest (T-1994). `create` with the init holds on the incus tier only
   (T-1993). On the namespace rung, the command of `--user NAME` gets the
   primary group of the user and each group of `/etc/group` of the image
   that lists the name; `tty` in a command of `-t` names no device.
