@@ -156,6 +156,8 @@ const SETTLE_MS: u64 = 10_000;
 /// The usage of `rm` (TODO/cli.md T-1831: `-v` is in it).
 pub(crate) const RM_USAGE: &str =
     "usage: podvm rm [-f|--force] [-v|--volumes] [--podvm-tier incus] <container> [container...]
+  -f, --force    kill a running container first; a name that is not there is named, not
+                 an error, as docker does
   -v, --volumes  taken and does nothing: podvm has no named or anonymous volume
   --podvm-tier incus  an instance of incus; of the other flags it takes -f only";
 
@@ -206,6 +208,12 @@ pub fn rm(args: &[String]) -> i32 {
         code = match remove_tree(&s, want, force) {
             Ok(None) => code,
             Ok(Some(c)) => c,
+            // TODO/cli.md T-2079 (OR-B39-19): docker's `rm -f` names a
+            // container that is not there and fails nothing for it.
+            Err(e) if force && matches!(e.1, Some(pod_core::Class::NotFound)) => {
+                eprintln!("podvm rm: {e}");
+                code
+            }
             Err(e) => fail_named("rm", want, e),
         };
     }

@@ -715,7 +715,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2076](machine.md) | P1 | M | none | machine | done | `inspect` of a stopped instance of the incus tier gives a dash for the CPU time, the peak memory and the OOM kills |
 | [T-2077](machine.md) | P1 | M | none | machine | done | Under `--memory`, the init of an incus instance can end with no exit file: `inspect` gives no exit code |
 | [T-2078](machine.md) | P1 | M | none | machine | partial | On the incus tier, a full storage pool gives "the response body is larger than allowed" with no word of the cause |
-| [T-2079](cli.md) | P1 | M | none | cli | partial | The faults of the eighth outside pass (2026-11-24, the gate of 0.2.0-beta.39) |
+| [T-2079](cli.md) | P1 | M | none | cli | done | The faults of the eighth outside pass (2026-11-24, the gate of 0.2.0-beta.39) |
 | [T-2080](machine.md) | P1 | M | none | machine | done | On the incus tier, an exit of 126 or 127 is a refusal of incusd, and a signal leaves the instance running |
 | [T-2081](machine.md) | P1 | S | none | machine | done | Parallel first runs of one image on the incus tier race on its import |
 | [T-2082](machine.md) | P1 | S | none | machine | done | On the incus tier, an upload of the image that incusd cuts ends podvm with SIGPIPE and no line |
@@ -748,7 +748,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-679 entries: 18 open, 42 partial, 6 blocked, 613 done.
+679 entries: 18 open, 41 partial, 6 blocked, 614 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -758,10 +758,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 0 | 21 | 1 | 277 | 299 |
+| P1 | 0 | 20 | 1 | 278 | 299 |
 | P2 | 13 | 16 | 4 | 216 | 249 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 18 | 42 | 6 | 613 | 679 |
+| **All** | 18 | 41 | 6 | 614 | 679 |
 
 ## Work order
 

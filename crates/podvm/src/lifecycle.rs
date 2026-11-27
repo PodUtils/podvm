@@ -35,7 +35,8 @@ pub const PS_USAGE: &str = "\
 usage: podvm ps [-a|--all] [-q|--quiet] [--format T] [--no-trunc] [--podvm-tier incus]
        [--filter key=value]
 
-  Fields: .ID .Names .Image .Command .CreatedAt .Status .State .Ports .Pid
+  Fields: .ID .Names .Image .Command .CreatedAt .RunningFor .Status .State .Ports .Pid
+  The newest container comes first (TODO/cli.md T-2108).
   --format T takes the template language of `podvm images --help`, with
   `table` and `json` (TODO/cli.md T-2087).
 
@@ -362,7 +363,7 @@ pub fn ps(args: &[String]) -> i32 {
     list.extend(target::views(all)); // T-2042: and the machines, as containers
                                      // ⭐ TODO/cli.md T-1331. Caller-side predicate over the listed
                                      // records: every `--filter` must match (docker ANDs them).
-    let list: Vec<_> = list
+    let mut list: Vec<_> = list
         .into_iter()
         .filter(|c| {
             filters.iter().all(|f| match f.key.as_str() {
@@ -373,9 +374,10 @@ pub fn ps(args: &[String]) -> i32 {
             })
         })
         .collect();
-    // TODO/machine.md T-1846: the instances of podvm where the
-    // configuration selects the incus tier, with no filter (a filter reads
-    // the fields of a container).
+    ps_view::newest_first(&mut list); // TODO/cli.md T-2108 (OR-B42-08)
+                                      // TODO/machine.md T-1846: the instances of podvm where the
+                                      // configuration selects the incus tier, with no filter (a filter reads
+                                      // the fields of a container).
     let machines = if filters.is_empty() {
         crate::incus::ps::ps_rows(all)
     } else {
@@ -393,24 +395,9 @@ pub fn ps(args: &[String]) -> i32 {
     if let Some(t) = &template {
         return ps_template(t, &list, no_trunc);
     }
-    let mut rows = vec![vec![
-        "CONTAINER ID".to_string(),
-        "IMAGE".into(),
-        "COMMAND".into(),
-        "CREATED".into(),
-        "STATUS".into(),
-        "NAMES".into(),
-    ]];
-    for c in &list {
-        rows.push(vec![
-            if no_trunc { c.id.clone() } else { c.short_id() },
-            c.image.clone(),
-            command_of(c),
-            c.created_at.clone(),
-            c.status(),
-            c.name.clone(),
-        ]);
-    }
+    let now = ps_view::now();
+    let mut rows = vec![ps_view::TABLE.iter().map(|(_, h)| h.to_string()).collect()];
+    rows.extend(list.iter().map(|c| ps_view::table_row(c, no_trunc, now)));
     rows.extend(machines);
     print!("{}", crate::images::table(&rows));
     0
@@ -439,6 +426,7 @@ mod opened; // TODO/cli.md T-2087
 pub(crate) use opened::*;
 
 mod prune; // TODO/supervise.md T-1848
+mod ps_view; // TODO/cli.md T-2108
 pub use prune::container_group;
 
 mod entry;

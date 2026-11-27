@@ -153,16 +153,11 @@ pub fn cap_status(code: i32) -> Option<i32> {
 }
 
 /// The cached base image: `PODVM_WINDOWS_BASE` where it is set, so an
-/// experiment isolates with its own copy, else under the home directory so
-/// it survives between runs the way an image cache should.
+/// experiment isolates with its own copy, else `windows/base.vhdx` in the
+/// store, so it survives between runs the way an image cache should
+/// ([`places`]).
 pub fn base_cache() -> PathBuf {
-    if let Some(p) = std::env::var_os("PODVM_WINDOWS_BASE")
-        && !p.is_empty()
-    {
-        return PathBuf::from(p);
-    }
-    let home = std::env::var_os("HOME").unwrap_or_else(|| "/tmp".into());
-    Path::new(&home).join(".local/share/podvm/windows/base.vhdx")
+    places::base_cache_in(&places::process)
 }
 
 /// The DOS flavor: `pod_guest::dos` with podvm's marker and base cache.
@@ -174,6 +169,7 @@ pub mod machines; // TODO/machine.md T-1870
 pub mod media; // TODO/machine.md T-1866
 pub mod options; // TODO/machine.md T-1865
 pub mod pelogs; // TODO/machine.md T-1867
+pub mod places; // TODO/cli.md T-2100
 #[cfg(unix)]
 pub mod qga; // TODO/machine.md T-1868
 pub mod tools; // TODO/machine.md T-1875
@@ -204,21 +200,16 @@ pub mod dos {
     }
 
     /// The DOS base image: `PODVM_DOS_BASE` where it is set, so an experiment
-    /// isolates with its own copy, else under the home directory beside the
-    /// other flavor's cache so both persist between runs the same way.
+    /// isolates with its own copy, else `windows/freedos-base.img` in the
+    /// store, beside the other flavor's cache, so both persist between runs
+    /// the same way.
     ///
     /// ⛔ **Not `PODVM_WINDOWS_BASE`.** That name is the other flavor's cache,
     /// and one variable naming two different disk images is the variant-keyed
     /// cache defect `docs/conventions/forbidden-patterns.md` refuses: a DOS
     /// run would boot a Windows disk and report its output as DOS's.
     pub fn base_cache() -> PathBuf {
-        if let Some(p) = std::env::var_os("PODVM_DOS_BASE")
-            && !p.is_empty()
-        {
-            return PathBuf::from(p);
-        }
-        let home = std::env::var_os("HOME").unwrap_or_else(|| "/tmp".into());
-        Path::new(&home).join(".local/share/podvm/windows/freedos-base.img")
+        crate::places::dos_base_in(&crate::places::process)
     }
 
     #[cfg(test)]

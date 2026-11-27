@@ -154,7 +154,8 @@ fn incus_verbs_discard_and_rm_name_what_stays() {
     let rows = rt.block_on(super::ps::rows(&c, true)).unwrap();
     assert_eq!(rows.len(), 1, "{rows:?}");
     assert_eq!(rows[0][0], "inc1");
-    assert_eq!(rows[0][4], "Up");
+    assert!(rows[0][4].starts_with("Up"), "{rows:?}");
+    assert_eq!(rows[0].len(), 7, "the columns of the containers: {rows:?}");
 }
 
 /// PodUtils/podrunner#316 ask 1 (TODO/machine.md T-1996): the init of the

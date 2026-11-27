@@ -33,7 +33,7 @@ OUT="$ROOT/experiments/results/windows-lifecycle.txt"
 rm -rf "$WORK"
 mkdir -p "$WORK/home"
 export HOME="$WORK/home" PODVM_STORE="$WORK/store"
-MACH="$HOME/.local/share/podvm/windows/machines"
+MACH="$PODVM_STORE/windows/machines"
 fail=0
 : >"$OUT"
 say() { printf '%s\n' "$*" | tee -a "$OUT"; }

@@ -15,6 +15,7 @@ pub(super) fn ps_field_names() -> Vec<&'static str> {
         "Image",
         "Command",
         "CreatedAt",
+        "RunningFor",
         "Status",
         "State",
         "Ports",
@@ -28,9 +29,10 @@ pub(super) const PS_HEADERS: &[(&str, &str)] = &[("ID", "CONTAINER ID")];
 
 /// `ps --format`: each container through the template (TODO/cli.md T-2087).
 pub(super) fn ps_template(t: &format::Template, list: &[Container], no_trunc: bool) -> i32 {
+    let now = super::ps_view::now();
     let rows: Vec<_> = list
         .iter()
-        .map(|c| format::Data::text(&ps_fields(c, no_trunc)))
+        .map(|c| format::Data::text(&super::ps_view::ps_fields(c, no_trunc, now)))
         .collect();
     match t.render_list(&rows, PS_HEADERS) {
         Ok(text) => {
@@ -42,25 +44,6 @@ pub(super) fn ps_template(t: &format::Template, list: &[Container], no_trunc: bo
             EXIT_CLI_ERROR
         }
     }
-}
-
-pub(super) fn ps_fields(c: &Container, no_trunc: bool) -> Vec<(&'static str, String)> {
-    vec![
-        ("ID", if no_trunc { c.id.clone() } else { c.short_id() }),
-        ("Names", c.name.clone()),
-        ("Image", c.image.clone()),
-        ("Command", c.argv.join(" ")),
-        ("CreatedAt", c.created_at.clone()),
-        ("Status", c.status()),
-        ("State", c.state.word().to_string()),
-        // ⛔ Always empty, and the usage says why rather than leaving a reader
-        // to wonder whether podvm forgot.
-        ("Ports", String::new()),
-        (
-            "Pid",
-            c.pid.map(|p| p.to_string()).unwrap_or_else(|| "0".into()),
-        ),
-    ]
 }
 
 /// The usage of `stop`. TODO/cli.md T-2100 (OR-B41-17): it names `-t` as

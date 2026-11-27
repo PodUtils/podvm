@@ -121,8 +121,8 @@ pub const RMI_USAGE: &str = "\
 usage: podvm rmi [-f|--force] <image> [image...]
        podvm image rm <image> [image...]
 
-  Remove images and every blob no remaining image reaches. Refuses an image
-  any container references or a running container holds, and names it.
+  Remove images and every blob no remaining image reaches. An image that a
+  container references or holds stays, also with -f, and the line names it.
 ";
 
 pub const TAG_USAGE: &str = "\

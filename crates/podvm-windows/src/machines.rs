@@ -45,18 +45,14 @@ pub struct Record {
     pub ended: String,
     /// The forwards of `-p`, as `PROTO:IP:HOST:GUEST`, separated by `,`.
     pub forwards: String,
+    /// The command of a Linux guest, words separated by a space, for `ps`.
+    pub command: String,
 }
 
 /// The directory of all machines: `PODVM_MACHINES_DIR` where it is set,
-/// else `machines` beside the catalog.
+/// else `windows/machines` in the store ([`crate::places`]).
 pub fn root() -> PathBuf {
-    if let Some(p) = std::env::var_os("PODVM_MACHINES_DIR")
-        && !p.is_empty()
-    {
-        return PathBuf::from(p);
-    }
-    let base = crate::base_cache();
-    base.parent().unwrap_or(Path::new(".")).join("machines")
+    crate::places::machines_in(&crate::places::process)
 }
 
 /// A name of a machine: a letter or digit, then letters, digits, `_`, `.`
@@ -154,7 +150,7 @@ impl Record {
 
     /// The JSON of the record: one object, each value a string.
     pub fn to_json(&self) -> String {
-        let pairs: [(&str, String); 14] = [
+        let pairs: [(&str, String); 15] = [
             ("name", self.name.clone()),
             ("id", self.id.clone()),
             ("image", self.image.clone()),
@@ -169,6 +165,7 @@ impl Record {
             ("emulator_start", self.emulator_start.to_string()),
             ("ended", self.ended.clone()),
             ("forwards", self.forwards.clone()),
+            ("command", self.command.clone()),
         ];
         let body: Vec<String> = pairs
             .iter()
@@ -204,6 +201,7 @@ impl Record {
             emulator_start: n("emulator_start"),
             ended: s("ended"),
             forwards: s("forwards"),
+            command: s("command"),
         })
     }
 
@@ -372,6 +370,7 @@ mod tests {
             emulator_start: 901,
             ended: "stopped by \"podvm stop\" C:\\".into(),
             forwards: "tcp:127.0.0.1:33890:3389".into(),
+            command: "sh -c echo \"hi\"".into(),
         };
         assert_eq!(Record::from_json(&r.to_json()), Some(r));
         assert_eq!(Record::from_json("{\"name\":\"../x\"}"), None);

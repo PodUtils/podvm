@@ -38,7 +38,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 BIN="${PODVM_452_BIN:-$ROOT/target/x86_64-unknown-linux-musl/release/podvm}"
 NAMES="${PODVM_452_NAMES:-2025}"
 OUT="$ROOT/experiments/results/windows-install.txt"
-STORE="$HOME/.local/share/podvm/windows/catalog"
+STORE="${PODVM_STORE:-${XDG_DATA_HOME:-$HOME/.local/share}/podvm}/windows/catalog"
 fail=0
 say() { printf '%s\n' "$*" | tee -a "$OUT"; }
 bad() { say "FAIL: $*"; fail=1; }

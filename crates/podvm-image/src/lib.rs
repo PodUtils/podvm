@@ -63,7 +63,12 @@ pub use store::{Record, Store};
 /// ⚠ The probe is only run when the three configured locations are all unset,
 /// which is the one case where podvm has nothing else to go on.
 pub fn open_store() -> Result<Store> {
-    let root = Store::default_root(|| {
+    Store::open(default_root()?)
+}
+
+/// The root of the store that [`open_store`] opens, without opening it.
+pub fn default_root() -> Result<std::path::PathBuf> {
+    Store::default_root(|| {
         let (document, _) = probe_cache::measure("choosing a store root");
         let probe = probe_cache::Probe {
             document,
@@ -78,6 +83,5 @@ pub fn open_store() -> Result<Store> {
             &mut dropped,
         );
         ranked.into_iter().next().map(|c| c.path)
-    })?;
-    Store::open(root)
+    })
 }

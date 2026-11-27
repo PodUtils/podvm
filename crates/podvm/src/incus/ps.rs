@@ -60,15 +60,25 @@ pub fn hint(verb: &str, name: &str) {
 
 /// TODO/machine.md T-1846: the rows of `podvm ps` for the instances of
 /// podvm, in the columns of the containers: each one with `all`, else the
-/// running ones.
+/// running ones. TODO/cli.md T-2108 (OR-B42-08): the newest first, with
+/// the age in CREATED and the time of the state in STATUS, as the rows of
+/// the containers have them.
 pub(crate) async fn rows(c: &Client, all: bool) -> Result<Vec<Vec<String>>, String> {
-    let list = c.instances().await.map_err(|e| e.to_string())?;
+    let mut list: Vec<&Instance> = Vec::new();
+    let got = c.instances().await.map_err(|e| e.to_string())?;
+    list.extend(
+        got.iter()
+            .filter(|i| ours(i) && (all || i.status == "Running")),
+    );
+    list.sort_by(|a, b| b.created_at.cmp(&a.created_at));
     Ok(list
-        .iter()
-        .filter(|i| ours(i) && (all || i.status == "Running"))
+        .into_iter()
         .map(|i| {
             let status = if i.status == "Running" {
-                "Up".to_string()
+                match podvm_image::clock::span(&i.last_used_at) {
+                    Some(s) if !never_started(i) => format!("Up {s}"),
+                    _ => "Up".to_string(),
+                }
             } else if never_started(i) {
                 "Created".to_string()
             } else {
@@ -81,12 +91,9 @@ pub(crate) async fn rows(c: &Client, all: bool) -> Result<Vec<Vec<String>>, Stri
                     .cloned()
                     .unwrap_or_else(|| "-".into()),
                 "(incus instance)".to_string(),
-                if i.created_at.is_empty() {
-                    "-".into()
-                } else {
-                    i.created_at.clone()
-                },
+                podvm_image::clock::since(&i.created_at).unwrap_or_else(|| "-".into()),
                 status,
+                String::new(),
                 i.name.clone(),
             ]
         })

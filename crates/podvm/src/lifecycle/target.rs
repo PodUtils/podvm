@@ -42,7 +42,13 @@ pub(crate) fn view(r: &Record, running: bool) -> Container {
     Container {
         id: r.id_or_name().to_string(),
         name: r.name.clone(),
-        argv: vec![format!("({} guest)", r.flavor)],
+        // T-2100 (OR-B41-17): the command of the guest where the keeper
+        // wrote it; a Windows or DOS machine has none.
+        argv: if r.command.is_empty() {
+            vec![format!("({} guest)", r.flavor)]
+        } else {
+            r.command.split(' ').map(str::to_string).collect()
+        },
         env: Vec::new(),
         working_dir: String::new(),
         created_at: at(r.created),

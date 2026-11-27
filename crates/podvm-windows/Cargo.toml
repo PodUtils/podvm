@@ -7,6 +7,9 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+# TODO/cli.md T-2100 (OR-B41-02): the root of the store, where each file of
+# the machine tier and of a Windows guest goes (`places.rs`).
+podvm-image = { path = "../podvm-image" }
 # The disposable guest: the boot plan on the machine tier's own profile, the
 # overlay, the FAT16 mailbox, the cmd.exe and DOS agents, QMP, the bounded
 # stop and the bounded store of a base image with its digest, shared through

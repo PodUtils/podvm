@@ -20,31 +20,44 @@ pub fn now() -> String {
     iso8601(SystemTime::now())
 }
 
-/// How long ago, in docker's `CreatedSince` wording. ⛔ Returns `None` where the
-/// input does not parse, so the caller prints a dash: `AGENTS.md` absolute
-/// 3, a dash where a value is unknown.
+/// How long ago, in docker's `CreatedSince` wording: [`human`] and "ago".
+/// ⛔ Returns `None` where the input does not parse, so the caller prints a
+/// dash: `AGENTS.md` absolute 3, a dash where a value is unknown.
 pub fn since(iso: &str) -> Option<String> {
-    let then = parse_iso8601(iso)?;
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).ok()?.as_secs() as i64;
-    let d = now - then;
-    if d < 0 {
-        return Some("just now".into());
-    }
-    Some(match d {
-        s if s < 60 => format!("{s} second{} ago", plural(s)),
-        s if s < 3600 => format!("{} minute{} ago", s / 60, plural(s / 60)),
-        s if s < 86_400 => format!("{} hour{} ago", s / 3600, plural(s / 3600)),
-        s if s < 2_592_000 => format!("{} day{} ago", s / 86_400, plural(s / 86_400)),
-        s if s < 31_536_000 => format!("{} month{} ago", s / 2_592_000, plural(s / 2_592_000)),
-        s => format!("{} year{} ago", s / 31_536_000, plural(s / 31_536_000)),
-    })
+    span(iso).map(|s| format!("{s} ago"))
 }
 
-fn plural(n: i64) -> &'static str {
-    if n == 1 {
-        ""
-    } else {
-        "s"
+/// The time from `iso` to now, in docker's words ([`human`]); `None` where
+/// `iso` does not parse.
+pub fn span(iso: &str) -> Option<String> {
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).ok()?.as_secs();
+    span_at(iso, i64::try_from(now).ok()?)
+}
+
+/// [`span`] at the epoch second `now`.
+pub fn span_at(iso: &str, now: i64) -> Option<String> {
+    Some(human(now.saturating_sub(parse_iso8601(iso)?)))
+}
+
+/// A span of `secs` seconds in the words of docker (`HumanDuration` of
+/// go-units): the CREATED and STATUS columns of `ps` and the CREATED column
+/// of `images` (TODO/cli.md T-2108, OR-B42-08). A span below zero (a clock
+/// that went back) is "Less than a second".
+pub fn human(secs: i64) -> String {
+    let minutes = secs / 60;
+    let hours = (secs + 1800) / 3600;
+    match secs {
+        s if s < 1 => "Less than a second".into(),
+        1 => "1 second".into(),
+        s if s < 60 => format!("{s} seconds"),
+        _ if minutes == 1 => "About a minute".into(),
+        _ if minutes < 60 => format!("{minutes} minutes"),
+        _ if hours == 1 => "About an hour".into(),
+        _ if hours < 48 => format!("{hours} hours"),
+        _ if hours < 24 * 7 * 2 => format!("{} days", hours / 24),
+        _ if hours < 24 * 30 * 2 => format!("{} weeks", hours / 24 / 7),
+        _ if hours < 24 * 365 * 2 => format!("{} months", hours / 24 / 30),
+        s => format!("{} years", s / 3600 / 24 / 365),
     }
 }
 
@@ -102,16 +115,40 @@ mod tests {
         assert!(since("not a date").is_none());
     }
 
+    /// One table: the words of a span, at each edge of each unit of
+    /// go-units' `HumanDuration`, and the age of a time before now.
     #[test]
     fn an_age_is_worded_the_way_docker_words_it() {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
-        let ago = |s: i64| since(&iso8601(UNIX_EPOCH + Duration::from_secs((now - s) as u64)));
-        assert_eq!(ago(1).unwrap(), "1 second ago");
-        assert_eq!(ago(90).unwrap(), "1 minute ago");
-        assert_eq!(ago(7200).unwrap(), "2 hours ago");
-        assert_eq!(ago(90_000).unwrap(), "1 day ago");
+        let (m, h, d) = (60, 3600, 86_400);
+        for (secs, want) in [
+            (-5, "Less than a second"),
+            (0, "Less than a second"),
+            (1, "1 second"),
+            (59, "59 seconds"),
+            (60, "About a minute"),
+            (119, "About a minute"),
+            (120, "2 minutes"),
+            (59 * m + 59, "59 minutes"),
+            (h, "About an hour"),
+            (h + 29 * m, "About an hour"),
+            (h + 30 * m, "2 hours"),
+            (47 * h, "47 hours"),
+            (2 * d, "2 days"),
+            (13 * d, "13 days"),
+            (14 * d, "2 weeks"),
+            (59 * d, "8 weeks"),
+            (60 * d, "2 months"),
+            (729 * d, "24 months"),
+            (730 * d, "2 years"),
+        ] {
+            assert_eq!(human(secs), want, "{secs}");
+        }
+        let at = 1_709_164_800 + 90;
+        assert_eq!(
+            span_at("2024-02-29T00:00:00Z", at).as_deref(),
+            Some("About a minute")
+        );
+        assert!(span_at("yesterday", at).is_none());
+        assert!(since(&now()).unwrap().ends_with(" ago"));
     }
 }

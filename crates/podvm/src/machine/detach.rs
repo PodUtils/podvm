@@ -121,7 +121,7 @@ fn spawn(argv: &[String], name: &str, dir: &Path) -> Result<u32, String> {
 
 /// Wait for the pid file of the keeper's boot, and write both pids into the
 /// record.
-fn wait_up(root: &Path, mut r: Record, dir: &Path, keeper: u32) -> Result<(), String> {
+fn wait_up(root: &Path, r: Record, dir: &Path, keeper: u32) -> Result<(), String> {
     let keeper_start = machines::start_of(keeper).unwrap_or(0);
     let t0 = Instant::now();
     while t0.elapsed() < START_WAIT {
@@ -130,6 +130,8 @@ fn wait_up(root: &Path, mut r: Record, dir: &Path, keeper: u32) -> Result<(), St
             if let (Some(Ok(pid)), Some(Ok(start))) =
                 (it.next().map(str::parse), it.next().map(str::parse))
             {
+                // The keeper wrote the command before the boot.
+                let mut r = machines::read(root, &r.name).unwrap_or(r);
                 r.keeper_pid = keeper;
                 r.keeper_start = keeper_start;
                 r.emulator_pid = pid;
@@ -150,6 +152,19 @@ fn wait_up(root: &Path, mut r: Record, dir: &Path, keeper: u32) -> Result<(), St
         "the guest did not start within {} s",
         START_WAIT.as_secs()
     ))
+}
+
+/// TODO/cli.md T-2100 (OR-B41-17): in the keeper, before the boot, write
+/// the command of the guest into the record, so that `ps` shows it.
+pub fn note_command(argv: &[String]) {
+    let Ok(name) = std::env::var(KEEPER_ENV) else {
+        return;
+    };
+    let root = machines::root();
+    if let Some(mut r) = machines::read(&root, &name) {
+        r.command = argv.join(" ");
+        let _ = machines::write(&root, &r);
+    }
 }
 
 /// In the keeper, after the boot: write how the guest ended.

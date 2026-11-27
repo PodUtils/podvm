@@ -121,7 +121,10 @@ fn the_ps_fields_are_the_ones_the_template_check_allows() {
             hardening: Default::default(),
         },
     };
-    let built: Vec<&str> = ps_fields(&c, false).iter().map(|(k, _)| *k).collect();
+    let built: Vec<&str> = crate::lifecycle::ps_view::ps_fields(&c, false, 0)
+        .iter()
+        .map(|(k, _)| *k)
+        .collect();
     assert_eq!(built, ps_field_names());
     assert!(format::check("{{.Status}}", &ps_field_names()).is_ok());
     assert!(format::check("{{.Nope}}", &ps_field_names()).is_err());
