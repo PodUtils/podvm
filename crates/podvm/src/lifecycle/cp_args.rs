@@ -8,9 +8,24 @@ use super::*;
 pub(super) const CP_USAGE: &str = "\
 usage: podvm cp [-r|--recursive] <container|image>:<path> <dest>
        podvm cp [-r|--recursive] <src> <container>:<path>
+       podvm cp <container|image>:<path> -
+       podvm cp - <container>:<path>
 
   -r, --recursive  copy a directory tree. A file copies with or without
                    it; a directory without it is refused naming the flag.
+
+  - as the destination writes a tar of the path to stdout; - as the
+  source unpacks a tar from stdin into the directory <path> of a container
+  (docker's two forms; a file of the name - is ./-). The entries of the
+  stream going out are named by the last name of the path (or ./ where it
+  ends with /.) and are owned by 0:0. A tar going in keeps the mode and
+  the modification time of each entry; it takes files, directories and
+  links, refuses a name above the destination (..), a link on the way and
+  a special file by name, and needs no -r (TODO/cli.md T-2108). The
+  refusals exit 1, as docker's.
+
+  cp keeps the modification time of each file, directory and link, in
+  both directions (docker sets the access time to it as well).
 
   The name before the colon is a container first (as before), then an
   image, whose rootfs is extracted if needed. An image is a source only:
@@ -55,6 +70,8 @@ pub(super) fn parse_cp(args: &[String]) -> std::result::Result<CpArgs, i32> {
                 return Err(0);
             }
             "-r" | "--recursive" => recursive = true,
+            // TODO/cli.md T-2108: `-` is the tar stream of stdin or stdout.
+            "-" => positionals.push("-".to_string()),
             other if other.starts_with('-') => {
                 crate::parity::admit("cp", other, CP_USAGE)?;
                 return Err(crate::parity::no_arm("cp", other));

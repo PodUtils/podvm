@@ -150,6 +150,10 @@ pub(super) fn copy_one(
             }
         }
     };
+    // TODO/cli.md T-2108 (OR-B42-06): `-` is the tar stream, as docker has it.
+    if outside == Path::new(super::cp_tar::STREAM) {
+        return super::cp_tar::stream(root, &target, inside, out_of);
+    }
     let (src, dst) = if out_of {
         (target, outside.to_path_buf())
     } else {
@@ -174,14 +178,15 @@ pub(super) fn copy_one(
             "podvm cp: {} is a directory; pass -r to copy it",
             shown(root, &src)
         );
-        return EXIT_FLAG_ERROR;
+        // TODO/cli.md T-2108 (OR-B42-06): the flags parsed, so a refusal.
+        return EXIT_CLI_ERROR;
     }
     if !kind.is_dir() && !kind.is_file() && !kind.is_symlink() {
         eprintln!(
             "podvm cp: {} is not a file or directory; special files are refused",
             shown(root, &src)
         );
-        return EXIT_RUNTIME_ERROR;
+        return EXIT_CLI_ERROR; // TODO/cli.md T-2108 (OR-B42-06)
     }
     // The basename of SRC as it was named; `..` takes its resolved name.
     let name = std::path::Path::new(&src_named)
@@ -220,7 +225,7 @@ pub(super) fn copy_one(
             "podvm cp: {} is a symlink; writing through one is refused",
             shown(root, &dst)
         );
-        return EXIT_RUNTIME_ERROR;
+        return EXIT_CLI_ERROR; // TODO/cli.md T-2108
     }
     if !out_of && let Err(msg) = clear_of_symlinks(root, &dst, root, false) {
         eprintln!("podvm cp: {msg}");
@@ -234,6 +239,14 @@ pub(super) fn copy_one(
     }
     match std::fs::copy(&src, &dst) {
         Ok(n) => {
+            // TODO/cli.md T-2108 (OR-B42-07): the modification time stays.
+            if let Err(e) = super::copy_tree::keep_time(&src, &dst) {
+                eprintln!(
+                    "podvm cp: {}: the modification time is not kept: {e}",
+                    shown(root, &dst)
+                );
+                return EXIT_RUNTIME_ERROR;
+            }
             eprintln!(
                 "podvm cp: {} bytes {} -> {}",
                 n,

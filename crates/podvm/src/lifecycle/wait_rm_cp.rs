@@ -74,6 +74,18 @@ pub fn wait(args: &[String]) -> i32 {
         }
         match podvm_supervise::wait(&s, want, WAIT_BOUND_MS).map(|(c, n)| settle(&s, c, n)) {
             Ok((_, Some(n))) => println!("{n}"),
+            // TODO/cli.md T-2108 (OR-B42-06): a container that was never
+            // started has no exit code to wait for. docker waits until a
+            // start; podvm refuses at once, as a refusal after the parse
+            // (exit 1), and never waits for a start that nobody ordered.
+            Ok((c, None)) if c.state == podvm_supervise::table::State::Created => {
+                eprintln!(
+                    "podvm wait: {} is created and was never started, so it has no exit \
+                     code; `podvm start {}` first (docker waits for a start, podvm refuses)",
+                    c.name, c.name
+                );
+                code = EXIT_CLI_ERROR;
+            }
             Ok((c, None)) => {
                 // ⛔ THE BOUND, OR AN UNWATCHED EXIT, AND NEVER A NUMBER. A `0`
                 // printed here for a container podvm did not see end is the
@@ -231,7 +243,9 @@ pub fn cp(args: &[String]) -> i32 {
         Err(member) => return crate::parity::refuse_member("cp", &member, CP_USAGE),
     };
     let args: &[String] = &expanded;
-    if let Some(c) = crate::parity::admit_all("cp", args, CP_USAGE) {
+    // A lone `-` is the tar stream of `cp` (T-2108), not an option to admit.
+    let flags: Vec<String> = args.iter().filter(|a| *a != "-").cloned().collect();
+    if let Some(c) = crate::parity::admit_all("cp", &flags, CP_USAGE) {
         return c;
     }
     let o = match parse_cp(args) {
@@ -255,7 +269,7 @@ pub fn cp(args: &[String]) -> i32 {
     match (from_named, to_named) {
         (true, true) => {
             eprintln!("podvm cp: copying between two named filesystems is not implemented");
-            EXIT_RUNTIME_ERROR
+            EXIT_CLI_ERROR // TODO/cli.md T-2108: a refusal after the parse
         }
         (false, false) => {
             eprintln!("podvm cp: one of the two paths has to be <name>:<path>");
@@ -290,8 +304,14 @@ fn copy_named(
         // namespace rung, as `exec` does (T-1765); `setns` moves the cwd.
         // ⚠ A join, not `std::path::absolute`: that drops a last `/.`, which
         // names the contents of SRC (T-2079).
+        // `-` is the tar stream, not a file of the cwd (T-2108).
         let outside = match std::env::current_dir() {
-            Ok(cwd) if outside.is_relative() => cwd.join(outside),
+            Ok(cwd)
+                if outside.is_relative()
+                    && outside != std::path::Path::new(super::cp_tar::STREAM) =>
+            {
+                cwd.join(outside)
+            }
             _ => outside.to_path_buf(),
         };
         if c.state == podvm_supervise::table::State::Running && c.rung == "namespace" {
