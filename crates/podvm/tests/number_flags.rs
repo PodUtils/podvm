@@ -102,8 +102,13 @@ fn a_number_out_of_its_range_is_one_line_and_125() {
             vec!["--ulimit", big, "from 0 to"],
         ),
         (
+            vec!["stop", "-t", "-2", "x"],
+            vec!["podvm stop:", "-t", "\"-2\"", "from 0 to"],
+        ),
+        // `-t -1` (docker's "wait for ever") has its own line (T-2108).
+        (
             vec!["stop", "-t", "-1", "x"],
-            vec!["podvm stop:", "-t", "\"-1\"", "from 0 to"],
+            vec!["podvm stop:", "-t -1", "wait for ever", "-t 3600"],
         ),
         (vec!["stop", "-t", "abc", "x"], vec!["-t", "\"abc\""]),
         (vec!["stop", "-t", big, "x"], vec!["-t", big, "too large"]),

@@ -592,6 +592,7 @@ section 11): #313 in `54258666`, #314 in `c5f9e315`; both are closed.
 | #696 | [gh action] requested | closed (gate 45947913637 passed on `d42677e`) | the gate after T-2105, T-2107 and T-2108 (OR-B42-02) |
 | #697 | COORD-269: pod-guest: the module closure from the text of modules.dep and modules.builtin, with compressed modules (to podcrates) | open | T-1994 |
 | #698 | COORD-270: pod-core: one bounded parser of a number that a flag takes, with one refusal line (to podcrates) | open | T-1947 |
+| #699 | [gh action] requested | open | the gate after T-1947 and T-2108 (`stop -t -1`) on `ddbc820` |
 
 ## Messages whose title does not start with COORD-NNN
 
