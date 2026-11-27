@@ -68,7 +68,7 @@ CLAUDE.local.md
 # line existed.
 /crates/podvm-interpose/target
 # TODO/interpose.md T-1880: the glibc 2.34 object builds into its own directory.
-/crates/podvm-interpose/target-glibc234/
+/crates/podvm-interpose/target-glibc234
 **/*.rs.bk
 *.pdb
 

@@ -87,6 +87,14 @@ each step below is done.
 
 ## Rules learned
 
+* A worktree under `.claude/worktrees/` gets the interposer objects as
+  symlinks (`crates/podvm-interpose/target`, `target-glibc234`). Commit
+  `5916373` tracked the symlink `target-glibc234` (its ignore rule ended in
+  `/`, which matches a directory only); the checkout of the merge on `main`
+  replaced the directory of the built objects with a symlink to itself.
+  The rule has no `/` now. After a merge, check `git ls-files
+  crates/podvm-interpose` and that `podvm version --verbose` names three
+  interposer digests.
 * `scripts/dev/checks.sh` runs the unit tests as the user of the session
   (root on the cloud host); the gate runs them as a user with no root.
   Before a push of a change that reads files of an image, run the unit
