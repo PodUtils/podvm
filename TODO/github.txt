@@ -591,5 +591,5 @@
 699 issue closed
 700 issue closed
 701 issue open
-702 issue open
+702 issue closed
 703 issue open
