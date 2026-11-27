@@ -121,8 +121,11 @@ pub fn args(job: &InitJob<'_>, base: &Path) -> Vec<String> {
         c.rootfs.clone(),
         "--cwd".into(),
         c.working_dir.clone(),
-        "--".into(),
     ];
+    // TODO/enter.md T-2017: the limits and the bit of the record.
+    let h = &c.of.hardening;
+    a.extend(super::harden::args(&h.limits(), h.no_new_privs));
+    a.push("--".into());
     a.extend(c.argv.iter().cloned());
     a
 }
@@ -360,11 +363,12 @@ fn prepare(spec: &mut Spec) -> Result<(), String> {
         crate::userns::set_hostname(name).map_err(|e| format!("--hostname {name}: {e}"))?;
     }
     owners_once(&spec.root);
-    // A volume at or under /tmp goes onto the tmpfs of the init; each
-    // other one is a bind on the tree, which the init takes with it.
+    // A volume at or under /tmp, /dev or /run goes onto the mount of the
+    // init there (T-2017: a --device on its /dev); each other one is a
+    // bind on the tree, which the init takes with it.
     let (mut at_tmp, mut rest, mut ro) = (Vec::new(), Vec::new(), Vec::new());
     for b in podvm_supervise::launcher::binds_of(&env) {
-        if b.guest == "/tmp" || b.guest.starts_with("/tmp/") {
+        if mounts::late(&b.guest) {
             let suffix = if b.read_only { ":ro" } else { "" };
             let text = format!("{}:{}{suffix}", b.guest, b.host);
             at_tmp.push(

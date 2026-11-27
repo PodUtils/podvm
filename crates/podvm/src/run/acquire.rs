@@ -232,7 +232,7 @@ pub(super) fn hostname_env(
                                           // `/tmp` after podvm's binds, so a volume at or under `/tmp` goes to
                                           // pod-enter's own binds, which come after it.
                                           // The other volumes are bound after the completion (`binds::bind`).
-    let (at_tmp, _) = super::binds::split_tmp(&o.volumes);
+    let (at_tmp, _) = super::binds::split_tmp(&o.volumes, o.init_image);
     super::binds::push_env(
         &o.volumes,
         (&o.ro_volumes, &o.overlay_volumes),

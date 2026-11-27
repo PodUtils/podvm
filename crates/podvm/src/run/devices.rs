@@ -47,9 +47,18 @@ pub(super) fn fold(o: &mut Opts) {
 /// node read-only, and refuses it by name. The userland rung serves the
 /// read-only table of the interposer, which answers EROFS.
 pub(super) fn check_rung(verb: &str, o: &Opts, rung: &str) -> Result<(), i32> {
+    let Some(why) = read_only_node(o, rung) else {
+        return Ok(());
+    };
+    eprintln!("podvm {verb}: {why}");
+    Err(podvm_image::error::EXIT_RUNTIME_ERROR)
+}
+
+/// The line of [`check_rung`], or none.
+pub(super) fn read_only_node(o: &Opts, rung: &str) -> Option<String> {
     use std::os::unix::fs::FileTypeExt;
     if rung != "namespace" {
-        return Ok(());
+        return None;
     }
     let node = |host: &str| {
         std::fs::metadata(host).is_ok_and(|m| {
@@ -57,19 +66,15 @@ pub(super) fn check_rung(verb: &str, o: &Opts, rung: &str) -> Result<(), i32> {
             t.is_char_device() || t.is_block_device()
         })
     };
-    let ro = o.volumes.iter().find(|v| {
+    let v = o.volumes.iter().find(|v| {
         o.device_guests.contains(&v.guest) && o.ro_volumes.contains(&v.guest) && node(&v.host)
-    });
-    let Some(v) = ro else {
-        return Ok(());
-    };
-    eprintln!(
-        "podvm {verb}: --device {}:{}:r is refused on the namespace rung: it binds the device \
-         node, and a read-only bind does not refuse a write to a device node; give rw, or \
-         leave out the device (TODO/enter.md T-1939)",
+    })?;
+    Some(format!(
+        "--device {}:{}:r is refused on the namespace rung: it binds the device node, and a \
+         read-only bind does not refuse a write to a device node; give rw, or leave out the \
+         device (TODO/enter.md T-1939)",
         v.host, v.guest
-    );
-    Err(podvm_image::error::EXIT_RUNTIME_ERROR)
+    ))
 }
 
 /// The device spec of the devices that stay on the descriptor serve, in

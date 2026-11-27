@@ -66,7 +66,9 @@ impl Namespaces {
     /// A command that joins before its `execve`, then takes `ids` with the
     /// supplementary `groups`, and the working directory `cwd` of the image.
     /// With `tty` (a path of the image), the command is the leader of a
-    /// session of its own with that terminal on 0, 1 and 2.
+    /// session of its own with that terminal on 0, 1 and 2. The limits and
+    /// the no-new-privileges bit of `harden` come last (TODO/enter.md
+    /// T-2017).
     fn command(
         &self,
         program: &str,
@@ -74,7 +76,9 @@ impl Namespaces {
         groups: &[u32],
         cwd: &str,
         tty: Option<&str>,
+        harden: (&[podvm_enter::Limit], bool),
     ) -> Command {
+        let (limits, no_new_privs) = (harden.0.to_vec(), harden.1);
         let tty = tty.and_then(|t| std::ffi::CString::new(t).ok());
         // The list of setgroups: the primary group first, as login does.
         let list: Vec<u32> = ids
@@ -114,7 +118,8 @@ impl Namespaces {
                     // denies setgroups keeps them.
                     None => drop_groups(),
                 }
-                check(chdir(cwd.as_ptr()))
+                check(chdir(cwd.as_ptr()))?;
+                super::harden::apply_raw(&limits, no_new_privs)
             });
         }
         c
@@ -166,7 +171,7 @@ pub fn wait_boot(ns: &Namespaces, ended: &mut dyn FnMut() -> Option<i32>) -> Res
                 "the init of the image ended during its boot with status {code}"
             ));
         }
-        let mut c = ns.command("systemctl", None, &[], "/", None);
+        let mut c = ns.command("systemctl", None, &[], "/", None, (&[], false));
         c.arg("is-system-running");
         if wait {
             c.arg("--wait");
@@ -236,7 +241,8 @@ pub fn run_command(
         }
     };
     let slave = inner.as_ref().map(|p| p.slave.as_str());
-    let mut c = ns.command(program, spec.ids, &spec.groups, &spec.cwd, slave);
+    let harden = (&spec.limits[..], spec.no_new_privs);
+    let mut c = ns.command(program, spec.ids, &spec.groups, &spec.cwd, slave, harden);
     c.args(&spec.argv[1..]).env_clear();
     // The bytes of a value stay as they are, also where they are no text.
     use std::ffi::OsString;

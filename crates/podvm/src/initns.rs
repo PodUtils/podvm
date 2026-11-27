@@ -27,6 +27,7 @@ pub mod cgroup;
 pub mod detach;
 pub mod enter;
 pub mod groups;
+pub mod harden;
 pub mod hold;
 pub mod join;
 pub mod mounts;
@@ -226,15 +227,15 @@ pub fn takes(env: &[String]) -> bool {
     native() && env.iter().any(|e| e == MARK)
 }
 
-/// The arguments of the supervisor for a run on the namespace rung.
+/// The arguments of the supervisor for a run on the namespace rung: the
+/// working directory, the volumes, the limits, the no-new-privileges bit
+/// and the command of `plan`.
 pub fn host_args(
     rootfs: &str,
     base: &Path,
-    cwd: &str,
     ids: Option<(u32, u32)>,
     groups: &[u32],
-    binds: &[podvm_enter::VolumeBind],
-    argv: &[String],
+    plan: &podvm_enter::Plan,
 ) -> Vec<String> {
     let mut a = vec![
         VERB.to_string(),
@@ -243,9 +244,10 @@ pub fn host_args(
         "--cgroup".into(),
         base.to_string_lossy().into_owned(),
         "--cwd".into(),
-        cwd.to_string(),
+        plan.working_dir.clone(),
         "--tmp".into(),
     ];
+    a.extend(harden::args(&plan.limits, plan.no_new_privs)); // T-2017
     if let Some((u, g)) = ids.filter(|i| *i != (0, 0)) {
         a.extend(["--ids".to_string(), format!("{u}:{g}")]);
         if !groups.is_empty() {
@@ -253,12 +255,12 @@ pub fn host_args(
             a.extend(["--groups".to_string(), list.join(",")]);
         }
     }
-    for b in binds {
+    for b in &plan.volumes {
         let ro = if b.read_only { ":ro" } else { "" };
         a.extend(["--bind".to_string(), format!("{}:{}{ro}", b.guest, b.host)]);
     }
     a.push("--".into());
-    a.extend(argv.iter().cloned());
+    a.extend(plan.argv.iter().cloned());
     a
 }
 
@@ -302,10 +304,13 @@ pub fn parse(args: &[String]) -> Result<boot::Spec, String> {
             }
             "--bind" => {
                 let v = value()?;
-                let b = mounts::Bind::parse(&v)
-                    .ok_or(format!("--bind takes /tmp/GUEST:/HOST[:ro], not {v:?}"))?;
+                let b = mounts::Bind::parse(&v).ok_or(format!(
+                    "--bind takes GUEST:/HOST[:ro] with GUEST under /tmp, /dev or /run, not {v:?}"
+                ))?;
                 s.tmp.get_or_insert_with(Vec::new).push(b);
             }
+            harden::ULIMIT => s.limits.push(harden::limit(&value()?)?),
+            harden::NO_NEW_PRIVS => s.no_new_privs = true,
             "--state" => s.state = Some(PathBuf::from(value()?)),
             "--tty" => s.tty = true,
             "--hold" => s.hold = Some(PathBuf::from(value()?)),
@@ -373,15 +378,7 @@ pub fn spawn(rootfs: &str, plan: &podvm_enter::Plan) -> Result<(i64, PathBuf), S
         .and_then(|(u, g)| Some((u.parse().ok()?, g.parse().ok()?)));
     let me = std::env::current_exe().map_err(|e| format!("the path of podvm: {e}"))?;
     let groups = ids.map_or(Vec::new(), |i| image_groups(rootfs, i));
-    let args = host_args(
-        rootfs,
-        &base,
-        &plan.working_dir,
-        ids,
-        &groups,
-        &plan.volumes,
-        &plan.argv,
-    );
+    let args = host_args(rootfs, &base, ids, &groups, plan);
     let mut c = std::process::Command::new(me);
     c.args(args).env_clear();
     for e in &plan.env {

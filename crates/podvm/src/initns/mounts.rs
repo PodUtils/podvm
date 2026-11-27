@@ -75,7 +75,23 @@ fn mnt(src: &str, dst: &Path, fstype: &str, flags: u64, data: &str) -> std::io::
     }
 }
 
-/// A bind of a volume at or under `/tmp`: `GUEST:HOST` or `GUEST:HOST:ro`.
+/// The directories on which the init gets a mount of its own (a tmpfs, or
+/// the `/dev` of [`dev`]): a bind on the tree at or under one is hidden.
+const LATE: [&str; 3] = ["/tmp", "/dev", "/run"];
+
+/// True for a guest path at or under a directory of [`LATE`]: its volume
+/// goes on after the mounts of the init (TODO/enter.md T-2017: a `--device`
+/// on the `/dev` of the init), not on the tree before them.
+pub fn late(guest: &str) -> bool {
+    LATE.iter().any(|d| {
+        guest
+            .strip_prefix(d)
+            .is_some_and(|r| r.is_empty() || r.starts_with('/'))
+    })
+}
+
+/// A bind of a volume at or under `/tmp`, `/dev` or `/run` ([`late`]):
+/// `GUEST:HOST` or `GUEST:HOST:ro`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Bind {
     pub guest: String,
@@ -90,9 +106,7 @@ impl Bind {
             Some(h) => (h, true),
             None => (rest, false),
         };
-        let clean = guest.starts_with("/tmp")
-            && guest.split('/').all(|p| p != "..")
-            && host.starts_with('/');
+        let clean = late(guest) && guest.split('/').all(|p| p != "..") && host.starts_with('/');
         clean.then(|| Bind {
             guest: guest.to_string(),
             host: host.to_string(),
@@ -109,7 +123,8 @@ pub struct Want<'a> {
     pub console: Option<&'a Path>,
     /// True where the init gets a cgroup namespace of its own.
     pub cgroup: bool,
-    /// A tmpfs on `/tmp` with these binds (the namespace rung of the host).
+    /// A tmpfs on `/tmp`, and these binds after each mount (the namespace
+    /// rung of the host).
     pub tmp: Option<&'a [Bind]>,
 }
 
@@ -157,7 +172,7 @@ pub fn build(w: &Want) -> Result<(), String> {
         )
         .map_err(|e| step("the tmpfs on /tmp", e))?;
         for b in binds {
-            tmp_bind(&stage, b)
+            late_bind(&stage, b)
                 .map_err(|e| step(&format!("the bind of -v {}:{}", b.host, b.guest), e))?;
         }
     }
@@ -318,10 +333,21 @@ fn dev(target: &Path, console: Option<&Path>) -> std::io::Result<()> {
     Ok(())
 }
 
-/// One volume at or under `/tmp`, on the new tmpfs: no link of the image
-/// lies on the path.
-fn tmp_bind(stage: &Path, b: &Bind) -> std::io::Result<()> {
+/// One volume at or under `/tmp`, `/dev` or `/run`, on the new mount of
+/// the init: no link of the image lies on the path. A device node binds on
+/// a new file, as the nodes of [`DEVICES`] do.
+fn late_bind(stage: &Path, b: &Bind) -> std::io::Result<()> {
     let target = stage.join(b.guest.trim_start_matches('/'));
+    // The `/dev` of the init holds links of podvm (`fd`, `ptmx`), and an
+    // absolute link resolves on the old root here: a path through one is
+    // refused (ELOOP), not followed.
+    let mut at = stage.to_path_buf();
+    for part in b.guest.split('/').filter(|p| !p.is_empty()) {
+        at.push(part);
+        if std::fs::symlink_metadata(&at).is_ok_and(|m| m.file_type().is_symlink()) {
+            return Err(std::io::Error::from_raw_os_error(40));
+        }
+    }
     let host = Path::new(&b.host);
     if std::fs::metadata(host)?.is_dir() {
         std::fs::create_dir_all(&target)?;
@@ -382,7 +408,7 @@ mod tests {
     use super::Bind;
 
     #[test]
-    fn a_bind_names_a_guest_path_under_tmp_and_a_host_path() {
+    fn a_bind_names_a_guest_path_under_tmp_dev_or_run_and_a_host_path() {
         let b = |guest: &str, host: &str, read_only| Bind {
             guest: guest.to_string(),
             host: host.to_string(),
@@ -392,6 +418,14 @@ mod tests {
             ("/tmp/a:/srv/a", Some(b("/tmp/a", "/srv/a", false))),
             ("/tmp:/srv/t:ro", Some(b("/tmp", "/srv/t", true))),
             ("/etc:/srv/a", None),
+            (
+                "/dev/xnull:/dev/null",
+                Some(b("/dev/xnull", "/dev/null", false)),
+            ),
+            ("/run/s:/srv/s:ro", Some(b("/run/s", "/srv/s", true))),
+            ("/tmpx:/srv/a", None),
+            ("/devices:/srv/a", None),
+            ("/dev/../etc:/srv/a", None),
             ("/tmp/../etc:/srv/a", None),
             ("/tmp/a:relative", None),
             ("/tmp/a", None),

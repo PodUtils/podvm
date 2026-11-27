@@ -8,6 +8,27 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: the init of the image on the namespace rung applies `--ulimit`, no-new-privileges and `--device`, 2026-11-27
+
+Record: T-2017.
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `run --podvm-init=image` on the namespace rung (in the foreground, with
+  `-d`, and with `create` and `start`) applies `--ulimit` and
+  `--security-opt no-new-privileges` (also `--cap-drop ALL`) to the init
+  of the image before its exec, so systemd and each service get them, and
+  to the command of the run. Before, the run refused these flags with 125.
+- A `--device` that reads, and each volume at or under `/dev` or `/run`,
+  is a bind on the mount of the init there. Before, the `/dev` of the init
+  covered it.
+- `--podvm-confine` stays refused by name with 125: its seccomp filter and
+  its Landlock domain deny the mounts and the namespaces that systemd makes
+  as PID 1. A `--device` with `w` and no `r` is refused by name with 125:
+  no interposer loads in the init. `exec` into the init gets no limit, as
+  on the namespace rung.
+- Not measured: this host gives no user a subordinate range, so experiment
+  465, clause 12, did not run.
+
 ### Fixed: `--format` reads docker's `{{json .}}`, `table`, `range` and `index`, 2026-11-27
 
 Record: T-2087 (OR-B40-15), T-2108 (OR-B42-08).
