@@ -20,6 +20,9 @@ fn podvm(base: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_podvm"))
         .args(args)
         .current_dir(base)
+        // TODO/gate.md T-1859: no detached spare-tree fill writes into the
+        // store after the test removed it.
+        .env("PODVM_SPARE_TREE", "0")
         .env("HOME", base)
         .env("PODVM_STORE", base.join("store"))
         .stdin(Stdio::null())
