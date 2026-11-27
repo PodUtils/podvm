@@ -65,8 +65,9 @@ usage: podvm system info [--format T]
                -v H:G:overlay, and B true where the rung of this host is
                one of them (TODO/enter.md T-2101)
 
-  --format T   {{.Field}} placeholders, plus `{{json .Field}}`. .Parity is
-               already a JSON document, so both spellings print it.
+  --format T   the template language of `podvm images --help`, with no
+               `table`. .Parity is already a JSON document, so {{.Parity}}
+               and {{json .Parity}} print it, and range and index read it.
 
   refused: podvm has no daemon, so there is no client/server split to report. The
     rung this machine permits stands where docker prints a server version,

@@ -23,10 +23,16 @@ pub fn inspect_container(want: &str, template: Option<&str>) -> Option<Result<St
     };
     let typed = super::typed::fields(&fields, &c);
     Some(match template {
-        Some(t) => format::render_typed(t, &typed, &super::typed::plain(&c)).map_err(|bad| {
-            eprintln!("podvm inspect: {bad}");
-            EXIT_CLI_ERROR
-        }),
+        // TODO/cli.md T-2087: `.` is the document that `inspect` prints.
+        Some(t) => format::Template::parse(t)
+            .and_then(|t| {
+                let data = format::Data::typed(&typed, &super::typed::plain(&c));
+                t.render(&data.with_root(super::typed::document(&typed)))
+            })
+            .map_err(|bad| {
+                eprintln!("podvm inspect: {bad}");
+                EXIT_CLI_ERROR
+            }),
         None => Ok(super::typed::document(&typed).to_string()),
     })
 }

@@ -62,6 +62,9 @@ fn text(out: &[u8]) -> String {
 fn run(args: &[&str], store: &Path, deadline: Duration) -> Output {
     let mut child = Command::new(bin())
         .args(args)
+        // TODO/gate.md T-1859: no detached spare-tree fill writes into the
+        // store after the test removed it.
+        .env("PODVM_SPARE_TREE", "0")
         .env("PODVM_STORE", store)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

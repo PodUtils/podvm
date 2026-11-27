@@ -7,7 +7,13 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
 ## Host and payload
 
 - A chroot changes paths. It does not provide process or network isolation.
-- The namespace path provides mount behavior only.
+- The namespace rung opens the parts that `podvm man`, ISOLATION, names
+  for each shape of a run (T-2053). `podvm probe` states the parts of a
+  foreground `run` of its caller, of an image with a `/proc` (T-2070).
+- podvm refuses an argument that is not UTF-8 with exit 125 and one line
+  that names its position (T-2087). A word of the payload (the command,
+  its arguments, an `-e` value) cannot pass as bytes yet: each tier hands
+  it to the plan of pod-enter, which takes UTF-8 only.
 - A userland entry retains the host root and shared host resources.
 - A static x86_64 payload on a host that denies chroot runs on the
   native-static rung (T-1652): Syscall User Dispatch (Linux 5.11) gives
@@ -52,6 +58,17 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
   option `mode=M` (octal, up to 7777) is the mode of that directory. A
   mount with `size=` has the mode 1777 of the kernel, and a `mode=` of it
   that is not 1777 is refused by name (OR-B38-16, T-2070).
+- With `-it`, the pty of `run` and `exec` is the controlling terminal of
+  the payload where podvm can leave the session of the caller: a user
+  with no root on the namespace rung, and `exec` into its `run -d`
+  (T-2070). A job-control shell then has `/dev/tty`, Ctrl-C goes to its
+  foreground job, and Ctrl-Z stops that job. podvm, the parent of the
+  payload, leads the session; in docker the payload leads it. As root
+  (podvm leads its process group) and with `-t` and no `-i`, the pty is
+  the controlling terminal of no process: an interactive shell turns job
+  control off, and podvm sends the signal of Ctrl-C and Ctrl-\ to the
+  processes of the payload itself. The session of the payload needs
+  podcrates@T-927 (COORD-188).
 - On the namespace rung a volume (`-v HOST:GUEST`) is a bind mount:
   `/proc/mounts` lists it, and `/proc/self/mountinfo` names the host path
   (T-1920). On the userland rung a volume, `--tmpfs` and `--read-only` are
@@ -330,6 +347,18 @@ the limit, so none owns it. T-1003 in [packaging](../TODO/packaging.md)
 stays `done`: everything it claimed to deliver is delivered and its
 `Prove` exits 0.
 
+`--format` reads a part of Go's templates (T-2087): fields (`.`,
+`.A.B`), strings, integers, `( )`, `|`, `range` ... `end`, and the
+functions `json`, `index`, `join`, `upper`, `lower`, `len` and `println`.
+`ps` and `images` also take the `table` prefix (a header and columns
+aligned as docker aligns them) and `json` alone. podvm refuses `if`,
+`with`, `else`, a variable and each other function by name, with exit 1.
+A template has at most 64 KiB, 16 levels of `range` and `( )`, and 16 MiB
+of output. `index` of a key that a map does not have gives an empty
+string, as docker gives for a label. A key that a map does not have in
+`.A.B` is refused with the keys that it has, where docker prints
+`<no value>`.
+
 ## SSH
 
 The source build produces separate `node`, `operator`, `proxy`, and `shell` executables.
@@ -440,7 +469,10 @@ windows` and `run windows:NAME` fetch a pinned static QEMU 11.1.3 and its
 firmware into the store (T-1875); `podvm machine ssh` and `podvm doctor`
 look on PATH only. `--podvm-mem` sizes the virtual machine, as QEMU's `-m` does,
 and the guest kernel keeps a part of it: `MemTotal` is 85 % of 256M,
-92 % of 512M and 95 % of 1G (T-1849).
+92 % of 512M and 95 % of 1G (T-1849). The least value is 256M: a guest
+of 256M booted, a guest of 64M ended before the payload, and 128M is not
+measured. A smaller value is refused with 125, and the line names the
+minimum (T-2100).
 `podvm machine ssh` and `podvm windows` boot a guest
 ([architecture](architecture.md)).
 

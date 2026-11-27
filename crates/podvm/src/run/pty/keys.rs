@@ -1,10 +1,14 @@
-//! The interrupt and quit keys of a pty with no session (OQ-05 of the
-//! sixth outside pass, TODO/cli.md T-2052).
+//! The interrupt and quit keys of the pty of `-it` (OQ-05 of the sixth
+//! outside pass, TODO/cli.md T-2052).
 //!
-//! The slave of the pty is not the controlling terminal of the payload:
-//! `pod-enter` makes no session (COORD-188 asks for one). So the line
-//! discipline signals no process for `VINTR` or `VQUIT`, and podvm takes
-//! the key out of the input of `-i` and sends the signal itself
+//! `pod-enter` makes no session (COORD-188 asks for one). Where podvm left
+//! the caller's session, the pty is the controlling terminal of podvm's
+//! session (`super::leave_the_session`, T-2070), and the foreground group
+//! of that session can be podvm's own: a SIGINT of the line discipline
+//! would reach podvm, whose waiter forwards it, and the payload would take
+//! it twice. Elsewhere the pty is the controlling terminal of no process,
+//! and the line discipline signals none. So podvm takes `VINTR` and
+//! `VQUIT` out of the input of `-i` and sends the signal itself
 //! ([`super::send`]).
 //!
 //! A terminal sends the signal to its foreground process group, not to one
@@ -15,8 +19,13 @@
 //! podvm, `sleep` too: so `-i` changed the result.
 //!
 //! The rule now: the signal goes to each process of the tree of the
-//! payload (the payload and its descendants) that is in the process group
-//! of the payload, as a terminal sends it to that group. A process of
+//! payload (the payload and its descendants) that is in the foreground
+//! group of the terminal of the payload (`tpgid`), as a terminal sends it
+//! to that group. A job-control shell moves its foreground job to a group
+//! of its own (T-2070): the job takes the signal, and the shell and its
+//! background jobs do not. Where the payload has no controlling terminal,
+//! or its foreground group is outside the PID namespace of the `/proc`
+//! that podvm reads, the group is the group of the payload. A process of
 //! podvm in that tree (the relay of `exec` that stays in a PID namespace)
 //! gets none: it would forward the signal, and the payload would take it
 //! twice. A process that left the group (`setsid`, a daemon) gets none, as
@@ -46,31 +55,43 @@ pub struct Proc {
     pub pid: i64,
     /// The process group, field 5 of `/proc/PID/stat`.
     pub pgrp: i64,
+    /// The foreground group of the controlling terminal, field 8: -1 with
+    /// no terminal, 0 for a group outside the PID namespace of `/proc`.
+    pub tpgid: i64,
     /// True where the program of the process is podvm itself.
     pub podvm: bool,
 }
 
-/// The process group in the text of `/proc/PID/stat`: the fields start
-/// after the last `)`, as the name of the command can hold one.
-pub fn pgrp_of(stat: &str) -> Option<i64> {
+/// The process group and the foreground group of the terminal in the text
+/// of `/proc/PID/stat`: the fields start after the last `)`, as the name
+/// of the command can hold one.
+pub fn groups_of(stat: &str) -> Option<(i64, i64)> {
     let rest = &stat[stat.rfind(')')? + 1..];
-    let mut fields = rest.split_whitespace();
-    fields.next()?; // the state
-    fields.next()?; // the parent
-    fields.next()?.parse().ok()
+    let f: Vec<&str> = rest.split_whitespace().take(6).collect();
+    // The state, the parent, the group, the session, the terminal, tpgid.
+    let [_, _, pgrp, _, _, tpgid] = f[..] else {
+        return None;
+    };
+    Some((pgrp.parse().ok()?, tpgid.parse().ok()?))
 }
 
 /// The processes that a key signals: each of `tree` (the payload first,
-/// then its descendants) in the process group of the payload, and not
-/// podvm. Where the payload is not in `tree` (it ended, or `/proc` did not
-/// give it) or no process stays, the payload alone.
+/// then its descendants) in the foreground group of the terminal of the
+/// payload (else in its process group), and not podvm. Where the payload
+/// is not in `tree` (it ended, or `/proc` did not give it) or no process
+/// stays, the payload alone.
 pub fn targets(payload: i64, tree: &[Proc]) -> Vec<i64> {
     let Some(head) = tree.iter().find(|p| p.pid == payload) else {
         return vec![payload];
     };
+    let group = if head.tpgid > 0 {
+        head.tpgid
+    } else {
+        head.pgrp
+    };
     let out: Vec<i64> = tree
         .iter()
-        .filter(|p| p.pgrp == head.pgrp && !p.podvm)
+        .filter(|p| p.pgrp == group && !p.podvm)
         .map(|p| p.pid)
         .collect();
     if out.is_empty() {
@@ -96,11 +117,16 @@ fn tree_of(proc: &Path, payload: i64) -> Option<Vec<Proc>> {
     pids.push(payload);
     let one = |pid: i64| {
         let dir = proc.join(pid.to_string());
-        let pgrp = pgrp_of(&std::fs::read_to_string(dir.join("stat")).ok()?)?;
+        let (pgrp, tpgid) = groups_of(&std::fs::read_to_string(dir.join("stat")).ok()?)?;
         // A program that cannot be read is not podvm's: the signal goes to
         // it, as to each process of the payload.
         let podvm = me.is_some() && program(&dir.join("exe")) == me;
-        Some(Proc { pid, pgrp, podvm })
+        Some(Proc {
+            pid,
+            pgrp,
+            tpgid,
+            podvm,
+        })
     };
     Some(pids.into_iter().filter_map(one).collect())
 }
@@ -132,11 +158,25 @@ mod tests {
     use super::*;
 
     fn p(pid: i64, pgrp: i64, podvm: bool) -> Proc {
-        Proc { pid, pgrp, podvm }
+        Proc {
+            pid,
+            pgrp,
+            tpgid: -1,
+            podvm,
+        }
     }
 
-    /// One rule for each shape of a tree: the members of the group of the
-    /// payload that are not podvm, else the payload alone.
+    /// `p` with a controlling terminal whose foreground group is `tpgid`.
+    fn t(pid: i64, pgrp: i64, tpgid: i64) -> Proc {
+        Proc {
+            tpgid,
+            ..p(pid, pgrp, false)
+        }
+    }
+
+    /// One rule for each shape of a tree: the members of the foreground
+    /// group of the terminal of the payload (else of its group) that are
+    /// not podvm, else the payload alone.
     #[test]
     fn a_key_signals_the_group_of_the_payload_in_its_tree() {
         let cases: &[(&str, i64, &[Proc], &[i64])] = &[
@@ -166,6 +206,54 @@ mod tests {
             ),
             ("no tree from /proc", 104, &[], &[104]),
             (
+                "T-2070: a job-control shell at its prompt: the shell",
+                104,
+                &[t(104, 104, 104), t(120, 120, 104)],
+                &[104],
+            ),
+            (
+                "T-2070: the foreground job of the shell, not its background job",
+                104,
+                &[
+                    t(104, 104, 110),
+                    t(110, 110, 110),
+                    t(111, 110, 110),
+                    t(120, 120, 110),
+                ],
+                &[110, 111],
+            ),
+            (
+                "T-2070: the relay of exec reads the group of the job",
+                30,
+                &[
+                    Proc {
+                        tpgid: 40,
+                        ..p(30, 7, true)
+                    },
+                    t(31, 31, 40),
+                    t(40, 40, 40),
+                ],
+                &[40],
+            ),
+            (
+                "the foreground group is podvm's: its members but podvm",
+                30,
+                &[
+                    Proc {
+                        tpgid: 7,
+                        ..p(30, 7, true)
+                    },
+                    t(31, 7, 7),
+                ],
+                &[31],
+            ),
+            (
+                "the foreground group is outside the namespace (0)",
+                104,
+                &[t(104, 7, 0), t(105, 7, 0)],
+                &[104, 105],
+            ),
+            (
                 "only podvm in the group",
                 30,
                 &[p(30, 7, true), p(31, 9, false)],
@@ -178,16 +266,17 @@ mod tests {
     }
 
     #[test]
-    fn the_group_is_read_after_the_last_parenthesis() {
-        let cases: &[(&str, Option<i64>)] = &[
-            ("104 (sh) S 2 104 1 0", Some(104)),
-            ("105 (a b) c)) S 104 77 1 0", Some(77)),
-            ("105 (sleep) S 104", None),
+    fn the_groups_are_read_after_the_last_parenthesis() {
+        let cases: &[(&str, Option<(i64, i64)>)] = &[
+            ("104 (sh) S 2 104 1 0 -1 4194304", Some((104, -1))),
+            ("104 (sh) S 2 104 104 34816 110 0", Some((104, 110))),
+            ("105 (a b) c)) S 104 77 1 0 0", Some((77, 0))),
+            ("105 (sleep) S 104 104 1 0", None),
             ("no parenthesis", None),
-            ("105 (x) S 104 notanumber", None),
+            ("105 (x) S 104 notanumber 1 0 -1", None),
         ];
         for (stat, want) in cases {
-            assert_eq!(pgrp_of(stat), *want, "{stat}");
+            assert_eq!(groups_of(stat), *want, "{stat}");
         }
     }
 

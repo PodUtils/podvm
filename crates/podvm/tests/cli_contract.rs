@@ -167,3 +167,76 @@ fn a_row_gives_each_of_its_spellings() {
     assert_eq!(spellings("--network, --net"), ["--network", "--net"]);
     assert_eq!(spellings("-e, --env K=V"), ["-e", "--env"]);
 }
+
+/// TODO/cli.md T-2087 (OR-B40-09, OR-B42-04): an argument that is not
+/// UTF-8. One rule for the family: podvm never panics on it, and refuses it
+/// with exit 125 and one line that names its position and its class; an
+/// argument that is UTF-8 (the empty one too) is not refused for it. The
+/// payload class says why it cannot pass yet: the plan of pod-enter takes
+/// UTF-8 only.
+#[test]
+fn an_argument_that_is_not_utf8_is_refused_by_its_position_and_class() {
+    // The classes: the words of each line.
+    const PAYLOAD: &str = "of the payload is not UTF-8: each tier hands";
+    const PODVM: &str = "is not UTF-8: podvm takes its flags";
+    const VERB: &str = "takes UTF-8 arguments only";
+    const HOLDS: &str = "a character that podvm keeps for a byte";
+    const PASSES: &str = "-";
+    let dir = std::env::temp_dir().join(format!("podvm-t2087-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let i: &[u8] = b"mirror.gcr.io/library/alpine:3.20";
+    #[rustfmt::skip]
+    let rows: &[(&[&[u8]], &str, &str)] = &[
+        // The command and its arguments, and an `-e` value.
+        (&[b"run", b"--pull=never", i, b"echo", b"\xff\xfe"], PAYLOAD, r#"argument 5 ("\xff\xfe")"#),
+        (&[b"run", i, b"printf", b"caf\xe9"], PAYLOAD, r#"argument 4 ("caf\xe9")"#),
+        (&[b"run", b"-e", b"K=caf\xe9", i, b"true"], PAYLOAD, r#"argument 3 ("K=caf\xe9")"#),
+        (&[b"run", b"--env=K=\xff", i, b"true"], PAYLOAD, r#"argument 2 ("K=\xff")"#),
+        (&[b"create", i, b"\xe2\x28\xa1"], PAYLOAD, r#"argument 3 ("\xe2(\xa1")"#),
+        (&[b"exec", b"-e", b"K=\xff", b"ctr", b"true"], PAYLOAD, r#"argument 3 ("K=\xff")"#),
+        (&[b"exec", b"ctr", b"sh", b"-c", b"caf\xe9"], PAYLOAD, r#"argument 5 ("caf\xe9")"#),
+        // A flag, its value or the image name: podvm's own.
+        (&[b"run", b"--name", b"caf\xe9", i, b"true"], PODVM, r#"argument 3 ("caf\xe9")"#),
+        (&[b"run", b"-w", b"/\xff", i, b"true"], PODVM, r#"argument 3 ("/\xff")"#),
+        (&[b"run", b"--\xff", i], PODVM, r#"argument 2 ("--\xff")"#),
+        (&[b"run", b"caf\xe9:1"], PODVM, r#"argument 2 ("caf\xe9:1")"#),
+        (&[b"exec", b"--user", b"\xff", b"ctr", b"true"], PODVM, r#"argument 3 ("\xff")"#),
+        (&[b"container", b"run", b"--label", b"a=\xff", i], PODVM, r#"argument 4 ("a=\xff")"#),
+        (&[b"--store", b"/tmp/\xff", b"images"], PODVM, r#"argument 2 ("/tmp/\xff")"#),
+        // A verb with no payload.
+        (&[b"rm", b"caf\xe9"], VERB, r#"argument 2 ("caf\xe9") is not UTF-8: `rm`"#),
+        (&[b"\xff"], VERB, r#"argument 1 ("\xff") is not UTF-8: `podvm`"#),
+        // A UTF-8 argument with a character of the carried range.
+        (&[b"run", i, "\u{10FFE9}".as_bytes()], HOLDS, r#"argument 3 ("\u{10ffe9}") holds U+10FFE9"#),
+        // UTF-8, and empty: not refused for it.
+        (&[b"run", b"--pull=never", b"nosuch.invalid/x:1", b"echo", b""], PASSES, ""),
+    ];
+    let mut bad: Vec<String> = Vec::new();
+    for (args, class, want) in rows {
+        let a: Vec<&std::ffi::OsStr> = args
+            .iter()
+            .map(|b| std::ffi::OsStr::from_bytes(b))
+            .collect();
+        let o = podvm(&a, &dir);
+        let err = String::from_utf8_lossy(&o.stderr).to_string();
+        let lines = err
+            .lines()
+            .filter(|l| l.contains("UTF-8") || l.contains("holds U+"))
+            .count();
+        let row = format!("{a:?}");
+        let ok = if *class == PASSES {
+            lines == 0
+        } else {
+            o.status.code() == Some(125) && lines == 1 && err.contains(want) && err.contains(class)
+        };
+        if !ok || err.contains("internal error") || err.contains("panicked") {
+            bad.push(format!(
+                "{row}: exit {:?}, want {class:?} {want:?}: {err}",
+                o.status.code()
+            ));
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}

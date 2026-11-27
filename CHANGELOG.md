@@ -23,6 +23,62 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
   the VM, and a flag that a VM does not hold are refused by name with 125.
 - `kvm.yml` has the job `incusvm`, which runs experiment 492.
 
+### Fixed: `--format` reads docker's `{{json .}}`, `table`, `range` and `index`, 2026-11-27
+
+Record: T-2087 (OR-B40-15), T-2108 (OR-B42-08).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `--format` of `ps`, `images`, `inspect` and `system info` reads a part
+  of Go's templates: fields (`.`, `.A.B`), strings, integers, `( )`, `|`,
+  `range` ... `end`, and the functions `json`, `index`, `join`, `upper`,
+  `lower`, `len` and `println`. `{{json .}}` prints the whole row, or the
+  document of plain `inspect`. `ps` and `images` take the `table` prefix
+  (a header and columns aligned as docker aligns them; `table` alone is the
+  default table) and `json` alone. Before, each of these forms was refused
+  with exit 1.
+- `if`, `with`, a variable and each other function are refused by name
+  with one line and exit 1. `inspect` with a template that fits no image
+  and no container names the field that fails for each kind.
+
+### Fixed: the pty of `-it` is the controlling terminal of the payload of a user, 2026-11-27
+
+Record: T-2070 (OR-B38-17), T-2087 (OR-B40-13).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- As a user with no root on the namespace rung, `run -it IMAGE sh` and
+  `exec -it CTR sh` into a `run -d` give the shell the pty as its
+  controlling terminal. The shell no longer says "can't access tty; job
+  control turned off": its group is the foreground group of the pty,
+  Ctrl-C ends its foreground job and the shell goes on, and Ctrl-Z stops
+  the job. podvm leads the session of the pty, as the parent of the
+  payload.
+- Known gap: as root and with `-t` and no `-i`, the pty is still the
+  controlling terminal of no process. That needs the session of the
+  payload in podcrates (podcrates@T-927, COORD-188).
+
+### Fixed: findings of the outside passes: arguments that are not UTF-8, the least memory of a guest, the banner of `probe`, 2026-11-27
+
+Record: T-2087 (OR-B40-09), T-2108 (OR-B42-04), T-2100 (OR-B41-15),
+T-2070 (OR-B38-10).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- An argument that is not UTF-8 gives one line with its position and
+  its class, and exit 125: a flag, a value or the image name of podvm
+  (`argument 3 ("caf\xe9") is not UTF-8: podvm takes its flags, their
+  values and the image name as UTF-8`), or a word of the payload, which
+  each tier hands to the plan of pod-enter, a UTF-8 text. Before, each
+  had the same line, with `U+FFFD` for each byte. A word of the payload
+  cannot pass as bytes yet.
+- `--podvm-mem` takes 256M or more. A smaller value is refused before
+  the boot with a line that names the minimum ("the machine tier needs
+  at least 256 MiB"); before, `--podvm-mem 64M` gave "the guest ended
+  before it gave the exit code of the payload".
+- The banner of `podvm probe` gives the namespaces, the `pids:` cell and
+  the "does NOT provide" words of a foreground `run` of its caller, as
+  the banner of `run` does, with a line that says so. Before, it said
+  `namespaces: mount-only`, no user or PID isolation and no `/proc` on a
+  host where `run` opens user+pid+uts+mount and a `/proc`.
+
 ### Fixed: each number flag is refused outside its range with one true line, 2026-11-27
 
 Record: T-1947.

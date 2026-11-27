@@ -111,7 +111,7 @@ pub(super) fn size(t: &Table, table: &str, key: &str) -> Result<Option<u64>, Str
     match t.get(key) {
         None => Ok(None),
         Some(Value::Integer(n)) if *n > 0 => Ok(Some(*n as u64)),
-        Some(Value::String(s)) => crate::tier::parse_mem(s).map(Some).ok_or_else(|| {
+        Some(Value::String(s)) => crate::number::size(s).map(Some).ok_or_else(|| {
             format!("`{table}.{key}` takes bytes with an optional K/M/G/T suffix, not {s:?}")
         }),
         Some(other) => Err(format!(

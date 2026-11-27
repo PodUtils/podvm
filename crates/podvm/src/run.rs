@@ -222,7 +222,8 @@ pub const RUN_OPTIONS: &str = "\
                    split on whitespace (TODO/machine.md T-1302)
   --podvm-mem S   podvm's own, machine tier only and refused elsewhere: the
                    memory of the virtual machine in bytes, with an optional
-                   K/M/G/T suffix, from 1 to 9223372036854775807 bytes, as
+                   K/M/G/T suffix, from 268435456 (256M, the least that a
+                   guest booted with) to 9223372036854775807 bytes, as
                    QEMU's -m; the guest kernel keeps a
                    part of it (256M gives 85 % to MemTotal). A
                    guest over the RLIMIT_FSIZE ceiling is refused before it

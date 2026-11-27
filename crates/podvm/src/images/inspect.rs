@@ -82,12 +82,26 @@ pub fn inspect(verb: &str, args: &[String]) -> i32 {
     // ⚠ Checked against the IMAGE fields here and against the container's in
     // `lifecycle::inspect_container`, because the two kinds have different
     // fields and a union would accept a name neither of them has.
+    // TODO/cli.md T-2087 (OR-B40-15): where the template fits neither kind,
+    // the line names the part that fails for each kind.
     if let Some(t) = &template
-        && format::check(t, INSPECT_FIELDS).is_err()
-        && format::check(t, crate::lifecycle::CONTAINER_INSPECT_FIELDS).is_err()
+        && let Err(image) = format::check(t, INSPECT_FIELDS)
+        && let Err(container) = format::check(t, crate::lifecycle::CONTAINER_INSPECT_FIELDS)
     {
-        let bad = format::check(t, INSPECT_FIELDS).unwrap_err();
-        eprintln!("podvm inspect: {bad}");
+        match (&image, &container) {
+            (format::Bad::UnknownField { got, .. }, format::Bad::UnknownField { got: g2, .. })
+                if got == g2 =>
+            {
+                eprintln!("podvm inspect: no image and no container has the field {got:?}")
+            }
+            (format::Bad::UnknownField { .. }, format::Bad::UnknownField { .. }) => eprintln!(
+                "podvm inspect: the template fits no image and no container: as an image, {}; \
+                 as a container, {}",
+                image.short(),
+                container.short()
+            ),
+            _ => eprintln!("podvm inspect: {image}"),
+        }
         return EXIT_CLI_ERROR;
     }
     let store = match podvm_image::open_store() {
@@ -128,7 +142,10 @@ pub fn inspect(verb: &str, args: &[String]) -> i32 {
             eprintln!("podvm inspect: {want}: .UnpackedBytes is a dash: {why}");
         }
         match &template {
-            Some(t) => match format::render_typed(t, &inspect_fields(&r, &store), &[]) {
+            Some(t) => match format::Template::parse(t).and_then(|t| {
+                let data = format::Data::typed(&inspect_fields(&r, &store), &[]);
+                t.render(&data.with_root(inspect_doc(&r, &store)))
+            }) {
                 Ok(line) => docs.push(line),
                 Err(bad) => {
                     eprintln!("podvm inspect: {bad}");
