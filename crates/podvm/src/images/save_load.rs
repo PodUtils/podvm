@@ -444,9 +444,10 @@ pub fn verify(verb: &str, args: &[String]) -> i32 {
         if single {
             print_provenance(&store, record);
         }
+        // TODO/cli.md T-2100 (OR-B41-17): the name as `images` gives it.
         let name = match &record.tag {
-            Some(tag) => format!("{}:{tag}", record.repository),
-            None => record.repository.clone(),
+            Some(tag) => format!("{}:{tag}", record.display_repository()),
+            None => record.display_repository(),
         };
         let digests: Vec<String> = record.blobs().iter().map(|s| s.to_string()).collect();
         match store.verify_blobs(&digests) {

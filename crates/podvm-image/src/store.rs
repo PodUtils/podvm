@@ -267,19 +267,8 @@ impl Store {
     /// Where none of the three is set, `fallback` is consulted; the caller
     /// supplies the probe's write allowlist, ranked by free space (T-0203).
     pub fn default_root(fallback: impl FnOnce() -> Option<String>) -> Result<PathBuf> {
-        if let Some(p) = std::env::var_os("PODVM_STORE") {
-            let p = PathBuf::from(p);
-            if !p.as_os_str().is_empty() {
-                return Ok(p);
-            }
-        }
-        for (var, suffix) in [("XDG_DATA_HOME", "podvm"), ("HOME", ".local/share/podvm")] {
-            if let Some(base) = std::env::var_os(var) {
-                let base = PathBuf::from(base);
-                if base.is_absolute() {
-                    return Ok(base.join(suffix));
-                }
-            }
+        if let Some(p) = Self::configured_root(&|k| std::env::var_os(k)) {
+            return Ok(p);
         }
         match fallback() {
             Some(p) => Ok(PathBuf::from(p).join("podvm")),
@@ -290,6 +279,22 @@ impl Store {
                     .into(),
             )),
         }
+    }
+
+    /// The root that the variables of `env` give: `PODVM_STORE`, then
+    /// `XDG_DATA_HOME/podvm`, then `HOME/.local/share/podvm`; `None` where
+    /// each is unset, empty or relative. The machine tier puts its files
+    /// under this root too (TODO/cli.md T-2100, OR-B41-02).
+    pub fn configured_root(env: &dyn Fn(&str) -> Option<std::ffi::OsString>) -> Option<PathBuf> {
+        if let Some(p) = env("PODVM_STORE").filter(|p| !p.is_empty()) {
+            return Some(PathBuf::from(p));
+        }
+        [("XDG_DATA_HOME", "podvm"), ("HOME", ".local/share/podvm")]
+            .into_iter()
+            .find_map(|(var, suffix)| {
+                let base = PathBuf::from(env(var)?);
+                base.is_absolute().then(|| base.join(suffix))
+            })
     }
 
     pub fn open(root: impl Into<PathBuf>) -> Result<Store> {

@@ -252,8 +252,8 @@ pub const USER: &[Group] = &[
             v(
                 "PODVM_WINDOWS_BASE",
                 "a directory",
-                "Names the cache of the base image of a Windows guest. With no value, podvm uses \
-                 a directory under $HOME.",
+                "Names the cache of the base image of a Windows guest. With no value, it is \
+                 windows/base.vhdx in the store.",
             ),
             v(
                 "PODVM_DOS_BASE",
@@ -263,14 +263,14 @@ pub const USER: &[Group] = &[
             v(
                 "PODVM_MACHINES_DIR",
                 "a directory",
-                "Names the directory of all machines. With no value, it is machines beside the \
-                 catalog.",
+                "Names the directory of all machines. With no value, it is windows/machines in the \
+                 store.",
             ),
             v(
                 "PODVM_TOOLS_DIR",
                 "a directory",
-                "Names the directory of the copy of the emulator in the store. With no value, it \
-                 is tools/qemu-VERSION in PODVM_STORE where that is set, else beside the catalog.",
+                "Names the directory of the copy of the emulator. With no value, it is \
+                 tools/qemu-VERSION in the store.",
             ),
             v(
                 "PODVM_WINDOWS_KEEP",

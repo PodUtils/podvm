@@ -7,7 +7,7 @@ start.
 
 ## State
 
-679 entries: 19 open, 41 partial, 6 blocked, 613 done.
+679 entries: 19 open, 40 partial, 6 blocked, 614 done.
 
 * The newest release is `v0.2.0-beta.41` (2026-11-26). [CHANGELOG](../CHANGELOG.md)
   holds what each release ships, with its known gaps.
@@ -48,8 +48,8 @@ status with `podvm-count` in the same commit as the work.
    [T-1998](machine.md)). Then the asks of githome and cfb for their CI,
    then the items below. A quality item that a podrunner unit meets counts
    as an ask of podrunner.
-2. The open findings of the outside passes: [T-2079](cli.md),
-   [T-2070](cli.md), [T-2054](enter.md), [T-2044](cli.md).
+2. The open findings of the outside passes: [T-2070](cli.md),
+   [T-2054](enter.md), [T-2044](cli.md).
 3. Quality first (the owner's ruling, 2026-11-17;
    `docs/methodology/quality.md`): each beta passes the gate of
    `docs/maintenance.md`, "Releases". Work the open entries of the external

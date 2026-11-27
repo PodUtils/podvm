@@ -37,7 +37,7 @@ fail=0
 : >"$OUT"
 say() { printf '%s\n' "$*" | tee -a "$OUT"; }
 bad() { say "FAIL: $*"; fail=1; }
-STORE="$HOME/.local/share/podvm/tools/qemu-9.2.0"
+STORE="$PODVM_STORE/tools/qemu-11.1.3"
 
 say "date      $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 say "podvm     $("$BIN" version 2>/dev/null)"

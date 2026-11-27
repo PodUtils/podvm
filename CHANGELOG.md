@@ -8,6 +8,30 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: the files of the machine tier go to the store; `ps` has docker's order, columns and times, 2026-11-27
+
+Record: T-2100 (OR-B41-02, OR-B41-17), T-2108 (OR-B42-08), T-2079 (OR-B39-19).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- The copy of QEMU, the records and logs of each machine and the base
+  caches of a Windows or DOS guest go to the store (`PODVM_STORE`, else
+  `XDG_DATA_HOME/podvm`, else `HOME/.local/share/podvm`) or to the
+  directory of their own variable. Before, the records of a machine and the
+  base caches went under `$HOME` also where `PODVM_STORE` was set, and a
+  run with a read-only home failed. The sockets of a machine stay in
+  `XDG_RUNTIME_DIR`: a socket path has a limit of 108 bytes.
+- `ps` lists the newest container first. CREATED is the age ("5 minutes
+  ago", the new field `.RunningFor`), STATUS has the time of the state
+  ("Up 5 minutes", "Exited (3) 2 hours ago"), and an empty PORTS column
+  stands before NAMES, as docker has them. The age in CREATED of `images`
+  takes docker's words too ("About an hour ago", "2 weeks ago").
+- `ps` shows the command of a detached guest of the machine tier, not
+  `(linux guest)`. `verify` names an image as `images` does (`dup:1`, not
+  `docker.io/library/dup:1`).
+- `rm -f` of a container that is not there names it and exits 0, as
+  docker does. The usage of `rmi` says that `-f` does not remove an image
+  that a container uses.
+
 ### Fixed: `--format` reads docker's `{{json .}}`, `table`, `range` and `index`, 2026-11-27
 
 Record: T-2087 (OR-B40-15), T-2108 (OR-B42-08).

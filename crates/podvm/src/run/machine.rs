@@ -200,6 +200,9 @@ pub(super) fn machine_tier(
         Ok(p) => p,
         Err(c) => return c,
     };
+    if keeper.is_some() {
+        crate::machine::detach::note_command(&p.argv); // T-2100 (OR-B41-17)
+    }
     let sealed = if o.sealed {
         let Some(b) = p.stdin.take() else {
             eprintln!(
