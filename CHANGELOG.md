@@ -8,6 +8,29 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: four findings of the external QA of 0.2.0-beta.31, 2026-11-27
+
+Record: T-1953 (PodUtils/podvm#547, #558, #560, #566).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- A run that enters chroot because the image has no `/tmp` mount point now
+  names `chroot` in `--report`, `inspect` and the container record, and
+  `--strict` refuses it for the rung. `run -d` and `create` of such an image
+  are refused at once: a detached container has a PID namespace, which only
+  the namespace rung gives.
+- `probe --cached` is served from the second call on for a caller with no
+  capability: the key of a run in a mount namespace that podvm made reads the
+  namespace that the run came from. That entry keeps its answer in
+  `$store/probe-userns.json`; `pull` keeps `$store/probe.json`, so neither
+  replaces the other.
+- The reach check of the source fixup takes the first answer of the host: a
+  301, 302 or 308 from `security.ubuntu.com` is an answer over HTTPS, and the
+  host of the redirect is not asked and not named in an error.
+- A SIGTERM, SIGINT or SIGHUP to a foreground run of a Windows or DOS guest
+  ends the emulator and its children, removes the run directory (about a
+  hundred megabytes) and ends podvm with 143, 130 or 129. Before, SIGTERM
+  ended podvm and left the directory and the children of the emulator.
+
 ### Added: `run -d` of a guest with systemd as PID 1, and its stop, 2026-11-26
 
 Record: T-1994 (PodUtils/podrunner#313 ask 2).

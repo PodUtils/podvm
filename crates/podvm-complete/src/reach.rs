@@ -29,19 +29,28 @@ pub fn probe(host: &str) -> Answer {
     let (config, _roots) = podvm_image::tls::client_config();
     // ⚠ The environment's proxy where it sets one: an intercepting proxy is
     // the normal case in the environments podvm is built for.
-    let mut net = match Net::from_environment(config) {
-        Ok(n) => n,
-        Err(why) => return Answer::No(why),
-    };
+    match Net::from_environment(config) {
+        Ok(mut net) => answer(&mut net, &format!("https://{host}/")),
+        Err(why) => Answer::No(why),
+    }
+}
+
+/// The answer of the first reply of `url`.
+///
+/// ⛔ A redirect is not followed (TODO/enter.md T-1953, PodUtils/podvm#560):
+/// the question is about this host. A 301 to another host is this host's
+/// answer over HTTPS, and a follow would turn a timeout of that other host
+/// into a refusal that names a host that no source line names.
+fn answer(net: &mut Net, url: &str) -> Answer {
     let limits = Limits {
         head: CONNECT.saturating_add(READ),
         idle: READ,
     };
-    match net.send("HEAD", &format!("https://{host}/"), &[], true, limits) {
+    match net.first_status("HEAD", url, true, limits) {
+        // ⭐ Any status is an answer: the host terminated TLS and replied.
         Ok(_) => Answer::Https,
-        // ⭐ A status is an answer: the host terminated TLS and replied.
+        Err(e @ (Refusal::Transport(_) | Refusal::Refused(_))) => Answer::No(e.to_string()),
         Err(Refusal::Status(_)) => Answer::Https,
-        Err(e) => Answer::No(e.to_string()),
     }
 }
 
@@ -121,6 +130,68 @@ pub fn cached(path: Option<std::path::PathBuf>) -> impl FnMut(&str) -> Answer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+
+    fn net() -> Net {
+        let (config, _) = podvm_image::tls::client_config();
+        Net::with_environment(config, podvm_image::net::environment(&|_| None))
+            .expect("the transport starts")
+    }
+
+    /// A loopback origin that answers its first connection with `reply`.
+    fn origin(reply: String) -> (u16, TcpListener) {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("loopback binds");
+        let port = listener.local_addr().unwrap().port();
+        let l = listener.try_clone().unwrap();
+        std::thread::spawn(move || {
+            if let Ok((mut s, _)) = l.accept() {
+                let mut head = [0u8; 1024];
+                let _ = s.read(&mut head);
+                let _ = s.write_all(reply.as_bytes());
+            }
+        });
+        (port, listener)
+    }
+
+    /// TODO/enter.md T-1953 (PodUtils/podvm#560): a reach check decides by
+    /// the first answer of the host that it asks. A redirect to another
+    /// host is a yes, and the other host is not asked: it can time out, or
+    /// be down, with no effect on the verdict and no name in the error.
+    #[test]
+    fn a_redirect_is_the_answer_of_the_first_host_and_is_not_followed() {
+        let (far, far_listener) = origin("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n".into());
+        far_listener.set_nonblocking(true).unwrap();
+        for status in [
+            "301 Moved Permanently",
+            "302 Found",
+            "308 Permanent Redirect",
+        ] {
+            let reply = format!(
+                "HTTP/1.1 {status}\r\nLocation: http://localhost:{far}/x\r\nContent-Length: 0\r\n\r\n"
+            );
+            let (near, _keep) = origin(reply);
+            let got = answer(&mut net(), &format!("http://127.0.0.1:{near}/"));
+            assert_eq!(got, Answer::Https, "{status}");
+        }
+        // The redirect target was never dialled.
+        let dialled = far_listener.accept().map(|_| true).unwrap_or(false);
+        assert!(!dialled, "the host of the redirect was asked");
+        // A status of 400 or more is an answer too; a host that answers
+        // nothing is a no whose reason names the host that was asked.
+        let (near, _keep) = origin("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n".into());
+        assert_eq!(
+            answer(&mut net(), &format!("http://127.0.0.1:{near}/")),
+            Answer::Https
+        );
+        let closed = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = closed.local_addr().unwrap().port();
+        drop(closed);
+        match answer(&mut net(), &format!("http://127.0.0.1:{port}/")) {
+            Answer::No(why) => assert!(why.contains(&format!("127.0.0.1:{port}")), "{why}"),
+            Answer::Https => panic!("a closed port answered"),
+        }
+    }
 
     #[test]
     fn a_verdict_is_cached_with_its_age_bound() {

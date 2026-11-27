@@ -71,7 +71,11 @@ fn main() -> std::process::ExitCode {
     }
     names::start(); // T-1652 (the native-static rung) and SIGPIPE (T-1769)
     let argv: Vec<String> = names::store::take(names::argv()); // T-1913, #505
+    let outer_mnt = podvm_probe::mount_namespace(); // PodUtils/podvm#558: before the entry's own
     userns::enter_if(&argv); // T-1909: before any thread
+    if userns::active() || userns::joined() {
+        podvm_probe::own_mount_namespace(outer_mnt);
+    }
     initns::detach::start(&argv); // T-2002: the supervisor of a detached init
                                   // TODO/net.md T-1665: one connection of a guest, relayed to the broker.
     if argv.get(1).map(String::as_str) == Some(broker::RELAY_ARG) {

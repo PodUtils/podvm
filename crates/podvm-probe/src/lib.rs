@@ -72,8 +72,56 @@ pub fn interpreter() -> interp::Interpreter {
 }
 
 /// The cache key of `id` with the emulator check of this process.
+///
+/// ⛔ In a run that podvm gave a mount namespace of its own (the user
+/// namespace of `run` and `probe`, a join of `exec`), the `mnt_ns`
+/// component is the namespace that the run came from: the new one is
+/// fresh at each invocation, so a key that read it never matched the next
+/// invocation (TODO/enter.md T-1953, PodUtils/podvm#558).
 pub fn confinement_key(id: &identity::Identity) -> identity::ConfinementKey {
-    identity::confinement_key(id, &interpreter())
+    confinement_key_from(id, ENTRY_MOUNT_NS.get())
+}
+
+/// [`confinement_key`] with `outer`, the mount namespace that a run came
+/// from, in place of the live one. `Some(None)` is a namespace that could
+/// not be read: the key then has a hole and never matches.
+pub fn confinement_key_from(
+    id: &identity::Identity,
+    outer: Option<&Option<String>>,
+) -> identity::ConfinementKey {
+    let mut key = identity::confinement_key(id, &interpreter());
+    if let Some(outer) = outer {
+        key.mnt_ns = outer.clone();
+    }
+    key
+}
+
+/// The mount namespace of the entry, once podvm made one of its own
+/// ([`own_mount_namespace`]).
+static ENTRY_MOUNT_NS: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+
+/// `mnt:[INODE]`, the mount namespace of this process, or `None` where
+/// the kernel does not say.
+pub fn mount_namespace() -> Option<String> {
+    let link = std::fs::read_link(identity::MNT_NS_PATH).ok()?;
+    link.into_os_string().into_string().ok()
+}
+
+/// Record that this process runs in a mount namespace that podvm made at
+/// its start: `outer` is the one that podvm read before.
+pub fn own_mount_namespace(outer: Option<String>) {
+    let _ = ENTRY_MOUNT_NS.set(outer);
+}
+
+/// The entry that this process measures in: the answer of a run in a
+/// mount namespace of its own is not the answer of a plain process of the
+/// same user, so each has its own cache file (`podvm-image`).
+pub fn entry_variant() -> &'static str {
+    if ENTRY_MOUNT_NS.get().is_some() {
+        "userns"
+    } else {
+        "plain"
+    }
 }
 
 /// Run the whole set with podvm's settings. One disposable child per probe,
@@ -99,6 +147,32 @@ pub fn run_child(name: &str) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// TODO/enter.md T-1953 (PodUtils/podvm#558): the key of a run in a
+    /// mount namespace of its own names the namespace that it came from,
+    /// so two invocations in two fresh namespaces have one key. A
+    /// namespace that was not read is a hole, which never matches.
+    #[test]
+    fn a_fresh_mount_namespace_does_not_change_the_key() {
+        let id = identity::read();
+        let live = confinement_key_from(&id, None);
+        assert_eq!(live.mnt_ns, mount_namespace(), "no entry: the live one");
+        let from = Some("mnt:[4026531841]".to_string());
+        let a = confinement_key_from(&id, Some(&from));
+        let b = confinement_key_from(&id, Some(&from));
+        assert_eq!(a.mnt_ns, from);
+        assert!(a.differences(&b).is_empty());
+        // The other components are the live ones, so a change of the
+        // confinement itself still changes the key.
+        let moved = identity::ConfinementKey {
+            cap_eff: Some("0".into()),
+            ..a.clone()
+        };
+        assert_eq!(a.differences(&moved), vec!["cap_eff"]);
+        let hole = confinement_key_from(&id, Some(&None));
+        assert!(!hole.is_complete());
+        assert!(hole.differences(&hole).contains(&"mnt_ns"));
+    }
 
     #[test]
     fn a_probe_name_that_does_not_exist_exits_two() {

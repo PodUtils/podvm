@@ -129,6 +129,31 @@ pub(super) fn fg_end(store: &podvm_image::Store, fg: Foreground, code: i32) {
     });
 }
 
+/// TODO/enter.md T-1953 (PodUtils/podvm#547): the rung that the entry
+/// reports for `child`, where it is not the one that `prepare` decided
+/// (a fallback to chroot that the host forced at the entry): the record
+/// and the report name the rung that ran. pod-enter wrote the line of the
+/// fallback.
+pub(super) fn note_entered(
+    store: &podvm_image::Store,
+    id: &str,
+    child: &podvm_enter::Child,
+    planned: &str,
+    report: &mut crate::run::report::Report,
+) {
+    let Some(ran) = child.entered.map(|r| r.word()).filter(|w| *w != planned) else {
+        return;
+    };
+    report.rung = Some(ran.to_string());
+    let _ = podvm_supervise::table::update(store, |t| {
+        t.containers
+            .iter_mut()
+            .find(|c| c.id == id)
+            .map(|c| c.rung = ran.to_string())
+            .ok_or_else(|| podvm_supervise::Error::new(format!("the record {id} is gone")))
+    });
+}
+
 /// TODO/supervise.md T-1786: the record reads `Running` while the payload
 /// `pid` runs. A hold that cannot start leaves the run as it was: the
 /// record lands at the end, and a line names why.

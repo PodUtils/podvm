@@ -48,6 +48,7 @@ mod root_bus; // TODO/machine.md T-1867
 mod run;
 mod settle; // TODO/machine.md T-1933: the first boot inside the install
 mod setup;
+mod stop; // TODO/enter.md T-1953
 pub(crate) mod tools; // TODO/machine.md T-1875
 
 use std::path::PathBuf;

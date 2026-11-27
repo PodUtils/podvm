@@ -98,7 +98,16 @@ pub(crate) fn run(verb: &str, a: &Args) -> i32 {
         podvm_windows::cleanup(&plan);
         return EXIT_RUNTIME_ERROR;
     }
-    match podvm_windows::run(&plan, &request) {
+    // TODO/enter.md T-1953 (PodUtils/podvm#566): a signal ends the emulator,
+    // then the run directory, then podvm with the signal.
+    let stop = super::stop::Stop::arm(verb);
+    let run = podvm_windows::run(&plan, &request);
+    if let Some(signo) = stop.signal() {
+        after(&plan, kept, dir.as_deref());
+        drop(work); // the end of podvm runs no destructor: the root disk goes now
+        stop.end(signo);
+    }
+    match run {
         Ok(out) => {
             use std::io::Write;
             let _ = std::io::stdout().write_all(&out.stdout);

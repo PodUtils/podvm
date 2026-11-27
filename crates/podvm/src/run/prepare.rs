@@ -346,6 +346,8 @@ pub(crate) fn prepare(
     // ------------------------------------------------------------- the banner
     // ⭐ TODO/probe.md T-0107, T-0108: the rung is selected here, and the banner
     // names it and what the entry opens (T-2053), from the probe of T-1317.
+    let own = ladder.is_some() || o.init_image; // T-1953 (#547)
+    let fb = super::fallback::decide(verb, &findings, userland.is_some(), own, detached, &rootfs)?;
     let (mut banner, entered, opened) = entry_banner(
         &findings,
         super::acquire::facts(&o, detached || ladder.is_none(), &rootfs), // T-2053, T-2054
@@ -354,6 +356,7 @@ pub(crate) fn prepare(
         &devices,
         dropped_preload.as_deref(),
         &userland_note,
+        fb.is_some(),
     );
     crate::initns::stays::check_rung(verb, &o, entered.word())?; // T-2002
     super::devices::check_rung(verb, &o, entered.word())?; // TODO/enter.md T-1939

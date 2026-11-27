@@ -436,7 +436,7 @@
 544 issue closed
 545 issue closed
 546 issue closed
-547 issue open
+547 issue closed
 548 issue closed
 549 issue closed
 550 issue closed
@@ -447,15 +447,15 @@
 555 issue closed
 556 issue closed
 557 issue closed
-558 issue open
+558 issue closed
 559 issue closed
-560 issue open
+560 issue closed
 561 issue closed
 562 issue closed
 563 issue closed
 564 issue closed
 565 issue closed
-566 issue open
+566 issue closed
 567 issue open
 568 issue closed
 569 issue closed

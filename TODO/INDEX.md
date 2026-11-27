@@ -615,7 +615,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-1950](gate.md) | P1 | M | none | gate | done | The external QA of `0.2.0-beta.31`: verify the third batch of reports |
 | [T-1951](cli.md) | P1 | M | none | cli | done | The external QA of `0.2.0-beta.31`, third batch: the output contract |
 | [T-1952](image.md) | P2 | M | none | image | partial | The external QA of `0.2.0-beta.31`, third batch: images, `import`, `cp` and the store |
-| [T-1953](enter.md) | P1 | M | none | enter | partial | The external QA of `0.2.0-beta.31`, third batch: signals, rungs and runs |
+| [T-1953](enter.md) | P1 | M | none | enter | done | The external QA of `0.2.0-beta.31`, third batch: signals, rungs and runs |
 | [T-1954](machine.md) | P2 | M | none | machine | open | The external QA of `0.2.0-beta.31`, third batch: the machine tier |
 | [T-1955](deps.md) | P2 | M | none | deps | partial | Remove the copies of shared code that podcrates names (COORD-131 of podcrates) |
 | [T-1956](enter.md) | P2 | L | none | enter | open | The donor study: syscall tiers |
@@ -745,7 +745,7 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 
 ## Counts
 
-676 entries: 20 open, 41 partial, 5 blocked, 610 done.
+676 entries: 20 open, 40 partial, 5 blocked, 611 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -755,10 +755,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 2 | 20 | 0 | 275 | 297 |
+| P1 | 2 | 19 | 0 | 276 | 297 |
 | P2 | 13 | 16 | 4 | 215 | 248 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 20 | 41 | 5 | 610 | 676 |
+| **All** | 20 | 40 | 5 | 611 | 676 |
 
 ## Work order
 
