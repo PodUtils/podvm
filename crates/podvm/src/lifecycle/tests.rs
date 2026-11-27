@@ -316,5 +316,29 @@ fn the_stop_grace_is_checked_seconds_and_zero_is_valid() {
     assert_eq!(grace_ms(""), None);
     assert_eq!(grace_ms("abc"), None);
     assert_eq!(grace_ms("-1"), None);
+    // TODO/cli.md T-2108 (OR-B42-08): `-t -1` is refused with its own line,
+    // in each spelling that `expand` gives; no other value and no other
+    // position is taken for it.
+    let a = |s: &[&str]| s.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+    for yes in [
+        &["-t", "-1", "c"][..],
+        &["c", "--time", "-1"],
+        &["--timeout", "-1", "c"],
+    ] {
+        let line = wait_forever(&a(yes)).unwrap_or_default();
+        assert!(
+            line.contains("wait for ever") && line.contains("-t 3600"),
+            "{yes:?}: {line}"
+        );
+    }
+    for no in [
+        &["-t", "1", "c"][..],
+        &["c", "-1"],
+        &["-1"],
+        &["-t"],
+        &["-t", "-2", "c"],
+    ] {
+        assert_eq!(wait_forever(&a(no)), None, "{no:?}");
+    }
     assert_eq!(grace_ms("18446744073709551615"), None);
 }

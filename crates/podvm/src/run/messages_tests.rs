@@ -70,4 +70,21 @@ fn an_env_file_is_read_as_docker_reads_it() {
     let e = ok("A=1\nB C\n").unwrap_err();
     assert_eq!(e.0, 2);
     assert!(e.1.contains("white space") && e.1.contains("B C"), "{e:?}");
+    // TODO/cli.md T-2108 (OR-B42-08): the value of a line keeps its end, and
+    // a name with white space or a digit at its start is refused with the
+    // line number. One table of the lines and the words of the refusal.
+    assert_eq!(ok("A=9 \nB=  x\t\n"), Ok(v(&["A=9 ", "B=  x\t"])));
+    assert_eq!(ok("  \tA=1\n"), Ok(v(&["A=1"])));
+    let refused: &[(&str, usize, &str)] = &[
+        ("A=1\nexport I=9\n", 2, "`export` is not part"),
+        ("FOO BAR=2\n", 1, "white space in the name"),
+        ("A=1\nB=2\nFOO =2\n", 3, "white space in the name"),
+        ("A=1\n\n1BAD=1\n", 3, "starts with a digit"),
+        ("9\n", 1, "starts with a digit"),
+    ];
+    for (text, line, words) in refused {
+        let e = ok(text).unwrap_err();
+        assert_eq!(e.0, *line, "{text:?}: {e:?}");
+        assert!(e.1.contains(words), "{text:?}: {e:?}");
+    }
 }

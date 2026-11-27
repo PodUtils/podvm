@@ -8,9 +8,9 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
-### Fixed: `cp` streams a tar, keeps the time, a refusal exits 1, and the limit of an overlay is named, 2026-11-27
+### Fixed: `cp` streams a tar and keeps the time, refusals exit 1, the words of the outside pass, 2026-11-27
 
-Record: T-2108 (OR-B42-05, OR-B42-06, OR-B42-07).
+Record: T-2108 (OR-B42-05, OR-B42-06, OR-B42-07, OR-B42-08).
 Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 
 - `cp NAME:PATH -` writes a tar of the path to stdout, and `cp - NAME:PATH`
@@ -36,6 +36,24 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
   "Value too large for data type", at the copy-up). podvm does not walk the
   lower tree at the start: a tree that the payload only reads is a normal
   use.
+- The warning "other users can read the container table" names the real
+  modes now, and it appears only where the table or `containers/` is open to
+  group or other. A store root of mode 755 with a table of 0600 and
+  `containers/` of 0700 gives no warning, and `podvm doctor` says so.
+- `-q` silences the `--user` line (the payload keeps the caller's access).
+- `-v H:G:ro,rw` is refused (a conflict) where `ro` won silently.
+- A line of an env file with a name that has white space (`export I=9`,
+  `FOO BAR=2`, `FOO =2`) or that starts with a digit (`1BAD=1`) is refused
+  with the line number. A value keeps its trailing space (and its leading
+  one), as docker keeps it. Before, `B = x` was read as `B= x`.
+- `stop -t -1` is refused with a line that says why: a wait for ever has
+  no bound, and every wait of podvm has one. Give the seconds, as
+  `-t 3600`.
+- Left open with a reason (`TODO/cli.md`, T-2108): the order and the columns
+  of `ps`, `{{json .}}`, `range` and `table` templates, the names of
+  `verify` and `images` for an import, `doctor` and QEMU, the variables
+  `PODVM_*` and the descriptor 17 of the payload, and `upperdir=` in the
+  mount table.
 
 ### Fixed: `--read-only` keeps the namespace rung with a read-only root, 2026-11-27
 

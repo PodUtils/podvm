@@ -55,6 +55,12 @@ pub fn stop(args: &[String]) -> i32 {
         Err(member) => return crate::parity::refuse_member("stop", &member, STOP_USAGE),
     };
     let args: &[String] = &expanded;
+    // TODO/cli.md T-2108 (OR-B42-08): before the admission, which would
+    // take the `-1` after `-t` for a flag of its own.
+    if let Some(line) = wait_forever(args) {
+        eprintln!("{line}");
+        return EXIT_FLAG_ERROR;
+    }
     if let Some(c) = crate::parity::admit_all("stop", args, STOP_USAGE) {
         return c;
     }
@@ -109,6 +115,23 @@ pub fn stop(args: &[String]) -> i32 {
         }
     }
     code
+}
+
+/// `stop -t -1` asks, as docker reads it, to wait for ever for the payload
+/// to end after SIGTERM. podvm refuses: every wait of podvm has an upper
+/// bound (TODO/RULES.md section 8), and a stop that cannot end holds the
+/// caller of a script for ever. The line says what happened and what to
+/// give instead; `args` are the arguments after `expand`.
+pub(crate) fn wait_forever(args: &[String]) -> Option<String> {
+    let asked = args
+        .windows(2)
+        .any(|w| matches!(w[0].as_str(), "-t" | "--time" | "--timeout") && w[1] == "-1");
+    asked.then(|| {
+        "podvm stop: -t -1 asks to wait for ever, and podvm refuses it: every wait of podvm \
+         has a bound, and a stop that cannot end holds its caller. Give the seconds that \
+         the payload may take, as -t 3600 (TODO/cli.md T-2108)"
+            .to_string()
+    })
 }
 
 /// The grace of `stop -t SECONDS` in milliseconds. `None` for a value that

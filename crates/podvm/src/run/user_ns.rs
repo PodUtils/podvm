@@ -36,7 +36,7 @@ pub(super) fn push(
             && u.dispatch_exe.is_some()
         {
             let (uid, _) = crate::lifecycle::resolve_user(verb, rootfs, spec)?;
-            say_kept(verb, spec, uid, Kept::Caller);
+            say_kept(o.ask.quiet, verb, spec, uid, Kept::Caller);
         }
         return Ok(());
     }
@@ -55,7 +55,7 @@ pub(super) fn push(
     if uid != 0 {
         env.push(format!("{USERNS_IDS_VAR}={uid}:{gid}"));
         if let Some(spec) = o.user.as_deref() {
-            say_kept(verb, spec, uid, Kept::OneId);
+            say_kept(o.ask.quiet, verb, spec, uid, Kept::OneId);
         }
     }
     Ok(())
@@ -92,8 +92,17 @@ pub(super) fn kept_line(verb: &str, spec: &str, uid: u32, how: Kept) -> Option<S
     }
 }
 
-fn say_kept(verb: &str, spec: &str, uid: u32, how: Kept) {
-    if let Some(line) = kept_line(verb, spec, uid, how) {
+/// TODO/cli.md T-2108 (OR-B42-08): `-q` silences the line, as it silences
+/// the rest of the notes of a run that succeeds.
+fn kept_note(quiet: bool, verb: &str, spec: &str, uid: u32, how: Kept) -> Option<String> {
+    if quiet {
+        return None;
+    }
+    kept_line(verb, spec, uid, how)
+}
+
+fn say_kept(quiet: bool, verb: &str, spec: &str, uid: u32, how: Kept) {
+    if let Some(line) = kept_note(quiet, verb, spec, uid, how) {
         eprintln!("{line}");
     }
 }
@@ -106,7 +115,7 @@ pub(super) fn applied(env: &[String]) -> bool {
 
 /// TODO/cli.md T-2087 (OR-B40-17): one rule for each row: a uid other than
 /// 0 that the run does not drop to gives one line that names how the
-/// caller's access stays; uid 0 gives none.
+/// caller's access stays; uid 0 gives none. T-2108: `-q` gives none.
 #[cfg(test)]
 #[test]
 fn a_user_that_keeps_the_callers_access_is_named() {
@@ -120,6 +129,8 @@ fn a_user_that_keeps_the_callers_access_is_named() {
     for (uid, how, words) in rows {
         let line = kept_line("run", "u", uid, how);
         assert_eq!(line.is_some(), words.is_some(), "{uid}");
+        assert_eq!(kept_note(false, "run", "u", uid, how), line);
+        assert_eq!(kept_note(true, "run", "u", uid, how), None, "-q, {uid}");
         if let (Some(l), Some(w)) = (line, words) {
             assert!(
                 l.contains(w) && l.starts_with("podvm run: --user u: "),

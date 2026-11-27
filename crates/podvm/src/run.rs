@@ -40,7 +40,9 @@ pub const RUN_OPTIONS: &str = "\
   --env-file F     read KEY=VALUE lines from F into the environment.
                    Repeatable; entries load at the flag's position, so a
                    later -e wins over the file; a value keeps its quotes
-                   (TODO/cli.md T-0801, T-1828)
+                   and its trailing space; a name with white space (`export
+                   I=9`, `FOO BAR=2`) or a digit first is refused with the
+                   line number (TODO/cli.md T-0801, T-1828, T-2108)
   --env-file0 F    read KEY=VALUE entries from F, each ended by a NUL (as
                    `env -0` writes them), so a value can hold a newline;
                    the same order rule as --env-file (TODO/cli.md T-1971)
