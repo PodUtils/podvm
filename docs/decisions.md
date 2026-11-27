@@ -104,6 +104,24 @@ Each call stays in force until the owner rules otherwise.
 
 ## Questions for the owner
 
+Q11 (2026-11-27, T-2105, T-2106, the release gate): two P1 faults of the
+namespace rung are open in `0.2.0-beta.41` and on `main`. A payload of uid
+0 can remount a `:ro` volume writable (T-2105) and can leave the chroot of
+the tree (T-2106); both reach host files with the payload's ids, and as
+host root for a run of root. `main` locks the mount flags on the paths
+that podvm controls (a foreground run as a user with no root, its `exec`,
+an overlay `run -d`, uid 0 of a one-id user namespace); the rest and the
+way out of the chroot need pod-enter (COORD-268, #695). `--podvm-confine`
+stops both on each path. `main` also carries 15 asks of podrunner since
+beta.41. The rule of the gate ("no P1 stays open", call C25) is the
+owner's. The recommendation: release `0.2.0-beta.42` with both faults in
+"Known gaps" and the advice of `--podvm-confine`, because beta.42 closes
+more of the fault than beta.41, which stays the newest release until
+then; release the fix of T-2106 as the next beta when podcrates tags it.
+The other choice: hold the beta until podcrates tags COORD-268. Until the
+owner answers, the session runs the blind QA of the candidate and holds
+the release request.
+
 Q10 (2026-11-20, T-2008, call C27): the machine tier now saves the state
 of a guest that booted the init of an image, by default, and each later
 run starts from it: the first output comes about 12 times sooner under

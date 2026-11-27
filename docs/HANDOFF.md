@@ -58,6 +58,10 @@ each step below is done.
 
 ## Next steps, in order
 
+0. The release of `0.2.0-beta.42` waits for the owner's answer to Q11
+   (`docs/decisions.md`): two P1 faults (T-2105 partial, T-2106 blocked on
+   COORD-268, #695) are open, as in beta.41. The blind QA of the candidate
+   runs meanwhile.
 1. Make the docs true for beta.41 (README, `docs/limits.md`, the
    per-release state of `TODO/PROGRESS.md`), as after beta.40. Watch
    COORD-257 (#676) for podrunner's take of beta.41 and its rerun of the
