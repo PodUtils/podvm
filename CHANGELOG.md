@@ -8,9 +8,9 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
-### Fixed: `cp` streams a tar, keeps the time, and a refusal exits 1, 2026-11-27
+### Fixed: `cp` streams a tar, keeps the time, a refusal exits 1, and the limit of an overlay is named, 2026-11-27
 
-Record: T-2108 (OR-B42-06, OR-B42-07).
+Record: T-2108 (OR-B42-05, OR-B42-06, OR-B42-07).
 Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 
 - `cp NAME:PATH -` writes a tar of the path to stdout, and `cp - NAME:PATH`
@@ -31,6 +31,11 @@ Deployed: not deployed; for the next beta after 0.2.0-beta.41.
 - `cp` keeps the modification time of each file, directory and link, in
   both directions, and never follows a link to set it. The access time is
   the modification time, as docker sets it.
+- `-v H:G:overlay`: the help of `-v` and `docs/limits.md` name the limit of
+  a lower file whose owner the user namespace does not map (`EOVERFLOW`,
+  "Value too large for data type", at the copy-up). podvm does not walk the
+  lower tree at the start: a tree that the payload only reads is a normal
+  use.
 
 ### Fixed: `--read-only` keeps the namespace rung with a read-only root, 2026-11-27
 
