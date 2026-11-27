@@ -7446,3 +7446,59 @@ The state of each finding (2026-11-26):
 | OR-B41-15, the machine tier with too little memory names no minimum | P3 | gap | - | open |
 | OR-B41-16, `update --memory` of a value too large says "at least 6m" | P3 | fix | [T-2100](cli.md) | done: an overflow says "larger than 16 EiB"; a row of the update test |
 | OR-B41-17, words and looks (the list of the report) | P3 | fix | [T-2100](cli.md) | partial: done: the note of `exec` on a created container and two more messages had the indentation of a continuation line in them, and the gate counts the pattern now (`joined_literal`, plant 27g); the usage of `exec` says `<container\|image>`, and `exec nosuch` says "no such container or image" (`the_words_of_exec_name_a_container_in_one_spacing`); `load` of stdin names "the archive on stdin", not the spool (a row of `refusal_text_names_the_cause`); the refusal of `cp -` names both directions; `save` to a full stdout gives one line (a row of `stdout_full_is_125_with_the_errno_named`); the usages of `stop`, `ps` and `rm` name the flags that the incus tier refuses (`a_usage_with_the_incus_tier_names_the_flags_it_refuses`); a file on the path of the store root gives "PATH cannot be the store root: FILE is a file" (`a_file_on_the_path_of_the_store_root_is_named`). Open: `exec -w /nonexistent` says "docker creates it" from `pod-enter` (`refuse_workdir`, podcrates `v0.85.0`), COORD-259 (#678); `Up` with no time, `(linux guest)`, `verify` and `images` names, the line of each concurrent pull, `images` on a read-only store, the fixture path of `probe` and `doctor`, and `rmi -f` of an image of a stopped container each need a feature or a decision |
+
+# T-2108: The faults of the eleventh outside pass (2026-11-27, the gate of 0.2.0-beta.42)
+
+**Source:** the eleventh outside pass (2026-11-27, the gate of 0.2.0-beta.42): an agent with the release binary of `40c5934` (`--version` 0.2.0-beta.41) and `podvm man` only; the native surface as uid 1000, the incus tier as root against a private incusd 6.0.0, the machine tier under TCG ([the report](../docs/history/outside-pass-2026-11-27.md))
+**Category:** cli
+**Milestone:** none
+**Priority:** P1
+**Effort:** M
+**Status:** partial
+
+## Problem
+
+The pass found eight findings, OR-B42-01 to OR-B42-08. The gate of a beta
+holds no open P0 or P1 finding (`docs/maintenance.md`, "Releases", step
+4). OR-B42-02 is P1: `--read-only` puts a foreground run of a user with no
+root on the userland rung, where a raw system call reaches the host's
+`/tmp`, although the namespace rung holds on that host.
+
+## Premise
+
+The lead reproduced none of the findings before the record; each has the
+command and the count of the tester. OR-B42-01 is the known gap of
+OR-B38-08, OR-B40-08 and OR-B41-12; its check waits for a ping of
+`pod-oci` (COORD-266, #692).
+
+## Approach
+
+Fix OR-B42-02 before the beta. Keep each other finding as a line of "Known
+gaps" or fix it by its class.
+
+## Decision
+
+OR-B42-01 is P2 for the gate, as each pass before it: the line before
+"Login Succeeded" says that the registry checks the login at the next
+pull, and the check waits for podcrates.
+
+## Prove
+
+`sh scripts/dev/checks.sh` passes with a test of the class of each fixed
+finding; the reproducer of OR-B42-02 on the release binary as uid 1000
+gives `mode=namespace` and a read-only root.
+
+## Done
+
+**Partial (2026-11-27).** The state of each finding:
+
+| Finding | Sev | Triage | Entry | State |
+| --- | --- | --- | --- | --- |
+| OR-B42-01, `login` prints "Login Succeeded" for a registry that it did not contact | P2 | known | [T-2087](cli.md), OR-B40-08 | open: the check waits for a ping of `pod-oci` (COORD-266, #692) |
+| OR-B42-02, `--read-only` puts a foreground run of uid 1000 on the userland rung, where a raw system call reaches the host's `/tmp` | P1 | fix | [T-2108](cli.md) | open |
+| OR-B42-03, `--tmpfs P:size=N,mode=M` refuses each mode but 1777 | P2 | known | [T-2070](cli.md), OR-B38-16 | open: the mode of a mount waits for `pod-enter` (COORD-266, #692) |
+| OR-B42-04, an argument that is not UTF-8 is refused | P2 | known | [T-2087](cli.md), OR-B40-09 | open |
+| OR-B42-05, a copy-up of an `:overlay` lower file of an owner that the user namespace does not map fails with EOVERFLOW | P2 | gap | - | open |
+| OR-B42-06, `cp -`, `cp` of a directory with no `-r`, `cp` of a FIFO and `wait` of a created container exit 125 where the table says 1 | P2 | gap | - | open |
+| OR-B42-07, `cp` does not keep the modification time | P3 | gap | - | open |
+| OR-B42-08, words and looks (the list of the report) | P3 | gap | - | open |

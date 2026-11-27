@@ -744,10 +744,11 @@ See [entry closure](RULES.md#5-entry-closure) for their use.
 | [T-2105](enter.md) | P1 | M | none | enter | partial | On the namespace rung, the payload can remount a `:ro` volume writable and write the host file |
 | [T-2106](enter.md) | P1 | M | none | enter | blocked | On the namespace rung, a payload of uid 0 leaves the chroot of the tree and reaches host files |
 | [T-2107](enter.md) | P2 | S | none | enter | open | `run -d` with an `:overlay` volume has no device nodes |
+| [T-2108](cli.md) | P1 | M | none | cli | partial | The faults of the eleventh outside pass (2026-11-27, the gate of 0.2.0-beta.42) |
 
 ## Counts
 
-678 entries: 20 open, 41 partial, 6 blocked, 611 done.
+679 entries: 20 open, 42 partial, 6 blocked, 611 done.
 
 Counted from the rows above by
 `./target/x86_64-unknown-linux-musl/release/podvm-count` and asserted
@@ -757,10 +758,10 @@ the gate. A number here that disagrees with the rows cannot reach a commit.
 | Priority | Open | Partial | Blocked | Done | Total |
 | --- | --- | --- | --- | --- | --- |
 | P0 | 0 | 0 | 0 | 75 | 75 |
-| P1 | 1 | 20 | 1 | 276 | 298 |
+| P1 | 1 | 21 | 1 | 276 | 299 |
 | P2 | 14 | 16 | 4 | 215 | 249 |
 | P3 | 5 | 5 | 1 | 45 | 56 |
-| **All** | 20 | 41 | 6 | 611 | 678 |
+| **All** | 20 | 42 | 6 | 611 | 679 |
 
 ## Work order
 
