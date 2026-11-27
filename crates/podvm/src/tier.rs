@@ -54,18 +54,6 @@ pub fn refusal(verb: &str, value: &str) -> String {
     )
 }
 
-/// The validated value of one `--podvm-mem` spelling, in bytes, or `None`
-/// where the spelling names no size. `TODO/machine.md` T-1305.
-///
-/// A plain integer is bytes; a trailing `K`, `M`, `G` or `T`
-/// (case-insensitive, with an optional `iB`/`B`) scales it by a binary
-/// power. Zero is refused: a zero-byte guest is not a configuration.
-/// Overflow is refused rather than wrapped.
-pub fn parse_mem(s: &str) -> Option<u64> {
-    // TODO/gate.md T-1947: the rule of `--podvm-mem` in `crate::number`.
-    crate::number::parse(&crate::number::PODVM_MEM, s).ok()
-}
-
 /// True where a configured guest memory in bytes crosses the file-size
 /// ceiling `cur` read from `prlimit(RLIMIT_FSIZE)`. `u64::MAX` is infinity:
 /// no finite guest crosses it, so an unbounded machine never refuses here.
@@ -260,11 +248,15 @@ mod tests {
     /// Anything else is not a size.
     #[test]
     fn the_mem_spelling_takes_bytes_and_suffixes_and_nothing_else() {
-        assert_eq!(parse_mem("512"), Some(512));
-        assert_eq!(parse_mem("1K"), Some(1024));
-        assert_eq!(parse_mem("2k"), Some(2048));
-        assert_eq!(parse_mem("128M"), Some(128 << 20));
-        assert_eq!(parse_mem("128MiB"), Some(128 << 20));
+        // TODO/gate.md T-1947: the rule of `--podvm-mem` in `crate::number`;
+        // under 256 MiB is refused (TODO/cli.md T-2100).
+        let parse_mem = |s| crate::number::parse(&crate::number::PODVM_MEM, s).ok();
+        assert_eq!(parse_mem("268435456"), Some(256 << 20));
+        assert_eq!(parse_mem("262144K"), Some(256 << 20));
+        assert_eq!(parse_mem("524288k"), Some(512 << 20));
+        assert_eq!(parse_mem("256M"), Some(256 << 20));
+        assert_eq!(parse_mem("384MiB"), Some(384 << 20));
+        assert_eq!(parse_mem("128M"), None); // under the least, T-2100
         assert_eq!(parse_mem("4GB"), Some(4 << 30));
         assert_eq!(parse_mem("1T"), Some(1 << 40));
         assert_eq!(parse_mem("0"), None);

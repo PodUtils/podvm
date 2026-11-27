@@ -243,6 +243,15 @@ fn each_number_flag_has_one_bounded_parser() {
                 );
             }
             assert!(!line.contains('\n'), "{line:?}");
+            // TODO/cli.md T-2100: a value under a size that a tier needs
+            // names that minimum.
+            let least = format!("{} needs at least {} MiB", r.least, r.lo >> 20);
+            assert_eq!(
+                line.contains(&least),
+                why == Edge::Low && !r.least.is_empty(),
+                "{} {t:?}: {line:?}",
+                r.flag
+            );
             assert_eq!(
                 line.contains("too large"),
                 why == Edge::High,

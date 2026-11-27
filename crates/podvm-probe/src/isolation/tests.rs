@@ -140,6 +140,27 @@ fn each_statement_of_an_entry_reads_its_facts() {
             "{}: the /proc of the host",
             c.what
         );
+        // TODO/cli.md T-2070 (OR-B38-10): the banner of `probe` reads the
+        // same facts, never the name of the rung.
+        let f = crate::Findings::empty();
+        let mut sel = crate::select::Selection::choose(&f);
+        sel.rung = c.rung;
+        let e = crate::report::evidence_of(&f, &sel, o);
+        let never = format!("this mode does NOT provide: {}\n", c.never);
+        assert!(c.never.is_empty() || e.contains(&never), "{}: {e}", c.what);
+        assert!(e.contains(&format!("pids: {})", c.pids)), "{}: {e}", c.what);
+        if let Some(ns) = c.ns {
+            assert!(e.contains(&format!("namespaces: {ns};")), "{}: {e}", c.what);
+        }
+        let no_proc = e.contains("no /proc is mounted");
+        let mounts_none = c.rung == Rung::Namespace && !o.has(Part::Proc);
+        assert_eq!(no_proc, c.rung == Rung::Chroot || mounts_none, "{}", c.what);
+        assert_eq!(
+            e.contains(crate::report::FORECAST),
+            o != Opened::NONE,
+            "{}",
+            c.what
+        );
     }
 }
 

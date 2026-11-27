@@ -159,7 +159,21 @@ pub fn entry_banner_of(
 /// section 6.9 needs to name the mechanism and the remedy rather than an errno
 /// on its own.
 pub fn evidence(f: &Findings, sel: &Selection) -> String {
-    let mut out = banner(f, sel);
+    evidence_of(f, sel, crate::isolation::Opened::NONE)
+}
+
+/// The line under the banner of `probe`: the parts are a forecast.
+pub const FORECAST: &str = "the parts above are those of a foreground `run` of this caller, of an \
+     image with a /proc; `run -d`, `create` and `--hostname` change them (`podvm man`, ISOLATION)\n";
+
+/// [`evidence`] whose banner states the parts that an entry opens where
+/// it opens `opened`: `probe` gives those of a foreground run of its
+/// caller (TODO/cli.md T-2070, OR-B38-10), as the banner of `run` does.
+pub fn evidence_of(f: &Findings, sel: &Selection, opened: crate::isolation::Opened) -> String {
+    let mut out = entry_banner_of(f, sel, sel.rung, opened);
+    if opened != crate::isolation::Opened::NONE {
+        out.push_str(FORECAST);
+    }
 
     out.push_str("\nidentity\n");
     out.push_str(&identity_block(&f.identity));

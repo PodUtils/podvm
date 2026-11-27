@@ -75,8 +75,8 @@ usage: podvm exec [options] <container|image> <command> [arg...]
                    emulator token per occurrence, repeatable, never split
   --podvm-mem S   as in run: machine tier only and refused elsewhere, the
                    guest memory in bytes with an optional K/M/G/T suffix,
-                   from 1 to 9223372036854775807 bytes (TODO/machine.md
-                   T-1305)
+                   from 268435456 (256M) to 9223372036854775807 bytes
+                   (TODO/machine.md T-1305)
 
   A detached full Windows machine (run -d windows:2025) takes the
     command through its QEMU Guest Agent as cmd.exe /d /c COMMAND, with
@@ -200,6 +200,8 @@ fn parse(args: &[String]) -> std::result::Result<Opts, i32> {
     };
     let mut expecting: Option<&'static str> = None;
     for a in args {
+        let payload = expecting == Some("-e") || o.image.is_some(); // T-2087
+        crate::names::bytes::word("exec", a, crate::names::bytes::Class::of(payload))?;
         if let Some(flag) = expecting.take() {
             match flag {
                 "-e" => o.env.extend(crate::run::env_arg("exec", a)?),

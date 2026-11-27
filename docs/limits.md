@@ -7,7 +7,13 @@ Read [PROGRESS](../TODO/PROGRESS.md) for current verification.
 ## Host and payload
 
 - A chroot changes paths. It does not provide process or network isolation.
-- The namespace path provides mount behavior only.
+- The namespace rung opens the parts that `podvm man`, ISOLATION, names
+  for each shape of a run (T-2053). `podvm probe` states the parts of a
+  foreground `run` of its caller, of an image with a `/proc` (T-2070).
+- podvm refuses an argument that is not UTF-8 with exit 125 and one line
+  that names its position (T-2087). A word of the payload (the command,
+  its arguments, an `-e` value) cannot pass as bytes yet: each tier hands
+  it to the plan of pod-enter, which takes UTF-8 only.
 - A userland entry retains the host root and shared host resources.
 - A static x86_64 payload on a host that denies chroot runs on the
   native-static rung (T-1652): Syscall User Dispatch (Linux 5.11) gives
@@ -440,7 +446,10 @@ windows` and `run windows:NAME` fetch a pinned static QEMU 11.1.3 and its
 firmware into the store (T-1875); `podvm machine ssh` and `podvm doctor`
 look on PATH only. `--podvm-mem` sizes the virtual machine, as QEMU's `-m` does,
 and the guest kernel keeps a part of it: `MemTotal` is 85 % of 256M,
-92 % of 512M and 95 % of 1G (T-1849).
+92 % of 512M and 95 % of 1G (T-1849). The least value is 256M: a guest
+of 256M booted, a guest of 64M ended before the payload, and 128M is not
+measured. A smaller value is refused with 125, and the line names the
+minimum (T-2100).
 `podvm machine ssh` and `podvm windows` boot a guest
 ([architecture](architecture.md)).
 
