@@ -111,7 +111,9 @@ run_vm() {
     name=$1
     shift
     names="$names $name"
-    podvm_call 1500 run -d --podvm-tier=incus --podvm-vm --podvm-init=image \
+    # --verbose names each stage, so a run that ends at its bound shows
+    # where it stopped (kvm 45991827383 ended at 1500 s with no line).
+    podvm_call 1500 run -d --verbose --podvm-tier=incus --podvm-vm --podvm-init=image \
         --insecure-registry "localhost:$port" --name "$name" "$image" "$@"
 }
 
@@ -120,6 +122,9 @@ start=$(date +%s)
 run_vm vm492a sh -c 'while [ ! -e /run/podvm492.go ]; do sleep 1; done; exit 7' \
     >"$work/run1.out" 2>"$work/run1.err" || {
     cat "$work/run1.err" >>"$out"
+    incus_call list --format csv -c nst >>"$out" 2>&1 || true
+    incus_call image list --format csv -c lfs >>"$out" 2>&1 || true
+    df -h /var/lib/incus "$work" >>"$out" 2>&1 || true
     fail "clause 1: the first run -d failed"
 }
 cat "$work/run1.err" >>"$out"
