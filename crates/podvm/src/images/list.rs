@@ -92,12 +92,13 @@ pub fn images(verb: &str, args: &[String]) -> i32 {
     // checked only inside the loop is never checked at all: measured on
     // 2026-09-08, `--format '{{.Nope}}'` against an empty store printed
     // nothing and exited 0, so a caller's typo read as an empty result set.
-    if let Some(t) = &o.format
-        && let Err(bad) = format::check(t, IMAGE_FIELDS)
-    {
-        eprintln!("podvm images: {bad}");
-        return EXIT_CLI_ERROR;
-    }
+    let template = match format::list_template(o.format.as_deref(), IMAGE_FIELDS) {
+        Ok(t) => t,
+        Err(bad) => {
+            eprintln!("podvm images: {bad}");
+            return EXIT_CLI_ERROR;
+        }
+    };
 
     let store = match podvm_image::open_store() {
         Ok(s) => s,
@@ -154,21 +155,23 @@ pub fn images(verb: &str, args: &[String]) -> i32 {
             );
         }
     }
-    if let Some(template) = &o.format {
-        for r in &records {
-            match format::render(template, &image_fields(r, &store, o.no_trunc)) {
-                Ok(line) => {
-                    if let Err(e) = writeln!(out, "{line}") {
-                        return crate::names::stdout::failed(&e); // T-1816
-                    }
-                }
-                Err(bad) => {
-                    eprintln!("podvm images: {bad}");
-                    return EXIT_CLI_ERROR;
-                }
+    if let Some(t) = &template {
+        let rows: Vec<_> = records
+            .iter()
+            .map(|r| format::Data::text(&image_fields(r, &store, o.no_trunc)))
+            .collect();
+        // docker's column names where they are not the words of the field.
+        let headers = [("ID", "IMAGE ID"), ("CreatedSince", "CREATED")];
+        return match t.render_list(&rows, &headers) {
+            Ok(text) => match write!(out, "{text}") {
+                Ok(()) => 0,
+                Err(e) => crate::names::stdout::failed(&e), // T-1816
+            },
+            Err(bad) => {
+                eprintln!("podvm images: {bad}");
+                EXIT_CLI_ERROR
             }
-        }
-        return 0;
+        };
     }
 
     let mut header: Vec<&str> = vec!["REPOSITORY", "TAG"];

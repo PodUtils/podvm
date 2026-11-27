@@ -347,6 +347,18 @@ the limit, so none owns it. T-1003 in [packaging](../TODO/packaging.md)
 stays `done`: everything it claimed to deliver is delivered and its
 `Prove` exits 0.
 
+`--format` reads a part of Go's templates (T-2087): fields (`.`,
+`.A.B`), strings, integers, `( )`, `|`, `range` ... `end`, and the
+functions `json`, `index`, `join`, `upper`, `lower`, `len` and `println`.
+`ps` and `images` also take the `table` prefix (a header and columns
+aligned as docker aligns them) and `json` alone. podvm refuses `if`,
+`with`, `else`, a variable and each other function by name, with exit 1.
+A template has at most 64 KiB, 16 levels of `range` and `( )`, and 16 MiB
+of output. `index` of a key that a map does not have gives an empty
+string, as docker gives for a label. A key that a map does not have in
+`.A.B` is refused with the keys that it has, where docker prints
+`<no value>`.
+
 ## SSH
 
 The source build produces separate `node`, `operator`, `proxy`, and `shell` executables.

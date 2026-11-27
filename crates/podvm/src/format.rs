@@ -1,21 +1,54 @@
-//! `--format '{{.Field}}'`, the part of docker's Go templates podvm answers.
+//! `--format`: the part of docker's Go templates that podvm reads.
+//!
+//! TODO/cli.md T-2087 (OR-B40-15): fields (`.`, `.A.B`), string and integer
+//! literals, `( )`, pipelines with `|`, `range` ... `end`, and the functions
+//! `json`, `index`, `join`, `upper`, `lower`, `len` and `println`
+//! ([`parse`]); the `table` prefix of a list verb ([`table`]); `json` alone
+//! as `{{json .}}`. Each other word of Go's language (`if`, `with`, a
+//! variable, `printf`) is refused by name with one line: a template that
+//! podvm cannot read never prints a wrong answer.
 //!
 //! ⛔ **Selected by name, never by position.** `docs/conventions/code.md`. An
 //! unknown field is refused and the known ones are listed, rather than
 //! rendering as empty: a template that silently produces a blank column is a
 //! wrong answer that looks like a right one.
 //!
-//! ⚠ **Right-sized on purpose.** This is not a Go template engine and does not
-//! pretend to be: no pipelines, no functions, no conditionals. A template using
-//! any of those is refused by name so a caller learns immediately, instead of
-//! receiving something that parsed as a field name and was not one.
+//! ⛔ **Bounded.** The template ([`parse::MAX_TEMPLATE`]), its nesting
+//! ([`parse::MAX_DEPTH`]), its output and its steps ([`eval::MAX_OUTPUT`],
+//! [`eval::MAX_STEPS`]) have limits, and each limit ends with a true line.
+
+mod eval;
+mod parse;
+mod table;
+#[cfg(test)]
+mod tests;
+
+use parse::{Arg, Cmd, Node, Pipe};
+use serde_json::Value;
 
 /// What went wrong with a template, for a message the caller can act on.
 #[derive(Debug)]
 pub enum Bad {
     Unterminated,
     Unsupported(String),
-    UnknownField { got: String, known: Vec<String> },
+    UnknownField {
+        got: String,
+        known: Vec<String>,
+    },
+    /// The template does not parse: the action, and why.
+    Parse {
+        action: String,
+        why: String,
+    },
+    /// The template parsed and an action cannot give a value.
+    Exec {
+        action: String,
+        why: String,
+    },
+    TooLarge(String),
+    TooDeep(usize),
+    /// `table` for a verb that prints one document for each name.
+    Table,
 }
 
 impl std::fmt::Display for Bad {
@@ -24,128 +57,358 @@ impl std::fmt::Display for Bad {
             Bad::Unterminated => write!(f, "the template has a `{{{{` that is never closed"),
             Bad::Unsupported(what) => write!(
                 f,
-                "{what:?} is not something podvm's --format understands. It \
-                 takes `{{{{.Field}}}}` placeholders and literal text, and \
-                 nothing else: no pipelines, no functions, no `table` prefix, no `json` keyword"
+                "`{what}` is not a part of Go's templates that podvm's --format reads. It \
+                 reads fields (`.`, `.A.B`), strings, integers, `( )`, `|`, `range` ... \
+                 `end`, and the functions json, index, join, upper, lower, len and println"
             ),
             Bad::UnknownField { got, known } => write!(
                 f,
                 "there is no field {got:?}. This verb has: {}",
                 known.join(", ")
             ),
+            Bad::Parse { action, why } | Bad::Exec { action, why } => {
+                write!(f, "in {action}: {why}")
+            }
+            Bad::TooLarge(why) => write!(f, "{why}"),
+            Bad::TooDeep(n) => write!(
+                f,
+                "the template nests `range` and `( )` deeper than {n} levels, the limit of podvm"
+            ),
+            Bad::Table => write!(
+                f,
+                "the `table` prefix lays out the rows of a list verb (`ps`, `images`); this \
+                 verb prints one document for each name, so use the fields and `\\t` without it"
+            ),
         }
     }
 }
 
-/// Walk a template once, appending literal text to `out` and asking `value`
-/// for each field. `value` returns `None` for a name this verb does not have.
-///
-/// ⛔ One walk, used by both [`check`] and [`render`]. Two walks would be two
-/// parsers, and the one nobody exercises is the one that diverges:
-/// `docs/conventions/code.md`, one read path.
-fn walk(
-    template: &str,
-    known: &[&str],
-    mut value: impl FnMut(&str) -> Option<Typed>,
-    out: &mut String,
-) -> Result<(), Bad> {
-    let template = template.replace("\\t", "\t").replace("\\n", "\n");
-    // ⛔ docker's `table` prefix, refused BY NAME. It is not literal text there:
-    // it selects a column layout with a header. Rendering it as text prints the
-    // word `table` beside the values, which is output shaped like something
-    // podvm does not do. Measured on 2026-09-08 by driving
-    // `--format 'table {{.Tag}}'`, which printed `table latest` and exited 0.
-    if template == "table" || template.starts_with("table ") || template.starts_with("table\t") {
-        return Err(Bad::Unsupported("table".to_string()));
-    }
-    // ⛔ OR-B41-05: docker's `--format json` prints each row as JSON. As
-    // literal text it printed the word `json` and exited 0.
-    if template.trim() == "json" {
-        return Err(Bad::Unsupported("json".to_string()));
-    }
-    let mut rest = template.as_str();
-    loop {
-        let Some(at) = rest.find("{{") else {
-            out.push_str(rest);
-            return Ok(());
-        };
-        out.push_str(&rest[..at]);
-        let after = &rest[at + 2..];
-        let Some(end) = after.find("}}") else {
-            return Err(Bad::Unterminated);
-        };
-        let expr = after[..end].trim();
-        rest = &after[end + 2..];
-
-        // ⭐ `json` is the ONE function podvm answers, and it is here because
-        // docker's own spelling for "give me this field as a document" is
-        // `{{json .Field}}`. TODO/cli.md T-0801's Prove is that template.
-        // ⚠ It is not a general function call: anything else after a name, and
-        // any other function, is still refused by name below.
-        let (as_json, expr) = match expr.strip_prefix("json ") {
-            Some(inner) => (true, inner.trim()),
-            Option::None => (false, expr),
-        };
-        let Some(name) = expr.strip_prefix('.') else {
-            return Err(Bad::Unsupported(expr.to_string()));
-        };
-        // ⚠ A dot INSIDE the name is allowed and is not a traversal. docker
-        // writes a nested field as `{{.Exec.Shares}}`, and podvm has no object
-        // graph to walk: the whole thing is one registered name, so a name that
-        // is not registered is refused exactly like any other rather than
-        // resolving half of itself. Whitespace and a pipe are still a template
-        // feature podvm does not have.
-        if name.contains(char::is_whitespace) || name.contains('|') {
-            return Err(Bad::Unsupported(expr.to_string()));
+impl Bad {
+    /// The line with no list of the known fields, for a message that names
+    /// two kinds (`inspect` of an image and of a container).
+    pub fn short(&self) -> String {
+        match self {
+            Bad::UnknownField { got, .. } => format!("there is no field {got:?}"),
+            other => other.to_string(),
         }
-        if !known.contains(&name) {
-            return Err(Bad::UnknownField {
-                got: expr.to_string(),
-                known: known.iter().map(|k| format!(".{k}")).collect(),
+    }
+}
+
+/// A field with its JSON type, and the text for `{{.X}}` where it is not the
+/// Go text of the value (`{{.State}}` is the word, and `{{json .State}}` is
+/// docker's object).
+#[derive(Clone, Debug)]
+pub struct Typed {
+    pub json: Value,
+    pub plain: Option<String>,
+}
+
+/// The fields of one row or one document. A registered name can hold dots
+/// (`Exec.Shares`); `.` is the whole object.
+pub struct Data {
+    fields: Vec<(String, Typed)>,
+    root: Value,
+}
+
+impl Data {
+    fn new(fields: Vec<(String, Typed)>) -> Data {
+        let root = nest(&fields);
+        Data { fields, root }
+    }
+
+    /// Fields that are text.
+    pub fn text(fields: &[(&str, String)]) -> Data {
+        Data::documents(fields, &[])
+    }
+
+    /// Fields that are text, and the names of those whose text is a JSON
+    /// document (`{{json .Parity}}` prints it as one).
+    pub fn documents(fields: &[(&str, String)], documents: &[&str]) -> Data {
+        Data::new(
+            fields
+                .iter()
+                .map(|(k, v)| {
+                    let t = if documents.contains(k) {
+                        Typed {
+                            json: serde_json::from_str(v).unwrap_or_else(|_| v.clone().into()),
+                            plain: Some(v.clone()),
+                        }
+                    } else {
+                        Typed {
+                            json: v.clone().into(),
+                            plain: None,
+                        }
+                    };
+                    (k.to_string(), t)
+                })
+                .collect(),
+        )
+    }
+
+    /// Fields with JSON types; `plain` names the text of a field for
+    /// `{{.X}}` where it is not [`go_text`] of its value.
+    pub fn typed(fields: &[(&str, Value)], plain: &[(&str, String)]) -> Data {
+        Data::new(
+            fields
+                .iter()
+                .map(|(k, v)| {
+                    let plain = plain.iter().find(|(p, _)| p == k).map(|(_, t)| t.clone());
+                    (
+                        k.to_string(),
+                        Typed {
+                            json: v.clone(),
+                            plain,
+                        },
+                    )
+                })
+                .collect(),
+        )
+    }
+
+    /// The object of `.`: the verb's own document (`inspect` prints it),
+    /// where the verb has one.
+    pub fn with_root(mut self, root: Value) -> Data {
+        self.root = root;
+        self
+    }
+
+    fn known(&self) -> Vec<&str> {
+        self.fields.iter().map(|(k, _)| k.as_str()).collect()
+    }
+
+    /// The value of `.A.B` at the root: a registered name first (the longest
+    /// that starts the chain), then a key of the object of `.`.
+    fn resolve(&self, chain: &[String]) -> Result<eval::Val, Bad> {
+        let shown = format!(".{}", chain.join("."));
+        if chain.is_empty() {
+            return Ok(eval::Val {
+                json: self.root.clone(),
+                plain: None,
             });
         }
-        // ⛔ One typed value for each field (T-2060): `{{json .X}}` prints the
-        // value as JSON, and `{{.X}}` prints it as Go does (`[a b]`, `map[k:v]`).
-        // A string is quoted under `json` and bare otherwise, and no guess is
-        // made from its first byte.
-        if let Some(t) = value(name) {
-            match (as_json, t.plain) {
-                (false, Some(p)) => out.push_str(&p),
-                (false, Option::None) => out.push_str(&go_text(&t.json)),
-                (true, _) => out.push_str(&t.json.to_string()),
+        for k in (1..=chain.len()).rev() {
+            let name = chain[..k].join(".");
+            if let Some((_, t)) = self.fields.iter().find(|(n, _)| *n == name) {
+                if k == chain.len() {
+                    return Ok(eval::Val {
+                        json: t.json.clone(),
+                        plain: t.plain.clone(),
+                    });
+                }
+                return eval::navigate(&t.json, &chain[k..], &format!(".{name}"))
+                    .map_err(|why| exec(&shown, why));
+            }
+        }
+        if self.root.get(&chain[0]).is_some() {
+            return eval::navigate(&self.root, chain, "").map_err(|why| exec(&shown, why));
+        }
+        Err(unknown(&shown, &self.known()))
+    }
+}
+
+fn exec(action: &str, why: String) -> Bad {
+    Bad::Exec {
+        action: action.to_string(),
+        why,
+    }
+}
+
+fn unknown(got: &str, known: &[&str]) -> Bad {
+    Bad::UnknownField {
+        got: got.to_string(),
+        known: known.iter().map(|k| format!(".{k}")).collect(),
+    }
+}
+
+/// The object of `.` from the fields: `A.B` is the key `B` of the object
+/// `A`. A name under a field that is not an object stays out of it.
+fn nest(fields: &[(String, Typed)]) -> Value {
+    let mut sorted: Vec<&(String, Typed)> = fields.iter().collect();
+    sorted.sort_by_key(|(k, _)| k.matches('.').count());
+    let mut root = serde_json::Map::new();
+    'each: for (k, t) in sorted {
+        let parts: Vec<&str> = k.split('.').collect();
+        let mut at = &mut root;
+        for p in &parts[..parts.len() - 1] {
+            let next = at
+                .entry(p.to_string())
+                .or_insert_with(|| Value::Object(serde_json::Map::new()));
+            match next {
+                Value::Object(o) => at = o,
+                _ => continue 'each,
+            }
+        }
+        at.insert(parts[parts.len() - 1].to_string(), t.json.clone());
+    }
+    Value::Object(root)
+}
+
+/// A parsed template.
+pub struct Template {
+    nodes: Vec<Node>,
+    table: bool,
+    /// `table` alone: the verb's own table.
+    default_table: bool,
+}
+
+impl Template {
+    /// Read `text` as docker's CLI reads it: `json` alone is `{{json .}}`,
+    /// a `table` prefix lays out the rows, and `\t` and `\n` are a tab and a
+    /// new line.
+    pub fn parse(text: &str) -> Result<Template, Bad> {
+        let trimmed = text.trim_matches(' ');
+        if trimmed == "json" {
+            return Ok(Template {
+                nodes: parse::parse("{{json .}}")?,
+                table: false,
+                default_table: false,
+            });
+        }
+        let rest = trimmed.strip_prefix("table");
+        let table = rest.is_some_and(|r| r.is_empty() || r.starts_with(char::is_whitespace));
+        let body = if table {
+            rest.unwrap_or_default().trim_matches(' ')
+        } else {
+            text
+        };
+        let body = body.replace("\\t", "\t").replace("\\n", "\n");
+        Ok(Template {
+            nodes: parse::parse(&body)?,
+            table,
+            default_table: table && body.trim().is_empty(),
+        })
+    }
+
+    /// `table` alone: the caller prints its own table.
+    pub fn is_default_table(&self) -> bool {
+        self.default_table
+    }
+
+    /// Check each field at the root against the verb's names, with no
+    /// record in hand. A field in the body of `range` reads an element and
+    /// is checked when it runs.
+    ///
+    /// ⛔ **Called BEFORE the loop over records.** Measured on 2026-09-08:
+    /// with the template checked only inside the loop, `podvm images --format
+    /// '{{.Nope}}'` against an EMPTY store printed nothing and exited **0**.
+    pub fn check(&self, known: &[&str]) -> Result<(), Bad> {
+        check_nodes(&self.nodes, known)
+    }
+
+    /// One document. `table` is refused here ([`Bad::Table`]).
+    pub fn render(&self, data: &Data) -> Result<String, Bad> {
+        if self.table {
+            return Err(Bad::Table);
+        }
+        let mut run = eval::Run::new(data, None);
+        run.nodes(&self.nodes)?;
+        Ok(run.out)
+    }
+
+    /// Each row on its own line; with `table`, a header first and the
+    /// columns aligned. `headers` gives the column name of a field where it
+    /// is not the words of its name (`ID` of `ps` is `CONTAINER ID`).
+    pub fn render_list(&self, rows: &[Data], headers: &[(&str, &str)]) -> Result<String, Bad> {
+        let mut text = String::new();
+        if self.table {
+            let empty = Data::new(Vec::new());
+            let name = |chain: &[String]| table::header(chain, headers);
+            let mut run = eval::Run::new(&empty, Some(&name));
+            run.nodes(&self.nodes)?;
+            text.push_str(&run.out);
+            text.push('\n');
+        }
+        for d in rows {
+            let mut run = eval::Run::new(d, None);
+            run.nodes(&self.nodes)?;
+            text.push_str(&run.out);
+            text.push('\n');
+            if text.len() > eval::MAX_OUTPUT {
+                return Err(Bad::TooLarge(format!(
+                    "the output of the template is larger than {} bytes",
+                    eval::MAX_OUTPUT
+                )));
+            }
+        }
+        Ok(if self.table {
+            table::align(&text)
+        } else {
+            text
+        })
+    }
+}
+
+fn check_nodes(nodes: &[Node], known: &[&str]) -> Result<(), Bad> {
+    for n in nodes {
+        match n {
+            Node::Text(_) => {}
+            Node::Action(p) => check_pipe(p, known)?,
+            // The body reads the elements: only the pipeline is at the root.
+            Node::Range(p, _) => check_pipe(p, known)?,
+        }
+    }
+    Ok(())
+}
+
+fn check_pipe(p: &Pipe, known: &[&str]) -> Result<(), Bad> {
+    for c in &p.cmds {
+        let args: &[Arg] = match c {
+            Cmd::Call(_, a) => a,
+            Cmd::Operand(a) => std::slice::from_ref(a),
+        };
+        for a in args {
+            match a {
+                Arg::Field(chain) if !chain.is_empty() => {
+                    let full = chain.join(".");
+                    let under =
+                        (1..=chain.len()).any(|k| known.contains(&chain[..k].join(".").as_str()));
+                    let above = known.iter().any(|k| k.starts_with(&format!("{full}.")));
+                    if !under && !above {
+                        return Err(unknown(&format!(".{full}"), known));
+                    }
+                }
+                Arg::Sub(inner) => check_pipe(inner, known)?,
+                _ => {}
             }
         }
     }
+    Ok(())
 }
 
-/// Validate a template against a verb's field names, with no record in hand.
-///
-/// ⛔ **Called BEFORE the loop over records, and that is the whole point.**
-/// Measured on 2026-09-08 by driving the CLI: with the template validated only
-/// inside the loop, `podvm images --format '{{.Nope}}'` against an EMPTY store
-/// never ran the loop, printed nothing and exited **0**. A caller's typo read as
-/// an empty result set, which is the wrong answer that looks like a right one.
+/// Parse and check the template of a list verb (`ps`, `images`): `None`
+/// where there is none, and for `table` alone, which is the verb's own table.
+pub fn list_template(template: Option<&str>, known: &[&str]) -> Result<Option<Template>, Bad> {
+    let Some(text) = template else {
+        return Ok(None);
+    };
+    let t = Template::parse(text)?;
+    t.check(known)?;
+    Ok((!t.is_default_table()).then_some(t))
+}
+
+/// Parse `template` and check it for a verb that prints one document.
 pub fn check(template: &str, known: &[&str]) -> Result<(), Bad> {
-    check_with_documents(template, known, &[])
+    let t = Template::parse(template)?;
+    if t.table {
+        return Err(Bad::Table);
+    }
+    t.check(known)
 }
 
-/// The same, for a verb that has a field whose value is already a JSON
-/// document. ⚠ `documents` is a subset of `known`, never a second list of
-/// names: a name in one and not the other would be a field only one of the two
-/// paths can see.
+/// The same; `documents` names the fields whose text is a JSON document,
+/// a subset of `known`.
 pub fn check_with_documents(
     template: &str,
     known: &[&str],
     _documents: &[&str],
 ) -> Result<(), Bad> {
-    let mut sink = String::new();
-    walk(template, known, |_| None, &mut sink)
+    check(template, known)
 }
 
-/// Expand `{{.Field}}` against `fields`, and the two escapes docker expands in
-/// a format string before the template sees it.
+/// Render `template` against fields that are text.
+#[cfg(test)]
 pub fn render(template: &str, fields: &[(&str, String)]) -> Result<String, Bad> {
-    render_with_documents(template, fields, &[])
+    Template::parse(template)?.render(&Data::text(fields))
 }
 
 /// The same, naming the fields whose values are already JSON documents.
@@ -154,49 +417,28 @@ pub fn render_with_documents(
     fields: &[(&str, String)],
     documents: &[&str],
 ) -> Result<String, Bad> {
-    let known: Vec<&str> = fields.iter().map(|(k, _)| *k).collect();
-    let mut out = String::new();
-    walk(
-        template,
-        &known,
-        |name| {
-            let v = fields.iter().find(|(k, _)| *k == name).map(|(_, v)| v)?;
-            Some(if documents.contains(&name) {
-                // A string that holds a document: `json` prints it as one.
-                Typed {
-                    json: serde_json::from_str(v).unwrap_or_else(|_| v.clone().into()),
-                    plain: Some(v.clone()),
-                }
-            } else {
-                Typed {
-                    json: v.clone().into(),
-                    plain: None,
-                }
-            })
-        },
-        &mut out,
-    )?;
-    Ok(out)
+    Template::parse(template)?.render(&Data::documents(fields, documents))
 }
 
-/// A field with its JSON type, and the text for `{{.X}}` where it is not the
-/// Go text of the value (`{{.State}}` is the word, and `{{json .State}}` is
-/// docker's object).
-pub struct Typed {
-    pub json: serde_json::Value,
-    pub plain: Option<String>,
+/// The same, for a verb whose fields have JSON types.
+#[cfg(test)]
+pub fn render_typed(
+    template: &str,
+    fields: &[(&str, Value)],
+    plain: &[(&str, String)],
+) -> Result<String, Bad> {
+    Template::parse(template)?.render(&Data::typed(fields, plain))
 }
 
 /// The text that Go prints for a value with `{{.X}}`: `[a b]` for a list,
 /// `map[k:v k2:v2]` for a map (keys in order), the number or the word as it
 /// is. A null is a dash (AGENTS.md section 5: an unknown value is a dash).
-pub fn go_text(v: &serde_json::Value) -> String {
-    use serde_json::Value as V;
+pub fn go_text(v: &Value) -> String {
     match v {
-        V::Null => "-".to_string(),
-        V::String(s) => s.clone(),
-        V::Array(a) => format!("[{}]", a.iter().map(go_text).collect::<Vec<_>>().join(" ")),
-        V::Object(o) => {
+        Value::Null => "-".to_string(),
+        Value::String(s) => s.clone(),
+        Value::Array(a) => format!("[{}]", a.iter().map(go_text).collect::<Vec<_>>().join(" ")),
+        Value::Object(o) => {
             let mut keys: Vec<&String> = o.keys().collect();
             keys.sort();
             let items: Vec<String> = keys
@@ -206,134 +448,5 @@ pub fn go_text(v: &serde_json::Value) -> String {
             format!("map[{}]", items.join(" "))
         }
         other => other.to_string(),
-    }
-}
-
-/// The same, for a verb whose fields have JSON types. `plain` names the text
-/// of a field for `{{.X}}` where it is not `go_text` of its value.
-pub fn render_typed(
-    template: &str,
-    fields: &[(&str, serde_json::Value)],
-    plain: &[(&str, String)],
-) -> Result<String, Bad> {
-    let known: Vec<&str> = fields.iter().map(|(k, _)| *k).collect();
-    let mut out = String::new();
-    walk(
-        template,
-        &known,
-        |name| {
-            let json = fields.iter().find(|(k, _)| *k == name)?.1.clone();
-            let plain = plain
-                .iter()
-                .find(|(k, _)| *k == name)
-                .map(|(_, v)| v.clone());
-            Some(Typed { json, plain })
-        },
-        &mut out,
-    )?;
-    Ok(out)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn fields() -> Vec<(&'static str, String)> {
-        vec![
-            ("Repository", "alpine".into()),
-            ("Tag", "latest".into()),
-            ("Digest", "sha256:abc".into()),
-        ]
-    }
-
-    #[test]
-    fn the_acceptance_template_renders_the_digest_and_nothing_else() {
-        // ⭐ TODO/milestones.md T-1102's acceptance is exactly this template.
-        assert_eq!(render("{{.Digest}}", &fields()).unwrap(), "sha256:abc");
-    }
-
-    #[test]
-    fn literal_text_and_several_fields_survive_together() {
-        assert_eq!(
-            render("{{.Repository}}:{{.Tag}} -> {{.Digest}}", &fields()).unwrap(),
-            "alpine:latest -> sha256:abc"
-        );
-        assert_eq!(
-            render("no fields here", &fields()).unwrap(),
-            "no fields here"
-        );
-    }
-
-    #[test]
-    fn the_escapes_docker_expands_are_expanded() {
-        assert_eq!(
-            render("{{.Repository}}\\t{{.Tag}}", &fields()).unwrap(),
-            "alpine\tlatest"
-        );
-    }
-
-    #[test]
-    fn an_unknown_field_is_refused_and_lists_the_known_ones() {
-        // ⛔ Never a blank. A silently empty column is a wrong answer that
-        // looks authoritative.
-        let e = render("{{.Nope}}", &fields()).unwrap_err();
-        let text = format!("{e}");
-        assert!(text.contains(".Nope"), "{text}");
-        assert!(text.contains(".Repository"), "{text}");
-    }
-
-    /// ⭐ TODO/cli.md T-0801's `Prove` is `{{json .Parity}}`, and `json` is the
-    /// one function podvm answers. A field the verb declares a document is
-    /// printed as one; anything else is quoted and escaped.
-    #[test]
-    fn the_one_function_podvm_answers_is_json() {
-        let mut f = fields();
-        f.push(("Parity", "[{\"status\":\"Native\"}]".into()));
-        let docs = ["Parity"];
-        assert_eq!(
-            render_with_documents("{{json .Parity}}", &f, &docs).unwrap(),
-            "[{\"status\":\"Native\"}]"
-        );
-        // ⛔ A plain string under `json` is quoted, so a caller piping into a
-        // parser gets a document either way.
-        assert_eq!(
-            render_with_documents("{{json .Tag}}", &f, &docs).unwrap(),
-            "\"latest\""
-        );
-        // ⚠ And an unknown field is still unknown under `json`.
-        assert!(render_with_documents("{{json .Nope}}", &f, &docs).is_err());
-    }
-
-    #[test]
-    fn a_template_feature_podvm_does_not_have_is_refused_rather_than_guessed() {
-        for bad in [
-            "{{json .}}",
-            "{{.Repository | upper}}",
-            "{{if .Tag}}x{{end}}",
-            "{{upper .Tag}}",
-        ] {
-            assert!(render(bad, &fields()).is_err(), "{bad} was accepted");
-        }
-        assert!(matches!(
-            render("{{.Tag", &fields()).unwrap_err(),
-            Bad::Unterminated
-        ));
-    }
-
-    #[test]
-    fn whitespace_inside_the_braces_is_the_go_spelling_and_is_accepted() {
-        assert_eq!(render("{{ .Tag }}", &fields()).unwrap(), "latest");
-    }
-
-    /// ⭐ TODO/enter.md T-0505's `Prove` is `{{.Exec.Shares}}`. A dotted name is
-    /// ONE registered name here, so an unregistered one is refused rather than
-    /// resolving its first component and rendering a blank.
-    #[test]
-    fn a_dotted_name_is_one_name_and_an_unregistered_one_is_still_refused() {
-        let mut f = fields();
-        f.push(("Exec.Shares", "filesystem".into()));
-        assert_eq!(render("{{.Exec.Shares}}", &f).unwrap(), "filesystem");
-        assert!(render("{{.Exec.Nope}}", &f).is_err());
-        assert!(render("{{.Exec}}", &f).is_err());
     }
 }

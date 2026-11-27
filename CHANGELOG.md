@@ -8,6 +8,23 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: `--format` reads docker's `{{json .}}`, `table`, `range` and `index`, 2026-11-27
+
+Record: T-2087 (OR-B40-15), T-2108 (OR-B42-08).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- `--format` of `ps`, `images`, `inspect` and `system info` reads a part
+  of Go's templates: fields (`.`, `.A.B`), strings, integers, `( )`, `|`,
+  `range` ... `end`, and the functions `json`, `index`, `join`, `upper`,
+  `lower`, `len` and `println`. `{{json .}}` prints the whole row, or the
+  document of plain `inspect`. `ps` and `images` take the `table` prefix
+  (a header and columns aligned as docker aligns them; `table` alone is the
+  default table) and `json` alone. Before, each of these forms was refused
+  with exit 1.
+- `if`, `with`, a variable and each other function are refused by name
+  with one line and exit 1. `inspect` with a template that fits no image
+  and no container names the field that fails for each kind.
+
 ### Fixed: the pty of `-it` is the controlling terminal of the payload of a user, 2026-11-27
 
 Record: T-2070 (OR-B38-17), T-2087 (OR-B40-13).
