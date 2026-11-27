@@ -8,6 +8,29 @@ They describe their recorded revision, not the current build.
 
 ## Unreleased
 
+### Fixed: findings of the outside passes: arguments that are not UTF-8, the least memory of a guest, the banner of `probe`, 2026-11-27
+
+Record: T-2087 (OR-B40-09), T-2108 (OR-B42-04), T-2100 (OR-B41-15),
+T-2070 (OR-B38-10).
+Deployed: not deployed; for the next beta after 0.2.0-beta.41.
+
+- An argument that is not UTF-8 gives one line with its position and
+  its class, and exit 125: a flag, a value or the image name of podvm
+  (`argument 3 ("caf\xe9") is not UTF-8: podvm takes its flags, their
+  values and the image name as UTF-8`), or a word of the payload, which
+  each tier hands to the plan of pod-enter, a UTF-8 text. Before, each
+  had the same line, with `U+FFFD` for each byte. A word of the payload
+  cannot pass as bytes yet.
+- `--podvm-mem` takes 256M or more. A smaller value is refused before
+  the boot with a line that names the minimum ("the machine tier needs
+  at least 256 MiB"); before, `--podvm-mem 64M` gave "the guest ended
+  before it gave the exit code of the payload".
+- The banner of `podvm probe` gives the namespaces, the `pids:` cell and
+  the "does NOT provide" words of a foreground `run` of its caller, as
+  the banner of `run` does, with a line that says so. Before, it said
+  `namespaces: mount-only`, no user or PID isolation and no `/proc` on a
+  host where `run` opens user+pid+uts+mount and a `/proc`.
+
 ### Fixed: each number flag is refused outside its range with one true line, 2026-11-27
 
 Record: T-1947.

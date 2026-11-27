@@ -84,6 +84,8 @@ fn parse_flags_with(
     let mut i = 0;
     while i < args.len() {
         let a = &args[i];
+        let payload = expecting == Some("-e") || o.image.is_some(); // T-2087
+        crate::names::bytes::word(verb, a, crate::names::bytes::Class::of(payload))?;
         if let Some(flag) = expecting.take() {
             match flag {
                 "-e" => o.env.extend(env_arg(verb, a)?),

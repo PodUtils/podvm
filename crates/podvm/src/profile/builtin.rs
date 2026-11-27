@@ -80,7 +80,7 @@ extends = "workspace"
 leaves_out = [
   "Lambda's invocation protocol (the Runtime Interface Emulator)",
   "its 15-minute limit and its network",
-  "memory 128m and pids 1024: no cgroup on a rootfs tier (-s limits.memory=128m with fs.backend = machine)",
+  "memory 128m and pids 1024: no cgroup on a rootfs tier (the machine tier takes -s limits.memory with fs.backend = machine, from 256m)",
   "the size of /tmp (512m; enforced on the syscall tier only)",
 ]
 [fs]

@@ -73,6 +73,9 @@ fn main() -> std::process::ExitCode {
     }
     names::start(); // T-1652 (the native-static rung) and SIGPIPE (T-1769)
     let argv: Vec<String> = names::store::take(names::argv()); // T-1913, #505
+    if let Some(code) = names::bytes::gate(&argv) {
+        return exit(code); // TODO/cli.md T-2087
+    }
     let outer_mnt = podvm_probe::mount_namespace(); // PodUtils/podvm#558: before the entry's own
     userns::enter_if(&argv); // T-1909: before any thread
     if userns::active() || userns::joined() {
@@ -356,7 +359,21 @@ fn probe(args: &[String]) -> i32 {
         print!("{}", report::rows(&findings));
     } else {
         println!("{}", selection.rung.word());
-        let _ = write!(err, "{}", report::evidence(&findings, &selection));
+        // TODO/cli.md T-2070 (OR-B38-10): the parts of a foreground run of
+        // this caller, which took the entry of `run` (T-1713).
+        let facts = podvm_probe::isolation::Facts {
+            userns_active: userns::active(),
+            host_root: userns::host_root(),
+            pid_init: true,
+            hostname: false,
+            proc_dir: true,
+        };
+        let opened = podvm_probe::isolation::of_entry(selection.rung, facts);
+        let _ = write!(
+            err,
+            "{}",
+            report::evidence_of(&findings, &selection, opened)
+        );
     }
 
     let code = selection.exit_code(strictness);

@@ -29,6 +29,9 @@ pub fn take(mut argv: Vec<String>) -> Vec<String> {
         } else {
             continue;
         };
+        if super::bytes::word("", &value, super::bytes::Class::Podvm).is_err() {
+            std::process::exit(podvm_image::error::EXIT_FLAG_ERROR); // T-2087
+        }
         // SAFETY: one thread (the contract of this function).
         unsafe { std::env::set_var("PODVM_STORE", &value) };
         break;

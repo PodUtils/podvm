@@ -29,23 +29,29 @@ use std::time::Duration;
 use podvm_image::error::{EXIT_CLI_ERROR, EXIT_FLAG_ERROR, EXIT_RUNTIME_ERROR};
 
 /// The arguments of podvm. PodUtils/podvm#505: `env::args` panicked on an
-/// argument that is not UTF-8 (exit 134); such an argument is refused by
-/// name with exit 125. The native-static rung entered before this, so the
-/// arguments of a payload there stay bytes.
+/// argument that is not UTF-8 (exit 134). Such an argument is carried as
+/// text ([`bytes::carry`]), and the parser that reads it refuses it with
+/// its position and its class (TODO/cli.md T-2087), exit 125. The
+/// native-static rung entered before this, so the arguments of a payload
+/// there stay bytes.
 pub fn argv() -> Vec<String> {
+    use std::os::unix::ffi::OsStrExt;
     let mut out = Vec::new();
     for (i, a) in std::env::args_os().enumerate() {
-        match a.into_string() {
+        match bytes::carry(a.as_bytes()) {
             Ok(s) => out.push(s),
-            Err(bad) => {
+            Err(c) => {
                 eprintln!(
-                    "podvm: argument {i} ({}) is not UTF-8; podvm takes UTF-8 arguments only",
-                    bad.to_string_lossy()
+                    "podvm: argument {i} ({}) holds U+{:X}, a character that podvm keeps \
+                     for a byte that is not UTF-8 (TODO/cli.md T-2087)",
+                    bytes::shown_bytes(a.as_bytes()),
+                    c as u32
                 );
                 std::process::exit(EXIT_RUNTIME_ERROR);
             }
         }
     }
+    bytes::record(&out);
     out
 }
 
@@ -380,6 +386,7 @@ fn hold_memo_number() {
     }
 }
 
+pub mod bytes; // TODO/cli.md T-2087
 pub mod stdout;
 pub mod store; // TODO/cli.md T-1913
 

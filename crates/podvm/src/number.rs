@@ -49,6 +49,9 @@ pub(crate) struct Rule {
     /// The least and the greatest value, in the unit of [`Kind`].
     pub lo: u64,
     pub hi: u64,
+    /// What needs `lo` (a size), for the line of a value under it: "the
+    /// machine tier needs at least 256 MiB". Empty for each other rule.
+    pub least: &'static str,
 }
 
 /// The largest value of a signed 64-bit count: docker's own bound of a size.
@@ -66,7 +69,14 @@ const fn rule(flag: &'static str, what: &'static str, kind: Kind, lo: u64, hi: u
         kind,
         lo,
         hi,
+        least: "",
     }
+}
+
+/// `r`, whose line of a value under `lo` says that `who` needs it.
+const fn needs(mut r: Rule, who: &'static str) -> Rule {
+    r.least = who;
+    r
 }
 
 /// `run --timeout`: the seconds of the wall bound (TODO/cli.md T-1655).
@@ -82,7 +92,13 @@ pub(crate) static PODVM_TIMEOUT: Rule = rule(
     SECONDS_MAX,
 );
 pub(crate) static PODVM_CPUS: Rule = rule("--podvm-cpus", "a whole number", Kind::Whole, 1, 64);
-pub(crate) static PODVM_MEM: Rule = rule("--podvm-mem", SIZE, Kind::Bytes, 1, I64_MAX);
+/// TODO/cli.md T-2100 (OR-B41-15): 256 MiB is the least memory that a
+/// measured guest booted with (T-1849: `MemTotal` of 256M); 64 MiB ended
+/// the guest before the payload, and 128 MiB is not measured.
+pub(crate) static PODVM_MEM: Rule = needs(
+    rule("--podvm-mem", SIZE, Kind::Bytes, 256 << 20, I64_MAX),
+    "the machine tier",
+);
 pub(crate) static PIDS_LIMIT: Rule = rule(
     "--pids-limit",
     "a count of processes",
@@ -242,6 +258,15 @@ fn value(kind: Kind, raw: &str) -> Result<u64, Edge> {
     }
 }
 
+/// A size of a key of a profile (`limits.file_max`, `limits.memory`): the
+/// spelling of [`Kind::Bytes`], from 1 to [`I64_MAX`]. A flag that the key
+/// becomes checks its own rule (`--podvm-mem`: [`PODVM_MEM`]).
+pub(crate) fn size(raw: &str) -> Option<u64> {
+    value(Kind::Bytes, raw)
+        .ok()
+        .filter(|n| (1..=I64_MAX).contains(n))
+}
+
 /// The value of `raw` under `rule`, or why not.
 pub(crate) fn parse(rule: &Rule, raw: &str) -> Result<u64, Edge> {
     let n = value(rule.kind, raw)?;
@@ -272,6 +297,11 @@ pub(crate) fn line(rule: &Rule, raw: &str, why: Edge) -> String {
     let head = format!("{} takes {} from {lo} to {hi}", rule.flag, rule.what);
     match why {
         Edge::High => format!("{head}, {raw:?} is too large (the bound is {hi})"),
+        Edge::Low if !rule.least.is_empty() => format!(
+            "{head}, not {raw:?}: {} needs at least {} MiB",
+            rule.least,
+            rule.lo >> 20
+        ),
         Edge::Bad | Edge::Low => format!("{head}, not {raw:?}"),
     }
 }
