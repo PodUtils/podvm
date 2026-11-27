@@ -59,7 +59,7 @@ acf6932:docs/HANDOFF.md`. Remove this file when each step below is done.
     (#705) asks pod-guest to take the ext4 and qcow2 writers.
   * The tests that create a container set `PODVM_SPARE_TREE=0`, and the
     guard `crates/podvm/tests/spare_tree_off.rs` holds the class (T-1859).
-* The last gate (45988037109 on `2497a26`) failed in one test,
+* Gate 46003966264 passed on `008686e`. The gate before it (45988037109 on `2497a26`) failed in one test,
   `tty_ctty`: the hosted runner runs `-it` on the userland rung, where the
   shell cannot open `/dev/tty`. The cause was the session, not `/dev/tty`: a shell or a terminal starts podvm as the leader of its group, so its `setsid` failed and the payload stayed in the session of the caller. Merged in `af8abf0`: for `run` and `exec` with `-t` and `-i`, podvm forks once (`run/pty/session.rs`), the child leads a new session with the pty, and the parent relays signals and the exit code (`ps` shows two podvm processes). `tty_ctty` is a table over the rungs, with a row for a host with no user namespace. As root on the namespace rung the payload gets no terminal (job control off, Ctrl-C works) until COORD-188.
 * The hosted proof of T-1998 (kvm 45991827383, #706) did not pass: incusd
@@ -76,7 +76,7 @@ acf6932:docs/HANDOFF.md`. Remove this file when each step below is done.
 
 ## Next steps, in order
 
-1. Request the gate of the head of `main` (the last gate failed before the fix of `tty_ctty`, `af8abf0`), and read it.
+1. The gate is green: 46003966264 passed on `008686e` (#710), with the fix of `tty_ctty` on the userland rung. Request the gate again after each merge.
 2. T-1998: request `kvm.yml` with `-f only=incusvm` again, read the
    `--verbose` lines in the result file (the artifact `incus-vm`), find
    the stage that takes the time (the disk, the qcow2 write or the import),

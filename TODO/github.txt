@@ -599,3 +599,4 @@
 707 pull closed
 708 issue open
 709 issue open
+710 issue closed

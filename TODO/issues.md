@@ -605,6 +605,7 @@ daemon watchers, the role column). It landed on `main` in the merge
 | #706 | [gh action] requested | closed (kvm 45991827383 failed on `a6fa765`: the first `run -d` of experiment 492 gave no line until the bound of 1500 s; T-1998 stays partial) | the hosted proof of T-1998 (`kvm.yml`, `only=incusvm`, experiment 492) on `a6fa765`, after the fix of the script |
 | #708 | COORD-274: pod-hostprobe: the census names the paths of a test fixture in `probe` and `doctor` (to podcrates) | open | T-2100 |
 | #709 | COORD-275: pod-supervise: a list of the containers that needs no lock, so `ps -a` works on a read-only store (to podcrates) | open | T-2070, T-2108 |
+| #710 | [gh action] requested | closed (gate 46003966264 passed on `008686e`) | the gate at the end of the session of 2026-11-27 |
 
 ## Messages whose title does not start with COORD-NNN
 
