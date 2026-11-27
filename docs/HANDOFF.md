@@ -87,6 +87,10 @@ each step below is done.
 
 ## Rules learned
 
+* Run the whole integration suite as uid 1000 after each merge, not only
+  the tests that a worker names: the fix of #547 (`de5e01b`) refused
+  `create` of an image with no `/tmp` mount point, and two tests that the
+  worker did not run (`cp_tree`, `container_prune`) failed on the merge.
 * A worktree under `.claude/worktrees/` gets the interposer objects as
   symlinks (the two build directories of the interposer). Commit
   `5916373` tracked the symlink of the glibc 2.34 build (its ignore rule ended in
