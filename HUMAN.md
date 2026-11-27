@@ -7,8 +7,8 @@
 
 ## Cloud or Linux session
 
-Use [Hosted sessions](docs/hosted-sessions.md) for Claude Code and Codex.
-`AGENTS.md`, section 8, gives the lead's start procedure.
+Use [Hosted sessions](docs/hosted-sessions.md) for Claude Code, Codex, and
+Gemini / Antigravity Cloud. `AGENTS.md`, section 8, gives the lead's start procedure.
 
 ```sh
 sh scripts/cloud-setup.sh

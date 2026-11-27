@@ -3,18 +3,38 @@
 # and checks of podvm. Each step is skipped when its tool is there, so the
 # script can run at the start of each session.
 #
-#   sh scripts/cloud-setup.sh
+#   sh scripts/cloud-setup.sh [--dev-tools]
 #
 # 1. zig from the download procedure shared with scripts/common/bootstrap-env.sh.
 #    Both callers use the same version and SHA-256 pin.
 # 2. Rustup from the Rust distribution when it is absent. Rustup reads
 #    rust-toolchain.toml. scripts/common/bootstrap-env.sh checks the musl
 #    target and sets up cargo-bloat, gcc, the binary tools and OpenSSH.
-# 3. A report of the host facts that podvm's checks depend on. A cloud
+# 3. With --dev-tools, install missing mandoc and shellcheck packages when
+#    root or passwordless sudo apt-get works, and fetch locked crates.
+# 4. A report of the host facts that podvm's checks depend on. A cloud
 #    container is a restricted host of its own kind: record what it allows.
 #
-# Exit codes: 0 ready, 1 a step failed, 2 could not run (not Linux).
+# Exit codes: 0 ready, 1 a step failed, 2 could not run (not Linux), 64 usage.
 set -u
+
+dev_tools=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --dev-tools)
+            dev_tools=1
+            shift
+            ;;
+        -h|--help)
+            sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0
+            ;;
+        *)
+            echo "usage: sh scripts/cloud-setup.sh [--dev-tools]" >&2
+            exit 64
+            ;;
+    esac
+done
 
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/.." && pwd)
@@ -89,6 +109,37 @@ setup_rust() {
     fi
 }
 
+install_dev_tools() {
+    missing=
+    for pkg in mandoc shellcheck; do
+        if ! command -v "$pkg" >/dev/null 2>&1; then
+            missing="$missing $pkg"
+        fi
+    done
+    if [ -n "$missing" ] && command -v apt-get >/dev/null 2>&1; then
+        apt_sudo=none
+        if [ "$(id -u)" = 0 ]; then
+            apt_sudo=
+        elif command -v sudo >/dev/null 2>&1 && sudo -n -E true 2>/dev/null; then
+            apt_sudo="sudo -n -E"
+        elif command -v sudo >/dev/null 2>&1 &&
+            (sudo -n true 2>/dev/null || sudo -n apt-get --version >/dev/null 2>&1); then
+            apt_sudo="sudo -n"
+        fi
+        if [ "$apt_sudo" != none ]; then
+            # shellcheck disable=SC2086
+            DEBIAN_FRONTEND=noninteractive timeout 300 $apt_sudo apt-get update -qq </dev/null &&
+                DEBIAN_FRONTEND=noninteractive timeout 300 $apt_sudo apt-get install -y -qq \
+                    --no-install-recommends $missing </dev/null || rc=1
+        fi
+    fi
+    if command -v cargo >/dev/null 2>&1; then
+        if ! cargo fetch --locked --offline >/dev/null 2>&1 </dev/null; then
+            timeout 300 cargo fetch --locked </dev/null || rc=1
+        fi
+    fi
+}
+
 if setup_rust; then
     bash "$root/scripts/common/bootstrap-env.sh" rust bloat cc tools openssh || rc=1
 else
@@ -97,10 +148,15 @@ else
     rc=1
 fi
 
+if [ "$dev_tools" = 1 ]; then
+    install_dev_tools
+fi
+
 # The host facts. Each line is measured here, not assumed.
 fact() { printf '  %-22s %s\n' "$1" "$2"; }
 echo "cloud-setup: host facts"
 fact "kernel" "$(uname -r)"
+fact "cpus" "$(nproc 2>/dev/null || echo unknown)"
 if [ -e /dev/kvm ]; then fact "/dev/kvm" present; else fact "/dev/kvm" absent; fi
 if [ -e /dev/ptmx ]; then fact "/dev/ptmx" present; else fact "/dev/ptmx" absent; fi
 if [ -e /dev/fuse ]; then fact "/dev/fuse" present; else fact "/dev/fuse" absent; fi

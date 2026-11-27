@@ -4,7 +4,9 @@ Start from the checkout. The current work and its proof are in tracked files.
 
 1. Read [AGENTS.md](../AGENTS.md) and follow section 8. Claude Code starts
    the shared script through its hook. In Codex, run
-   `sh scripts/session-start.sh` from the checkout.
+   `sh scripts/session-start.sh` from the checkout. In Antigravity / Gemini
+   Cloud, `.agents/environment.json` runs the setup and the lead starts
+   both watchers as daemon tasks (`--run-watcher watch` and `--run-watcher runs`).
 2. Read the [handoff](../docs/HANDOFF.md) when it exists, then
    [PROGRESS](PROGRESS.md) and [the owner's decisions](../docs/decisions.md).
    Check recent CI and issues. Use PROGRESS for the work order and
